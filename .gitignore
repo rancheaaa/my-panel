@@ -1,0 +1,49 @@
+# Logs
+logs/
+*.log
+my-panel/logs/
+my-panel/distribution/logs/
+my-panel/my-panel-admin-server/logs/
+
+# Data and H2
+data/
+h2/
+*.db
+*.mv.db
+*.trace.db
+
+# IDE and System
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+**/compiler.xml
+.DS_Store
+Thumbs.db
+
+# Build
+target/
+dist/
+build/
+bin/
+!my-panel/distribution/bin/
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+**/.flattened-pom.xml
+
+# Node / Frontend
+my-panel-ui/node_modules/
+my-panel-ui/dist/
+my-panel-ui/.env.local
+my-panel-ui/.env.development.local
+my-panel-ui/.env.production.local
+my-panel-ui/.env.test.local
+my-panel-ui/npm-debug.log*
+my-panel-ui/yarn-debug.log*
+my-panel-ui/yarn-error.log*
+my-panel-ui/pnpm-debug.log*
+

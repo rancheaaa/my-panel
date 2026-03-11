@@ -1,0 +1,125 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.cq</groupId>
+        <artifactId>my-panel</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <artifactId>distribution</artifactId>
+    <name>my-panel-distribution</name>
+    <packaging>pom</packaging>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>my-panel-admin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>my-panel-${project.version}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>npm-install</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>npm</executable>
+                            <arguments>
+                                <argument>install</argument>
+                            </arguments>
+                            <workingDirectory>../my-panel-ui</workingDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-run-build</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>npm</executable>
+                            <arguments>
+                                <argument>run</argument>
+                                <argument>build</argument>
+                            </arguments>
+                            <workingDirectory>../my-panel-ui</workingDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>download-binaries</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- JDK Linux -->
+                                <available file="jdk/jdk-21-linux.tar.gz" property="jdk-linux-exists"/>
+                                <get src="https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz" 
+                                     dest="jdk/jdk-21-linux.tar.gz" 
+                                     skipexisting="true"
+                                     verbose="true"/>
+                                
+                                <!-- JDK Windows -->
+                                <available file="jdk/jdk-21-windows.zip" property="jdk-windows-exists"/>
+                                <get src="https://download.oracle.com/java/21/latest/jdk-21_windows-x64_bin.zip" 
+                                     dest="jdk/jdk-21-windows.zip" 
+                                     skipexisting="true"
+                                     verbose="true"/>
+
+                                <!-- Nginx Linux -->
+                                <get src="http://nginx.org/download/nginx-1.24.0.tar.gz" 
+                                     dest="nginx/nginx-1.24.0.tar.gz" 
+                                     skipexisting="true"
+                                     verbose="true"/>
+
+                                <!-- Nginx Windows -->
+                                <get src="http://nginx.org/download/nginx-1.24.0.zip" 
+                                     dest="nginx/nginx-1.24.0.zip" 
+                                     skipexisting="true"
+                                     verbose="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.6.0</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/main/assembly/assembly.xml</descriptor>
+                    </descriptors>
+                    <appendAssemblyId>false</appendAssemblyId>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

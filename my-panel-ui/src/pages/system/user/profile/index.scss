@@ -1,0 +1,40 @@
+.box-card {
+    margin-bottom: 20px;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.user-avatar-box {
+    margin-bottom: 20px;
+}
+
+.list-group {
+    padding-left: 0;
+    list-style: none;
+    margin-bottom: 0;
+}
+
+.list-group-item {
+    border-bottom: 1px solid #e7eaec;
+    border-top: 1px solid #e7eaec;
+    margin-bottom: -1px;
+    padding: 11px 0;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.list-group-striped > .list-group-item {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.pull-right {
+    float: right !important;
+    color: #666;
+}

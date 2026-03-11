@@ -1,0 +1,158 @@
+.main-sider {
+  box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);
+  z-index: 10;
+  background: #001529; /* 保持深色背景 */
+}
+
+.logo-container {
+  height: 64px;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  overflow: hidden;
+  transition: all 0.3s;
+  background: #002140; /* Logo区域稍微深一点 */
+}
+
+.logo-icon {
+  font-size: 24px;
+  color: #1890ff;
+  transition: all 0.3s;
+}
+
+.logo-container .logo-text {
+  margin-left: 10px;
+  white-space: nowrap;
+  background: linear-gradient(90deg, #fff, #91caff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Sider Menu Overrides */
+.sider-menu {
+  border-right: 0;
+  background: transparent;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar for Sider Menu */
+.sider-menu::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.sider-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.sider-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sider-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sider-menu .ant-menu-item {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  width: calc(100% - 16px) !important; /* 留出边距 */
+  margin-left: 8px !important;
+}
+
+.sider-menu .ant-menu-submenu-title {
+    margin-top: 4px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    width: calc(100% - 16px) !important;
+    margin-left: 8px !important;
+}
+
+.sider-menu .ant-menu-item-selected {
+  background-color: #1890ff !important;
+  color: #fff !important;
+  box-shadow: 0 4px 10px rgba(24, 144, 255, 0.3);
+}
+
+.main-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  z-index: 9;
+  height: 64px;
+  padding-right: 24px !important; /* Right padding for user info */
+  position: relative; /* Enable absolute positioning for children */
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  /* flex: 1; Remove flex:1 to prevent taking up all space */
+  min-width: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.user-dropdown {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 0 8px;
+  height: 64px;
+  transition: all 0.3s;
+}
+
+.user-dropdown:hover {
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.user-dropdown .username {
+  margin-left: 8px;
+  color: rgba(0, 0, 0, 0.85);
+  font-size: 14px;
+}
+
+.copyright-card {
+    text-align: center;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 14px;
+}
+
+/* NProgress Customization */
+#nprogress {
+  pointer-events: none;
+}
+
+#nprogress .bar {
+  background: #1890ff; /* Ant Design Primary Color */
+  position: fixed;
+  z-index: 1031;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+}
+
+/* Fancy blur effect (the "laser") */
+#nprogress .peg {
+  display: block;
+  position: absolute;
+  right: 0px;
+  width: 100px;
+  height: 100%;
+  box-shadow: 0 0 10px #1890ff, 0 0 5px #1890ff;
+  opacity: 1.0;
+  transform: rotate(3deg) translate(0px, -4px);
+}

@@ -1,0 +1,85 @@
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  background-color: #f0f2f5; /* Global background color */
+}
+
+/* 简单的滚动条样式优化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Global Transition */
+* {
+  transition: background-color 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+/* Card Style Enhancement (Optional, applies to all Antd Cards if used) */
+.ant-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+}
+
+.ant-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Global Table Toolbar */
+.table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* Standard App Container for Pages */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Specific support for Pages using app-container with cards */
+.app-container .search-card {
+    /* No margin needed due to gap, but can enforce if gap not supported */
+    margin-bottom: 0; 
+}
+.app-container .table-card {
+    flex: 1; /* Allow table card to take remaining space */
+    display: flex;
+    flex-direction: column;
+}
+.app-container .table-card .ant-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Global Table Pagination Alignment */
+.ant-table-wrapper .ant-pagination {
+  margin: 16px 0 !important;
+  text-align: right;
+}
+
+/* Global Table Cell Compact Padding (Optional, to match previous SCSS) */
+.app-container .ant-table-cell {
+  padding: 8px 16px !important;
+}

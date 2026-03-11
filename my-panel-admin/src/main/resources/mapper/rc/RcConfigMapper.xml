@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.RcConfigMapper">
+    
+    <resultMap type="RcConfig" id="RcConfigResult">
+        <result property="id"    column="id"    />
+        <result property="envId"    column="env_id"    />
+        <result property="projectId"    column="project_id"    />
+        <result property="configKey"    column="config_key"    />
+        <result property="configValue"    column="config_value"    />
+        <result property="configDesc"    column="config_desc"    />
+        <result property="source"    column="source"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="envName"    column="env_name"    />
+        <result property="projectName"    column="project_name"    />
+    </resultMap>
+
+    <sql id="selectRcConfigVo">
+        select c.id, c.env_id, c.project_id, c.config_key, c.config_value, c.config_desc, c.source, c.create_by, c.create_time, c.update_by, c.update_time,
+               e.env_name, p.project_name
+        from rc_config c
+        left join rc_env e on c.env_id = e.id
+        left join rc_project p on c.project_id = p.id
+    </sql>
+
+    <select id="selectRcConfigList" parameterType="RcConfig" resultMap="RcConfigResult">
+        <include refid="selectRcConfigVo"/>
+        <where>  
+            <if test="envId != null "> and c.env_id = #{envId}</if>
+            <if test="projectId != null "> and c.project_id = #{projectId}</if>
+            <if test="configKey != null  and configKey != ''"> and c.config_key like concat('%', #{configKey}, '%')</if>
+        </where>
+    </select>
+    
+    <select id="selectRcConfigById" parameterType="Long" resultMap="RcConfigResult">
+        <include refid="selectRcConfigVo"/>
+        where c.id = #{id}
+    </select>
+
+    <select id="checkConfigKeyUnique" resultMap="RcConfigResult">
+        select id, env_id, project_id, config_key from rc_config
+        where env_id = #{envId} and project_id = #{projectId} and config_key = #{configKey} limit 1
+    </select>
+        
+    <insert id="insertRcConfig" parameterType="RcConfig" useGeneratedKeys="true" keyProperty="id">
+        insert into rc_config
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="envId != null">env_id,</if>
+            <if test="projectId != null">project_id,</if>
+            <if test="configKey != null and configKey != ''">config_key,</if>
+            <if test="configValue != null">config_value,</if>
+            <if test="configDesc != null">config_desc,</if>
+            <if test="source != null">source,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="envId != null">#{envId},</if>
+            <if test="projectId != null">#{projectId},</if>
+            <if test="configKey != null and configKey != ''">#{configKey},</if>
+            <if test="configValue != null">#{configValue},</if>
+            <if test="configDesc != null">#{configDesc},</if>
+            <if test="source != null">#{source},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateRcConfig" parameterType="RcConfig">
+        update rc_config
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="envId != null">env_id = #{envId},</if>
+            <if test="projectId != null">project_id = #{projectId},</if>
+            <if test="configKey != null and configKey != ''">config_key = #{configKey},</if>
+            <if test="configValue != null">config_value = #{configValue},</if>
+            <if test="configDesc != null">config_desc = #{configDesc},</if>
+            <if test="source != null">source = #{source},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteRcConfigById" parameterType="Long">
+        delete from rc_config where id = #{id}
+    </delete>
+
+    <delete id="deleteRcConfigByIds" parameterType="String">
+        delete from rc_config where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

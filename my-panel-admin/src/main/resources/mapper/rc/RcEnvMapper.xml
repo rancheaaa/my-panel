@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.RcEnvMapper">
+    
+    <resultMap type="RcEnv" id="RcEnvResult">
+        <result property="id"    column="id"    />
+        <result property="envName"    column="env_name"    />
+        <result property="envDesc"    column="env_desc"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectRcEnvVo">
+        select id, env_name, env_desc, create_by, create_time, update_by, update_time from rc_env
+    </sql>
+
+    <select id="selectRcEnvList" parameterType="RcEnv" resultMap="RcEnvResult">
+        <include refid="selectRcEnvVo"/>
+        <where>  
+            <if test="envName != null  and envName != ''"> and env_name like concat('%', #{envName}, '%')</if>
+        </where>
+    </select>
+    
+    <select id="selectRcEnvById" parameterType="Long" resultMap="RcEnvResult">
+        <include refid="selectRcEnvVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="checkEnvNameUnique" parameterType="String" resultMap="RcEnvResult">
+        <include refid="selectRcEnvVo"/>
+        where env_name = #{envName} limit 1
+    </select>
+        
+    <insert id="insertRcEnv" parameterType="RcEnv" useGeneratedKeys="true" keyProperty="id">
+        insert into rc_env
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="envName != null and envName != ''">env_name,</if>
+            <if test="envDesc != null">env_desc,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="envName != null and envName != ''">#{envName},</if>
+            <if test="envDesc != null">#{envDesc},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateRcEnv" parameterType="RcEnv">
+        update rc_env
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="envName != null and envName != ''">env_name = #{envName},</if>
+            <if test="envDesc != null">env_desc = #{envDesc},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteRcEnvById" parameterType="Long">
+        delete from rc_env where id = #{id}
+    </delete>
+
+    <delete id="deleteRcEnvByIds" parameterType="String">
+        delete from rc_env where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

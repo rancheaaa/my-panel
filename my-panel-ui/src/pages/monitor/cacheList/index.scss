@@ -1,0 +1,66 @@
+.cache-list-table {
+  .ant-table-tbody > tr:last-child > td {
+    border-bottom: none !important;
+  }
+  
+  .ant-table-body {
+    overflow-y: auto !important;
+  }
+}
+
+.cache-content-spin {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    
+    :global {
+        .ant-spin-nested-loading {
+            height: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            
+            .ant-spin-container {
+                height: 100%;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+        }
+    }
+}
+
+.flex-1-form-item {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0; /* Important for nested flex containers */
+    
+    :global {
+        .ant-form-item-control {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            
+            .ant-form-item-control-input {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
+
+            .ant-form-item-control-input-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                height: 100%;
+                
+                textarea.ant-input {
+                    height: 100% !important;
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.RcAccessTokenMapper">
+    
+    <resultMap type="RcAccessToken" id="RcAccessTokenResult">
+        <result property="id"    column="id"    />
+        <result property="tokenValue"    column="token_value"    />
+        <result property="tokenDesc"    column="token_desc"    />
+        <result property="status"    column="status"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectRcAccessTokenVo">
+        select id, token_value, token_desc, status, create_by, create_time, update_by, update_time from rc_access_token
+    </sql>
+
+    <select id="selectRcAccessTokenList" parameterType="RcAccessToken" resultMap="RcAccessTokenResult">
+        <include refid="selectRcAccessTokenVo"/>
+        <where>  
+            <if test="tokenValue != null  and tokenValue != ''"> and token_value like concat('%', #{tokenValue}, '%')</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+    </select>
+    
+    <select id="selectRcAccessTokenById" parameterType="Long" resultMap="RcAccessTokenResult">
+        <include refid="selectRcAccessTokenVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="checkTokenValueUnique" parameterType="String" resultMap="RcAccessTokenResult">
+        <include refid="selectRcAccessTokenVo"/>
+        where token_value = #{tokenValue} limit 1
+    </select>
+        
+    <insert id="insertRcAccessToken" parameterType="RcAccessToken" useGeneratedKeys="true" keyProperty="id">
+        insert into rc_access_token
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="tokenValue != null and tokenValue != ''">token_value,</if>
+            <if test="tokenDesc != null">token_desc,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="tokenValue != null and tokenValue != ''">#{tokenValue},</if>
+            <if test="tokenDesc != null">#{tokenDesc},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateRcAccessToken" parameterType="RcAccessToken">
+        update rc_access_token
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="tokenValue != null and tokenValue != ''">token_value = #{tokenValue},</if>
+            <if test="tokenDesc != null">token_desc = #{tokenDesc},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteRcAccessTokenById" parameterType="Long">
+        delete from rc_access_token where id = #{id}
+    </delete>
+
+    <delete id="deleteRcAccessTokenByIds" parameterType="String">
+        delete from rc_access_token where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

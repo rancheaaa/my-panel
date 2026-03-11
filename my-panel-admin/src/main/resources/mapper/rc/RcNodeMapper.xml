@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.RcNodeMapper">
+    
+    <resultMap type="RcNode" id="RcNodeResult">
+        <result property="id"    column="id"    />
+        <result property="envId"    column="env_id"    />
+        <result property="projectId"    column="project_id"    />
+        <result property="nodeIp"    column="node_ip"    />
+        <result property="nodePort"    column="node_port"    />
+        <result property="status"    column="status"    />
+        <result property="lastRefreshTime"    column="last_refresh_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="envName"    column="env_name"    />
+        <result property="projectName"    column="project_name"    />
+    </resultMap>
+
+    <sql id="selectRcNodeVo">
+        select n.id, n.env_id, n.project_id, n.node_ip, n.node_port, n.status, n.last_refresh_time, n.create_by, n.create_time, n.update_by, n.update_time,
+               e.env_name, p.project_name
+        from rc_node n
+        left join rc_env e on n.env_id = e.id
+        left join rc_project p on n.project_id = p.id
+    </sql>
+
+    <select id="selectRcNodeList" parameterType="RcNode" resultMap="RcNodeResult">
+        <include refid="selectRcNodeVo"/>
+        <where>  
+            <if test="envId != null "> and n.env_id = #{envId}</if>
+            <if test="projectId != null "> and n.project_id = #{projectId}</if>
+            <if test="nodeIp != null  and nodeIp != ''"> and n.node_ip like concat('%', #{nodeIp}, '%')</if>
+            <if test="status != null  and status != ''"> and n.status = #{status}</if>
+        </where>
+    </select>
+    
+    <select id="selectRcNodeById" parameterType="Long" resultMap="RcNodeResult">
+        <include refid="selectRcNodeVo"/>
+        where n.id = #{id}
+    </select>
+        
+    <insert id="insertRcNode" parameterType="RcNode" useGeneratedKeys="true" keyProperty="id">
+        insert into rc_node
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="envId != null">env_id,</if>
+            <if test="projectId != null">project_id,</if>
+            <if test="nodeIp != null and nodeIp != ''">node_ip,</if>
+            <if test="nodePort != null">node_port,</if>
+            <if test="status != null">status,</if>
+            <if test="lastRefreshTime != null">last_refresh_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="envId != null">#{envId},</if>
+            <if test="projectId != null">#{projectId},</if>
+            <if test="nodeIp != null and nodeIp != ''">#{nodeIp},</if>
+            <if test="nodePort != null">#{nodePort},</if>
+            <if test="status != null">#{status},</if>
+            <if test="lastRefreshTime != null">#{lastRefreshTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateRcNode" parameterType="RcNode">
+        update rc_node
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="envId != null">env_id = #{envId},</if>
+            <if test="projectId != null">project_id = #{projectId},</if>
+            <if test="nodeIp != null and nodeIp != ''">node_ip = #{nodeIp},</if>
+            <if test="nodePort != null">node_port = #{nodePort},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="lastRefreshTime != null">last_refresh_time = #{lastRefreshTime},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteRcNodeById" parameterType="Long">
+        delete from rc_node where id = #{id}
+    </delete>
+
+    <delete id="deleteRcNodeByIds" parameterType="String">
+        delete from rc_node where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="checkNodeUnique" parameterType="RcNode" resultMap="RcNodeResult">
+        <include refid="selectRcNodeVo"/>
+        where n.env_id = #{envId} and n.project_id = #{projectId} and n.node_ip = #{nodeIp} and n.node_port = #{nodePort}
+        limit 1
+    </select>
+
+    <update id="updateNodeOfflineByTimeout" parameterType="Integer">
+        update rc_node
+        set status = '1', update_time = now()
+        where status = '0' 
+        and TIMESTAMPDIFF(SECOND, last_refresh_time, now()) &gt; #{timeoutSeconds}
+    </update>
+</mapper>

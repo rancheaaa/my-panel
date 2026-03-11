@@ -1,0 +1,110 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.1.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.1.0 http://maven.apache.org/xsd/assembly-2.1.0.xsd">
+    <id>bin</id>
+    <formats>
+        <format>zip</format>
+        <format>tar.gz</format>
+        <format>dir</format>
+    </formats>
+    <includeBaseDirectory>true</includeBaseDirectory>
+    
+    <dependencySets>
+        <dependencySet>
+            <useProjectArtifact>false</useProjectArtifact>
+            <outputDirectory>libs</outputDirectory>
+            <scope>runtime</scope>
+            <includes>
+                <include>com.cq:my-panel-admin-server</include>
+            </includes>
+        </dependencySet>
+    </dependencySets>
+
+    <fileSets>
+        <!-- bin -->
+        <fileSet>
+            <directory>${project.basedir}/bin</directory>
+            <outputDirectory>bin</outputDirectory>
+            <fileMode>0755</fileMode>
+            <lineEnding>unix</lineEnding>
+            <includes>
+                <include>*.sh</include>
+            </includes>
+        </fileSet>
+        <fileSet>
+            <directory>${project.basedir}/bin</directory>
+            <outputDirectory>bin</outputDirectory>
+            <fileMode>0644</fileMode>
+            <lineEnding>dos</lineEnding>
+            <includes>
+                <include>*.bat</include>
+                <include>README.md</include>
+            </includes>
+        </fileSet>
+
+        <!-- config: copy from server resources -->
+        <fileSet>
+            <directory>../my-panel-admin-server/src/main/resources</directory>
+            <outputDirectory>config</outputDirectory>
+            <includes>
+                <include>application*.yml</include>
+                <include>logback.xml</include>
+                <include>banner.txt</include>
+            </includes>
+        </fileSet>
+        <!-- also include README from distribution/config if exists -->
+        <fileSet>
+            <directory>${project.basedir}/config</directory>
+            <outputDirectory>config</outputDirectory>
+            <includes>
+                <include>*</include>
+            </includes>
+        </fileSet>
+
+        <!-- jdk -->
+        <fileSet>
+            <directory>${project.basedir}/jdk</directory>
+            <outputDirectory>jdk</outputDirectory>
+        </fileSet>
+
+        <!-- logs (empty placeholder) -->
+        <fileSet>
+            <directory>${project.basedir}/logs</directory>
+            <outputDirectory>logs</outputDirectory>
+        </fileSet>
+
+        <!-- nginx -->
+        <fileSet>
+            <directory>${project.basedir}/nginx</directory>
+            <outputDirectory>nginx</outputDirectory>
+        </fileSet>
+
+        <!-- pages -->
+        <fileSet>
+            <directory>../../my-panel-ui/dist</directory>
+            <outputDirectory>pages</outputDirectory>
+        </fileSet>
+
+        <!-- tools -->
+        <fileSet>
+            <directory>${project.basedir}/tools</directory>
+            <outputDirectory>tools</outputDirectory>
+            <fileMode>0755</fileMode>
+            <lineEnding>unix</lineEnding>
+            <includes>
+                <include>*.sh</include>
+            </includes>
+        </fileSet>
+        <fileSet>
+            <directory>${project.basedir}/tools</directory>
+            <outputDirectory>tools</outputDirectory>
+            <fileMode>0644</fileMode>
+            <lineEnding>dos</lineEnding>
+            <includes>
+                <include>*.bat</include>
+                <include>*.txt</include>
+                <include>*.md</include>
+            </includes>
+        </fileSet>
+    </fileSets>
+</assembly>

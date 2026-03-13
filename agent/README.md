@@ -205,7 +205,7 @@ upload.session.timeout.minutes=60
   - 负责分片上传会话管理、分片落盘与合并、分片下载
 - [UploadSession](file:///e:/java-project2/my-panel/agent/src/main/java/com/cq/agent/model/UploadSession.java)
   - 上传会话模型，记录：
-    - `sessionId`、`targetPath`、`fileName`
+    - `transferId`、`targetPath`、`fileName`
     - `totalSize`、`totalChunks`、`chunkSize`
     - 已收到分片集合 `receivedChunks`
     - 进度、创建时间、最后访问时间、是否已合并、checksum 等
@@ -220,6 +220,8 @@ upload.session.timeout.minutes=60
 - `GET  /api/file/chunk/status`
 - `POST /api/file/chunk/cancel`
 - `GET  /api/file/chunk/sessions`
+- `GET  /api/file/chunk/download/info`
+- `GET  /api/file/chunk/download`
 
 ### 上传流程
 
@@ -236,7 +238,8 @@ Content-Type: application/json
 {
   "targetPath": "/path/to/save/big-file.dat",
   "fileName": "big-file.dat",
-  "totalSize": 10737418240
+  "totalSize": 10737418240,
+  "transferId": "abcdef123456..."
 }
 ```
 
@@ -246,7 +249,7 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "sessionId": "abcdef123456...",
+    "transferId": "abcdef123456...",
     "targetPath": "/path/to/save/big-file.dat",
     "fileName": "big-file.dat",
     "totalSize": 10737418240,
@@ -262,7 +265,7 @@ Content-Type: application/json
 
 说明：
 - `totalChunks` 和 `chunkSize` 由服务端根据 `totalSize` 和配置计算
-- `sessionId` 为后续上传的关键标识
+- `transferId` 为后续上传的关键标识，可由客户端生成（如文件MD5）以支持断点续传，若不传则服务端随机生成。
 
 #### 2. 按分片上传内容
 
@@ -273,7 +276,7 @@ POST /api/file/chunk/upload
 Content-Type: application/json
 
 {
-  "sessionId": "abcdef123456...",
+  "transferId": "abcdef123456...",
   "chunkIndex": 0,
   "content": "BASE64_DATA",
   "encoding": "base64"
@@ -291,7 +294,7 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "sessionId": "abcdef123456...",
+    "transferId": "abcdef123456...",
     "chunkIndex": 0,
     "received": 1,
     "total": 2560,
@@ -306,7 +309,7 @@ Content-Type: application/json
 当上传中断或客户端需要恢复时，调用：
 
 ```http
-GET /api/file/chunk/status?sessionId=abcdef123456...
+GET /api/file/chunk/status?transferId=abcdef123456...
 ```
 
 返回数据来自 `UploadSession.toMap()`，其中最关键字段：
@@ -324,7 +327,7 @@ GET /api/file/chunk/status?sessionId=abcdef123456...
 POST /api/file/chunk/merge
 Content-Type: application/json
 
-{ "sessionId": "abcdef123456..." }
+{ "transferId": "abcdef123456..." }
 ```
 
 服务端行为：
@@ -355,14 +358,47 @@ Content-Type: application/json
 POST /api/file/chunk/cancel
 Content-Type: application/json
 
-{ "sessionId": "abcdef123456..." }
+{ "transferId": "abcdef123456..." }
 ```
 
 服务端会：
 - 从 `uploadSessions` 中移除会话
 - 删除该会话临时目录及其中所有 `chunk_*` 文件
 
-#### 6. 会话自动清理
+#### 6. 查询所有活跃会话
+
+获取当前所有未过期且未被显式取消的上传会话列表：
+
+```http
+GET /api/file/chunk/sessions
+```
+
+返回（示例）：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "transferId": "abcdef123456...",
+      "targetPath": "/path/to/save/big-file.dat",
+      "fileName": "big-file.dat",
+      "totalSize": 10737418240,
+      "totalChunks": 2560,
+      "chunkSize": 4194304,
+      "receivedChunks": 100,
+      "missingChunks": [101, 102, ...],
+      "progress": "3.91%",
+      "completed": false,
+      "merged": false,
+      "createTime": 1678600000000,
+      "lastAccessTime": 1678600500000
+    }
+  ]
+}
+```
+
+#### 7. 会话自动清理
 
 后台存在一个定时任务：
 - 周期：每 5 分钟执行一次
@@ -504,7 +540,7 @@ GET /api/file/retr-raw?path=/path/to/file&start=0&length=1048576
   - 不在 Agent 内引入业务逻辑，只做通用能力
 
 - 上传大文件：
-  - 前端先调用 `/api/file/chunk/init` 获取 `sessionId` 与 `chunkSize`
+  - 前端先调用 `/api/file/chunk/init` 获取 `transferId` 与 `chunkSize`
   - 使用 `chunkSize` 对文件分片，循环调用 `/api/file/chunk/upload`
   - 支持中途断线后，通过 `/api/file/chunk/status` 查询 `missingChunks` 再续传
   - 成功后调用 `/api/file/chunk/merge` 完成合并

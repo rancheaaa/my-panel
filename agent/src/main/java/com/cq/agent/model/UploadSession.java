@@ -1,5 +1,7 @@
 package com.cq.agent.model;
 
+import com.google.gson.Gson;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -9,7 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class UploadSession {
 
-    private final String sessionId;
+    private static final Gson gson = new Gson();
+
+    private final String transferId;
     private final String targetPath;
     private final String fileName;
     private final long totalSize;
@@ -23,9 +27,9 @@ public class UploadSession {
     private volatile boolean merged;
     private String checksum;
 
-    public UploadSession(String sessionId, String targetPath, String fileName,
+    public UploadSession(String transferId, String targetPath, String fileName,
                          long totalSize, int totalChunks, int chunkSize, String tempDirectory) {
-        this.sessionId = sessionId;
+        this.transferId = transferId;
         this.targetPath = targetPath;
         this.fileName = fileName;
         this.totalSize = totalSize;
@@ -39,8 +43,8 @@ public class UploadSession {
         this.merged = false;
     }
 
-    public String getSessionId() {
-        return sessionId;
+    public String getTransferId() {
+        return transferId;
     }
 
     public String getTargetPath() {
@@ -91,6 +95,12 @@ public class UploadSession {
         }
     }
 
+    public void removeChunk(int chunkIndex) {
+        receivedChunks.remove(chunkIndex);
+        completed = false;
+        updateLastAccessTime();
+    }
+
     public boolean isChunkReceived(int chunkIndex) {
         return receivedChunks.contains(chunkIndex);
     }
@@ -137,9 +147,31 @@ public class UploadSession {
         return System.currentTimeMillis() - lastAccessTime > timeoutMs;
     }
 
+    public String toJson() {
+        return gson.toJson(this);
+    }
+
+    public static UploadSession fromJson(String json) {
+        UploadSession session = gson.fromJson(json, UploadSession.class);
+        // Ensure receivedChunks is thread-safe after deserialization
+        if (session != null && !(session.receivedChunks instanceof ConcurrentHashMap.KeySetView)) {
+            Set<Integer> safeSet = ConcurrentHashMap.newKeySet();
+            safeSet.addAll(session.receivedChunks);
+            try {
+                java.lang.reflect.Field field = UploadSession.class.getDeclaredField("receivedChunks");
+                field.setAccessible(true);
+                field.set(session, safeSet);
+            } catch (Exception e) {
+                // Fallback to synchronized set if reflection fails
+                System.err.println("Failed to set thread-safe set via reflection: " + e.getMessage());
+            }
+        }
+        return session;
+    }
+
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("sessionId", sessionId);
+        map.put("transferId", transferId);
         map.put("targetPath", targetPath);
         map.put("fileName", fileName);
         map.put("totalSize", totalSize);

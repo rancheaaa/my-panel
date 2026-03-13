@@ -546,12 +546,13 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             JsonObject body = parseJsonBody(request);
             String targetPath = getJsonString(body, "targetPath");
             String fileName = getJsonString(body, "fileName");
+            String transferId = getJsonString(body, "transferId"); // Optional
             if (targetPath == null || fileName == null || !body.has("totalSize")) {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'targetPath', 'fileName' and 'totalSize' fields are required"));
                 return;
             }
             long totalSize = body.get("totalSize").getAsLong();
-            ServiceResult<UploadSession> result = chunkedTransferService.initUpload(targetPath, fileName, totalSize);
+            ServiceResult<UploadSession> result = chunkedTransferService.initUpload(transferId, targetPath, fileName, totalSize);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -561,9 +562,9 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
     private void handleChunkUpload(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
             JsonObject body = parseJsonBody(request);
-            String sessionId = getJsonString(body, "sessionId");
-            if (sessionId == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'sessionId' field is required"));
+            String transferId = getJsonString(body, "transferId");
+            if (transferId == null) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
             if (!body.has("chunkIndex")) {
@@ -586,7 +587,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 return;
             }
 
-            ServiceResult<Map<String, Object>> result = chunkedTransferService.uploadChunk(sessionId, chunkIndex, content);
+            ServiceResult<Map<String, Object>> result = chunkedTransferService.uploadChunk(transferId, chunkIndex, content);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -596,12 +597,12 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
     private void handleChunkMerge(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
             JsonObject body = parseJsonBody(request);
-            String sessionId = getJsonString(body, "sessionId");
-            if (sessionId == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'sessionId' field is required"));
+            String transferId = getJsonString(body, "transferId");
+            if (transferId == null) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
-            ServiceResult<FileInfo> result = chunkedTransferService.mergeChunks(sessionId);
+            ServiceResult<FileInfo> result = chunkedTransferService.mergeChunks(transferId);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -609,24 +610,24 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
     }
 
     private void handleChunkStatus(ChannelHandlerContext ctx, FullHttpRequest request) {
-        String sessionId = getQueryParam(request, "sessionId", null);
-        if (sessionId == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'sessionId' parameter is required"));
+        String transferId = getQueryParam(request, "transferId", null);
+        if (transferId == null) {
+            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' parameter is required"));
             return;
         }
-        ServiceResult<Map<String, Object>> result = chunkedTransferService.getUploadStatus(sessionId);
+        ServiceResult<Map<String, Object>> result = chunkedTransferService.getUploadStatus(transferId);
         sendServiceResult(ctx, result);
     }
 
     private void handleChunkCancel(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
             JsonObject body = parseJsonBody(request);
-            String sessionId = getJsonString(body, "sessionId");
-            if (sessionId == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'sessionId' field is required"));
+            String transferId = getJsonString(body, "transferId");
+            if (transferId == null) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
-            ServiceResult<Void> result = chunkedTransferService.cancelUpload(sessionId);
+            ServiceResult<Void> result = chunkedTransferService.cancelUpload(transferId);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));

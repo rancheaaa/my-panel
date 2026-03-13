@@ -58,6 +58,7 @@
         try {
             Files.createDirectories(tempDirectory);
             logger.info("Chunked transfer service initialized. Temp dir: {}", tempDirectory);
+            loadExistingSessions();
         } catch (IOException e) {
             logger.error("Failed to create temp directory: {}", tempDirectory, e);
         }
@@ -70,7 +71,7 @@
         cleanupExecutor.scheduleAtFixedRate(this::cleanupExpiredSessions, 5, 5, TimeUnit.MINUTES);
     }
 
-    public FileService.ServiceResult<UploadSession> initUpload(String targetPath, String fileName, long totalSize) {
+    public FileService.ServiceResult<UploadSession> initUpload(String transferId, String targetPath, String fileName, long totalSize) {
         try {
             if (totalSize <= 0) {
                 return FileService.ServiceResult.error("Invalid file size");
@@ -84,15 +85,30 @@
             // Calculate chunks
             int totalChunks = (int) Math.ceil((double) totalSize / defaultChunkSize);
 
-            // Generate session ID
-            String sessionId = UUID.randomUUID().toString().replace("-", "");
+            // Use provided transferId or generate one if missing
+            String finalTransferId = (transferId != null && !transferId.isEmpty()) 
+                    ? transferId 
+                    : UUID.randomUUID().toString().replace("-", "");
+
+            // Check if session already exists for this transferId
+            if (uploadSessions.containsKey(finalTransferId)) {
+                UploadSession existing = uploadSessions.get(finalTransferId);
+                // Verify if it's the same file
+                if (existing.getTargetPath().equals(resolvedPath.toString()) && existing.getTotalSize() == totalSize) {
+                    logger.info("Resuming existing upload session for transferId: {}", finalTransferId);
+                    verifySession(existing);
+                    return FileService.ServiceResult.success(existing);
+                } else {
+                    return FileService.ServiceResult.error("transferId conflict: another file is being uploaded with the same ID");
+                }
+            }
 
             // Create session temp directory
-            Path sessionTempDir = tempDirectory.resolve(sessionId);
+            Path sessionTempDir = tempDirectory.resolve(finalTransferId);
             Files.createDirectories(sessionTempDir);
 
             UploadSession session = new UploadSession(
-                    sessionId,
+                    finalTransferId,
                     resolvedPath.toString(),
                     fileName,
                     totalSize,
@@ -101,9 +117,10 @@
                     sessionTempDir.toString()
             );
 
-            uploadSessions.put(sessionId, session);
+            uploadSessions.put(finalTransferId, session);
+            saveSession(session);
             logger.info("Upload session created: {}, file: {}, size: {}, chunks: {}",
-                    sessionId, fileName, totalSize, totalChunks);
+                    finalTransferId, fileName, totalSize, totalChunks);
 
             return FileService.ServiceResult.success(session);
         } catch (SecurityException e) {
@@ -114,10 +131,10 @@
         }
     }
 
-    public FileService.ServiceResult<Map<String, Object>> uploadChunk(String sessionId, int chunkIndex, byte[] data) {
-        UploadSession session = uploadSessions.get(sessionId);
+    public FileService.ServiceResult<Map<String, Object>> uploadChunk(String transferId, int chunkIndex, byte[] data) {
+        UploadSession session = uploadSessions.get(transferId);
         if (session == null) {
-            return FileService.ServiceResult.error("Upload session not found: " + sessionId);
+            return FileService.ServiceResult.error("Upload session not found: " + transferId);
         }
 
         if (session.isMerged()) {
@@ -143,10 +160,11 @@
             Files.write(chunkFile, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
             session.markChunkReceived(chunkIndex);
-            logger.debug("Chunk {} received for session {}", chunkIndex, sessionId);
+            saveSession(session);
+            logger.debug("Chunk {} received for session {}", chunkIndex, transferId);
 
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("sessionId", sessionId);
+            result.put("transferId", transferId);
             result.put("chunkIndex", chunkIndex);
             result.put("received", session.getReceivedChunkCount());
             result.put("total", session.getTotalChunks());
@@ -155,15 +173,15 @@
 
             return FileService.ServiceResult.success(result);
         } catch (IOException e) {
-            logger.error("Failed to write chunk {} for session {}", chunkIndex, sessionId, e);
+            logger.error("Failed to write chunk {} for session {}", chunkIndex, transferId, e);
             return FileService.ServiceResult.error("Failed to write chunk: " + e.getMessage());
         }
     }
 
-    public FileService.ServiceResult<FileInfo> mergeChunks(String sessionId) {
-        UploadSession session = uploadSessions.get(sessionId);
+    public FileService.ServiceResult<FileInfo> mergeChunks(String transferId) {
+        UploadSession session = uploadSessions.get(transferId);
         if (session == null) {
-            return FileService.ServiceResult.error("Upload session not found: " + sessionId);
+            return FileService.ServiceResult.error("Upload session not found: " + transferId);
         }
 
         if (!session.isCompleted()) {
@@ -205,7 +223,7 @@
             }
 
             session.setMerged(true);
-            logger.info("Chunks merged for session {}: {}", sessionId, targetPath);
+            logger.info("Chunks merged for session {}: {}", transferId, targetPath);
 
             // Cleanup temp files
             cleanupSessionTempFiles(session);
@@ -214,27 +232,101 @@
         } catch (NoSuchAlgorithmException e) {
             return FileService.ServiceResult.error("MD5 algorithm not available");
         } catch (IOException e) {
-            logger.error("Failed to merge chunks for session {}", sessionId, e);
+            logger.error("Failed to merge chunks for session {}", transferId, e);
             return FileService.ServiceResult.error("Failed to merge chunks: " + e.getMessage());
         }
     }
 
-    public FileService.ServiceResult<Map<String, Object>> getUploadStatus(String sessionId) {
-        UploadSession session = uploadSessions.get(sessionId);
+    public FileService.ServiceResult<Map<String, Object>> getUploadStatus(String transferId) {
+        UploadSession session = uploadSessions.get(transferId);
         if (session == null) {
-            return FileService.ServiceResult.error("Upload session not found: " + sessionId);
+            return FileService.ServiceResult.error("Upload session not found: " + transferId);
         }
+        verifySession(session);
         return FileService.ServiceResult.success(session.toMap());
     }
 
-    public FileService.ServiceResult<Void> cancelUpload(String sessionId) {
-        UploadSession session = uploadSessions.remove(sessionId);
+    private void saveSession(UploadSession session) {
+        try {
+            Path sessionFile = Path.of(session.getTempDirectory(), "session.json");
+            Files.writeString(sessionFile, session.toJson(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e) {
+            logger.warn("Failed to save session state for {}: {}", session.getTransferId(), e.getMessage());
+        }
+    }
+
+    private void loadExistingSessions() {
+        if (!Files.exists(tempDirectory)) return;
+        try (var stream = Files.list(tempDirectory)) {
+            stream.filter(Files::isDirectory).forEach(dir -> {
+                Path sessionFile = dir.resolve("session.json");
+                if (Files.exists(sessionFile)) {
+                    try {
+                        String json = Files.readString(sessionFile);
+                        UploadSession session = UploadSession.fromJson(json);
+                        if (session != null) {
+                            verifySession(session);
+                            uploadSessions.put(session.getTransferId(), session);
+                            logger.info("Restored upload session: {}", session.getTransferId());
+                        }
+                    } catch (IOException e) {
+                        logger.warn("Failed to load session from {}: {}", sessionFile, e.getMessage());
+                    }
+                }
+            });
+        } catch (IOException e) {
+            logger.warn("Failed to list sessions directory: {}", e.getMessage());
+        }
+    }
+
+    private void verifySession(UploadSession session) {
+        boolean changed = false;
+        List<Integer> corruptedChunks = new ArrayList<>();
+
+        for (int chunkIndex : session.getReceivedChunks()) {
+            Path chunkFile = Path.of(session.getTempDirectory(), "chunk_" + chunkIndex);
+            if (!Files.exists(chunkFile)) {
+                corruptedChunks.add(chunkIndex);
+                continue;
+            }
+
+            try {
+                long actualSize = Files.size(chunkFile);
+                long expectedSize = chunkIndex == session.getTotalChunks() - 1
+                        ? (int) (session.getTotalSize() - (long) chunkIndex * session.getChunkSize())
+                        : session.getChunkSize();
+
+                if (actualSize != expectedSize) {
+                    logger.warn("Corrupted chunk detected: session={}, chunk={}, expected size={}, actual size={}",
+                            session.getTransferId(), chunkIndex, expectedSize, actualSize);
+                    Files.deleteIfExists(chunkFile);
+                    corruptedChunks.add(chunkIndex);
+                }
+            } catch (IOException e) {
+                logger.warn("Failed to verify chunk file {}: {}", chunkFile, e.getMessage());
+                corruptedChunks.add(chunkIndex);
+            }
+        }
+
+        if (!corruptedChunks.isEmpty()) {
+            // Remove corrupted chunks from session
+            corruptedChunks.forEach(session::removeChunk);
+            changed = true;
+        }
+
+        if (changed) {
+            saveSession(session);
+        }
+    }
+
+    public FileService.ServiceResult<Void> cancelUpload(String transferId) {
+        UploadSession session = uploadSessions.remove(transferId);
         if (session == null) {
-            return FileService.ServiceResult.error("Upload session not found: " + sessionId);
+            return FileService.ServiceResult.error("Upload session not found: " + transferId);
         }
 
         cleanupSessionTempFiles(session);
-        logger.info("Upload session cancelled: {}", sessionId);
+        logger.info("Upload session cancelled: {}", transferId);
         return FileService.ServiceResult.success(null);
     }
 
@@ -326,11 +418,11 @@
             }
         }
 
-        for (String sessionId : expiredIds) {
-            UploadSession session = uploadSessions.remove(sessionId);
+        for (String transferId : expiredIds) {
+            UploadSession session = uploadSessions.remove(transferId);
             if (session != null) {
                 cleanupSessionTempFiles(session);
-                logger.info("Expired upload session cleaned up: {}", sessionId);
+                logger.info("Expired upload session cleaned up: {}", transferId);
             }
         }
     }
@@ -350,7 +442,7 @@
                         });
             }
         } catch (IOException e) {
-            logger.warn("Failed to cleanup session temp files: {}", session.getSessionId(), e);
+            logger.warn("Failed to cleanup session temp files: {}", session.getTransferId(), e);
         }
     }
 

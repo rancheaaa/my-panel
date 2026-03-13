@@ -45,6 +45,12 @@
     <!-- 依赖声明 -->
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>my-panel-admin</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
 
             <!-- SpringBoot的依赖配置-->
             <dependency>

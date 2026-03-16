@@ -1,8 +1,12 @@
 package com.cq.agent.handler;
 
+import com.cq.agent.dto.ApiCode;
+import com.cq.agent.dto.ApiResponse;
+import com.cq.agent.dto.ExecuteRequest;
+import com.cq.agent.dto.ExecuteResponse;
+import com.cq.agent.dto.HealthResponse;
 import com.cq.agent.executor.CommandExecutor;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -12,7 +16,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -54,13 +57,13 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private void handleHealthCheck(ChannelHandlerContext ctx) {
-        JsonObject response = new JsonObject();
-        response.addProperty("status", "UP");
-        response.addProperty("os", commandExecutor.getOsName());
-        response.addProperty("osType", commandExecutor.isWindows() ? "windows" : "unix");
-        response.addProperty("defaultTimeout", commandExecutor.getDefaultTimeoutSeconds());
-        response.addProperty("maxTimeout", commandExecutor.getMaxTimeoutSeconds());
-        sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(response));
+        HealthResponse resp = new HealthResponse();
+        resp.setStatus("UP");
+        resp.setOs(commandExecutor.getOsName());
+        resp.setOsType(commandExecutor.isWindows() ? "windows" : "unix");
+        resp.setDefaultTimeout(commandExecutor.getDefaultTimeoutSeconds());
+        resp.setMaxTimeout(commandExecutor.getMaxTimeoutSeconds());
+        sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(resp));
     }
 
     private void handleExecute(ChannelHandlerContext ctx, FullHttpRequest request) {
@@ -74,47 +77,37 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
 
         try {
-            JsonObject requestJson = gson.fromJson(body, JsonObject.class);
-
-            if (!requestJson.has("command") || requestJson.get("command").isJsonNull()) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'command' field is required"));
+            ExecuteRequest requestJson = gson.fromJson(body, ExecuteRequest.class);
+            if (requestJson == null || requestJson.getCommand() == null || requestJson.getCommand().isBlank()) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST.getCode(), "'command' field is required"));
                 return;
             }
 
-            String command = requestJson.get("command").getAsString();
-
-            // Use default timeout from config if not specified in request
             long timeout;
-            if (requestJson.has("timeout") && !requestJson.get("timeout").isJsonNull()) {
-                timeout = requestJson.get("timeout").getAsLong();
-                if (timeout <= 0) {
-                    timeout = commandExecutor.getDefaultTimeoutSeconds();
-                } else if (timeout > commandExecutor.getMaxTimeoutSeconds()) {
+            if (requestJson.getTimeout() != null && requestJson.getTimeout() > 0) {
+                if (requestJson.getTimeout() > commandExecutor.getMaxTimeoutSeconds()) {
                     sendResponse(ctx, HttpResponseStatus.BAD_REQUEST,
                             createErrorResponse("Timeout must be between 1 and " + commandExecutor.getMaxTimeoutSeconds() + " seconds"));
                     return;
                 }
+                timeout = requestJson.getTimeout();
             } else {
-                // Use default timeout from configuration
                 timeout = commandExecutor.getDefaultTimeoutSeconds();
             }
 
-            // Execute command
-            CommandExecutor.CommandResult result = commandExecutor.execute(command, timeout);
+            CommandExecutor.CommandResult result = commandExecutor.execute(requestJson.getCommand(), timeout);
 
-            JsonObject response = new JsonObject();
-            response.addProperty("success", result.isSuccess());
-            response.addProperty("exitCode", result.exitCode());
-            response.addProperty("output", result.output());
-            if (result.error() != null) {
-                response.addProperty("error", result.error());
-            }
+            ExecuteResponse resp = new ExecuteResponse();
+            resp.setSuccess(result.isSuccess());
+            resp.setExitCode(result.exitCode());
+            resp.setOutput(result.output());
+            resp.setError(result.error());
 
-            sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(response));
+            sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(resp));
 
         } catch (JsonSyntaxException e) {
             logger.warn("Invalid JSON in request body", e);
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST.getCode(), "Invalid JSON format"));
         } catch (Exception e) {
             logger.error("Error processing request", e);
             sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR,
@@ -122,11 +115,12 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
+    private String createErrorResponse(int code, String message) {
+        return gson.toJson(ApiResponse.failure(code, message));
+    }
+
     private String createErrorResponse(String message) {
-        JsonObject error = new JsonObject();
-        error.addProperty("success", false);
-        error.addProperty("error", message);
-        return gson.toJson(error);
+        return gson.toJson(ApiResponse.failure(message));
     }
 
     private void sendResponse(ChannelHandlerContext ctx, HttpResponseStatus status, String content) {
@@ -143,7 +137,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         logger.error("Exception caught in handler", cause);
         if (ctx.channel().isActive()) {
             sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    createErrorResponse("Internal server error"));
+                    createErrorResponse(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Internal server error"));
         }
     }
 }

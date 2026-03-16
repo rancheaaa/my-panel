@@ -3,6 +3,7 @@
  import com.cq.agent.config.AgentConfig;
  import com.cq.agent.executor.CommandExecutor;
  import com.cq.agent.handler.FileHandler;
+ import com.cq.agent.handler.HandlerFactory;
  import com.cq.agent.handler.HttpServerHandler;
  import com.cq.agent.service.ChunkedTransferService;
  import com.cq.agent.service.FileService;
@@ -35,6 +36,7 @@ public class HttpServer {
     private final CommandExecutor commandExecutor;
     private final FileService fileService;
     private final ChunkedTransferService chunkedTransferService;
+    private final HandlerFactory handlerFactory;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
@@ -43,6 +45,7 @@ public class HttpServer {
         this.config = config;
         this.commandExecutor = commandExecutor;
         this.fileService = fileService;
+        this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService);
         this.chunkedTransferService = chunkedTransferService;
     }
 
@@ -73,7 +76,7 @@ public class HttpServer {
                         pipeline.addLast(new IdleStateHandler(idleTimeout, 0, 0, TimeUnit.SECONDS));
                         pipeline.addLast(new HttpServerCodec());
                         pipeline.addLast(new HttpObjectAggregator(maxContentLength));
-                        pipeline.addLast(new FileHandler(fileService, chunkedTransferService));
+                        pipeline.addLast(new FileHandler(handlerFactory));
                         pipeline.addLast(new HttpServerHandler(commandExecutor));
                     }
                 });

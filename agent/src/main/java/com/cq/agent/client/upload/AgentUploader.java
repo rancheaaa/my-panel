@@ -1,7 +1,12 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.dto.ApiResponse;
+import com.cq.agent.dto.ChunkInitRequest;
+import com.cq.agent.dto.ChunkMergeRequest;
+import com.cq.agent.dto.ChunkStatusData;
+import com.cq.agent.dto.MergeResultData;
+import com.cq.agent.dto.ChunkUploadRequest;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +16,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.util.Collections;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -278,39 +284,40 @@ public class AgentUploader {
         }
     }
 
+    private static final Type API_RESPONSE_CHUNK_STATUS = TypeToken.getParameterized(ApiResponse.class, ChunkStatusData.class).getType();
+    private static final Type API_RESPONSE_MERGE_RESULT = TypeToken.getParameterized(ApiResponse.class, MergeResultData.class).getType();
+    private static final Type API_RESPONSE_BOOLEAN = TypeToken.getParameterized(ApiResponse.class, Boolean.class).getType();
+
     private UploadState initOrResumeUpload(File file, String remoteTargetPath, String transferId) throws IOException, InterruptedException {
-        JsonObject responseJson;
+        ApiResponse<ChunkStatusData> resp;
         if (transferId != null && !transferId.isEmpty()) {
-            responseJson = getUploadStatus(transferId);
+            resp = getUploadStatus(transferId);
         } else {
-            responseJson = initUpload(remoteTargetPath, file.getName(), file.length());
+            resp = initUpload(remoteTargetPath, file.getName(), file.length());
         }
-
-        if (!responseJson.get("success").getAsBoolean()) {
-            String err = responseJson.has("error") ? responseJson.get("error").getAsString() : "Unknown error";
-            throw new IOException(UploadErrorClassifier.classifyServerError(err));
+        if (!resp.isSuccess()) {
+            throw new IOException(UploadErrorClassifier.classifyServerError(resp.getMsg()));
         }
-
-        return parseUploadState(responseJson.getAsJsonObject("data"));
+        return toUploadState(resp.getData());
     }
 
     private UploadState fetchLatestState(String transferId) throws IOException, InterruptedException {
-        JsonObject responseJson = getUploadStatus(transferId);
-        if (!responseJson.get("success").getAsBoolean()) {
-            String err = responseJson.has("error") ? responseJson.get("error").getAsString() : "Unknown error";
-            throw new IOException(UploadErrorClassifier.classifyServerError(err));
+        ApiResponse<ChunkStatusData> resp = getUploadStatus(transferId);
+        if (!resp.isSuccess()) {
+            throw new IOException(UploadErrorClassifier.classifyServerError(resp.getMsg()));
         }
-        return parseUploadState(responseJson.getAsJsonObject("data"));
+        return toUploadState(resp.getData());
     }
 
-    private UploadState parseUploadState(JsonObject data) {
-        Type listType = new TypeToken<List<Integer>>() {}.getType();
+    private static UploadState toUploadState(ChunkStatusData data) throws IOException {
+        if (data == null) throw new IOException("Empty chunk status data");
+        List<Integer> missing = data.getMissingChunks() != null ? data.getMissingChunks() : Collections.emptyList();
         return new UploadState(
-                data.get("transferId").getAsString(),
-                data.get("totalSize").getAsLong(),
-                data.get("totalChunks").getAsInt(),
-                data.get("chunkSize").getAsInt(),
-                gson.fromJson(data.get("missingChunks"), listType)
+                data.getTransferId(),
+                data.getTotalSize(),
+                data.getTotalChunks(),
+                data.getChunkSize(),
+                missing
         );
     }
 
@@ -326,91 +333,97 @@ public class AgentUploader {
         return data;
     }
 
-    private JsonObject initUpload(String targetPath, String fileName, long totalSize) throws IOException, InterruptedException {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("targetPath", targetPath);
-        payload.addProperty("fileName", fileName);
-        payload.addProperty("totalSize", totalSize);
-        return postJson("api/file/chunk/init", payload.toString());
+    private ApiResponse<ChunkStatusData> initUpload(String targetPath, String fileName, long totalSize) throws IOException, InterruptedException {
+        ChunkInitRequest req = new ChunkInitRequest();
+        req.setTargetPath(targetPath);
+        req.setFileName(fileName);
+        req.setTotalSize(totalSize);
+        return postApi("api/file/chunk/init", req, API_RESPONSE_CHUNK_STATUS);
     }
 
-    private JsonObject getUploadStatus(String transferId) throws IOException, InterruptedException {
-        return getJson("api/file/chunk/status?transferId=" + transferId);
+    private ApiResponse<ChunkStatusData> getUploadStatus(String transferId) throws IOException, InterruptedException {
+        return getApi("api/file/chunk/status?transferId=" + transferId, API_RESPONSE_CHUNK_STATUS);
     }
 
     private void uploadChunk(String transferId, int chunkIndex, byte[] data) throws IOException, InterruptedException {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("transferId", transferId);
-        payload.addProperty("chunkIndex", chunkIndex);
-        payload.addProperty("content", Base64.getEncoder().encodeToString(data));
-        payload.addProperty("encoding", "base64");
-
-        JsonObject response = postJson("api/file/chunk/upload", payload.toString());
-        if (response == null || !response.has("success") || !response.get("success").getAsBoolean()) {
-            String error = (response != null && response.has("error")) ? response.get("error").getAsString() : "Unknown error";
+        ChunkUploadRequest req = new ChunkUploadRequest();
+        req.setTransferId(transferId);
+        req.setChunkIndex(chunkIndex);
+        req.setContent(Base64.getEncoder().encodeToString(data));
+        req.setEncoding("base64");
+        ApiResponse<?> response = postApi("api/file/chunk/upload", req, TypeToken.getParameterized(ApiResponse.class, Object.class).getType());
+        if (response == null || !response.isSuccess()) {
+            String error = response != null ? response.getMsg() : "Unknown error";
             throw new IOException("Chunk upload failed: " + UploadErrorClassifier.classifyServerError(error));
         }
     }
 
     private UploadResult mergeChunks(String transferId) throws IOException, InterruptedException {
-        JsonObject payload = new JsonObject();
-        payload.addProperty("transferId", transferId);
+        int attempt = 0;
+        while (true) {
+            ChunkMergeRequest req = new ChunkMergeRequest();
+            req.setTransferId(transferId);
+            ApiResponse<MergeResultData> response = postApi("api/file/chunk/merge", req, API_RESPONSE_MERGE_RESULT);
 
-        JsonObject response = postJson("api/file/chunk/merge", payload.toString());
-        if (!response.get("success").getAsBoolean()) {
-            String err = response.has("error") ? response.get("error").getAsString() : "Unknown error";
-            throw new IOException(UploadErrorClassifier.classifyServerError(err));
+            if (response != null && response.isSuccess()) {
+                MergeResultData data = response.getData();
+                if (data == null) throw new IOException("Empty merge result");
+                return new UploadResult(data.getPath(), data.getSize(), data.getChecksum());
+            }
+
+            // Check for merge size mismatch error
+            if (response != null && response.getCode() == 500 && response.getMsg().contains("Merged file size does not match")) {
+                attempt++;
+                if (attempt > maxRetries) {
+                    throw new IOException("Merge failed after " + maxRetries + " retries due to file size mismatch.");
+                }
+                logger.warn("Merge failed due to size mismatch (attempt {}/{}), retrying in {}ms...", attempt, maxRetries, retryDelayMs);
+                Thread.sleep(retryDelayMs);
+                // Re-sync state before retrying
+                fetchLatestState(transferId);
+            } else {
+                throw new IOException(UploadErrorClassifier.classifyServerError(response != null ? response.getMsg() : "Unknown error"));
+            }
         }
-
-        JsonObject data = response.getAsJsonObject("data");
-        return new UploadResult(
-                data.get("path").getAsString(),
-                data.get("size").getAsLong(),
-                data.has("checksum") ? data.get("checksum").getAsString() : null
-        );
     }
 
     private boolean verifyRemoteFileExists(String remotePath) throws IOException, InterruptedException {
         String encodedPath = java.net.URLEncoder.encode(remotePath, StandardCharsets.UTF_8);
-        JsonObject response = getJson("api/file/exists?path=" + encodedPath);
-
-        if (!response.get("success").getAsBoolean()) {
-            String error = response.has("error") ? response.get("error").getAsString() : "Unknown API error";
-            logger.debug("Verification failed for '{}': {}", remotePath, error);
+        ApiResponse<Boolean> response = getApi("api/file/exists?path=" + encodedPath, API_RESPONSE_BOOLEAN);
+        if (response == null || !response.isSuccess()) {
+            logger.debug("Verification failed for '{}': {}", remotePath, response != null ? response.getMsg() : "null");
             return false;
         }
-        return response.get("data").getAsBoolean();
+        Boolean data = response.getData();
+        return Boolean.TRUE.equals(data);
     }
 
-    private JsonObject postJson(String path, String jsonPayload) throws IOException, InterruptedException {
+    private <T> ApiResponse<T> postApi(String path, Object body, Type responseType) throws IOException, InterruptedException {
         return executeWithRetry(() -> {
+            String jsonPayload = body instanceof String ? (String) body : gson.toJson(body);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(agentApiUrl + path))
                     .header("Content-Type", "application/json")
                     .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8))
                     .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            JsonObject obj = gson.fromJson(response.body(), JsonObject.class);
-            if (obj == null) {
-                throw new IOException("Empty or invalid JSON response");
-            }
+            HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
+            if (obj == null) throw new IOException("Empty or invalid JSON response");
             return obj;
         });
     }
 
-    private JsonObject getJson(String path) throws IOException, InterruptedException {
+    private <T> ApiResponse<T> getApi(String path, Type responseType) throws IOException, InterruptedException {
         return executeWithRetry(() -> {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(agentApiUrl + path))
                     .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                     .GET()
                     .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            JsonObject obj = gson.fromJson(response.body(), JsonObject.class);
-            if (obj == null) {
-                throw new IOException("Empty or invalid JSON response");
-            }
+            HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
+            if (obj == null) throw new IOException("Empty or invalid JSON response");
             return obj;
         });
     }

@@ -2,19 +2,17 @@ package com.cq.agent.client;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -78,11 +76,11 @@ public class KeepAliveTest {
         }
         
         // Verify all requests were successful
-        assertTrue(responses.size() == 5, "Expected 5 responses, got " + responses.size());
+        assertEquals(5, responses.size(), "Expected 5 responses, got " + responses.size());
         for (String response : responses) {
             JsonObject jsonResponse = JsonParser.parseString(response).getAsJsonObject();
             assertTrue(jsonResponse.has("status"), "Response should contain status field");
-            assertTrue(jsonResponse.get("status").getAsString().equals("UP"), "Status should be UP");
+            assertEquals("UP", jsonResponse.get("status").getAsString(), "Status should be UP");
         }
         
         logger.info("Keep-alive test completed successfully");
@@ -163,9 +161,9 @@ public class KeepAliveTest {
         }
         
         // Verify all requests were successful
-        assertTrue(responseCode1 == 200, "Health check should return 200");
-        assertTrue(responseCode2 == 200, "System info should return 200");
-        assertTrue(responseCode3 == 200, "Working directory should return 200");
+        assertEquals(200, responseCode1, "Health check should return 200");
+        assertEquals(200, responseCode2, "System info should return 200");
+        assertEquals(200, responseCode3, "Working directory should return 200");
         
         connection.disconnect();
         

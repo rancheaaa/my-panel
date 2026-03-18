@@ -5,16 +5,25 @@ package com.cq.agent.dto;
  */
 public class MergeResultData {
 
-    private String path;
+    private String destFileDir;
+    private String destFileName;
     private long size;
     private String checksum;
 
-    public String getPath() {
-        return path;
+    public String getDestFileDir() {
+        return destFileDir;
     }
 
-    public void setPath(String path) {
-        this.path = path;
+    public void setDestFileDir(String destFileDir) {
+        this.destFileDir = destFileDir;
+    }
+
+    public String getDestFileName() {
+        return destFileName;
+    }
+
+    public void setDestFileName(String destFileName) {
+        this.destFileName = destFileName;
     }
 
     public long getSize() {

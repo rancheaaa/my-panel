@@ -6,5 +6,6 @@ package com.cq.agent.client.upload;
 public enum UploadTaskStatus {
     PENDING,
     UPLOADING,
+    UPLOAD_SUCCESS,
     FAILED
 }

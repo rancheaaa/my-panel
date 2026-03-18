@@ -4,9 +4,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
 import java.util.Properties;
+import java.util.UUID;
 
 /**
  * Configuration loader for the agent.
@@ -19,6 +24,10 @@ public class AgentConfig {
     private static final String CONFIG_FILE_NAME = "agent.properties";
 
     private final Properties properties;
+
+    // Agent identifier
+    private String agentId;
+    private String agentIp;
 
     // Server configuration
     private int serverPort;
@@ -82,6 +91,20 @@ public class AgentConfig {
     }
 
     private void parseConfiguration() {
+        // Agent ID
+        this.agentId = getStringProperty("agent.id", null);
+        if (this.agentId == null || this.agentId.isBlank()) {
+            this.agentId = UUID.randomUUID().toString();
+            logger.info("agent.id is not configured, generated a random UUID: {}", this.agentId);
+        }
+
+        this.agentIp = getStringProperty("agent.ip", null);
+        if (this.agentIp == null || this.agentIp.isBlank()) {
+            this.agentIp = findFirstNonLoopbackAddress();
+            logger.info("agent.ip is {}", this.agentIp);
+
+        }
+
         // Server configuration
         this.serverPort = getIntProperty("server.port", 8090);
         this.bossThreads = getIntProperty("server.boss.threads", 1);
@@ -192,7 +215,39 @@ public class AgentConfig {
         return Boolean.parseBoolean(value.trim());
     }
 
+    private String findFirstNonLoopbackAddress() {
+        try {
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+            while (networkInterfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = networkInterfaces.nextElement();
+                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                    continue;
+                }
+                Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
+                while (inetAddresses.hasMoreElements()) {
+                    InetAddress inetAddress = inetAddresses.nextElement();
+                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof java.net.Inet4Address) {
+                        logger.info("No agent.ip configured, automatically detected IP: {}", inetAddress.getHostAddress());
+                        return inetAddress.getHostAddress();
+                    }
+                }
+            }
+        } catch (SocketException e) {
+            logger.warn("Failed to get network interfaces, defaulting to 0.0.0.0", e);
+        }
+        logger.info("Could not find a suitable non-loopback IP, defaulting to 0.0.0.0");
+        return "0.0.0.0";
+    }
+
     // Getters
+    public String getAgentId() {
+        return agentId;
+    }
+
+    public String getAgentIp() {
+        return agentIp;
+    }
+
     public int getServerPort() {
         return serverPort;
     }

@@ -8,7 +8,10 @@
  import org.slf4j.Logger;
  import org.slf4j.LoggerFactory;
 
-/**
+ import java.io.File;
+ import java.nio.file.Path;
+
+ /**
  * Main entry point for the Agent application.
  * <p>
  * This agent provides HTTP interfaces for:
@@ -27,10 +30,9 @@ public class AgentApplication {
 
     public static void main(String[] args) {
         logger.info("Starting Agent application...");
-
-        // Load configuration
         AgentConfig config = new AgentConfig();
         logger.info("Configuration loaded: {}", config);
+        logger.info("Agent ID: {}", config.getAgentId());
 
         // Log OS type
         String osName = System.getProperty("os.name");
@@ -51,7 +53,6 @@ public class AgentApplication {
         try {
             server.start();
             logger.info("Agent started successfully");
-            logger.info("Server port: {}", config.getServerPort());
             logger.info("");
             logger.info("Command API Endpoints:");
             logger.info("  GET  /api/health   - Health check");
@@ -82,7 +83,7 @@ public class AgentApplication {
             logger.info("  GET  /api/file/search   - Search files");
             logger.info("  GET  /api/file/disk     - Disk space info");
             logger.info("");
-            logger.info("File base directory: {}", config.getFileBaseDirectory());
+            logger.info("File base directory: {}", Path.of(config.getFileBaseDirectory()).toAbsolutePath().normalize());
             server.awaitTermination();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

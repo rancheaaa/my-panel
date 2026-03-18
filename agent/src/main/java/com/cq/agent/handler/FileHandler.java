@@ -11,7 +11,9 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 /**
  * HTTP handler for file operations (FTP-like commands).
@@ -29,29 +31,40 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-        if (!request.decoderResult().isSuccess()) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid request"));
-            return;
+        // Generate or get traceid
+        String traceid = request.headers().get("X-Trace-Id");
+        if (traceid == null || traceid.isEmpty()) {
+            traceid = UUID.randomUUID().toString();
         }
-
-        String uri = request.uri();
-        // Remove query string for path matching
-        int queryIndex = uri.indexOf('?');
-        String path = queryIndex > 0 ? uri.substring(0, queryIndex) : uri;
-        HttpMethod method = request.method();
-
-        logger.debug("File request: {} {}", method, uri);
+        MDC.put("traceid", traceid);
+        
         try {
-            IRequestHandler handler = handlerFactory.getHandler(path);
-            if (handler != null) {
-                handler.handle(ctx, request);
-            } else {
-                ctx.fireChannelRead(request.retain());
+            if (!request.decoderResult().isSuccess()) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid request"));
+                return;
             }
-        } catch (Exception e) {
-            logger.error("Error processing file request", e);
-            sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    createErrorResponse("Internal error: " + e.getMessage()));
+
+            String uri = request.uri();
+            // Remove query string for path matching
+            int queryIndex = uri.indexOf('?');
+            String path = queryIndex > 0 ? uri.substring(0, queryIndex) : uri;
+            HttpMethod method = request.method();
+
+            logger.debug("File request: {} {}", method, uri);
+            try {
+                IRequestHandler handler = handlerFactory.getHandler(path);
+                if (handler != null) {
+                    handler.handle(ctx, request);
+                } else {
+                    ctx.fireChannelRead(request.retain());
+                }
+            } catch (Exception e) {
+                logger.error("Error processing file request", e);
+                sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                        createErrorResponse("Internal error: " + e.getMessage()));
+            }
+        } finally {
+            MDC.clear();
         }
     }
 

@@ -16,7 +16,9 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 /**
  * HTTP request handler for command execution API.
@@ -37,22 +39,33 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-        if (!request.decoderResult().isSuccess()) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid request"));
-            return;
+        // Generate or get traceid
+        String traceid = request.headers().get("X-Trace-Id");
+        if (traceid == null || traceid.isEmpty()) {
+            traceid = UUID.randomUUID().toString();
         }
+        MDC.put("traceid", traceid);
+        
+        try {
+            if (!request.decoderResult().isSuccess()) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid request"));
+                return;
+            }
 
-        String uri = request.uri();
-        HttpMethod method = request.method();
+            String uri = request.uri();
+            HttpMethod method = request.method();
 
-        logger.debug("Received request: {} {}", method, uri);
+            logger.debug("Received request: {} {}", method, uri);
 
-        if (uri.equals(HEALTH_PATH) && method == HttpMethod.GET) {
-            handleHealthCheck(ctx);
-        } else if (uri.equals(EXECUTE_PATH) && method == HttpMethod.POST) {
-            handleExecute(ctx, request);
-        } else {
-            sendResponse(ctx, HttpResponseStatus.NOT_FOUND, createErrorResponse("Endpoint not found"));
+            if (uri.equals(HEALTH_PATH) && method == HttpMethod.GET) {
+                handleHealthCheck(ctx);
+            } else if (uri.equals(EXECUTE_PATH) && method == HttpMethod.POST) {
+                handleExecute(ctx, request);
+            } else {
+                sendResponse(ctx, HttpResponseStatus.NOT_FOUND, createErrorResponse("Endpoint not found"));
+            }
+        } finally {
+            MDC.clear();
         }
     }
 

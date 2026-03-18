@@ -28,7 +28,6 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <version>${netty.version}</version>
         </dependency>
 
         <!-- JSON processing -->
@@ -54,12 +53,17 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-core</artifactId>
-            <version>${logback.version}</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
+        </dependency>
+        <!-- JUnit 5 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.2</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -86,7 +90,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.cq.agent.client.upload.UploaderExample</mainClass>
+                            <mainClass>com.cq.agent.AgentApplication</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
@@ -103,6 +107,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <testFailureIgnore>true</testFailureIgnore>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -1,5 +1,6 @@
 package com.cq.agent.handler.chunk;
 
+import com.cq.agent.dto.ChunkStatusData;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
@@ -17,7 +18,7 @@ public class ChunkSessionsHandler extends BaseHandler {
 
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
-        List<Map<String, Object>> sessions = chunkedTransferService.listUploadSessions();
+        java.util.List<ChunkStatusData> sessions = chunkedTransferService.listUploadSessions();
         sendSuccessResponse(ctx, sessions);
     }
 }

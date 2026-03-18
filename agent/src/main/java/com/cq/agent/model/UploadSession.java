@@ -1,7 +1,7 @@
 package com.cq.agent.model;
 
 import com.google.gson.Gson;
-import java.lang.reflect.Field;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,8 +14,8 @@ public class UploadSession {
     private static final Gson gson = new Gson();
 
     private final String transferId;
-    private final String targetPath;
-    private final String fileName;
+    private final String destFileDir;
+    private final String destFileName;
     private final long totalSize;
     private final int totalChunks;
     private final int chunkSize;
@@ -27,11 +27,11 @@ public class UploadSession {
     private volatile boolean merged;
     private String checksum;
 
-    public UploadSession(String transferId, String targetPath, String fileName,
+    public UploadSession(String transferId, String destFileDir, String destFileName,
                          long totalSize, int totalChunks, int chunkSize, String tempDirectory) {
         this.transferId = transferId;
-        this.targetPath = targetPath;
-        this.fileName = fileName;
+        this.destFileDir = destFileDir;
+        this.destFileName = destFileName;
         this.totalSize = totalSize;
         this.totalChunks = totalChunks;
         this.chunkSize = chunkSize;
@@ -47,12 +47,12 @@ public class UploadSession {
         return transferId;
     }
 
-    public String getTargetPath() {
-        return targetPath;
+    public String getDestFileDir() {
+        return destFileDir;
     }
 
-    public String getFileName() {
-        return fileName;
+    public String getDestFileName() {
+        return destFileName;
     }
 
     public long getTotalSize() {
@@ -169,24 +169,13 @@ public class UploadSession {
         return session;
     }
 
-    public Map<String, Object> toMap() {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("transferId", transferId);
-        map.put("targetPath", targetPath);
-        map.put("fileName", fileName);
-        map.put("totalSize", totalSize);
-        map.put("totalChunks", totalChunks);
-        map.put("chunkSize", chunkSize);
-        map.put("receivedChunks", receivedChunks.size());
-        map.put("missingChunks", getMissingChunks());
-        map.put("progress", String.format("%.2f%%", getProgress()));
-        map.put("completed", completed);
-        map.put("merged", merged);
-        map.put("createTime", createTime);
-        map.put("lastAccessTime", lastAccessTime);
-        if (checksum != null) {
-            map.put("checksum", checksum);
-        }
-        return map;
+    public com.cq.agent.dto.ChunkStatusData toChunkStatusData() {
+        com.cq.agent.dto.ChunkStatusData data = new com.cq.agent.dto.ChunkStatusData();
+        data.setTransferId(this.getTransferId());
+        data.setTotalSize(this.getTotalSize());
+        data.setTotalChunks(this.getTotalChunks());
+        data.setChunkSize(this.getChunkSize());
+        data.setMissingChunks(this.getMissingChunks());
+        return data;
     }
 }

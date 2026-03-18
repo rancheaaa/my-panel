@@ -91,16 +91,4 @@ final class UploadErrorClassifier {
         }
         return serverError;
     }
-
-    /**
-     * Checks local file readability and returns error message if not readable.
-     */
-    static String checkLocalFileReadable(String localFilePath) {
-        if (localFilePath == null || localFilePath.isBlank()) return "本地路径为空";
-        java.io.File f = new java.io.File(localFilePath);
-        if (!f.exists()) return "本地文件不存在: " + localFilePath;
-        if (!f.isFile()) return "本地路径不是文件: " + localFilePath;
-        if (!f.canRead()) return "本地文件无读取权限: " + localFilePath;
-        return null;
-    }
 }

@@ -2,12 +2,10 @@ package com.cq.agent.service;
 
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ApiCode;
-
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.model.FileInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -42,8 +40,10 @@ public class FileService {
 
         // Ensure base directory exists
         try {
-            Files.createDirectories(baseDirectory);
-            logger.info("File service initialized with base directory: {}", baseDirectory);
+            if(!Files.exists(baseDirectory)) {
+                Files.createDirectories(baseDirectory);
+                logger.info("File service initialized with base directory: {}", baseDirectory);
+            }
         } catch (IOException e) {
             logger.error("Failed to create base directory: {}", baseDirectory, e);
         }

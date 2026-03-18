@@ -22,6 +22,6 @@ public class DeleHandler extends BaseHandler {
             return;
         }
         ApiResponse<Void> result = fileService.delete(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

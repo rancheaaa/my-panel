@@ -20,6 +20,6 @@ public class ListHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
         ApiResponse<List<FileInfo>> result = fileService.list(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

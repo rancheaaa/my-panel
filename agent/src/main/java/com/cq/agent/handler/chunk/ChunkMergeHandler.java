@@ -36,7 +36,7 @@ public class ChunkMergeHandler extends BaseHandler {
             } else {
                 logger.debug("Merge failed for transferId: {} - {}", body.getTransferId(), result.getMsg());
             }
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             logger.debug("Invalid JSON format for merge request", e);
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));

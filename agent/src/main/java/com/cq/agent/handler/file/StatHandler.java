@@ -19,10 +19,10 @@ public class StatHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
         ApiResponse<FileInfo> result = fileService.stat(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx, request, result);
     }
 }

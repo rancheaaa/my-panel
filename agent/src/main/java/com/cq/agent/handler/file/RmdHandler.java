@@ -23,6 +23,6 @@ public class RmdHandler extends BaseHandler {
         }
         boolean recursive = "true".equals(getQueryParam(request, "recursive", "false"));
         ApiResponse<Void> result = fileService.removeDirectory(path, recursive);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

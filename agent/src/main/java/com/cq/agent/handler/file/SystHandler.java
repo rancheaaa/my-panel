@@ -17,6 +17,6 @@ public class SystHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         Map<String, Object> info = fileService.getSystemInfo();
-        sendSuccessResponse(ctx, info);
+        sendSuccessResponse(ctx,request, info);
     }
 }

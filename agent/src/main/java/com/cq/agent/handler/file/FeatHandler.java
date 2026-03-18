@@ -17,6 +17,6 @@ public class FeatHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         List<String> features = fileService.getFeatures();
-        sendSuccessResponse(ctx, features);
+        sendSuccessResponse(ctx,request, features);
     }
 }

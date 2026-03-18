@@ -2,13 +2,11 @@ package com.cq.agent.client;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -40,6 +38,7 @@ public class BaseIntegrationTest {
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
+            connection.setRequestProperty("Connection", "keep-alive");
 
             int responseCode = connection.getResponseCode();
             logger.info("GET request response code: {}", responseCode);
@@ -56,9 +55,7 @@ public class BaseIntegrationTest {
                     // Ignore
                 }
             }
-            if (connection != null) {
-                connection.disconnect();
-            }
+            // Don't disconnect to keep the connection alive for reuse
         }
     }
 
@@ -82,6 +79,7 @@ public class BaseIntegrationTest {
             connection.setReadTimeout(10000);
             connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("Connection", "keep-alive");
 
             // Send request body
             connection.getOutputStream().write(requestBody.getBytes());
@@ -101,9 +99,7 @@ public class BaseIntegrationTest {
                     // Ignore
                 }
             }
-            if (connection != null) {
-                connection.disconnect();
-            }
+            // Don't disconnect to keep the connection alive for reuse
         }
     }
 }

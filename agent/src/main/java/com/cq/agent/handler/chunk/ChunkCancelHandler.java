@@ -25,7 +25,7 @@ public class ChunkCancelHandler extends BaseHandler {
                 return;
             }
             ApiResponse<Void> result = chunkedTransferService.cancelUpload(body.getTransferId());
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }

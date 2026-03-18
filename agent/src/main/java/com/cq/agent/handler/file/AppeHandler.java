@@ -36,7 +36,7 @@ public class AppeHandler extends BaseHandler {
                     ? Base64.getDecoder().decode(body.getContent())
                     : body.getContent().getBytes(StandardCharsets.UTF_8);
             ApiResponse<FileInfo> result = fileService.append(body.getPath(), content);
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }

@@ -24,6 +24,6 @@ public class ChunkDownloadInfoHandler extends BaseHandler {
             return;
         }
         ApiResponse<Map<String, Object>> result = chunkedTransferService.getDownloadInfo(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx, request, result);
     }
 }

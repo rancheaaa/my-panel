@@ -22,6 +22,6 @@ public class SearchHandler extends BaseHandler {
         String pattern = getQueryParam(request, "pattern", "*");
         int maxDepth = Integer.parseInt(getQueryParam(request, "maxDepth", "10"));
         ApiResponse<List<FileInfo>> result = fileService.search(path, pattern, maxDepth);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

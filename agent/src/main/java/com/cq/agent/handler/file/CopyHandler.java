@@ -26,7 +26,7 @@ public class CopyHandler extends BaseHandler {
                 return;
             }
             ApiResponse<FileInfo> result = fileService.copy(body.getFrom(), body.getTo());
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }

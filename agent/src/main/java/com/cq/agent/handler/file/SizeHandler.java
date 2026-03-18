@@ -22,6 +22,6 @@ public class SizeHandler extends BaseHandler {
             return;
         }
         ApiResponse<Long> result = fileService.getSize(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

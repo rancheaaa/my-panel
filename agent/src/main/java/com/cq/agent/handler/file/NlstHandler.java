@@ -19,6 +19,6 @@ public class NlstHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
         ApiResponse<List<String>> result = fileService.nameList(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

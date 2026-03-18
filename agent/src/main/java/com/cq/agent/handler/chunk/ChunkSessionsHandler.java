@@ -19,6 +19,6 @@ public class ChunkSessionsHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         java.util.List<ChunkStatusData> sessions = chunkedTransferService.listUploadSessions();
-        sendSuccessResponse(ctx, sessions);
+        sendSuccessResponse(ctx,request, sessions);
     }
 }

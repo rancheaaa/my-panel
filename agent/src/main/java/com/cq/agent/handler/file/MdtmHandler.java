@@ -22,6 +22,6 @@ public class MdtmHandler extends BaseHandler {
             return;
         }
         ApiResponse<Long> result = fileService.getModificationTime(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

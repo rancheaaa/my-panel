@@ -18,10 +18,10 @@ public class ExistsHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
         ApiResponse<Boolean> result = fileService.exists(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx, request, result);
     }
 }

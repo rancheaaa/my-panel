@@ -26,6 +26,6 @@ public class ChunkStatusHandler extends BaseHandler {
             return;
         }
         ApiResponse<ChunkStatusData> result = chunkedTransferService.getUploadStatus(transferId);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

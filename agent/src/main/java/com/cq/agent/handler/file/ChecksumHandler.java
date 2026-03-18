@@ -23,6 +23,6 @@ public class ChecksumHandler extends BaseHandler {
         }
         String algorithm = getQueryParam(request, "algorithm", "MD5");
         ApiResponse<String> result = fileService.checksum(path, algorithm);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

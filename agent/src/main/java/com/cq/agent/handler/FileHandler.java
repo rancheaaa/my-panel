@@ -40,7 +40,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         
         try {
             if (!request.decoderResult().isSuccess()) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid request"));
+                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid request"));
                 return;
             }
 
@@ -60,7 +60,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 }
             } catch (Exception e) {
                 logger.error("Error processing file request", e);
-                sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR,
                         createErrorResponse("Internal error: " + e.getMessage()));
             }
         } finally {
@@ -76,7 +76,41 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         return createErrorResponse(ApiCode.GENERIC_ERROR, message);
     }
 
+    private void sendResponse(ChannelHandlerContext ctx, FullHttpRequest request, HttpResponseStatus status, String content) {
+        ByteBuf buffer = Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
+        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buffer);
+        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
+        
+        // Handle keep-alive
+        boolean keepAlive = HttpUtil.isKeepAlive(request);
+        if (keepAlive) {
+            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        } else {
+            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+        }
+        
+        // Get connection information
+        String remoteAddress = ctx.channel().remoteAddress().toString();
+        int localPort = ctx.channel().localAddress() instanceof java.net.InetSocketAddress ? 
+            ((java.net.InetSocketAddress) ctx.channel().localAddress()).getPort() : 0;
+        int remotePort = ctx.channel().remoteAddress() instanceof java.net.InetSocketAddress ? 
+            ((java.net.InetSocketAddress) ctx.channel().remoteAddress()).getPort() : 0;
+        String connectionId = ctx.channel().id().asShortText();
+        
+        // Log response details
+        logger.info("Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}", 
+            status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
+        
+        if (keepAlive) {
+            ctx.writeAndFlush(response);
+        } else {
+            ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+        }
+    }
+    
     private void sendResponse(ChannelHandlerContext ctx, HttpResponseStatus status, String content) {
+        // For exception cases where we don't have the original request
         ByteBuf buffer = Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
         FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buffer);
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");

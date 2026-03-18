@@ -79,6 +79,7 @@ public class ApiIntegrationTest extends BaseIntegrationTest {
 
         // Send command to list current directory
         String jsonInputString = "{\"command\": \"ls -la\", \"timeout\": 10}";
+        logger.info("Sending command: {}", jsonInputString);
         JsonObject response = sendPostRequest(url, jsonInputString);
         assertTrue(response.has("exitCode"), "Response should contain exit code");
     }

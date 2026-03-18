@@ -46,7 +46,7 @@ public class ChunkUploadHandler extends BaseHandler {
                     ? Base64.getDecoder().decode(body.getContent())
                     : body.getContent().getBytes(StandardCharsets.UTF_8);
             ApiResponse<ChunkUploadResultData> result = chunkedTransferService.uploadChunk(body, content);
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }

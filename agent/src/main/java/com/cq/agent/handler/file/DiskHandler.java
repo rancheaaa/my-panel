@@ -19,6 +19,6 @@ public class DiskHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
         ApiResponse<Map<String, Long>> result = fileService.getDiskSpace(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx, request, result);
     }
 }

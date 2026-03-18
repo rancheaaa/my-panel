@@ -27,15 +27,15 @@ public class ChunkInitHandler extends BaseHandler {
         try {
             ChunkInitRequest body = parseBody(request, ChunkInitRequest.class);
             if (body == null || body.getDestFileDir() == null || body.getDestFileName() == null || body.getTotalSize() <= 0) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'destFileDir', 'destFileName' and 'totalSize' (positive) are required"));
+                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'destFileDir', 'destFileName' and 'totalSize' (positive) are required"));
                 return;
             }
             log.debug("receive init upload request {}", body);
             ApiResponse<ChunkStatusData> result = chunkedTransferService.initUpload(
                     body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

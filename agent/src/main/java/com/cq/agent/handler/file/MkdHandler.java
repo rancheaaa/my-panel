@@ -23,6 +23,6 @@ public class MkdHandler extends BaseHandler {
             return;
         }
         ApiResponse<FileInfo> result = fileService.makeDirectory(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

@@ -26,7 +26,7 @@ public class MfmtHandler extends BaseHandler {
                 return;
             }
             ApiResponse<FileInfo> result = fileService.setModificationTime(body.getPath(), body.getTimestamp());
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }

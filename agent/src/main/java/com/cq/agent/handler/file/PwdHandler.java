@@ -18,6 +18,6 @@ public class PwdHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
         ApiResponse<FileInfo> result = fileService.printWorkingDirectory(path);
-        sendServiceResult(ctx, result);
+        sendServiceResult(ctx,request, result);
     }
 }

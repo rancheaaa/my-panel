@@ -30,7 +30,7 @@ public class RetrHandler extends BaseHandler {
 
         if ("text".equals(mode)) {
             ApiResponse<String> result = fileService.retrieveText(path, charset);
-            sendServiceResult(ctx, result);
+            sendServiceResult(ctx,request, result);
         } else {
             ApiResponse<byte[]> result = fileService.retrieve(path);
             if (result.isSuccess()) {

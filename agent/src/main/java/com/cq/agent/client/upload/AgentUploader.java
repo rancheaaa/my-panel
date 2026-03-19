@@ -224,25 +224,38 @@ public class AgentUploader {
             if (task.getTransferId() == null || !task.getTransferId().equals(state.getTransferId())) {
                 task.setTransferId(state.getTransferId());
             }
-            for (int attempt =1; attempt <= maxMergeRetries; attempt++) {
+            for (int attempt = 1; attempt <= maxMergeRetries; attempt++) {
                 try {
                     uploadChunks(file, state, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
                 } catch (IOException e) {
-                    throw new IOException("Chunk upload failed", e);
+                    boolean isRetryable = e.getMessage() != null && e.getMessage().contains("(retryable)");
+                    if (!isRetryable) {
+                        throw new IOException("Chunk upload failed (non-retryable): " + e.getMessage(), e);
+                    }
+                    logger.warn("[traceId={}] Chunk upload failed (retryable) (attempt {}/{}), re-syncing and retrying: {}", 
+                            traceId, attempt, maxMergeRetries, e.getMessage());
+                    state = fetchLatestState(state.getTransferId(), traceId);
+                    continue;
                 }
 
                 UploadResult mergeAttemptResult = null;
                 try {
                     mergeAttemptResult = mergeChunks(state.getTransferId(), traceId);
                 } catch (IOException e) {
-                    if (attempt < maxMergeRetries && (e.getMessage().contains("size mismatch") || e.getMessage().contains("2007"))) {
-                        logger.warn("Merge failed due to size mismatch (attempt {}/{}), re-syncing and retrying", attempt, maxMergeRetries);
-                        state = fetchLatestState(state.getTransferId(), traceId);
-                        continue;
+                    boolean isRetryable = e.getMessage() != null && e.getMessage().contains("(retryable)");
+                    if (!isRetryable || attempt >= maxMergeRetries) {
+                        throw new IOException("Merge failed (non-retryable or max retries reached): " + e.getMessage(), e);
                     }
+                    logger.warn("[traceId={}] Merge failed (retryable) (attempt {}/{}), re-syncing and retrying: {}", 
+                            traceId, attempt, maxMergeRetries, e.getMessage());
+                    state = fetchLatestState(state.getTransferId(), traceId);
+                    continue;
                 }
                 if (mergeAttemptResult == null) {
-                    logger.warn("Merge failed (attempt {}/{}), re-syncing and retrying", attempt, maxMergeRetries);
+                    if (attempt >= maxMergeRetries) {
+                        throw new IOException("Merge failed: max retries reached, but no result produced");
+                    }
+                    logger.warn("[traceId={}] Merge failed (attempt {}/{}), re-syncing and retrying", traceId, attempt, maxMergeRetries);
                     state = fetchLatestState(state.getTransferId(), traceId);
                     continue;
                 }
@@ -253,7 +266,7 @@ public class AgentUploader {
                 }
 
                 if (attempt < maxMergeRetries) {
-                    logger.warn("Verification failed after merge (attempt {}/{}), re-syncing", attempt, maxMergeRetries);
+                    logger.warn("[traceId={}] Verification failed after merge (attempt {}/{}), re-syncing", traceId, attempt, maxMergeRetries);
                     state = fetchLatestState(state.getTransferId(), traceId);
                 } else {
                     throw new IOException("Verification failed after " + maxMergeRetries + " attempts");
@@ -376,8 +389,16 @@ public class AgentUploader {
             resp = initUpload(localPath, remoteTargetPath, file.length(), traceId);
         }
         if (!resp.isSuccess()) {
-            logger.debug("[traceId={}] Upload initialization failed: {}", traceId, resp.getMsg());
-            throw new IOException(UploadErrorClassifier.classifyServerError(resp.getMsg()));
+            int errorCode = resp.getCode();
+            String errorMsg = resp.getMsg();
+            logger.debug("[traceId={}] Upload initialization failed: code={}, msg={}", traceId, errorCode, errorMsg);
+            
+            if (!UploadErrorClassifier.isRetryableByCode(errorCode)) {
+                logger.error("[traceId={}] Upload initialization failed (non-retryable): code={}, msg={}", traceId, errorCode, errorMsg);
+                throw new IOException("Upload initialization failed (non-retryable): " + UploadErrorClassifier.classifyServerError(errorMsg));
+            }
+            logger.warn("[traceId={}] Upload initialization failed (retryable): code={}, msg={}", traceId, errorCode, errorMsg);
+            throw new IOException("Upload initialization failed (retryable): " + UploadErrorClassifier.classifyServerError(errorMsg));
         }
         logger.debug("[traceId={}] Upload initialized successfully: transferId={}, totalChunks={}, chunkSize={}", 
                 traceId, resp.getData().getTransferId(), resp.getData().getTotalChunks(), resp.getData().getChunkSize());
@@ -504,12 +525,18 @@ public class AgentUploader {
             logger.warn("[traceId={}] Could not parse agentApiUrl to extract host and port", traceId, e);
         }
 
-
         ApiResponse<?> response = postApi("api/file/chunk/upload", req, TypeToken.getParameterized(ApiResponse.class, Object.class).getType(), traceId);
         if (response == null || !response.isSuccess()) {
             String error = response != null ? response.getMsg() : "Unknown error";
-            logger.debug("[traceId={}] Chunk upload failed: {} - {}", traceId, chunkIndex, error);
-            throw new IOException("Chunk upload failed: " + UploadErrorClassifier.classifyServerError(error));
+            int errorCode = response != null ? response.getCode() : 0;
+            logger.debug("[traceId={}] Chunk upload failed: chunkIndex={}, code={}, msg={}", traceId, chunkIndex, errorCode, error);
+            
+            if (!UploadErrorClassifier.isRetryableByCode(errorCode)) {
+                logger.error("[traceId={}] Chunk upload failed (non-retryable): chunkIndex={}, code={}, msg={}", traceId, chunkIndex, errorCode, error);
+                throw new IOException("Chunk upload failed (non-retryable): " + UploadErrorClassifier.classifyServerError(error));
+            }
+            logger.warn("[traceId={}] Chunk upload failed (retryable): chunkIndex={}, code={}, msg={}", traceId, chunkIndex, errorCode, error);
+            throw new IOException("Chunk upload failed (retryable): " + UploadErrorClassifier.classifyServerError(error));
         }
         logger.debug("[traceId={}] Chunk upload successful: {}", traceId, chunkIndex);
     }
@@ -535,14 +562,20 @@ public class AgentUploader {
             return new UploadResult(fullPath, data.getSize(), data.getChecksum());
         }
 
-        // Check for merge size mismatch error (ApiCode.MERGE_SIZE_MISMATCH = 2007)
-        if (response != null && (response.getCode() == 2007 || (response.getMsg() != null && response.getMsg().contains("Merged file size does not match")))) {
-            logger.debug("[traceId={}] Merge failed due to size mismatch: {}", traceId, response.getMsg());
-            throw new IOException("Merge failed due to size mismatch: " + response.getMsg());
+        if (response != null) {
+            int errorCode = response.getCode();
+            String errorMsg = response.getMsg();
+            logger.debug("[traceId={}] Merge failed: code={}, msg={}", traceId, errorCode, errorMsg);
+            
+            if (!UploadErrorClassifier.isRetryableByCode(errorCode)) {
+                logger.error("[traceId={}] Merge failed (non-retryable): code={}, msg={}", traceId, errorCode, errorMsg);
+                throw new IOException("Merge failed (non-retryable): " + UploadErrorClassifier.classifyServerError(errorMsg));
+            }
+            logger.warn("[traceId={}] Merge failed (retryable): code={}, msg={}", traceId, errorCode, errorMsg);
+            throw new IOException("Merge failed (retryable): " + UploadErrorClassifier.classifyServerError(errorMsg));
         } else {
-            String error = response != null ? response.getMsg() : "Unknown error";
-            logger.debug("[traceId={}] Merge failed: {}", traceId, error);
-            throw new IOException(UploadErrorClassifier.classifyServerError(error));
+            logger.error("[traceId={}] Merge failed: response is null", traceId);
+            throw new IOException("Merge failed: response is null");
         }
     }
 
@@ -622,9 +655,6 @@ public class AgentUploader {
                 if (e instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                     throw (InterruptedException) e;
-                }
-                if (UploadErrorClassifier.isNonRetryable(e)) {
-                    throw new IOException(UploadErrorClassifier.toUserMessage(e), last);
                 }
                 attempt++;
                 if (attempt > maxRetries) {

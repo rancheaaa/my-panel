@@ -11,6 +11,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -584,14 +585,17 @@ public class ChunkedTransferService {
         }
 
         try {
-            Path targetFullFileName = Path.of(session.getDestFileDir(), session.getDestFileName());
-            logger.debug("[traceId={}] Merging chunks to target file: {}", traceId, targetFullFileName);
+            Path targetDir = Path.of(session.getDestFileDir());
+            String destFileName = session.getDestFileName();
+            Path tempMergeFile = Path.of(session.getTempDirectory(), destFileName + ".tmp");
+            
+            logger.debug("[traceId={}] Merging chunks to temp file: {}", traceId, tempMergeFile);
 
-            try (FileChannel outChannel = FileChannel.open(targetFullFileName,
+            try (FileChannel outChannel = FileChannel.open(tempMergeFile,
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
                 for (int i = 0; i < session.getTotalChunks(); i++) {
-                    Path chunkFile = Path.of(session.getTempDirectory(), session.getDestFileName() + "_chunk_" + i);
+                    Path chunkFile = Path.of(session.getTempDirectory(), destFileName + "_chunk_" + i);
                     logger.debug("[traceId={}] Reading chunk file: {}", traceId, chunkFile);
                     try (FileChannel chunkChannel = FileChannel.open(chunkFile, StandardOpenOption.READ)) {
                         long size = chunkChannel.size();
@@ -604,20 +608,20 @@ public class ChunkedTransferService {
                 }
             }
 
-            // Verify merged file size
+            Path targetFullFileName = targetDir.resolve(destFileName);
+            Files.move(tempMergeFile, targetFullFileName, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            logger.info("[traceId={}] Moved merged file to target: {}", traceId, targetFullFileName);
             long mergedSize = Files.size(targetFullFileName);
-            logger.debug("[traceId={}] Merged file size: {}, expected: {}", traceId, mergedSize, session.getTotalSize());
+            logger.debug("[traceId={}] Merged temp file size: {}, expected: {}", traceId, mergedSize, session.getTotalSize());
             if (mergedSize != session.getTotalSize()) {
                 logger.error("[traceId={}] Merged file size mismatch for session {}. Expected: {}, Actual: {}",
                         traceId, transferId, session.getTotalSize(), mergedSize);
-                Files.deleteIfExists(targetFullFileName); // Clean up inconsistent file
+                Files.deleteIfExists(tempMergeFile);
                 return ApiResponse.failure(ApiCode.MERGE_SIZE_MISMATCH.getCode(), "Merged file size does not match original file size");
             }
-
             session.setMerged(true);
             logger.info("[traceId={}] Chunks merged for session {}: {}", traceId, transferId, targetFullFileName);
 
-            // Cleanup temp files
             logger.debug("[traceId={}] Cleaning up temp files for session: {}", traceId, transferId);
             cleanupSessionTempFiles(session);
 

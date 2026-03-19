@@ -1,11 +1,14 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.dto.ApiCode;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.file.AccessDeniedException;
 import java.util.Locale;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * Classifies upload errors into user-friendly messages for:
@@ -17,24 +20,55 @@ final class UploadErrorClassifier {
 
     private UploadErrorClassifier() {}
 
-    /**
-     * @return true if retrying the same request will not help (e.g. connection refused).
-     */
-    static boolean isNonRetryable(Throwable t) {
-        Throwable c = t;
-        while (c != null) {
-            if (c instanceof ConnectException || c instanceof UnknownHostException) {
-                return true;
-            }
-            if (c instanceof SocketTimeoutException) {
-                String msg = c.getMessage() != null ? c.getMessage().toLowerCase(Locale.ROOT) : "";
-                if (msg.contains("connect timed out") || msg.contains("connection timed out")) {
-                    return true;
-                }
-            }
-            c = c.getCause();
+    private static final Set<Integer> RETRYABLE_CODES = new HashSet<>();
+    static {
+        RETRYABLE_CODES.add(ApiCode.GENERIC_ERROR.getCode());
+        RETRYABLE_CODES.add(ApiCode.INIT_UPLOAD_FAILED.getCode());
+        RETRYABLE_CODES.add(ApiCode.CHUNK_WRITE_FAILED.getCode());
+        RETRYABLE_CODES.add(ApiCode.MERGE_CHUNKS_FAILED.getCode());
+        RETRYABLE_CODES.add(ApiCode.READ_FILE_FAILED.getCode());
+        RETRYABLE_CODES.add(ApiCode.GET_DISK_SPACE_FAILED.getCode());
+    }
+
+    private static final Set<Integer> NON_RETRYABLE_CODES = new HashSet<>();
+    static {
+        NON_RETRYABLE_CODES.add(ApiCode.NOT_FOUND.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.INVALID_REQUEST.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.PATH_NOT_FOUND.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.PATH_IS_NOT_DIRECTORY.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.PATH_IS_NOT_FILE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.PATH_ALREADY_EXISTS.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.FILE_NOT_READABLE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.DIRECTORY_NOT_EMPTY.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.DIRECTORY_NOT_WRITABLE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.DIRECTORY_CREATE_NO_PERMISSION.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.ACCESS_DENIED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.RENAME_FAILED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.COPY_FAILED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.DELETE_FILE_FAILED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.INSUFFICIENT_DISK_SPACE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.INVALID_TOTAL_SIZE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.FILE_SIZE_EXCEEDS_LIMIT.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.INVALID_CHUNK_INDEX.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.INVALID_CHUNK_SIZE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.CHUNK_WRITE_SIZE_MISMATCH.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.MERGE_SIZE_MISMATCH.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.INVALID_RANGE.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.UPLOAD_SESSION_NOT_FOUND.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.UPLOAD_SESSION_CONFLICT.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.UPLOAD_NOT_COMPLETED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.CHUNKS_ALREADY_MERGED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.TEMP_DIR_CREATE_FAILED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.TEMP_DIR_NO_WRITE_PERMISSION.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.TEMP_DIR_VERIFICATION_FAILED.getCode());
+        NON_RETRYABLE_CODES.add(ApiCode.DOWNLOAD_DIRECTORY_FAILED.getCode());
+    }
+
+    static boolean isRetryableByCode(int errorCode) {
+        if (NON_RETRYABLE_CODES.contains(errorCode)) {
+            return false;
         }
-        return false;
+        return RETRYABLE_CODES.contains(errorCode) || errorCode >= 500;
     }
 
     /**

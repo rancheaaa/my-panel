@@ -21,7 +21,7 @@ public class RetrHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
 
@@ -39,9 +39,9 @@ public class RetrHandler extends BaseHandler {
                 resp.setData(Base64.getEncoder().encodeToString(result.getData()));
                 resp.setSize(result.getData().length);
                 resp.setEncoding("base64");
-                sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(resp));
+                sendResponse(ctx,request, HttpResponseStatus.OK, gson.toJson(resp));
             } else {
-                sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
+                sendResponse(ctx,request, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
             }
         }
     }

@@ -21,7 +21,7 @@ public class ChunkCancelHandler extends BaseHandler {
         try {
             ChunkCancelRequest body = parseBody(request, ChunkCancelRequest.class);
             if (body == null || body.getTransferId() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
             // 从HTTP头获取traceid
@@ -29,7 +29,7 @@ public class ChunkCancelHandler extends BaseHandler {
             ApiResponse<Void> result = chunkedTransferService.cancelUpload(body.getTransferId(), traceId);
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

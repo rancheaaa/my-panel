@@ -7,6 +7,7 @@ public class ChunkUploadRequest {
 
     private String transferId;
     private int chunkIndex;
+    private int chunkSize;
     private String content;
     private String encoding;
 
@@ -38,6 +39,14 @@ public class ChunkUploadRequest {
 
     public void setChunkIndex(int chunkIndex) {
         this.chunkIndex = chunkIndex;
+    }
+
+    public int getChunkSize() {
+        return chunkSize;
+    }
+
+    public void setChunkSize(int chunkSize) {
+        this.chunkSize = chunkSize;
     }
 
     public String getContent() {
@@ -141,7 +150,7 @@ public class ChunkUploadRequest {
         return "ChunkUploadRequest{" +
                 "transferId='" + transferId + '\'' +
                 ", chunkIndex=" + chunkIndex +
-                ", content='" + content + '\'' +
+                ", chunkSize=" + chunkSize +
                 ", encoding='" + encoding + '\'' +
                 ", sourceAgentId='" + sourceAgentId + '\'' +
                 ", sourceAgentIp='" + sourceAgentIp + '\'' +

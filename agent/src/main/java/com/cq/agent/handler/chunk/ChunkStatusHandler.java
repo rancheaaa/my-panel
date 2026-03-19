@@ -22,7 +22,7 @@ public class ChunkStatusHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String transferId = getQueryParam(request, "transferId", null);
         if (transferId == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'transferId' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'transferId' parameter is required"));
             return;
         }
         String traceid = request.headers().get("X-Trace-Id");

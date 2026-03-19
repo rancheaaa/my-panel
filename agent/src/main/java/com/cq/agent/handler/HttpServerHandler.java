@@ -1,7 +1,6 @@
 package com.cq.agent.handler;
 
 import com.cq.agent.dto.ApiCode;
-import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ExecuteRequest;
 import com.cq.agent.dto.ExecuteResponse;
 import com.cq.agent.dto.HealthResponse;
@@ -9,11 +8,9 @@ import com.cq.agent.executor.CommandExecutor;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
+import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
@@ -23,12 +20,13 @@ import java.util.UUID;
  * HTTP request handler for command execution API.
  * Supports both Windows and Linux/Unix systems.
  */
-public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+public class HttpServerHandler extends CommonNettyHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(HttpServerHandler.class);
     private static final Gson gson = new Gson();
     private static final String EXECUTE_PATH = "/api/execute";
     private static final String HEALTH_PATH = "/api/health";
+    private static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
 
     private final CommandExecutor commandExecutor;
 
@@ -43,6 +41,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         if (traceid == null || traceid.isEmpty()) {
             traceid = UUID.randomUUID().toString();
         }
+        
+        ctx.channel().attr(TRACE_ID_KEY).set(traceid);
         
         try {
             if (!request.decoderResult().isSuccess()) {
@@ -90,7 +90,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         try {
             ExecuteRequest requestJson = gson.fromJson(body, ExecuteRequest.class);
             if (requestJson == null || requestJson.getCommand() == null || requestJson.getCommand().isBlank()) {
-                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST.getCode(), "'command' field is required"));
+                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'command' field is required"));
                 return;
             }
 
@@ -118,71 +118,11 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         } catch (JsonSyntaxException e) {
             logger.warn("Invalid JSON in request body", e);
-            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST.getCode(), "Invalid JSON format"));
+            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         } catch (Exception e) {
             logger.error("Error processing request", e);
             sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR,
                     createErrorResponse("Internal server error: " + e.getMessage()));
-        }
-    }
-
-    private String createErrorResponse(int code, String message) {
-        return gson.toJson(ApiResponse.failure(code, message));
-    }
-
-    private String createErrorResponse(String message) {
-        return gson.toJson(ApiResponse.failure(message));
-    }
-
-    private void sendResponse(ChannelHandlerContext ctx, FullHttpRequest request, HttpResponseStatus status, String content) {
-        ByteBuf buffer = Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
-        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buffer);
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
-        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
-        
-        // Handle keep-alive
-        boolean keepAlive = HttpUtil.isKeepAlive(request);
-        if (keepAlive) {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-        } else {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-        }
-        
-        // Get connection information
-        String remoteAddress = ctx.channel().remoteAddress().toString();
-        int localPort = ctx.channel().localAddress() instanceof java.net.InetSocketAddress ? 
-            ((java.net.InetSocketAddress) ctx.channel().localAddress()).getPort() : 0;
-        int remotePort = ctx.channel().remoteAddress() instanceof java.net.InetSocketAddress ? 
-            ((java.net.InetSocketAddress) ctx.channel().remoteAddress()).getPort() : 0;
-        String connectionId = ctx.channel().id().asShortText();
-        
-        // Log response details
-        logger.info("Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}", 
-            status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
-        
-        if (keepAlive) {
-            ctx.writeAndFlush(response);
-        } else {
-            ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
-        }
-    }
-    
-    private void sendResponse(ChannelHandlerContext ctx, HttpResponseStatus status, String content) {
-        // For exception cases where we don't have the original request
-        ByteBuf buffer = Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
-        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buffer);
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
-        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
-        response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-        ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
-    }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        logger.error("Exception caught in handler", cause);
-        if (ctx.channel().isActive()) {
-            sendResponse(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    createErrorResponse(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Internal server error"));
         }
     }
 }

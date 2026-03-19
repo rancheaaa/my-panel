@@ -351,8 +351,8 @@ public class ChunkedTransferService {
      * 上传单个文件分片
      * 
      * 该方法用于接收并存储大文件的一个分片。分片上传机制允许大文件被分割成多个小块进行独立上传，
-     * 每个分片都有唯一的索引标识。方法会验证分片的合法性，将分片数据写入临时文件，并更新上传会话状态。
-     * 支持重试机制以应对临时的IO错误，确保数据完整性。
+     * 每个分片都有唯一的索引标识。方法会验证分片的合法性，检查是否重复上传，将分片数据写入临时文件，
+     * 并更新上传会话状态。支持重试机制以应对临时的IO错误，确保数据完整性。
      * 
      * 方法执行流程：
      * 1. 验证上传会话是否存在（通过transferId查找）
@@ -410,14 +410,25 @@ public class ChunkedTransferService {
             return ApiResponse.failure(indexValidation.getCode(), indexValidation.getMsg());
         }
 
-        ApiResponse<Void> sizeValidation = validateChunkSize(session, chunkIndex, content.length, traceId);
+        int expectedChunkSize = request.getChunkSize();
+        if (expectedChunkSize <= 0) {
+            expectedChunkSize = content.length;
+        }
+        
+        ApiResponse<Void> sizeValidation = validateChunkSize(session, chunkIndex, expectedChunkSize, traceId);
         if (!sizeValidation.isSuccess()) {
             return ApiResponse.failure(sizeValidation.getCode(), sizeValidation.getMsg());
         }
-
         try {
             final String destFileName = request.getDestFileName();
             Path chunkFile = Path.of(session.getTempDirectory(), destFileName + "_chunk_" + chunkIndex);
+            
+            // 校验当前分片是否已经上传过，如果已经上传过则直接返回成功，避免重复写入
+            ApiResponse<Void> duplicateCheck = checkDuplicateChunk(session, chunkFile, chunkIndex, expectedChunkSize, traceId, transferId);
+            if (duplicateCheck.isSuccess()) {
+                logger.debug("[traceId={}] Chunk {} already uploaded for session {}, skipping duplicate upload", traceId, chunkIndex, transferId);
+                return buildChunkUploadResult(session, transferId, traceId);
+            }
             
             ApiResponse<Void> writeResult = writeChunkWithRetry(chunkFile, content, traceId, transferId, chunkIndex);
             if (!writeResult.isSuccess()) {
@@ -480,6 +491,62 @@ public class ChunkedTransferService {
         return chunkIndex == session.getTotalChunks() - 1
                 ? (int) (session.getTotalSize() - (long) chunkIndex * session.getChunkSize())
                 : session.getChunkSize();
+    }
+
+    /**
+     * 校验分片是否重复上传
+     * 
+     * 该方法用于检查指定分片是否已经成功上传过，避免重复写入和浪费资源。
+     * 通过检查 UploadSession 中的已接收分片索引集合以及物理文件的存在性和大小来验证。
+     * 
+     * 方法执行流程：
+     * 1. 检查分片索引是否已在 UploadSession 的已接收集合中
+     * 2. 如果不在集合中，说明该分片未上传过，返回失败（需要上传）
+     * 3. 如果在集合中，进一步检查物理文件是否存在
+     * 4. 如果物理文件不存在，说明文件可能被意外删除，返回失败（需要重新上传）
+     * 5. 如果物理文件存在，验证文件大小是否与预期一致
+     * 6. 如果文件大小一致，说明分片已成功上传，返回成功（跳过重复上传）
+     * 7. 如果文件大小不一致，说明文件可能损坏，返回失败（需要重新上传）
+     * 
+     * @param session 上传会话对象，包含已接收分片的索引集合
+     * @param chunkFile 分片文件的物理路径
+     * @param chunkIndex 分片索引
+     * @param expectedSize 预期的分片大小
+     * @param traceId 追踪ID，用于日志记录
+     * @param transferId 传输ID，用于日志记录
+     * @return ApiResponse<Void> 成功表示分片已存在且有效（跳过上传），失败表示需要上传
+     */
+    private ApiResponse<Void> checkDuplicateChunk(UploadSession session, Path chunkFile, int chunkIndex, 
+                                                  int expectedSize, String traceId, String transferId) {
+        if (!session.isChunkReceived(chunkIndex)) {
+            logger.debug("[traceId={}] Chunk {} not yet received for session {}", traceId, chunkIndex, transferId);
+            return ApiResponse.failure(ApiCode.CHUNK_NOT_RECEIVED.getCode(), "Chunk not yet received");
+        }
+        
+        if (!Files.exists(chunkFile)) {
+            logger.warn("[traceId={}] Chunk {} marked as received but file missing for session {}, need to re-upload", 
+                    traceId, chunkIndex, transferId);
+            return ApiResponse.failure(ApiCode.CHUNK_FILE_MISSING.getCode(), "Chunk file missing, need to re-upload");
+        }
+        
+        try {
+            long actualSize = Files.size(chunkFile);
+            if (actualSize == expectedSize) {
+                logger.debug("[traceId={}] Chunk {} already exists with correct size {} for session {}", 
+                        traceId, chunkIndex, actualSize, transferId);
+                return ApiResponse.success(null);
+            } else {
+                logger.warn("[traceId={}] Chunk {} file size mismatch for session {}: expected={}, actual={}, need to re-upload", 
+                        traceId, chunkIndex, transferId, expectedSize, actualSize);
+                return ApiResponse.failure(ApiCode.CHUNK_FILE_SIZE_MISMATCH.getCode(),
+                        "Chunk file size mismatch. Expected: " + expectedSize + ", actual: " + actualSize);
+            }
+        } catch (IOException e) {
+            logger.error("[traceId={}] Failed to check chunk file size for session {}: chunkIndex={}", 
+                    traceId, transferId, chunkIndex, e);
+            return ApiResponse.failure(ApiCode.CHUNK_FILE_CHECK_FAILED.getCode(), 
+                    "Failed to check chunk file: " + e.getMessage());
+        }
     }
 
     private ApiResponse<Void> writeChunkWithRetry(Path chunkFile, byte[] content, String traceId, String transferId, int chunkIndex) 

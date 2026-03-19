@@ -10,6 +10,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.netty.util.AttributeKey;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseHandler implements IRequestHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(BaseHandler.class);
+    private static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
     protected static final Gson gson = new Gson();
     protected final FileService fileService;
     protected final ChunkedTransferService chunkedTransferService;
@@ -65,6 +67,13 @@ public abstract class BaseHandler implements IRequestHandler {
     }
 
     protected void sendResponse(ChannelHandlerContext ctx, FullHttpRequest request, HttpResponseStatus status, String content) {
+        String traceId = request != null ? request.headers().get("X-Trace-Id") : null;
+        if (traceId == null || traceId.isEmpty()) {
+            traceId = "N/A";
+        }
+        
+        ctx.channel().attr(TRACE_ID_KEY).set(traceId);
+        
         ByteBuf buffer = Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
         FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buffer);
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
@@ -87,35 +96,13 @@ public abstract class BaseHandler implements IRequestHandler {
         String connectionId = ctx.channel().id().asShortText();
         
         // Log response details
-        logger.info("Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}", 
-            status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
+        logger.info("[traceId={}] Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}", 
+            traceId, status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
         
         if (keepAlive) {
             ctx.writeAndFlush(response);
         } else {
             ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
         }
-    }
-    
-    protected void sendResponse(ChannelHandlerContext ctx, HttpResponseStatus status, String content) {
-        ByteBuf buffer = Unpooled.copiedBuffer(content, StandardCharsets.UTF_8);
-        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status, buffer);
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/json; charset=UTF-8");
-        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
-        response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-        
-        // Get connection information
-        String remoteAddress = ctx.channel().remoteAddress().toString();
-        int localPort = ctx.channel().localAddress() instanceof java.net.InetSocketAddress ? 
-            ((java.net.InetSocketAddress) ctx.channel().localAddress()).getPort() : 0;
-        int remotePort = ctx.channel().remoteAddress() instanceof java.net.InetSocketAddress ? 
-            ((java.net.InetSocketAddress) ctx.channel().remoteAddress()).getPort() : 0;
-        String connectionId = ctx.channel().id().asShortText();
-        
-        // Log response details
-        logger.info("Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}", 
-            status, content, false, connectionId, localPort, remoteAddress, remotePort);
-        
-        ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
     }
 }

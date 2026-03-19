@@ -25,12 +25,12 @@ public class StouHandler extends BaseHandler {
         try {
             StouRequest body = parseBody(request, StouRequest.class);
             if (body == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Request body is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Request body is required"));
                 return;
             }
             String directory = body.getDirectory() != null ? body.getDirectory() : ".";
             if (body.getContent() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
                 return;
             }
             byte[] content = "base64".equals(body.getEncoding())
@@ -39,7 +39,7 @@ public class StouHandler extends BaseHandler {
             ApiResponse<FileInfo> result = fileService.storeUnique(directory, content, body.getPrefix());
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

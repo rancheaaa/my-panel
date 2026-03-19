@@ -23,7 +23,7 @@ public class ChunkDownloadHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
         String startParam = getQueryParam(request, "start", null);
@@ -38,13 +38,13 @@ public class ChunkDownloadHandler extends BaseHandler {
                 end = Long.parseLong(endParam);
             }
         } catch (NumberFormatException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid 'start' or 'end' parameter"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid 'start' or 'end' parameter"));
             return;
         }
 
         ApiResponse<ChunkedDownloadResult> result = chunkedTransferService.downloadRange(path, start, end);
         if (!result.isSuccess()) {
-            sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
+            sendResponse(ctx,request, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
             return;
         }
         ChunkedDownloadResult dataResult = result.getData();
@@ -57,6 +57,6 @@ public class ChunkDownloadHandler extends BaseHandler {
         resp.setRangeEnd(dataResult.getRangeEnd());
         resp.setTotalSize(dataResult.getTotalSize());
         resp.setFileName(dataResult.getFileName());
-        sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(resp));
+        sendResponse(ctx,request, HttpResponseStatus.OK, gson.toJson(resp));
     }
 }

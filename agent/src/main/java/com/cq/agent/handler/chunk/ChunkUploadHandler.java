@@ -36,16 +36,15 @@ public class ChunkUploadHandler extends BaseHandler {
 
             ChunkUploadRequest body = parseBody(request, ChunkUploadRequest.class);
             if (body == null || body.getTransferId() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
 
             // Log received metadata with traceid
-            logger.debug("[traceId={}] Received chunk upload request: transferId={}, chunkIndex={}, sourceAgentId={}, sourceFileDir={}, sourceFileName={}, destFileDir={}, destFileName={}",
-                    traceId, body.getTransferId(), body.getChunkIndex(), body.getSourceAgentId(), body.getSourceFileDir(), body.getSourceFileName(), body.getDestFileDir(), body.getDestFileName());
+            logger.debug("[traceId={}] Received chunk upload request {}", traceId, body);
 
             if (body.getContent() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
                 return;
             }
             byte[] content = "base64".equals(body.getEncoding())
@@ -54,7 +53,7 @@ public class ChunkUploadHandler extends BaseHandler {
             ApiResponse<ChunkUploadResultData> result = chunkedTransferService.uploadChunk(traceId, body, content);
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

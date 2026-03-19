@@ -32,7 +32,7 @@ public class ChunkMergeHandler extends BaseHandler {
 
             ChunkMergeRequest body = parseBody(request, ChunkMergeRequest.class);
             if (body == null || body.getTransferId() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
             logger.debug("[traceId={}] Received merge request: transferId={}", traceId, body.getTransferId());
@@ -45,7 +45,7 @@ public class ChunkMergeHandler extends BaseHandler {
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             logger.debug("Invalid JSON format for merge request", e);
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

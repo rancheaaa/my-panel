@@ -25,11 +25,11 @@ public class AppeHandler extends BaseHandler {
         try {
             AppeRequest body = parseBody(request, AppeRequest.class);
             if (body == null || body.getPath() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' field is required"));
                 return;
             }
             if (body.getContent() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
                 return;
             }
             byte[] content = "base64".equals(body.getEncoding())
@@ -38,7 +38,7 @@ public class AppeHandler extends BaseHandler {
             ApiResponse<FileInfo> result = fileService.append(body.getPath(), content);
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

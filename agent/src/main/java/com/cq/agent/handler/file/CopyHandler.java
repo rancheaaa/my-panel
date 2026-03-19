@@ -22,13 +22,13 @@ public class CopyHandler extends BaseHandler {
         try {
             CopyRequest body = parseBody(request, CopyRequest.class);
             if (body == null || body.getFrom() == null || body.getTo() == null) {
-                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'from' and 'to' fields are required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'from' and 'to' fields are required"));
                 return;
             }
             ApiResponse<FileInfo> result = fileService.copy(body.getFrom(), body.getTo());
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
         }
     }
 }

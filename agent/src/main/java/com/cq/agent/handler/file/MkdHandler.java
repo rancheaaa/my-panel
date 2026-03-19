@@ -19,7 +19,7 @@ public class MkdHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
         ApiResponse<FileInfo> result = fileService.makeDirectory(path);

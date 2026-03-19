@@ -65,6 +65,10 @@ public enum ApiCode {
     READ_FILE_FAILED(2014, "Failed to read file"),
     DOWNLOAD_DIRECTORY_FAILED(2015, "Cannot download directory"),
     GET_DOWNLOAD_INFO_FAILED(2016, "Failed to get download info"),
+    CHUNK_NOT_RECEIVED(2018, "Chunk not yet received"),
+    CHUNK_FILE_MISSING(2019, "Chunk file is missing"),
+    CHUNK_FILE_SIZE_MISMATCH(2021, "Chunk file size mismatch"),
+    CHUNK_FILE_CHECK_FAILED(2020, "Failed to check chunk file"),
     // Command Execution
     COMMAND_NOT_FOUND(3001, "Command not found or is not executable"),
     COMMAND_EXECUTION_ERROR(3002, "Error executing command"),

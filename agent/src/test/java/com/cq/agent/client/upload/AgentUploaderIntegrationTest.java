@@ -24,11 +24,10 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
     @DisplayName("测试文件上传集成 - 用法: 测试分块上传文件到agent服务")
     public void testUpload() throws IOException {
         // Change this to your agent's address
-        String agentUrl = "http://172.19.200.130:7777";
         int concurrentUploads = 2;
 
         AgentConfig config = new AgentConfig();
-        AgentUploader uploader = new AgentUploader(config, agentUrl, concurrentUploads);
+        AgentUploader uploader = new AgentUploader(config, AGENT_URL, concurrentUploads);
         uploader.init();
         final int random = ThreadLocalRandom.current().nextInt(2, 6);
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB

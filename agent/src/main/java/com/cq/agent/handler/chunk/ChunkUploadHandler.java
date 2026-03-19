@@ -1,5 +1,6 @@
 package com.cq.agent.handler.chunk;
 
+import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkUploadRequest;
 import com.cq.agent.dto.ChunkUploadResultData;
@@ -36,7 +37,7 @@ public class ChunkUploadHandler extends BaseHandler {
 
             ChunkUploadRequest body = parseBody(request, ChunkUploadRequest.class);
             if (body == null || body.getTransferId() == null) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'transferId' field is required"));
                 return;
             }
 
@@ -44,7 +45,7 @@ public class ChunkUploadHandler extends BaseHandler {
             logger.debug("[traceId={}] Received chunk upload request {}", traceId, body);
 
             if (body.getContent() == null) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'content' field is required"));
                 return;
             }
             byte[] content = "base64".equals(body.getEncoding())
@@ -53,7 +54,7 @@ public class ChunkUploadHandler extends BaseHandler {
             ApiResponse<ChunkUploadResultData> result = chunkedTransferService.uploadChunk(traceId, body, content);
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

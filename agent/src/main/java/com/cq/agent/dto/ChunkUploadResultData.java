@@ -1,5 +1,7 @@
 package com.cq.agent.dto;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  *
  * @author cq 2026/3/18 14:21
@@ -9,7 +11,7 @@ public class ChunkUploadResultData {
 
     private String transferId;
     private Boolean completed;
-    private Integer missingChunksCount;
+    private AtomicInteger missingChunksCount;
 
     public String getTransferId() {
         return transferId;
@@ -28,10 +30,10 @@ public class ChunkUploadResultData {
     }
 
     public Integer getMissingChunksCount() {
-        return missingChunksCount;
+        return missingChunksCount.get();
     }
 
     public void setMissingChunksCount(Integer missingChunksCount) {
-        this.missingChunksCount = missingChunksCount;
+        this.missingChunksCount.set(missingChunksCount);
     }
 }

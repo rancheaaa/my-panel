@@ -19,7 +19,9 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseHandler implements IRequestHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(BaseHandler.class);
-    private static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
+    protected static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
+    protected static final AttributeKey<String> REQUEST_URI_KEY = AttributeKey.valueOf("requestUri");
+
     protected static final Gson gson = new Gson();
     protected final FileService fileService;
     protected final ChunkedTransferService chunkedTransferService;
@@ -47,25 +49,18 @@ public abstract class BaseHandler implements IRequestHandler {
     }
 
     protected <T> void sendServiceResult(ChannelHandlerContext ctx, FullHttpRequest request, ApiResponse<T> result) {
-        if (result.isSuccess()) {
-            sendSuccessResponse(ctx, request, result.getData());
-        } else {
-            sendResponse(ctx, request, HttpResponseStatus.OK, gson.toJson(result));
-        }
+        sendResponse(ctx, request, HttpResponseStatus.OK, gson.toJson(result));
     }
 
-    protected void sendSuccessResponse(ChannelHandlerContext ctx, FullHttpRequest request, Object data) {
-        sendResponse(ctx, request, HttpResponseStatus.OK, gson.toJson(ApiResponse.success(data)));
+    protected <T> void sendSuccessResponse(ChannelHandlerContext ctx, FullHttpRequest request, T data) {
+        ApiResponse<T> response = ApiResponse.success(data);
+        sendResponse(ctx, request, HttpResponseStatus.OK, gson.toJson(response));
     }
 
     protected String createErrorResponse(ApiCode code, String message) {
         return gson.toJson(ApiResponse.failure(code.getCode(), message));
     }
-
-    protected String createErrorResponse(String message) {
-        return createErrorResponse(ApiCode.GENERIC_ERROR, message);
-    }
-
+    
     protected void sendResponse(ChannelHandlerContext ctx, FullHttpRequest request, HttpResponseStatus status, String content) {
         String traceId = request != null ? request.headers().get("X-Trace-Id") : null;
         if (traceId == null || traceId.isEmpty()) {
@@ -80,9 +75,14 @@ public abstract class BaseHandler implements IRequestHandler {
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
         
         // Handle keep-alive
-        boolean keepAlive = request != null && HttpUtil.isKeepAlive(request);
-        if (keepAlive) {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        boolean keepAlive = false;
+        if(request != null) {
+            keepAlive = HttpUtil.isKeepAlive(request);
+            if (keepAlive) {
+                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+            } else {
+                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            }
         } else {
             response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
         }
@@ -96,8 +96,8 @@ public abstract class BaseHandler implements IRequestHandler {
         String connectionId = ctx.channel().id().asShortText();
         
         // Log response details
-        logger.info("[traceId={}] Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}", 
-            traceId, status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
+        logger.info("[traceId={}] Sending response: uri={}, method={}, status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}",
+            traceId, request == null ? ctx.channel().attr(REQUEST_URI_KEY).get() : request.uri(), request == null ? "N/A" : request.method().toString(), status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
         
         if (keepAlive) {
             ctx.writeAndFlush(response);

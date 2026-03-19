@@ -29,7 +29,7 @@ public class ChmodHandler extends BaseHandler {
             ApiResponse<FileInfo> result = fileService.chmod(body.getPath(), body.getPermissions());
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

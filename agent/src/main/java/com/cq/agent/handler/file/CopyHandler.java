@@ -1,5 +1,6 @@
 package com.cq.agent.handler.file;
 
+import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.CopyRequest;
 import com.cq.agent.handler.BaseHandler;
@@ -22,13 +23,13 @@ public class CopyHandler extends BaseHandler {
         try {
             CopyRequest body = parseBody(request, CopyRequest.class);
             if (body == null || body.getFrom() == null || body.getTo() == null) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'from' and 'to' fields are required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'from' and 'to' fields are required"));
                 return;
             }
             ApiResponse<FileInfo> result = fileService.copy(body.getFrom(), body.getTo());
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

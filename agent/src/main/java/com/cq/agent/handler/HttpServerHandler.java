@@ -10,7 +10,6 @@ import com.google.gson.JsonSyntaxException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
@@ -26,7 +25,6 @@ public class HttpServerHandler extends CommonNettyHandler {
     private static final Gson gson = new Gson();
     private static final String EXECUTE_PATH = "/api/execute";
     private static final String HEALTH_PATH = "/api/health";
-    private static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
 
     private final CommandExecutor commandExecutor;
 
@@ -43,10 +41,11 @@ public class HttpServerHandler extends CommonNettyHandler {
         }
         
         ctx.channel().attr(TRACE_ID_KEY).set(traceid);
-        
+        ctx.channel().attr(REQUEST_URI_KEY).set(request.uri() + " " + request.method().toString());
+
         try {
             if (!request.decoderResult().isSuccess()) {
-                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid request"));
+                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid request"));
                 return;
             }
 
@@ -60,7 +59,7 @@ public class HttpServerHandler extends CommonNettyHandler {
             } else if (uri.equals(EXECUTE_PATH) && method == HttpMethod.POST) {
                 handleExecute(ctx, request);
             } else {
-                sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND, createErrorResponse("Endpoint not found"));
+                sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND, createErrorResponse(ApiCode.NOT_FOUND, "Endpoint not found"));
             }
         } finally {
             // 不再使用MDC，traceid通过手工打印传递
@@ -83,7 +82,7 @@ public class HttpServerHandler extends CommonNettyHandler {
         String body = content.toString(StandardCharsets.UTF_8);
 
         if (body.isEmpty()) {
-            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Request body is required"));
+            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Request body is required"));
             return;
         }
 
@@ -98,7 +97,7 @@ public class HttpServerHandler extends CommonNettyHandler {
             if (requestJson.getTimeout() != null && requestJson.getTimeout() > 0) {
                 if (requestJson.getTimeout() > commandExecutor.getMaxTimeoutSeconds()) {
                     sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST,
-                            createErrorResponse("Timeout must be between 1 and " + commandExecutor.getMaxTimeoutSeconds() + " seconds"));
+                            createErrorResponse(ApiCode.INVALID_REQUEST, "Timeout must be between 1 and " + commandExecutor.getMaxTimeoutSeconds() + " seconds"));
                     return;
                 }
                 timeout = requestJson.getTimeout();
@@ -117,12 +116,11 @@ public class HttpServerHandler extends CommonNettyHandler {
             sendResponse(ctx, request, HttpResponseStatus.OK, gson.toJson(resp));
 
         } catch (JsonSyntaxException e) {
-            logger.warn("Invalid JSON in request body", e);
             sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         } catch (Exception e) {
-            logger.error("Error processing request", e);
+            logger.error("[traceId={}] Error executing command", getTraceId(ctx), e);
             sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    createErrorResponse("Internal server error: " + e.getMessage()));
+                    createErrorResponse(ApiCode.INTERNAL_SERVER_ERROR, "Internal server error: " + e.getMessage()));
         }
     }
 }

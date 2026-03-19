@@ -26,13 +26,13 @@ public class RetrRawHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String pathParam = getQueryParam(request, "path", null);
         if (pathParam == null) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'path' parameter is required"));
             return;
         }
 
         ApiResponse<FileInfo> statResult = fileService.stat(pathParam);
         if (!statResult.isSuccess()) {
-            sendResponse(ctx,request, HttpResponseStatus.OK, createErrorResponse(statResult.getMsg()));
+            sendResponse(ctx,request, HttpResponseStatus.OK, createErrorResponse(ApiCode.GET_STATUS_FAILED, statResult.getMsg()));
             return;
         }
 
@@ -53,7 +53,7 @@ public class RetrRawHandler extends BaseHandler {
         }
 
         if (start < 0 || start >= fileSize) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid 'start' parameter range"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_RANGE, "Invalid 'start' parameter range"));
             return;
         }
 
@@ -62,7 +62,7 @@ public class RetrRawHandler extends BaseHandler {
             try {
                 length = Long.parseLong(lengthParam);
             } catch (NumberFormatException e) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid 'length' parameter"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid 'length' parameter"));
                 return;
             }
         } else {
@@ -70,7 +70,7 @@ public class RetrRawHandler extends BaseHandler {
         }
 
         if (length <= 0 || start + length > fileSize) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid range"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_RANGE, "Invalid range"));
             return;
         }
 
@@ -111,7 +111,7 @@ public class RetrRawHandler extends BaseHandler {
                 }
             });
         } catch (IOException e) {
-            sendResponse(ctx,request, HttpResponseStatus.INTERNAL_SERVER_ERROR, createErrorResponse("Failed to read file: " + e.getMessage()));
+            sendResponse(ctx,request, HttpResponseStatus.INTERNAL_SERVER_ERROR, createErrorResponse(ApiCode.READ_FILE_FAILED, "Failed to read file: " + e.getMessage()));
         }
     }
 }

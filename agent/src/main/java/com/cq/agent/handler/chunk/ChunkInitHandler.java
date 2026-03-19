@@ -1,5 +1,6 @@
 package com.cq.agent.handler.chunk;
 
+import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkInitRequest;
 import com.cq.agent.dto.ChunkStatusData;
@@ -30,7 +31,7 @@ public class ChunkInitHandler extends BaseHandler {
 
             ChunkInitRequest body = parseBody(request, ChunkInitRequest.class);
             if (body == null || body.getDestFileDir() == null || body.getDestFileName() == null || body.getTotalSize() <= 0) {
-                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'destFileDir', 'destFileName' and 'totalSize' (positive) are required"));
+                sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'destFileDir', 'destFileName' and 'totalSize' (positive) are required"));
                 return;
             }
             log.debug("[traceId={}] receive init upload request: {}", traceId, body);
@@ -38,7 +39,7 @@ public class ChunkInitHandler extends BaseHandler {
                     traceId, body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

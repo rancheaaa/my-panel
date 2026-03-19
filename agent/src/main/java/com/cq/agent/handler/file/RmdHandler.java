@@ -1,5 +1,6 @@
 package com.cq.agent.handler.file;
 
+import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.service.ChunkedTransferService;
@@ -18,7 +19,7 @@ public class RmdHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'path' parameter is required"));
             return;
         }
         boolean recursive = "true".equals(getQueryParam(request, "recursive", "false"));

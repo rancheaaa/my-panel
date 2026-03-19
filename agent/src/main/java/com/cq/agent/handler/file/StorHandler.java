@@ -26,7 +26,7 @@ public class StorHandler extends BaseHandler {
         try {
             StorRequest body = parseBody(request, StorRequest.class);
             if (body == null || body.getPath() == null) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'path' field is required"));
                 return;
             }
             if (body.getContent() == null) {
@@ -39,7 +39,7 @@ public class StorHandler extends BaseHandler {
             ApiResponse<FileInfo> result = fileService.store(body.getPath(), content);
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

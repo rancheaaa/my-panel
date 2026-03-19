@@ -12,6 +12,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 /**
  * @author cq 2026/3/19 21:23
@@ -19,7 +20,8 @@ import java.nio.charset.StandardCharsets;
 public abstract class CommonNettyHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     private static final Logger logger = org.slf4j.LoggerFactory.getLogger(CommonNettyHandler.class);
-    private static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
+    protected static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
+    protected static final AttributeKey<String> REQUEST_URI_KEY = AttributeKey.valueOf("requestUri");
     private static final Gson gson = new Gson();
 
     protected String createErrorResponse(ApiCode code, String message) {
@@ -30,6 +32,15 @@ public abstract class CommonNettyHandler extends SimpleChannelInboundHandler<Ful
         return createErrorResponse(ApiCode.GENERIC_ERROR, message);
     }
 
+    protected String getTraceId(ChannelHandlerContext ctx) {
+        String traceId = ctx.channel().attr(TRACE_ID_KEY).get();
+        if (traceId == null || traceId.isEmpty()) {
+            traceId = UUID.randomUUID().toString();
+        }
+        return traceId;
+    }
+
+    @SuppressWarnings("all")
     protected void sendResponse(ChannelHandlerContext ctx, FullHttpRequest request, HttpResponseStatus status, String content) {
         String traceId = request != null ? request.headers().get("X-Trace-Id") : null;
         if (traceId == null || traceId.isEmpty()) {
@@ -42,9 +53,14 @@ public abstract class CommonNettyHandler extends SimpleChannelInboundHandler<Ful
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, buffer.readableBytes());
 
         // Handle keep-alive
-        boolean keepAlive = HttpUtil.isKeepAlive(request);
-        if (keepAlive) {
-            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        boolean keepAlive = false;
+        if(request != null) {
+            keepAlive = HttpUtil.isKeepAlive(request);
+            if (keepAlive) {
+                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+            } else {
+                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            }
         } else {
             response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
         }
@@ -58,8 +74,8 @@ public abstract class CommonNettyHandler extends SimpleChannelInboundHandler<Ful
         String connectionId = ctx.channel().id().asShortText();
 
         // Log response details
-        logger.info("[traceId={}] Sending response: status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}",
-                traceId, status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
+        logger.info("[traceId={}] Sending response: uri={}, method={}, status={}, content={}, keepAlive={}, connectionId={}, localPort={}, remoteAddress={}:{}",
+                traceId, request == null ? ctx.channel().attr(REQUEST_URI_KEY).get() : request.uri(), request == null ? "N/A" : request.method().toString(), status, content, keepAlive, connectionId, localPort, remoteAddress, remotePort);
 
         if (keepAlive) {
             ctx.writeAndFlush(response);
@@ -75,10 +91,10 @@ public abstract class CommonNettyHandler extends SimpleChannelInboundHandler<Ful
             logger.debug("Normal connection close in file handler: {}", cause.getMessage());
         } else {
             logger.error("Exception caught in file handler", cause);
-        }
-        if (ctx.channel().isActive()) {
-            sendResponse(ctx, null, HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    createErrorResponse("Internal server error"));
+            if (ctx.channel().isActive()) {
+                sendResponse(ctx, null, HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                        createErrorResponse(ApiCode.INTERNAL_SERVER_ERROR, "Internal server error"));
+            }
         }
     }
 

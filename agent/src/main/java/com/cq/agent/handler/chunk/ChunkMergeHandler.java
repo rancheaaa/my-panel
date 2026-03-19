@@ -1,5 +1,6 @@
 package com.cq.agent.handler.chunk;
 
+import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkMergeRequest;
 import com.cq.agent.dto.MergeResultData;
@@ -32,7 +33,7 @@ public class ChunkMergeHandler extends BaseHandler {
 
             ChunkMergeRequest body = parseBody(request, ChunkMergeRequest.class);
             if (body == null || body.getTransferId() == null) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'transferId' field is required"));
                 return;
             }
             logger.debug("[traceId={}] Received merge request: transferId={}", traceId, body.getTransferId());
@@ -45,7 +46,7 @@ public class ChunkMergeHandler extends BaseHandler {
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             logger.debug("Invalid JSON format for merge request", e);
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

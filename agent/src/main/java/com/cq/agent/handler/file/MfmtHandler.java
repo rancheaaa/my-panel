@@ -1,5 +1,6 @@
 package com.cq.agent.handler.file;
 
+import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.MfmtRequest;
 import com.cq.agent.handler.BaseHandler;
@@ -22,13 +23,13 @@ public class MfmtHandler extends BaseHandler {
         try {
             MfmtRequest body = parseBody(request, MfmtRequest.class);
             if (body == null || body.getPath() == null) {
-                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' field is required"));
+                sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'path' field is required"));
                 return;
             }
             ApiResponse<FileInfo> result = fileService.setModificationTime(body.getPath(), body.getTimestamp());
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));
         }
     }
 }

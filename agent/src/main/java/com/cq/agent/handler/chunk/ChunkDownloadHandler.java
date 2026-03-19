@@ -23,7 +23,7 @@ public class ChunkDownloadHandler extends BaseHandler {
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", null);
         if (path == null) {
-            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
+            sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'path' parameter is required"));
             return;
         }
         String startParam = getQueryParam(request, "start", null);
@@ -44,7 +44,7 @@ public class ChunkDownloadHandler extends BaseHandler {
 
         ApiResponse<ChunkedDownloadResult> result = chunkedTransferService.downloadRange(path, start, end);
         if (!result.isSuccess()) {
-            sendResponse(ctx,request, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
+            sendResponse(ctx,request, HttpResponseStatus.OK, createErrorResponse(ApiCode.GET_DOWNLOAD_INFO_FAILED, result.getMsg()));
             return;
         }
         ChunkedDownloadResult dataResult = result.getData();

@@ -3,7 +3,6 @@ package com.cq.agent.handler;
 import com.cq.agent.dto.ApiCode;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
-import io.netty.util.AttributeKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.UUID;
@@ -14,7 +13,6 @@ import java.util.UUID;
 public class FileHandler extends CommonNettyHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(FileHandler.class);
-    private static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
 
     private final HandlerFactory handlerFactory;
 
@@ -31,7 +29,8 @@ public class FileHandler extends CommonNettyHandler {
         }
         
         ctx.channel().attr(TRACE_ID_KEY).set(traceid);
-        
+        ctx.channel().attr(REQUEST_URI_KEY).set(request.uri() + " " + request.method().toString());
+
         try {
             if (!request.decoderResult().isSuccess()) {
                 sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid request"));
@@ -55,7 +54,7 @@ public class FileHandler extends CommonNettyHandler {
             } catch (Exception e) {
                 logger.error("[traceId={}] Error processing file request: ", traceid, e);
                 sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                        createErrorResponse("Internal error: " + e.getMessage()));
+                        createErrorResponse(ApiCode.INTERNAL_SERVER_ERROR, "Internal error: " + e.getMessage()));
             }
         } finally {
             // 不再使用MDC，traceid通过手工打印传递

@@ -24,7 +24,9 @@ public class ChunkCancelHandler extends BaseHandler {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
-            ApiResponse<Void> result = chunkedTransferService.cancelUpload(body.getTransferId());
+            // 从HTTP头获取traceid
+            String traceId = request.headers().get("X-Trace-Id");
+            ApiResponse<Void> result = chunkedTransferService.cancelUpload(body.getTransferId(), traceId);
             sendServiceResult(ctx,request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));

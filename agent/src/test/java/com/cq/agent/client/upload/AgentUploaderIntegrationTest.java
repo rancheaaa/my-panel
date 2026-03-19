@@ -34,6 +34,7 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB
         // Standard remote path, relative to agent's base directory
         // Standard remote path, must be absolute
+//        String remotePath = "test/" + testFile.getName();
         String remotePath = "/tmp/uploaded-files/" + testFile.getName();
         CountDownLatch latch = new CountDownLatch(1);
 

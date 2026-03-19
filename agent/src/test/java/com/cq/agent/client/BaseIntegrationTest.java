@@ -38,7 +38,8 @@ public class BaseIntegrationTest {
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
-            connection.setRequestProperty("Connection", "keep-alive");
+//            connection.setRequestProperty("connection", "keep-alive");
+            connection.setRequestProperty("connection", "close");
 
             int responseCode = connection.getResponseCode();
             logger.info("GET request response code: {}", responseCode);
@@ -79,7 +80,8 @@ public class BaseIntegrationTest {
             connection.setReadTimeout(10000);
             connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("Connection", "keep-alive");
+            connection.setRequestProperty("connection", "close");
+//            connection.setRequestProperty("connection", "keep-alive");
 
             // Send request body
             connection.getOutputStream().write(requestBody.getBytes());

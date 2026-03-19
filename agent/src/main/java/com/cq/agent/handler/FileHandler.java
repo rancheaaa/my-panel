@@ -11,7 +11,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
@@ -31,12 +30,11 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-        // Generate or get traceid
+        // Get traceid from HTTP header
         String traceid = request.headers().get("X-Trace-Id");
         if (traceid == null || traceid.isEmpty()) {
             traceid = UUID.randomUUID().toString();
         }
-        MDC.put("traceid", traceid);
         
         try {
             if (!request.decoderResult().isSuccess()) {
@@ -50,7 +48,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             String path = queryIndex > 0 ? uri.substring(0, queryIndex) : uri;
             HttpMethod method = request.method();
 
-            logger.debug("File request: {} {}", method, uri);
+            logger.debug("[traceId={}] File request: {} {}", traceid, method, uri);
             try {
                 IRequestHandler handler = handlerFactory.getHandler(path);
                 if (handler != null) {
@@ -59,12 +57,12 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                     ctx.fireChannelRead(request.retain());
                 }
             } catch (Exception e) {
-                logger.error("Error processing file request", e);
+                logger.error("[traceId={}] Error processing file request: ", traceid, e);
                 sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR,
                         createErrorResponse("Internal error: " + e.getMessage()));
             }
         } finally {
-            MDC.clear();
+            // 不再使用MDC，traceid通过手工打印传递
         }
     }
 

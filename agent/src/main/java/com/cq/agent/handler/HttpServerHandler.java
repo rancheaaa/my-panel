@@ -16,7 +16,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
@@ -39,12 +38,11 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-        // Generate or get traceid
+        // Get traceid from HTTP header
         String traceid = request.headers().get("X-Trace-Id");
         if (traceid == null || traceid.isEmpty()) {
             traceid = UUID.randomUUID().toString();
         }
-        MDC.put("traceid", traceid);
         
         try {
             if (!request.decoderResult().isSuccess()) {
@@ -55,7 +53,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             String uri = request.uri();
             HttpMethod method = request.method();
 
-            logger.debug("Received request: {} {}", method, uri);
+            logger.debug("[traceId={}] Received request: {} {}", traceid, method, uri);
 
             if (uri.equals(HEALTH_PATH) && method == HttpMethod.GET) {
                 handleHealthCheck(ctx, request);
@@ -65,7 +63,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND, createErrorResponse("Endpoint not found"));
             }
         } finally {
-            MDC.clear();
+            // 不再使用MDC，traceid通过手工打印传递
         }
     }
 

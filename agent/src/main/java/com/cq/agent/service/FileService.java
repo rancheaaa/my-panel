@@ -118,10 +118,10 @@ public class FileService {
 
             return ApiResponse.success(files);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to list directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to list directory: " + path);
+            return ApiResponse.failure(ApiCode.LIST_DIRECTORY_FAILED.getCode(), "Failed to list directory: " + path);
         }
     }
 
@@ -147,10 +147,10 @@ public class FileService {
             Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
             return ApiResponse.success(names);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to list directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to list directory: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.LIST_DIRECTORY_FAILED.getCode(), "Failed to list directory: " + e.getMessage());
         }
     }
 
@@ -164,7 +164,7 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             if (Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Cannot retrieve directory: " + path);
+                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(), "Cannot retrieve directory: " + path);
             }
             if (!Files.isReadable(targetPath)) {
                 return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "File is not readable: " + path);
@@ -178,10 +178,10 @@ public class FileService {
             byte[] content = Files.readAllBytes(targetPath);
             return ApiResponse.success(content);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to retrieve file: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to retrieve file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.RETRIEVE_FILE_FAILED.getCode(), "Failed to retrieve file: " + e.getMessage());
         }
     }
 
@@ -223,10 +223,10 @@ public class FileService {
             logger.info("File stored: {}", targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to store file: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to store file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.STORE_FILE_FAILED.getCode(), "Failed to store file: " + e.getMessage());
         }
     }
 
@@ -256,10 +256,10 @@ public class FileService {
             logger.info("File stored with unique name: {}", targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + directory);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + directory);
         } catch (IOException e) {
             logger.error("Failed to store unique file: {}", directory, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to store file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.STORE_FILE_FAILED.getCode(), "Failed to store file: " + e.getMessage());
         }
     }
 
@@ -287,10 +287,10 @@ public class FileService {
             logger.info("Content appended to file: {}", targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to append to file: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to append to file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.APPEND_FILE_FAILED.getCode(), "Failed to append to file: " + e.getMessage());
         }
     }
 
@@ -311,10 +311,10 @@ public class FileService {
             logger.info("File deleted: {}", targetPath);
             return ApiResponse.success(null);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to delete file: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to delete file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.DELETE_FILE_FAILED.getCode(), "Failed to delete file: " + e.getMessage());
         }
     }
 
@@ -335,7 +335,7 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(),"Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to create directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to create directory: " + path);
+            return ApiResponse.failure(ApiCode.CREATE_DIRECTORY_FAILED.getCode(), "Failed to create directory: " + path);
         }
     }
 
@@ -367,10 +367,10 @@ public class FileService {
             logger.info("Directory removed: {}", targetPath);
             return ApiResponse.success(null);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to remove directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to remove directory: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.REMOVE_DIRECTORY_FAILED.getCode(), "Failed to remove directory: " + e.getMessage());
         }
     }
 
@@ -397,14 +397,14 @@ public class FileService {
         try {
             Path targetPath = resolvePath(path);
             if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Path does not exist: " + path);
+                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "Path does not exist: " + path);
             }
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(),"Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get directory info: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to get directory info: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_DIRECTORY_INFO_FAILED.getCode(), "Failed to get directory info: " + e.getMessage());
         }
     }
 
@@ -419,10 +419,10 @@ public class FileService {
             }
             return ApiResponse.success(Files.size(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get file size: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to get file size: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_FILE_SIZE_FAILED.getCode(), "Failed to get file size: " + e.getMessage());
         }
     }
 
@@ -433,14 +433,14 @@ public class FileService {
         try {
             Path targetPath = resolvePath(path);
             if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"File does not exist: " + path);
+                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             return ApiResponse.success(Files.getLastModifiedTime(targetPath).toMillis());
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get modification time: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to get modification time: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_MODIFICATION_TIME_FAILED.getCode(), "Failed to get modification time: " + e.getMessage());
         }
     }
 
@@ -451,16 +451,16 @@ public class FileService {
         try {
             Path targetPath = resolvePath(path);
             if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"File does not exist: " + path);
+                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             Files.setLastModifiedTime(targetPath, FileTime.fromMillis(timestamp));
             logger.info("Modification time set for: {}", targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to set modification time: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Failed to set modification time: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.SET_MODIFICATION_TIME_FAILED.getCode(), "Failed to set modification time: " + e.getMessage());
         }
     }
 
@@ -489,10 +489,10 @@ public class FileService {
             logger.info("Renamed: {} -> {}", sourcePath, targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied");
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied");
         } catch (IOException e) {
             logger.error("Failed to rename: {} -> {}", fromPath, toPath, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to rename: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.RENAME_FAILED.getCode(), "Failed to rename: " + e.getMessage());
         }
     }
 
@@ -508,7 +508,7 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "Source does not exist: " + fromPath);
             }
             if (Files.isDirectory(sourcePath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Cannot copy directory: " + fromPath);
+                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(), "Cannot copy directory: " + fromPath);
             }
             if (Files.exists(targetPath)) {
                 return ApiResponse.failure(ApiCode.PATH_ALREADY_EXISTS.getCode(),"Target already exists: " + toPath);
@@ -524,10 +524,10 @@ public class FileService {
             logger.info("Copied: {} -> {}", sourcePath, targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Access denied");
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied");
         } catch (IOException e) {
             logger.error("Failed to copy: {} -> {}", fromPath, toPath, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to copy from '" + fromPath + "' to '" + toPath + "': " + e.getMessage());
+            return ApiResponse.failure(ApiCode.COPY_FAILED.getCode(), "Failed to copy: " + e.getMessage());
         }
     }
 
@@ -538,14 +538,14 @@ public class FileService {
         try {
             Path targetPath = resolvePath(path);
             if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Path does not exist: " + path);
+                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "Path does not exist: " + path);
             }
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get status: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to get status: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_STATUS_FAILED.getCode(), "Failed to get status: " + e.getMessage());
         }
     }
 
@@ -557,7 +557,7 @@ public class FileService {
             Path targetPath = resolvePath(path);
             return ApiResponse.success(Files.exists(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         }
     }
 
@@ -566,13 +566,13 @@ public class FileService {
      */
     public ApiResponse<FileInfo> chmod(String path, String permissions) {
         if (IS_WINDOWS) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"CHMOD is not supported on Windows");
+            return ApiResponse.failure(ApiCode.CHMOD_NOT_SUPPORTED.getCode(), "CHMOD is not supported on Windows");
         }
 
         try {
             Path targetPath = resolvePath(path);
             if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Path does not exist: " + path);
+                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "Path does not exist: " + path);
             }
 
             Set<PosixFilePermission> perms = PosixFilePermissions.fromString(permissions);
@@ -582,10 +582,10 @@ public class FileService {
         } catch (IllegalArgumentException e) {
             return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Invalid permission string: " + permissions);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to change permissions: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Failed to change permissions: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.CHANGE_PERMISSIONS_FAILED.getCode(), "Failed to change permissions: " + e.getMessage());
         }
     }
 
@@ -596,7 +596,7 @@ public class FileService {
         try {
             Path targetPath = resolvePath(path);
             if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"File does not exist: " + path);
+                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             if (Files.isDirectory(targetPath)) {
                 return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Cannot calculate checksum for directory: " + path);
@@ -624,10 +624,10 @@ public class FileService {
         } catch (NoSuchAlgorithmException e) {
             return ApiResponse.failure(ApiCode.UNSUPPORTED_ALGORITHM.getCode(),"Unsupported algorithm: " + algorithm);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to calculate checksum: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to calculate checksum: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.CALCULATE_CHECKSUM_FAILED.getCode(), "Failed to calculate checksum: " + e.getMessage());
         }
     }
 
@@ -641,7 +641,7 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "Path does not exist: " + basePath);
             }
             if (!Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Path is not a directory: " + basePath);
+                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(), "Path is not a directory: " + basePath);
             }
 
             PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
@@ -663,7 +663,7 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(),"Access denied: " + basePath);
         } catch (IOException e) {
             logger.error("Failed to search: {}", basePath, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(),"Failed to search in " + basePath + ": " + e.getMessage());
+            return ApiResponse.failure(ApiCode.SEARCH_FAILED.getCode(), "Failed to search in " + basePath + ": " + e.getMessage());
         }
     }
 
@@ -681,10 +681,10 @@ public class FileService {
             space.put("free", store.getUnallocatedSpace());
             return ApiResponse.success(space);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get disk space: {}", path, e);
-            return ApiResponse.failure(ApiCode.INTERNAL_SERVER_ERROR.getCode(), "Failed to get disk space: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_DISK_SPACE_FAILED.getCode(), "Failed to get disk space: " + e.getMessage());
         }
     }
 

@@ -24,17 +24,23 @@ public class ChunkMergeHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
+            // 从HTTP头获取traceid
+            String traceId = request.headers().get("X-Trace-Id");
+            if (traceId == null || traceId.isEmpty()) {
+                traceId = java.util.UUID.randomUUID().toString();
+            }
+
             ChunkMergeRequest body = parseBody(request, ChunkMergeRequest.class);
             if (body == null || body.getTransferId() == null) {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
-            logger.debug("Received merge request for transferId: {}", body.getTransferId());
-            ApiResponse<MergeResultData> result = chunkedTransferService.mergeChunks(body.getTransferId());
+            logger.debug("[traceId={}] Received merge request: transferId={}", traceId, body.getTransferId());
+            ApiResponse<MergeResultData> result = chunkedTransferService.mergeChunks(traceId, body.getTransferId());
             if (result.isSuccess()) {
-                logger.debug("Merge successful for transferId: {}", body.getTransferId());
+                logger.debug("[traceId={}] Merge successful for transferId: {}", traceId, body.getTransferId());
             } else {
-                logger.debug("Merge failed for transferId: {} - {}", body.getTransferId(), result.getMsg());
+                logger.debug("[traceId={}] Merge failed for transferId: {} - {}", traceId, body.getTransferId(), result.getMsg());
             }
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {

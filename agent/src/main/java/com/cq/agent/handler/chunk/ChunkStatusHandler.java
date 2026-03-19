@@ -25,7 +25,8 @@ public class ChunkStatusHandler extends BaseHandler {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'transferId' parameter is required"));
             return;
         }
-        ApiResponse<ChunkStatusData> result = chunkedTransferService.getUploadStatus(transferId);
+        String traceid = request.headers().get("X-Trace-Id");
+        ApiResponse<ChunkStatusData> result = chunkedTransferService.getUploadStatus(transferId, traceid);
         sendServiceResult(ctx,request, result);
     }
 }

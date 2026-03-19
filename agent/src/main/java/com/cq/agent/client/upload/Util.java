@@ -32,6 +32,9 @@ class Util {
     }
 
     static String transferToLinuxPath(String path) {
+        if (path == null || path.isBlank()) {
+            return "";
+        }
         return path.replace("\\", "/");
     }
 

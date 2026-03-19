@@ -14,6 +14,7 @@ public class UploadSession {
     private static final Gson gson = new Gson();
 
     private final String transferId;
+    private final String traceId;
     private final String destFileDir;
     private final String destFileName;
     private final long totalSize;
@@ -29,7 +30,13 @@ public class UploadSession {
 
     public UploadSession(String transferId, String destFileDir, String destFileName,
                          long totalSize, int totalChunks, int chunkSize, String tempDirectory) {
+        this(transferId, null, destFileDir, destFileName, totalSize, totalChunks, chunkSize, tempDirectory);
+    }
+
+    public UploadSession(String transferId, String traceId, String destFileDir, String destFileName,
+                         long totalSize, int totalChunks, int chunkSize, String tempDirectory) {
         this.transferId = transferId;
+        this.traceId = traceId;
         this.destFileDir = destFileDir;
         this.destFileName = destFileName;
         this.totalSize = totalSize;
@@ -45,6 +52,10 @@ public class UploadSession {
 
     public String getTransferId() {
         return transferId;
+    }
+
+    public String getTraceId() {
+        return traceId;
     }
 
     public String getDestFileDir() {

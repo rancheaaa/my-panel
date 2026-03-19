@@ -28,15 +28,21 @@ public class ChunkUploadHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
+            // 从HTTP头获取traceid
+            String traceId = request.headers().get("X-Trace-Id");
+            if (traceId == null || traceId.isEmpty()) {
+                traceId = java.util.UUID.randomUUID().toString();
+            }
+
             ChunkUploadRequest body = parseBody(request, ChunkUploadRequest.class);
             if (body == null || body.getTransferId() == null) {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'transferId' field is required"));
                 return;
             }
 
-            // Log received metadata
-            logger.debug("Received chunk upload request: transferId={}, chunkIndex={}, sourceAgentId={}, sourceFileDir={}, sourceFileName={}, destFileDir={}, destFileName={}",
-                    body.getTransferId(), body.getChunkIndex(), body.getSourceAgentId(), body.getSourceFileDir(), body.getSourceFileName(), body.getDestFileDir(), body.getDestFileName());
+            // Log received metadata with traceid
+            logger.debug("[traceId={}] Received chunk upload request: transferId={}, chunkIndex={}, sourceAgentId={}, sourceFileDir={}, sourceFileName={}, destFileDir={}, destFileName={}",
+                    traceId, body.getTransferId(), body.getChunkIndex(), body.getSourceAgentId(), body.getSourceFileDir(), body.getSourceFileName(), body.getDestFileDir(), body.getDestFileName());
 
             if (body.getContent() == null) {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'content' field is required"));
@@ -45,7 +51,7 @@ public class ChunkUploadHandler extends BaseHandler {
             byte[] content = "base64".equals(body.getEncoding())
                     ? Base64.getDecoder().decode(body.getContent())
                     : body.getContent().getBytes(StandardCharsets.UTF_8);
-            ApiResponse<ChunkUploadResultData> result = chunkedTransferService.uploadChunk(body, content);
+            ApiResponse<ChunkUploadResultData> result = chunkedTransferService.uploadChunk(traceId, body, content);
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));

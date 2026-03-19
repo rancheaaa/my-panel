@@ -9,6 +9,7 @@ class UploadTask {
     private String localFilePath;
     private String remoteTargetPath;
     private String transferId;
+    private String traceId;
     private UploadTaskStatus status;
 
     public UploadTask(String localFilePath, String remoteTargetPath) {
@@ -41,6 +42,14 @@ class UploadTask {
 
     public void setTransferId(String transferId) {
         this.transferId = transferId;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
     }
 
     public UploadTaskStatus getStatus() {

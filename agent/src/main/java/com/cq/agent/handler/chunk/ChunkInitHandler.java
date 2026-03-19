@@ -25,14 +25,17 @@ public class ChunkInitHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
+            // 从HTTP头获取traceid
+            String traceId = request.headers().get("X-Trace-Id");
+
             ChunkInitRequest body = parseBody(request, ChunkInitRequest.class);
             if (body == null || body.getDestFileDir() == null || body.getDestFileName() == null || body.getTotalSize() <= 0) {
                 sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'destFileDir', 'destFileName' and 'totalSize' (positive) are required"));
                 return;
             }
-            log.debug("receive init upload request {}", body);
+            log.debug("[traceId={}] receive init upload request: {}", traceId, body);
             ApiResponse<ChunkStatusData> result = chunkedTransferService.initUpload(
-                    body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
+                    traceId, body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));

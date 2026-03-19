@@ -3,6 +3,7 @@ package com.cq.agent.handler.chunk;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkDownloadResponse;
+import com.cq.agent.dto.ChunkedDownloadResult;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
@@ -41,12 +42,12 @@ public class ChunkDownloadHandler extends BaseHandler {
             return;
         }
 
-        ApiResponse<ChunkedTransferService.ChunkedDownloadResult> result = chunkedTransferService.downloadRange(path, start, end);
+        ApiResponse<ChunkedDownloadResult> result = chunkedTransferService.downloadRange(path, start, end);
         if (!result.isSuccess()) {
             sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
             return;
         }
-        ChunkedTransferService.ChunkedDownloadResult dataResult = result.getData();
+        ChunkedDownloadResult dataResult = result.getData();
 
         ChunkDownloadResponse resp = new ChunkDownloadResponse();
         resp.setSuccess(true);

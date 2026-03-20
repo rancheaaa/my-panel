@@ -3,7 +3,7 @@ package com.cq.agent.handler.chunk;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkMergeRequest;
-import com.cq.agent.dto.MergeResultData;
+import com.cq.agent.dto.ChunkMergeResponse;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
@@ -37,7 +37,7 @@ public class ChunkMergeHandler extends BaseHandler {
                 return;
             }
             logger.debug("[traceId={}] Received merge request: transferId={}", traceId, body.getTransferId());
-            ApiResponse<MergeResultData> result = chunkedTransferService.mergeChunks(traceId, body.getTransferId());
+            ApiResponse<ChunkMergeResponse> result = chunkedTransferService.mergeChunks(traceId, body.getTransferId());
             if (result.isSuccess()) {
                 logger.debug("[traceId={}] Merge successful for transferId: {}", traceId, body.getTransferId());
             } else {

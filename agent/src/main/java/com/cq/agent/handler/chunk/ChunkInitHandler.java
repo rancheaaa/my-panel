@@ -3,7 +3,7 @@ package com.cq.agent.handler.chunk;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkInitRequest;
-import com.cq.agent.dto.ChunkStatusData;
+import com.cq.agent.dto.ChunkInitResponse;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.model.UploadSession;
 import com.cq.agent.service.ChunkedTransferService;
@@ -26,7 +26,6 @@ public class ChunkInitHandler extends BaseHandler {
     @Override
     public void handle(ChannelHandlerContext ctx, FullHttpRequest request) {
         try {
-            // 从HTTP头获取traceid
             String traceId = request.headers().get("X-Trace-Id");
 
             ChunkInitRequest body = parseBody(request, ChunkInitRequest.class);
@@ -35,7 +34,7 @@ public class ChunkInitHandler extends BaseHandler {
                 return;
             }
             log.debug("[traceId={}] receive init upload request: {}", traceId, body);
-            ApiResponse<ChunkStatusData> result = chunkedTransferService.initUpload(
+            ApiResponse<ChunkInitResponse> result = chunkedTransferService.initUpload(
                     traceId, body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {

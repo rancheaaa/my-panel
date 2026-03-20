@@ -3,8 +3,13 @@ package com.cq.agent.client.upload;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 class Util {
+
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     static String md5(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
@@ -36,6 +41,11 @@ class Util {
             return "";
         }
         return path.replace("\\", "/");
+    }
+
+    static String currentTime() {
+        LocalDateTime now = LocalDateTime.now();
+        return DATE_TIME_FORMATTER.format(now);
     }
 
 }

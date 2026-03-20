@@ -3,7 +3,7 @@ package com.cq.agent.handler.chunk;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkUploadRequest;
-import com.cq.agent.dto.ChunkUploadResultData;
+import com.cq.agent.dto.ChunkUploadResponse;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Map;
 
 public class ChunkUploadHandler extends BaseHandler {
 
@@ -51,7 +50,7 @@ public class ChunkUploadHandler extends BaseHandler {
             byte[] content = "base64".equals(body.getEncoding())
                     ? Base64.getDecoder().decode(body.getContent())
                     : body.getContent().getBytes(StandardCharsets.UTF_8);
-            ApiResponse<ChunkUploadResultData> result = chunkedTransferService.uploadChunk(traceId, body, content);
+            ApiResponse<ChunkUploadResponse> result = chunkedTransferService.uploadChunk(traceId, body, content);
             sendServiceResult(ctx, request, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "Invalid JSON format"));

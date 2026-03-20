@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * Response data for chunk init/status API.
  */
-public class ChunkStatusData {
+public class ChunkStatusResponse {
 
     private String transferId;
     private long totalSize;

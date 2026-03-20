@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author cq 2026/3/18 14:21
  * @since 1.0.0
  */
-public class ChunkUploadResultData {
+public class ChunkUploadResponse {
 
     private String transferId;
     private Boolean completed;

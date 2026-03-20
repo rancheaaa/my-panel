@@ -3,7 +3,7 @@ package com.cq.agent.dto;
 /**
  * Response data for chunk merge API.
  */
-public class MergeResultData {
+public class ChunkMergeResponse {
 
     private String destFileDir;
     private String destFileName;

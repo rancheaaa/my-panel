@@ -1,5 +1,6 @@
 package com.cq.agent.model;
 
+import com.cq.agent.dto.ChunkStatusResponse;
 import com.google.gson.Gson;
 
 import java.util.*;
@@ -180,13 +181,24 @@ public class UploadSession {
         return session;
     }
 
-    public com.cq.agent.dto.ChunkStatusData toChunkStatusData() {
-        com.cq.agent.dto.ChunkStatusData data = new com.cq.agent.dto.ChunkStatusData();
+    public ChunkStatusResponse toChunkStatusData() {
+        ChunkStatusResponse data = new ChunkStatusResponse();
         data.setTransferId(this.getTransferId());
         data.setTotalSize(this.getTotalSize());
         data.setTotalChunks(this.getTotalChunks());
         data.setChunkSize(this.getChunkSize());
         data.setMissingChunks(this.getMissingChunks());
         return data;
+    }
+
+    public com.cq.agent.dto.ChunkInitResponse toChunkInitResponse() {
+        com.cq.agent.dto.ChunkInitResponse response = new com.cq.agent.dto.ChunkInitResponse(
+                this.getTransferId(),
+                this.getTotalSize(),
+                this.getTotalChunks(),
+                this.getChunkSize(),
+                this.getMissingChunks()
+        );
+        return response;
     }
 }

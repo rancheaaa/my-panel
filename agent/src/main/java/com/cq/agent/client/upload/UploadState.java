@@ -1,5 +1,7 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.dto.ChunkInitResponse;
+import com.cq.agent.dto.ChunkStatusResponse;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +29,14 @@ class UploadState {
         }
     }
 
+    UploadState(ChunkInitResponse response) {
+        this(response.getTransferId(), response.getTotalSize(), response.getTotalChunks(), response.getChunkSize(), response.getMissingChunks());
+    }
+
+    UploadState(ChunkStatusResponse data) {
+        this(data.getTransferId(), data.getTotalSize(), data.getTotalChunks(), data.getChunkSize(), data.getMissingChunks());
+    }
+
     public String getTransferId() {
         return transferId;
     }
@@ -45,5 +55,16 @@ class UploadState {
 
     public Set<Integer> getMissingChunks() {
         return missingChunks;
+    }
+
+    @Override
+    public String toString() {
+        return "UploadState{" +
+                "transferId='" + transferId + '\'' +
+                ", totalSize=" + totalSize +
+                ", totalChunks=" + totalChunks +
+                ", chunkSize=" + chunkSize +
+                ", missingChunks=" + missingChunks +
+                '}';
     }
 }

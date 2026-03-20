@@ -48,6 +48,10 @@ public class AgentConfig {
     private long maxFileSize;
     private int chunkSize;
     private long uploadSessionTimeoutMinutes;
+    private int maxUploadRateKBPerSecond;
+
+    // Upload queue configuration
+    private String uploadQueueDbPath;
 
     public AgentConfig() {
         this.properties = new Properties();
@@ -124,6 +128,10 @@ public class AgentConfig {
         this.maxFileSize = getLongProperty("file.max.size", 104857600);
         this.chunkSize = getIntProperty("file.chunk.size.bytes", 4 * 1024 * 1024);
         this.uploadSessionTimeoutMinutes = getLongProperty("upload.session.timeout.minutes", 60);
+        this.maxUploadRateKBPerSecond = getIntProperty("upload.max.rate.kb.per.second", 0);
+
+        // Upload queue configuration
+        this.uploadQueueDbPath = getStringProperty("upload.queue.db.path", "upload_queue_db");
 
         // Validate configuration
         validateConfiguration();
@@ -297,6 +305,14 @@ public class AgentConfig {
 
     public long getUploadSessionTimeoutMinutes() {
         return uploadSessionTimeoutMinutes;
+    }
+
+    public int getMaxUploadRateKBPerSecond() {
+        return maxUploadRateKBPerSecond;
+    }
+
+    public String getUploadQueueDbPath() {
+        return uploadQueueDbPath;
     }
 
     @Override

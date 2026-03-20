@@ -112,7 +112,7 @@ public class ChunkedTransferService {
      *         - TEMP_DIR_VERIFICATION_FAILED: 临时目录验证失败
      *         - INIT_UPLOAD_FAILED: 初始化上传失败（其他未预期的错误）
      */
-    public ApiResponse<ChunkStatusData> initUpload(String traceId, String transferId, String destFileDir, String destFileName, long totalSize) {
+    public ApiResponse<com.cq.agent.dto.ChunkInitResponse> initUpload(String traceId, String transferId, String destFileDir, String destFileName, long totalSize) {
         try {
             logger.debug("[traceId={}] Initializing upload: transferId={}, destFileDir={}, destFileName={}, totalSize={}", 
                     traceId, transferId, destFileDir, destFileName, totalSize);
@@ -141,9 +141,16 @@ public class ChunkedTransferService {
             String finalTransferId = determineTransferId(transferId);
             logger.debug("[traceId={}] Using transferId: {}", traceId, finalTransferId);
 
-            ApiResponse<ChunkStatusData> existingSessionCheck = handleExistingSession(finalTransferId, resolvedPath, totalSize, traceId);
+            ApiResponse<ChunkStatusResponse> existingSessionCheck = handleExistingSession(finalTransferId, resolvedPath, totalSize, traceId);
             if (existingSessionCheck != null) {
-                return existingSessionCheck;
+                com.cq.agent.dto.ChunkInitResponse response = new com.cq.agent.dto.ChunkInitResponse(
+                        existingSessionCheck.getData().getTransferId(),
+                        existingSessionCheck.getData().getTotalSize(),
+                        existingSessionCheck.getData().getTotalChunks(),
+                        existingSessionCheck.getData().getChunkSize(),
+                        existingSessionCheck.getData().getMissingChunks()
+                );
+                return ApiResponse.success(response);
             }
 
             Path sessionTempDir = resolvedPath.resolve("." + finalTransferId);
@@ -162,7 +169,7 @@ public class ChunkedTransferService {
             logger.info("[traceId={}] Upload session created: {}, destDir:{} destFile: {}, size: {}, chunks: {}",
                     traceId, finalTransferId, resolvedPath, destFileName, totalSize, totalChunks);
 
-            return ApiResponse.success(session.toChunkStatusData());
+            return ApiResponse.success(session.toChunkInitResponse());
         } catch (Exception e) {
             logger.error("[traceId={}] Failed to initialize upload", traceId, e);
             return ApiResponse.failure(ApiCode.INIT_UPLOAD_FAILED.getCode(), "Failed to initialize upload: " + e.getMessage());
@@ -242,7 +249,7 @@ public class ChunkedTransferService {
                 : UUID.randomUUID().toString().replace("-", "");
     }
 
-    private ApiResponse<ChunkStatusData> handleExistingSession(String transferId, Path resolvedPath, long totalSize, String traceId) {
+    private ApiResponse<ChunkStatusResponse> handleExistingSession(String transferId, Path resolvedPath, long totalSize, String traceId) {
         if (!uploadSessions.containsKey(transferId)) {
             return null;
         }
@@ -388,7 +395,7 @@ public class ChunkedTransferService {
      *         - CHUNK_WRITE_FAILED: 分片写入失败（包括IO错误和重试失败）
      *         - CHUNK_WRITE_SIZE_MISMATCH: 分片写入后大小验证失败
      */
-    public ApiResponse<ChunkUploadResultData> uploadChunk(String traceId, ChunkUploadRequest request, byte[] content) {
+    public ApiResponse<ChunkUploadResponse> uploadChunk(String traceId, ChunkUploadRequest request, byte[] content) {
         final String transferId = request.getTransferId();
         
         ApiResponse<UploadSession> sessionValidation = validateChunkUploadSession(transferId, traceId);
@@ -618,8 +625,8 @@ public class ChunkedTransferService {
         }
     }
 
-    private ApiResponse<ChunkUploadResultData> buildChunkUploadResult(UploadSession session, String transferId, String traceId) {
-        ChunkUploadResultData result = new ChunkUploadResultData();
+    private ApiResponse<ChunkUploadResponse> buildChunkUploadResult(UploadSession session, String transferId, String traceId) {
+        ChunkUploadResponse result = new ChunkUploadResponse();
         result.setTransferId(transferId);
         result.setCompleted(session.isCompleted());
         result.setMissingChunksCount(session.getTotalChunks() - session.getReceivedChunkCount());
@@ -631,7 +638,7 @@ public class ChunkedTransferService {
         return ApiResponse.success(result);
     }
 
-    public ApiResponse<MergeResultData> mergeChunks(String traceId, String transferId) {
+    public ApiResponse<ChunkMergeResponse> mergeChunks(String traceId, String transferId) {
         UploadSession session = uploadSessions.get(transferId);
         if (session == null) {
             logger.debug("[traceId={}] Upload session not found: {}", traceId, transferId);
@@ -692,7 +699,7 @@ public class ChunkedTransferService {
             logger.debug("[traceId={}] Cleaning up temp files for session: {}", traceId, transferId);
             cleanupSessionTempFiles(session);
 
-            MergeResultData resultData = new MergeResultData();
+            ChunkMergeResponse resultData = new ChunkMergeResponse();
             resultData.setDestFileDir(session.getDestFileDir());
             resultData.setDestFileName(session.getDestFileName());
             resultData.setSize(mergedSize);
@@ -705,7 +712,7 @@ public class ChunkedTransferService {
         }
     }
 
-    public ApiResponse<ChunkStatusData> getUploadStatus(String transferId, String traceId) {
+    public ApiResponse<ChunkStatusResponse> getUploadStatus(String transferId, String traceId) {
         UploadSession session = uploadSessions.get(transferId);
         if (session == null) {
             return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "Upload session not found: " + transferId);
@@ -832,12 +839,8 @@ public class ChunkedTransferService {
         }
     }
 
-    public List<ChunkStatusData> listUploadSessions() {
-        List<ChunkStatusData> list = new ArrayList<>();
-        for (UploadSession session : uploadSessions.values()) {
-            list.add(session.toChunkStatusData());
-        }
-        return list;
+    public List<UploadSession> listUploadSessions() {
+        return new ArrayList<>(uploadSessions.values());
     }
 
     private void cleanupExpiredSessions() {

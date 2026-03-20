@@ -44,9 +44,9 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
             }
 
             @Override
-            public void onComplete(UploadResult result) {
-                logger.info("Upload complete: path={}, size={}, checksum={}, state={}",
-                        result.getPath(), result.getSize(), result.getChecksum(), result.getCompletionState());
+            public void onComplete(UploadTask result) {
+                logger.info("Upload complete: path={}, size={}, state={}",
+                        result.getLocalFilePath(), result.getTotalSize(), result.getStatus());
                 latch.countDown();
             }
 

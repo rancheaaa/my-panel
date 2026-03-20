@@ -258,7 +258,7 @@ public class ChunkedTransferService {
         if (existing.getDestFileDir().equals(resolvedPath.toString()) && existing.getTotalSize() == totalSize) {
             logger.info("[traceId={}] Resuming existing upload session for transferId: {}", traceId, transferId);
             verifySession(existing, traceId);
-            return ApiResponse.success(existing.toChunkStatusData());
+            return ApiResponse.success(existing.toChunkStatusResponse());
         } else {
             return ApiResponse.failure(ApiCode.UPLOAD_SESSION_CONFLICT.getCode(), "transferId conflict: another file is being uploaded with same ID");
         }
@@ -719,7 +719,7 @@ public class ChunkedTransferService {
         }
         session.updateLastAccessTime();
         verifySession(session, traceId);
-        return ApiResponse.success(session.toChunkStatusData());
+        return ApiResponse.success(session.toChunkStatusResponse());
     }
 
     private void verifySession(UploadSession session, String traceId) {

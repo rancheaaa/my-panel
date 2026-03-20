@@ -11,7 +11,7 @@ public class ChunkUploadResponse {
 
     private String transferId;
     private Boolean completed;
-    private AtomicInteger missingChunksCount;
+    private final AtomicInteger missingChunksCount =  new AtomicInteger(0);
 
     public String getTransferId() {
         return transferId;
@@ -35,5 +35,14 @@ public class ChunkUploadResponse {
 
     public void setMissingChunksCount(Integer missingChunksCount) {
         this.missingChunksCount.set(missingChunksCount);
+    }
+
+    @Override
+    public String toString() {
+        return "ChunkUploadResponse{" +
+                "transferId='" + transferId + '\'' +
+                ", completed=" + completed +
+                ", missingChunksCount=" + missingChunksCount +
+                '}';
     }
 }

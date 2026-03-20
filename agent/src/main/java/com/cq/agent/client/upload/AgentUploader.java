@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -80,7 +80,7 @@ public class AgentUploader {
         this.agentApiUrl = agentApiUrl.endsWith("/") ? agentApiUrl : agentApiUrl + "/";
         try {
             this.taskQueue = new PersistentQueue<>(agentConfig.getUploadQueueDbPath(), "upload-tasks", UploadTask.class);
-            this.taskInflightMap = new PersistentMap<>(agentConfig.getUploadQueueDbPath(), "upload-inflight", String.class, UploadTask.class);
+            this.taskInflightMap = new PersistentMap<>(agentConfig.getUploadMapDbPath(), "upload-inflight", String.class, UploadTask.class);
             logger.info("Persistent queue initialized at: {}", agentConfig.getUploadQueueDbPath());
             logger.info("Queue size on startup: {}", taskQueue.size());
             if (!taskQueue.isEmpty()) {
@@ -152,7 +152,7 @@ public class AgentUploader {
             try {
                 task = taskQueue.poll();
                 if (task == null) {
-                    Thread.sleep(1000);
+                    TimeUnit.SECONDS.sleep(1);
                     continue;
                 }
 //                String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
@@ -163,7 +163,7 @@ public class AgentUploader {
             } catch (Throwable t) {
                 if (task != null) {
                     String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
-                    handleListenerError(taskKey, UploadErrorClassifier.toUserMessage(t instanceof Exception ? (Exception) t : new Exception(t)));
+                    handleListenerError(taskKey, t.getMessage());
                     listeners.remove(taskKey);
                 }
                 logger.error("Worker {} error", id, t);
@@ -217,8 +217,7 @@ public class AgentUploader {
             if (listener != null) {
                 listeners.put(taskKey, listener);
             }
-
-            UploadTask task = new UploadTask(localFilePath, remoteTargetPath);
+            UploadTask task = new UploadTask(localFilePath, remoteTargetPath, fileSize);
             task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
             task.setTraceId(traceId);
             task.setEnqueuedTime(Util.currentTime());
@@ -246,55 +245,70 @@ public class AgentUploader {
 
             File file = new File(task.getLocalFilePath());
 
-            UploadResult finalResult;
-            UploadState state;
+            ApiResponse<ChunkStatusResponse> state;
             task.setStatus(UploadTaskStatus.INIT_UPLOADING);
             task.setInitUploadStartTime(Util.currentTime());
             this.taskInflightMap.put(task.getTransferId(), task);
 
-            state = initOrResumeUpload(file, task.getLocalFilePath(), task.getRemoteTargetPath(), task.getTransferId(), traceId);
+            String transferId = task.getTransferId();
+            int chunkSize;
+            int totalChunks;
+            List<Integer> missingChunks;
+            logger.debug("[traceId={}] Get upload session status with transferId: {}", traceId, transferId);
+            // 查询是否存在上传会话
+            ApiResponse<ChunkStatusResponse> resp = getUploadStatus(transferId, traceId);
+            if(resp.getData() == null) {
+                // 第一次初始化上传会话
+                ApiResponse<ChunkInitResponse> chunkInitResponse = initUpload(task);
+                logger.debug("[traceId={}] First time to Upload initialized successfully: transferId={}, totalChunks={}, chunkSize={}, initTime={}",
+                        traceId, chunkInitResponse.getData().getTransferId(), chunkInitResponse.getData().getTotalChunks(), chunkInitResponse.getData().getChunkSize(), chunkInitResponse.getData().getInitTime());
+                chunkSize = chunkInitResponse.getData().getChunkSize();
+                totalChunks = chunkInitResponse.getData().getTotalChunks();
+                missingChunks = chunkInitResponse.getData().getMissingChunks();
+            } else {
+                // 从上传会话状态中获取chunkSize和totalChunks
+                chunkSize = resp.getData().getChunkSize();
+                totalChunks = resp.getData().getTotalChunks();
+                missingChunks = resp.getData().getMissingChunks();
+            }
+
             task.setInitUploadEndTime(Util.currentTime());
             task.setStatus(UploadTaskStatus.INIT_UPLOAD_COMPLETED);
 
-            if (task.getTransferId() == null || !task.getTransferId().equals(state.getTransferId())) {
-                task.setTransferId(state.getTransferId());
-            }
-            task.setChunkSize(state.getChunkSize());
-            task.setTotalChunks(state.getTotalChunks());
+            task.setChunkSize(chunkSize);
+            task.setTotalChunks(totalChunks);
+            task.setMissingChunks(missingChunks);
             this.taskInflightMap.put(task.getTransferId(), task);
 
             try {
                 task.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
                 task.setUploadChunksStartTime(Util.currentTime());
                 this.taskInflightMap.put(task.getTransferId(), task);
-                uploadChunks(task, file, state, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
+                // 上传分片逻辑
+                uploadChunks(task, file, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
+
                 task.setUploadChunksEndTime(Util.currentTime());
                 task.setStatus(UploadTaskStatus.UPLOAD_CHUNKS_COMPLETED);
                 this.taskInflightMap.put(task.getTransferId(), task);
             } catch (IOException e) {
-                state = fetchLatestState(state.getTransferId(), traceId);
+                state = fetchLatestStatus(task.getTransferId(), traceId);
                 logger.error("[traceId={}] Chunk upload failed, status: {} {}", traceId, state, e.getMessage());
                 throw e;
             }
 
-            UploadResult mergeAttemptResult;
             try {
                 task.setStatus(UploadTaskStatus.MERGING_CHUNKS);
                 task.setMergeChunksStartTime(Util.currentTime());
-                mergeAttemptResult = mergeChunks(state.getTransferId(), traceId);
+                mergeChunks(task.getTransferId(), traceId);
                 task.setMergeChunksEndTime(Util.currentTime());
                 task.setStatus(UploadTaskStatus.MERGE_CHUNKS_COMPLETED);
             } catch (IOException e) {
-                state = fetchLatestState(state.getTransferId(), traceId);
+                state = fetchLatestStatus(task.getTransferId(), traceId);
                 logger.error("[traceId={}] Merge failed, status:{}  {}", traceId, state, e.getMessage());
                 throw e;
             }
             if (verifyRemoteFileExists(task.getRemoteTargetPath(), traceId)) {
-                finalResult = new UploadResult(task.getRemoteTargetPath(), mergeAttemptResult.getSize(),
-                        mergeAttemptResult.getChecksum(), UploadCompletionState.VERIFIED);
-                task.setCompletedTime(Util.currentTime());
-                task.setStatus(UploadTaskStatus.UPLOAD_SUCCESS);
-                handleListenerSuccess(taskKey, finalResult);
+                handleListenerSuccess(taskKey, task);
             } else {
                 logger.error("[traceId={}] Verify remote file {} failed", traceId, task.getRemoteTargetPath());
                 throw new IOException("Upload failed after all retries, but no result was produced.");
@@ -302,37 +316,39 @@ public class AgentUploader {
             logger.info("[traceId={}] Upload task completed: {}", traceId, taskKey);
             listeners.remove(taskKey);
         } catch (Exception e) {
-            String userMsg = UploadErrorClassifier.toUserMessage(e);
-            logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, userMsg, e);
+            logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
             task.setStatus(UploadTaskStatus.FAILED);
-            handleListenerError(taskKey, userMsg);
+            handleListenerError(taskKey, e.getMessage());
             listeners.remove(taskKey);
         }
     }
 
-    private void uploadChunks(UploadTask task, File file, UploadState state, String taskKey, String localPath, String remotePath, String traceId) throws IOException {
-        Set<Integer> missingChunks = state.getMissingChunks();
+    private void uploadChunks(UploadTask task, File file, String taskKey, String localPath, String remotePath, String traceId) throws IOException {
+        List<Integer> missingChunks = task.getMissingChunks();
         if (missingChunks.isEmpty()) {
             logger.debug("No missing chunks to upload for task: {}", taskKey);
             return;
         }
 
-        AtomicInteger uploadedCount = new AtomicInteger(state.getTotalChunks() - missingChunks.size());
+        AtomicInteger uploadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
         UploadListener listener = listeners.get(taskKey);
 
         try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(file.toPath(), java.nio.file.StandardOpenOption.READ)) {
             CompletableFuture<?>[] uploadFutures = missingChunks.stream()
                     .map(chunkIndex -> CompletableFuture.runAsync(() -> {
                         try {
-                            byte[] chunkData = readChunk(channel, chunkIndex, state.getChunkSize(), state.getTotalSize());
+                            byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
                             applyRateLimit(chunkData.length, traceId);
-                            uploadChunk(state.getTransferId(), chunkIndex, chunkData, localPath, remotePath, traceId);
+                            ApiResponse<ChunkUploadResponse> uploadResponse = uploadChunk(task.getTransferId(), chunkIndex, chunkData, localPath, remotePath, traceId);
+                            if (!uploadResponse.isSuccess()) {
+                                throw new IOException("Chunk upload failed: " + uploadResponse.getMsg());
+                            }
                             int currentUploaded = uploadedCount.incrementAndGet();
                             task.incrementUploadChunksCount();
                             this.taskInflightMap.put(task.getTransferId(), task);
                             if (listener != null) {
-                                double progress = (double) currentUploaded / state.getTotalChunks() * 100.0;
-                                handleListenerProgress(taskKey, state.getTotalChunks(), currentUploaded, progress);
+                                double progress = (double) currentUploaded / task.getTotalChunks() * 100.0;
+                                handleListenerProgress(taskKey, task.getTotalChunks(), currentUploaded, progress);
                             }
                         } catch (Exception e) {
                             throw new CompletionException("Failed to upload chunk " + chunkIndex, e);
@@ -354,12 +370,8 @@ public class AgentUploader {
                 throw new IOException("Chunk uploads timed out after " + timeoutSeconds + " seconds", e);
             }
 
-        } catch (CompletionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof IOException) throw (IOException) cause;
-            throw new IOException(UploadErrorClassifier.toUserMessage(cause != null ? cause : e), e);
         } catch (Exception e) {
-            throw new IOException(UploadErrorClassifier.toUserMessage(e), e);
+            throw new IOException("Failed to upload chunks", e);
         }
     }
 
@@ -380,7 +392,7 @@ public class AgentUploader {
         }
     }
 
-    private void handleListenerSuccess(String taskKey, UploadResult result) {
+    private void handleListenerSuccess(String taskKey, UploadTask result) {
         UploadListener listener = listeners.get(taskKey);
         if (listener == null) return;
         try {
@@ -409,25 +421,8 @@ public class AgentUploader {
     private static final Type API_RESPONSE_MERGE_RESULT = TypeToken.getParameterized(ApiResponse.class, ChunkMergeResponse.class).getType();
     private static final Type API_RESPONSE_BOOLEAN = TypeToken.getParameterized(ApiResponse.class, Boolean.class).getType();
 
-    private UploadState initOrResumeUpload(File file, String localPath, String remoteTargetPath, String transferId, String traceId) throws IOException, InterruptedException {
-        if (transferId != null && !transferId.isEmpty()) {
-            logger.debug("[traceId={}] Resuming upload with transferId: {}", traceId, transferId);
-            ApiResponse<ChunkStatusResponse> resp = getUploadStatus(transferId, traceId);
-            logger.debug("[traceId={}] Upload status retrieved: transferId={}, totalChunks={}, chunkSize={}",
-                    traceId, resp.getData().getTransferId(), resp.getData().getTotalChunks(), resp.getData().getChunkSize());
-            return new UploadState(resp.getData());
-        } else {
-            logger.debug("[traceId={}] Initializing new upload: local={}, remote={}, size={}", traceId, localPath, remoteTargetPath, file.length());
-            ApiResponse<ChunkInitResponse> resp = initUpload(localPath, remoteTargetPath, file.length(), traceId);
-            logger.debug("[traceId={}] Upload initialized successfully: transferId={}, totalChunks={}, chunkSize={}, initTime={}",
-                    traceId, resp.getData().getTransferId(), resp.getData().getTotalChunks(), resp.getData().getChunkSize(), resp.getData().getInitTime());
-            return new UploadState(resp.getData());
-        }
-    }
-
-    private UploadState fetchLatestState(String transferId, String traceId) throws IOException, InterruptedException {
-        ApiResponse<ChunkStatusResponse> resp = getUploadStatus(transferId, traceId);
-        return new UploadState(resp.getData());
+    private ApiResponse<ChunkStatusResponse> fetchLatestStatus(String transferId, String traceId) throws IOException, InterruptedException {
+        return getUploadStatus(transferId, traceId);
     }
 
     private byte[] readChunk(java.nio.channels.FileChannel channel, int chunkIndex, int chunkSize, long totalSize) throws IOException {
@@ -449,20 +444,22 @@ public class AgentUploader {
         }
     }
 
-    private ApiResponse<ChunkInitResponse> initUpload(String localPath, String remotePath, long totalSize, String traceId) throws IOException, InterruptedException {
+    private ApiResponse<ChunkInitResponse> initUpload(UploadTask task) throws IOException, InterruptedException {
+        logger.debug("[traceId={}] Initializing new upload: local={}, remote={}, size={}", task.getTraceId(), task.getLocalFilePath(), task.getRemoteTargetPath(), task.getTotalSize());
         ChunkInitRequest req = new ChunkInitRequest();
-        req.setTotalSize(totalSize);
+        req.setTotalSize(task.getTotalSize());
+        req.setTransferId(task.getTransferId());
 
         if (agentConfig != null) {
             req.setSourceAgentId(agentConfig.getAgentId());
             req.setSourceAgentIp(agentConfig.getAgentIp());
             req.setSourceAgentPort(agentConfig.getServerPort());
         }
-        File sourceFile = Paths.get(localPath).toFile();
+        File sourceFile = Paths.get(task.getLocalFilePath()).toFile();
         req.setSourceFileDir(Util.transferToLinuxPath(sourceFile.getParent()));
         req.setSourceFileName(sourceFile.getName());
 
-        File destFile = Paths.get(remotePath).toFile();
+        File destFile = Paths.get(task.getRemoteTargetPath()).toFile();
         req.setDestFileDir(Util.transferToLinuxPath(destFile.getParent()));
         req.setDestFileName(destFile.getName());
         try {
@@ -472,14 +469,14 @@ public class AgentUploader {
         } catch (java.net.URISyntaxException e) {
             logger.warn("Could not parse agentApiUrl to extract host and port", e);
         }
-        return postApi("api/file/chunk/init", req, API_RESPONSE_CHUNK_INIT, traceId);
+        return postApi("api/file/chunk/init", req, API_RESPONSE_CHUNK_INIT, task.getTraceId());
     }
 
     private ApiResponse<ChunkStatusResponse> getUploadStatus(String transferId, String traceId) throws IOException, InterruptedException {
         return getApi("api/file/chunk/status?transferId=" + transferId, API_RESPONSE_CHUNK_STATUS, traceId);
     }
 
-    private void uploadChunk(String transferId, int chunkIndex, byte[] data, String localPath, String remotePath, String traceId) throws IOException, InterruptedException {
+    private ApiResponse<ChunkUploadResponse> uploadChunk(String transferId, int chunkIndex, byte[] data, String localPath, String remotePath, String traceId) throws IOException, InterruptedException {
         logger.debug("[traceId={}] Uploading chunk {} for transferId: {}", traceId, chunkIndex, transferId);
         ChunkUploadRequest req = new ChunkUploadRequest();
         req.setTransferId(transferId);
@@ -510,11 +507,10 @@ public class AgentUploader {
             logger.warn("[traceId={}] Could not parse agentApiUrl to extract host and port", traceId, e);
         }
 
-        postApi("api/file/chunk/upload", req, TypeToken.getParameterized(ApiResponse.class, Object.class).getType(), traceId);
-        logger.debug("[traceId={}] Chunk upload successful: {}", traceId, chunkIndex);
+        return postApi("api/file/chunk/upload", req, TypeToken.getParameterized(ApiResponse.class, Object.class).getType(), traceId);
     }
 
-    private UploadResult mergeChunks(String transferId, String traceId) throws IOException, InterruptedException {
+    private void mergeChunks(String transferId, String traceId) throws IOException, InterruptedException {
         logger.debug("[traceId={}] Merging chunks for transferId: {}", traceId, transferId);
         ChunkMergeRequest req = new ChunkMergeRequest();
         req.setTransferId(transferId);
@@ -530,15 +526,14 @@ public class AgentUploader {
         fullPath += data.getDestFileName();
 
         logger.debug("[traceId={}] Merge successful: path={}, size={}, checksum={}", traceId, fullPath, data.getSize(), data.getChecksum());
-        return new UploadResult(fullPath, data.getSize(), data.getChecksum());
     }
 
     private boolean verifyRemoteFileExists(String remotePath, String traceId) throws IOException, InterruptedException {
         logger.debug("[traceId={}] Verifying remote file exists: {}", traceId, remotePath);
         String encodedPath = java.net.URLEncoder.encode(remotePath, StandardCharsets.UTF_8);
         ApiResponse<Boolean> response = getApi("api/file/exists?path=" + encodedPath, API_RESPONSE_BOOLEAN, traceId);
-        if (response == null || !response.isSuccess()) {
-            logger.debug("[traceId={}] Verification failed for '{}': {}", traceId, remotePath, response != null ? response.getMsg() : "null");
+        if (!response.isSuccess()) {
+            logger.debug("[traceId={}] Verification failed for '{}': {}", traceId, remotePath, response.getMsg());
             return false;
         }
         Boolean data = response.getData();
@@ -547,95 +542,49 @@ public class AgentUploader {
     }
 
     private <T> ApiResponse<T> postApi(String path, Object body, Type responseType, String traceId) throws IOException, InterruptedException {
-        return executeWithRetry(() -> {
-            String jsonPayload = body instanceof String ? (String) body : gson.toJson(body);
-            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(agentApiUrl + path))
-                    .header("Content-Type", "application/json")
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
+        String jsonPayload = body instanceof String ? (String) body : gson.toJson(body);
+        logger.debug("[traceId={}] Sending POST request to {}", traceId, path);
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(agentApiUrl + path))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
 
-            // Add traceid header if provided
-            if (traceId != null && !traceId.isEmpty()) {
-                requestBuilder.header("X-Trace-Id", traceId);
-            }
+        // Add traceid header if provided
+        if (traceId != null && !traceId.isEmpty()) {
+            requestBuilder.header("X-Trace-Id", traceId);
+        }
 
-            HttpRequest request = requestBuilder.build();
-            HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (httpResponse.statusCode() >= 400 && httpResponse.statusCode() != 500) {
-                throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
-            }
-            ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
-            if (obj == null) throw new IOException("Empty or invalid JSON response");
-            return obj;
-        });
+        HttpRequest request = requestBuilder.build();
+        HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (httpResponse.statusCode() >= 400 && httpResponse.statusCode() != 500) {
+            throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
+        }
+        ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
+        logger.debug("[traceId={}] Received response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
+        return obj;
     }
 
     private <T> ApiResponse<T> getApi(String path, Type responseType, String traceId) throws IOException, InterruptedException {
-        return executeWithRetry(() -> {
-            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(agentApiUrl + path))
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                    .GET();
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(agentApiUrl + path))
+                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
+                .GET();
+        logger.debug("[traceId={}] Sending GET request to {}", traceId, path);
 
-            // Add traceid header if provided
-            if (traceId != null && !traceId.isEmpty()) {
-                requestBuilder.header("X-Trace-Id", traceId);
-            }
-
-            HttpRequest request = requestBuilder.build();
-            HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (httpResponse.statusCode() >= 400 && httpResponse.statusCode() != 500) {
-                throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
-            }
-            ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
-            if (obj == null) throw new IOException("Empty or invalid JSON response");
-            return obj;
-        });
-    }
-
-    private interface RequestAction<T> {
-        T execute() throws IOException, InterruptedException;
-    }
-
-    private <T> T executeWithRetry(RequestAction<T> action) throws IOException, InterruptedException {
-        int attempt = 0;
-        Exception last;
-        while (true) {
-            try {
-                T result = action.execute();
-                if (result instanceof ApiResponse<?> apiResponse) {
-                    if (apiResponse.isSuccess()) {
-                        return result;
-                    } else {
-                        int errorCode = apiResponse.getCode();
-                        String errorMsg = apiResponse.getMsg();
-                        logger.debug("API request failed: code={}, msg={}", errorCode, errorMsg);
-
-                        if (!UploadErrorClassifier.isRetryableByCode(errorCode)) {
-                            logger.error("API request failed (non-retryable): code={}, msg={}", errorCode, errorMsg);
-                            throw new IOException("API request failed (non-retryable): " + UploadErrorClassifier.classifyServerError(errorMsg));
-                        }
-                        logger.warn("API request failed (retryable): code={}, msg={}", errorCode, errorMsg);
-                        throw new IOException("API request failed (retryable): " + UploadErrorClassifier.classifyServerError(errorMsg));
-                    }
-                }
-                return result;
-            } catch (Exception e) {
-                last = e;
-                if (e instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
-                    throw (InterruptedException) e;
-                }
-                attempt++;
-                if (attempt > maxRetries) {
-                    throw new IOException(UploadErrorClassifier.toUserMessage(last), last);
-                }
-                logger.debug("Request failed (attempt {}/{}), retrying in {}ms: {}",
-                        attempt, maxRetries, retryDelayMs, e.getMessage());
-                Thread.sleep(retryDelayMs);
-            }
+        // Add traceid header if provided
+        if (traceId != null && !traceId.isEmpty()) {
+            requestBuilder.header("X-Trace-Id", traceId);
         }
+
+        HttpRequest request = requestBuilder.build();
+        HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (httpResponse.statusCode() >= 400 && httpResponse.statusCode() != 500) {
+            throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
+        }
+        ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
+        logger.debug("[traceId={}] Received response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
+        return obj;
     }
 
     public void shutdown() {

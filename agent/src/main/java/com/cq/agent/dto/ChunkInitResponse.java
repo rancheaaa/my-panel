@@ -73,4 +73,16 @@ public class ChunkInitResponse {
     public void setInitTime(String initTime) {
         this.initTime = initTime;
     }
+
+    @Override
+    public String toString() {
+        return "ChunkInitResponse{" +
+                "transferId='" + transferId + '\'' +
+                ", totalSize=" + totalSize +
+                ", totalChunks=" + totalChunks +
+                ", chunkSize=" + chunkSize +
+                ", missingChunks=" + missingChunks +
+                ", initTime='" + initTime + '\'' +
+                '}';
+    }
 }

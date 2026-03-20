@@ -41,4 +41,14 @@ public class ChunkMergeResponse {
     public void setChecksum(String checksum) {
         this.checksum = checksum;
     }
+
+    @Override
+    public String toString() {
+        return "ChunkMergeResponse{" +
+                "destFileDir='" + destFileDir + '\'' +
+                ", destFileName='" + destFileName + '\'' +
+                ", size=" + size +
+                ", checksum='" + checksum + '\'' +
+                '}';
+    }
 }

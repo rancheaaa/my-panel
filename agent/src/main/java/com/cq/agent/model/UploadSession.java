@@ -181,7 +181,7 @@ public class UploadSession {
         return session;
     }
 
-    public ChunkStatusResponse toChunkStatusData() {
+    public ChunkStatusResponse toChunkStatusResponse() {
         ChunkStatusResponse data = new ChunkStatusResponse();
         data.setTransferId(this.getTransferId());
         data.setTotalSize(this.getTotalSize());

@@ -52,4 +52,15 @@ public class ChunkStatusResponse {
     public void setMissingChunks(List<Integer> missingChunks) {
         this.missingChunks = missingChunks;
     }
+
+    @Override
+    public String toString() {
+        return "ChunkStatusResponse{" +
+                "transferId='" + transferId + '\'' +
+                ", totalSize=" + totalSize +
+                ", totalChunks=" + totalChunks +
+                ", chunkSize=" + chunkSize +
+                ", missingChunks=" + missingChunks +
+                '}';
+    }
 }

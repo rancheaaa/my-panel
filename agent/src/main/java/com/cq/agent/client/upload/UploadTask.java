@@ -1,6 +1,7 @@
 package com.cq.agent.client.upload;
 
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,14 +26,18 @@ class UploadTask {
     private String completedTime;
     private int chunkSize;
     private int totalChunks;
+    private final long totalSize;
+
+    private List<Integer> missingChunks;
     private final AtomicInteger uploadChunksCount = new AtomicInteger(0);
     private final AtomicInteger retryCount = new AtomicInteger(-1);
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
-    public UploadTask(String localFilePath, String remoteTargetPath) {
+    public UploadTask(String localFilePath, String remoteTargetPath, long totalSize) {
         this.localFilePath = localFilePath;
         this.remoteTargetPath = remoteTargetPath;
+        this.totalSize = totalSize;
         this.status = UploadTaskStatus.PREPARED;
     }
 
@@ -173,6 +178,18 @@ class UploadTask {
         retryCount.incrementAndGet();
     }
 
+    public List<Integer> getMissingChunks() {
+        return missingChunks;
+    }
+
+    public void setMissingChunks(List<Integer> missingChunks) {
+        this.missingChunks = new ArrayList<>(missingChunks);
+    }
+
+    public long getTotalSize() {
+        return totalSize;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -185,5 +202,30 @@ class UploadTask {
     @Override
     public int hashCode() {
         return Objects.hash(localFilePath, remoteTargetPath);
+    }
+
+    @Override
+    public String toString() {
+        return "UploadTask{" +
+                "localFilePath='" + localFilePath + '\'' +
+                ", remoteTargetPath='" + remoteTargetPath + '\'' +
+                ", transferId='" + transferId + '\'' +
+                ", traceId='" + traceId + '\'' +
+                ", status=" + status +
+                ", enqueuedTime='" + enqueuedTime + '\'' +
+                ", initUploadStartTime='" + initUploadStartTime + '\'' +
+                ", initUploadEndTime='" + initUploadEndTime + '\'' +
+                ", uploadChunksStartTime='" + uploadChunksStartTime + '\'' +
+                ", uploadChunksEndTime='" + uploadChunksEndTime + '\'' +
+                ", mergeChunksStartTime='" + mergeChunksStartTime + '\'' +
+                ", mergeChunksEndTime='" + mergeChunksEndTime + '\'' +
+                ", completedTime='" + completedTime + '\'' +
+                ", chunkSize=" + chunkSize +
+                ", totalChunks=" + totalChunks +
+                ", totalSize=" + totalSize +
+                ", missingChunks=" + missingChunks +
+                ", uploadChunksCount=" + uploadChunksCount +
+                ", retryCount=" + retryCount +
+                '}';
     }
 }

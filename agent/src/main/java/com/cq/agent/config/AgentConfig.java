@@ -52,6 +52,7 @@ public class AgentConfig {
 
     // Upload queue configuration
     private String uploadQueueDbPath;
+    private String uploadMapDbPath;
 
     public AgentConfig() {
         this.properties = new Properties();
@@ -132,7 +133,7 @@ public class AgentConfig {
 
         // Upload queue configuration
         this.uploadQueueDbPath = getStringProperty("upload.queue.db.path", "upload_queue_db");
-
+        this.uploadMapDbPath = getStringProperty("upload.map.db.path", "upload_map_db");
         // Validate configuration
         validateConfiguration();
     }
@@ -315,10 +316,21 @@ public class AgentConfig {
         return uploadQueueDbPath;
     }
 
+    public String getUploadMapDbPath() {
+        return uploadMapDbPath;
+    }
+
+    public void setUploadMapDbPath(String uploadMapDbPath) {
+        this.uploadMapDbPath = uploadMapDbPath;
+    }
+
     @Override
     public String toString() {
         return "AgentConfig{" +
-                "serverPort=" + serverPort +
+                "properties=" + properties +
+                ", agentId='" + agentId + '\'' +
+                ", agentIp='" + agentIp + '\'' +
+                ", serverPort=" + serverPort +
                 ", bossThreads=" + bossThreads +
                 ", workerThreads=" + workerThreads +
                 ", executorThreadPoolSize=" + executorThreadPoolSize +
@@ -331,6 +343,9 @@ public class AgentConfig {
                 ", maxFileSize=" + maxFileSize +
                 ", chunkSize=" + chunkSize +
                 ", uploadSessionTimeoutMinutes=" + uploadSessionTimeoutMinutes +
+                ", maxUploadRateKBPerSecond=" + maxUploadRateKBPerSecond +
+                ", uploadQueueDbPath='" + uploadQueueDbPath + '\'' +
+                ", uploadMapDbPath='" + uploadMapDbPath + '\'' +
                 '}';
     }
 }

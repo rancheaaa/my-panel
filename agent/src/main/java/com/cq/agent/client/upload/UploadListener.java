@@ -17,9 +17,9 @@ public interface UploadListener {
     /**
      * Called when the upload is successfully completed (after merging).
      *
-     * @param result The result of the successful upload.
+     * @param task The result of the successful upload.
      */
-    void onComplete(UploadResult result);
+    void onComplete(UploadTask task);
 
     /**
      * Called when an error occurs during the upload.

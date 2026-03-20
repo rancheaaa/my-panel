@@ -62,4 +62,14 @@ public class ApiResponse<T> {
     public static <T> ApiResponse<T> failure(String msg) {
         return failure(ApiCode.GENERIC_ERROR.getCode(), msg);
     }
+
+    @Override
+    public String toString() {
+        return "ApiResponse{" +
+                "success=" + success +
+                ", code=" + code +
+                ", msg='" + msg + '\'' +
+                ", data=" + data +
+                '}';
+    }
 }

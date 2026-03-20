@@ -1,7 +1,6 @@
 package com.cq.agent.client.upload;
 
 import com.cq.agent.dto.ApiCode;
-import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
@@ -72,57 +71,35 @@ final class UploadErrorClassifier {
     }
 
     /**
-     * Converts an exception or server error message into a user-friendly Chinese message.
+     * if (t == null) return "未知错误";
+     *
+     *         String msg = t.getMessage() != null ? t.getMessage() : "";
+     *         Throwable cause = t.getCause();
+     *
+     *         if (t instanceof ConnectException || (cause instanceof ConnectException)) {
+     *             return "接收方不可达 (进程未启动或端口不通): " + (cause != null ? cause.getMessage() : msg);
+     *         }
+     *         if (t instanceof UnknownHostException || (cause instanceof UnknownHostException)) {
+     *             return "无法解析接收方地址 (主机名无效或网络不可达): " + (cause != null ? cause.getMessage() : msg);
+     *         }
+     *         if (t instanceof SocketTimeoutException || (cause instanceof SocketTimeoutException)) {
+     *             return "连接或读取超时 (接收方无响应或网络异常): " + (cause != null ? cause.getMessage() : msg);
+     *         }
+     *         if (t instanceof AccessDeniedException || (cause instanceof AccessDeniedException)) {
+     *             return "本地文件无读取权限: " + (cause != null ? cause.getMessage() : msg);
+     *         }
+     *         if (t instanceof SecurityException || (cause instanceof SecurityException)) {
+     *             return "本地文件无读取权限: " + (cause != null ? cause.getMessage() : msg);
+     *         }
+     *
+     *         String lower = msg.toLowerCase(Locale.ROOT);
+     *         if (lower.contains("permission denied") || lower.contains("access denied") || lower.contains("access is denied")
+     *                 || lower.contains("accessdenied") || lower.contains("拒绝访问") || lower.contains("权限")) {
+     *             return "文件权限不足: " + msg;
+     *         }
+     *         if (lower.contains("no space left") || lower.contains("no space left on device")
+     *                 || lower.contains("disk full") || lower.contains("空间不足") || lower.contains("磁盘已满")) {
+     *             return "接收方磁盘空间不足: " + msg;
+     *         }
      */
-    static String toUserMessage(Throwable t) {
-        if (t == null) return "未知错误";
-
-        String msg = t.getMessage() != null ? t.getMessage() : "";
-        Throwable cause = t.getCause();
-
-        if (t instanceof ConnectException || (cause instanceof ConnectException)) {
-            return "接收方不可达 (进程未启动或端口不通): " + (cause != null ? cause.getMessage() : msg);
-        }
-        if (t instanceof UnknownHostException || (cause instanceof UnknownHostException)) {
-            return "无法解析接收方地址 (主机名无效或网络不可达): " + (cause != null ? cause.getMessage() : msg);
-        }
-        if (t instanceof SocketTimeoutException || (cause instanceof SocketTimeoutException)) {
-            return "连接或读取超时 (接收方无响应或网络异常): " + (cause != null ? cause.getMessage() : msg);
-        }
-        if (t instanceof AccessDeniedException || (cause instanceof AccessDeniedException)) {
-            return "本地文件无读取权限: " + (cause != null ? cause.getMessage() : msg);
-        }
-        if (t instanceof SecurityException || (cause instanceof SecurityException)) {
-            return "本地文件无读取权限: " + (cause != null ? cause.getMessage() : msg);
-        }
-
-        String lower = msg.toLowerCase(Locale.ROOT);
-        if (lower.contains("permission denied") || lower.contains("access denied") || lower.contains("access is denied")
-                || lower.contains("accessdenied") || lower.contains("拒绝访问") || lower.contains("权限")) {
-            return "文件权限不足: " + msg;
-        }
-        if (lower.contains("no space left") || lower.contains("no space left on device")
-                || lower.contains("disk full") || lower.contains("空间不足") || lower.contains("磁盘已满")) {
-            return "接收方磁盘空间不足: " + msg;
-        }
-
-        return msg;
-    }
-
-    /**
-     * Classifies server API error message (success: false, error: "...").
-     */
-    static String classifyServerError(String serverError) {
-        if (serverError == null || serverError.isBlank()) return "服务端错误";
-
-        String lower = serverError.toLowerCase(Locale.ROOT);
-        if (lower.contains("no space") || lower.contains("disk full") || lower.contains("空间不足") || lower.contains("磁盘已满")) {
-            return "接收方磁盘空间不足: " + serverError;
-        }
-        if (lower.contains("permission") || lower.contains("access denied") || lower.contains("access is denied")
-                || lower.contains("拒绝访问") || lower.contains("权限")) {
-            return "接收方文件无写权限: " + serverError;
-        }
-        return serverError;
-    }
 }

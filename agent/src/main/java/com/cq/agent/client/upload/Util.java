@@ -6,11 +6,11 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-class Util {
+public class Util {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    static String md5(String input) {
+    public static String md5(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
@@ -27,7 +27,7 @@ class Util {
     /**
      * Checks local file readability and returns error message if not readable.
      */
-    static String checkLocalFileReadable(String localFilePath) {
+    public static String checkLocalFileReadable(String localFilePath) {
         if (localFilePath == null || localFilePath.isBlank()) return "本地路径为空";
         java.io.File f = new java.io.File(localFilePath);
         if (!f.exists()) return "本地文件不存在: " + localFilePath;
@@ -36,14 +36,14 @@ class Util {
         return null;
     }
 
-    static String transferToLinuxPath(String path) {
+    public static String transferToLinuxPath(String path) {
         if (path == null || path.isBlank()) {
             return "";
         }
         return path.replace("\\", "/");
     }
 
-    static String currentTime() {
+    public static String currentTime() {
         LocalDateTime now = LocalDateTime.now();
         return DATE_TIME_FORMATTER.format(now);
     }

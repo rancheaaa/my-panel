@@ -1,15 +1,14 @@
  package com.cq.agent;
 
- import com.cq.agent.config.AgentConfig;
- import com.cq.agent.executor.CommandExecutor;
- import com.cq.agent.server.HttpServer;
- import com.cq.agent.service.ChunkedTransferService;
- import com.cq.agent.service.FileService;
- import org.slf4j.Logger;
- import org.slf4j.LoggerFactory;
-
- import java.io.File;
- import java.nio.file.Path;
+import com.cq.agent.config.AgentConfig;
+import com.cq.agent.executor.CommandExecutor;
+import com.cq.agent.server.HttpServer;
+import com.cq.agent.service.ChunkedTransferService;
+import com.cq.agent.service.FileService;
+import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.nio.file.Path;
 
  /**
  * Main entry point for the Agent application.
@@ -40,7 +39,14 @@ public class AgentApplication {
 
         CommandExecutor commandExecutor = new CommandExecutor(config);
         FileService fileService = new FileService(config);
-        ChunkedTransferService chunkedTransferService = new ChunkedTransferService(config);
+        ChunkedTransferService chunkedTransferService;
+        try {
+            chunkedTransferService = new ChunkedTransferService(config);
+        } catch (RocksDBException e) {
+            logger.error("Failed to initialize ChunkedTransferService: {}", e.getMessage(), e);
+            System.exit(1);
+            return;
+        }
 
         HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService);
 

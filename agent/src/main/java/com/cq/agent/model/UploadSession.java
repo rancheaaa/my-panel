@@ -1,10 +1,16 @@
 package com.cq.agent.model;
 
+import com.cq.agent.dto.ChunkInitResponse;
 import com.cq.agent.dto.ChunkStatusResponse;
-import com.google.gson.Gson;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Upload session for tracking chunked file uploads.
@@ -12,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class UploadSession {
 
-    private static final Gson gson = new Gson();
+    private static final Logger log = LoggerFactory.getLogger(UploadSession.class);
 
     private final String transferId;
     private final String traceId;
@@ -27,15 +33,21 @@ public class UploadSession {
     private volatile long lastAccessTime;
     private volatile boolean completed;
     private volatile boolean merged;
-    private String checksum;
 
-    public UploadSession(String transferId, String destFileDir, String destFileName,
-                         long totalSize, int totalChunks, int chunkSize, String tempDirectory) {
-        this(transferId, null, destFileDir, destFileName, totalSize, totalChunks, chunkSize, tempDirectory);
-    }
-
-    public UploadSession(String transferId, String traceId, String destFileDir, String destFileName,
-                         long totalSize, int totalChunks, int chunkSize, String tempDirectory) {
+    public UploadSession(
+            String transferId,
+            String traceId,
+            String destFileDir,
+            String destFileName,
+            long totalSize,
+            int totalChunks,
+            int chunkSize,
+            String tempDirectory,
+            long createTime,
+            long lastAccessTime,
+            Set<Integer> receivedChunks,
+            boolean completed,
+            boolean merged) {
         this.transferId = transferId;
         this.traceId = traceId;
         this.destFileDir = destFileDir;
@@ -44,11 +56,11 @@ public class UploadSession {
         this.totalChunks = totalChunks;
         this.chunkSize = chunkSize;
         this.tempDirectory = tempDirectory;
-        this.createTime = System.currentTimeMillis();
-        this.lastAccessTime = this.createTime;
-        this.receivedChunks = ConcurrentHashMap.newKeySet();
-        this.completed = false;
-        this.merged = false;
+        this.createTime = createTime;
+        this.lastAccessTime = lastAccessTime;
+        this.receivedChunks = receivedChunks;
+        this.completed = completed;
+        this.merged = merged;
     }
 
     public String getTransferId() {
@@ -95,33 +107,74 @@ public class UploadSession {
         return tempDirectory;
     }
 
-    public Set<Integer> getReceivedChunks() {
-        return Collections.unmodifiableSet(receivedChunks);
-    }
+    public void refresh() {
+        Set<Integer> chunks = ConcurrentHashMap.newKeySet();
+        Path tempDir = Paths.get(getTempDirectory());
 
-    public void markChunkReceived(int chunkIndex) {
-        receivedChunks.add(chunkIndex);
-        updateLastAccessTime();
-        if (receivedChunks.size() == totalChunks) {
-            completed = true;
+        if (!Files.exists(tempDir) || !Files.isDirectory(tempDir)) {
+            return;
+        }
+        try {
+            Pattern chunkPattern = Pattern.compile(Pattern.quote(getDestFileName()) + "_chunk_(\\d+)");
+
+            Files.list(tempDir)
+                    .filter(Files::isRegularFile)
+                    .forEach(file -> {
+                        String fileName = file.getFileName().toString();
+                        Matcher matcher = chunkPattern.matcher(fileName);
+
+                        if (matcher.matches()) {
+                            try {
+                                int chunkIndex = Integer.parseInt(matcher.group(1));
+
+                                if (chunkIndex >= 0 && chunkIndex < totalChunks) {
+                                    long fileSize = Files.size(file);
+                                    long expectedSize = calculateExpectedChunkSize(chunkIndex);
+
+                                    if (fileSize == expectedSize) {
+                                        chunks.add(chunkIndex);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                log.error("Error processing chunk file {}: {}", fileName, e.getMessage());
+                            }
+                        }
+                    });
+            if (!receivedChunks.equals(chunks)) {
+                synchronized (receivedChunks) {
+                    receivedChunks.clear();
+                    receivedChunks.addAll(chunks);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error scanning chunk directory: {}", e.getMessage());
         }
     }
 
-    public void removeChunk(int chunkIndex) {
-        receivedChunks.remove(chunkIndex);
-        completed = false;
-        updateLastAccessTime();
+    public Set<Integer> getReceivedChunks() {
+        refresh();
+        return Collections.unmodifiableSet(receivedChunks);
+    }
+    
+    private long calculateExpectedChunkSize(int chunkIndex) {
+        if (chunkIndex == totalChunks - 1) {
+            return totalSize - (long) chunkIndex * chunkSize;
+        }
+        return chunkSize;
     }
 
     public boolean isChunkReceived(int chunkIndex) {
+        refresh();
         return receivedChunks.contains(chunkIndex);
     }
 
     public int getReceivedChunkCount() {
+        refresh();
         return receivedChunks.size();
     }
 
     public List<Integer> getMissingChunks() {
+        refresh();
         List<Integer> missing = new ArrayList<>();
         for (int i = 0; i < totalChunks; i++) {
             if (!receivedChunks.contains(i)) {
@@ -132,10 +185,15 @@ public class UploadSession {
     }
 
     public double getProgress() {
+        refresh();
         return totalChunks > 0 ? (double) receivedChunks.size() / totalChunks * 100.0 : 0.0;
     }
 
     public boolean isCompleted() {
+        refresh();
+        if (receivedChunks.size() == totalChunks) {
+            completed = true;
+        }
         return completed;
     }
 
@@ -147,41 +205,12 @@ public class UploadSession {
         this.merged = merged;
     }
 
-    public String getChecksum() {
-        return checksum;
-    }
-
-    public void setChecksum(String checksum) {
-        this.checksum = checksum;
-    }
-
     public boolean isExpired(long timeoutMs) {
         return System.currentTimeMillis() - lastAccessTime > timeoutMs;
     }
 
-    public String toJson() {
-        return gson.toJson(this);
-    }
-
-    public static UploadSession fromJson(String json) {
-        UploadSession session = gson.fromJson(json, UploadSession.class);
-        // Ensure receivedChunks is thread-safe after deserialization
-        if (session != null && !(session.receivedChunks instanceof ConcurrentHashMap.KeySetView)) {
-            Set<Integer> safeSet = ConcurrentHashMap.newKeySet();
-            safeSet.addAll(session.receivedChunks);
-            try {
-                java.lang.reflect.Field field = UploadSession.class.getDeclaredField("receivedChunks");
-                field.setAccessible(true);
-                field.set(session, safeSet);
-            } catch (Exception e) {
-                // Fallback to synchronized set if reflection fails
-                System.err.println("Failed to set thread-safe set via reflection: " + e.getMessage());
-            }
-        }
-        return session;
-    }
-
     public ChunkStatusResponse toChunkStatusResponse() {
+        refresh();
         ChunkStatusResponse data = new ChunkStatusResponse();
         data.setTransferId(this.getTransferId());
         data.setTotalSize(this.getTotalSize());
@@ -191,14 +220,33 @@ public class UploadSession {
         return data;
     }
 
-    public com.cq.agent.dto.ChunkInitResponse toChunkInitResponse() {
-        com.cq.agent.dto.ChunkInitResponse response = new com.cq.agent.dto.ChunkInitResponse(
+    public ChunkInitResponse toChunkInitResponse() {
+        refresh();
+        return new ChunkInitResponse(
                 this.getTransferId(),
                 this.getTotalSize(),
                 this.getTotalChunks(),
                 this.getChunkSize(),
                 this.getMissingChunks()
         );
-        return response;
+    }
+
+    @Override
+    public String toString() {
+        return "UploadSession{" +
+                "transferId='" + transferId + '\'' +
+                ", traceId='" + traceId + '\'' +
+                ", destFileDir='" + destFileDir + '\'' +
+                ", destFileName='" + destFileName + '\'' +
+                ", totalSize=" + totalSize +
+                ", totalChunks=" + totalChunks +
+                ", chunkSize=" + chunkSize +
+                ", createTime=" + createTime +
+                ", receivedChunks=" + receivedChunks +
+                ", tempDirectory='" + tempDirectory + '\'' +
+                ", lastAccessTime=" + lastAccessTime +
+                ", completed=" + completed +
+                ", merged=" + merged +
+                '}';
     }
 }

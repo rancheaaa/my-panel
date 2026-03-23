@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * In-memory upload task. No persistence.
  */
-class UploadTask {
+public class UploadTask {
     private String localFilePath;
     private String remoteTargetPath;
     private String transferId;
@@ -27,13 +27,13 @@ class UploadTask {
     private String uploadChunksEndTime;
     private String mergeChunksStartTime;
     private String mergeChunksEndTime;
-    private String completedTime;
+    private String uploadSuccessTime;
     private int chunkSize;
     private int totalChunks;
     private final long totalSize;
 
     private List<Integer> missingChunks;
-    private final AtomicInteger uploadChunksCount = new AtomicInteger(0);
+    private AtomicInteger uploadChunksCount = new AtomicInteger(0);
     private final AtomicInteger retryCount = new AtomicInteger(-1);
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
@@ -172,12 +172,12 @@ class UploadTask {
         this.mergeChunksEndTime = mergeChunksEndTime;
     }
 
-    public String getCompletedTime() {
-        return completedTime;
+    public String getUploadSuccessTime() {
+        return uploadSuccessTime;
     }
 
-    public void setCompletedTime(String completedTime) {
-        this.completedTime = completedTime;
+    public void setUploadSuccessTime(String uploadSuccessTime) {
+        this.uploadSuccessTime = uploadSuccessTime;
     }
 
     public int getChunkSize() {
@@ -198,6 +198,10 @@ class UploadTask {
 
     public int getUploadChunksCount() {
         return uploadChunksCount.get();
+    }
+
+    public void setUploadChunksCount(AtomicInteger uploadChunksCount) {
+        this.uploadChunksCount = uploadChunksCount;
     }
 
     public void incrementUploadChunksCount() {
@@ -255,7 +259,7 @@ class UploadTask {
                 ", uploadChunksEndTime='" + uploadChunksEndTime + '\'' +
                 ", mergeChunksStartTime='" + mergeChunksStartTime + '\'' +
                 ", mergeChunksEndTime='" + mergeChunksEndTime + '\'' +
-                ", completedTime='" + completedTime + '\'' +
+                ", uploadSuccessTime='" + uploadSuccessTime + '\'' +
                 ", chunkSize=" + chunkSize +
                 ", totalChunks=" + totalChunks +
                 ", totalSize=" + totalSize +

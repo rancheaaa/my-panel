@@ -3,6 +3,8 @@ package com.cq.agent.service;
 import com.cq.agent.dto.*;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.model.UploadSession;
+import com.cq.agent.client.upload.PersistentMap;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -40,10 +42,10 @@ public class ChunkedTransferService {
     private final long maxFileSize;
     private final long sessionTimeoutMs;
 
-    private final Map<String, UploadSession> uploadSessions = new ConcurrentHashMap<>();
+    private final PersistentMap<String, UploadSession> uploadSessions;
     private final ScheduledExecutorService cleanupExecutor;
 
-    public ChunkedTransferService(AgentConfig config) {
+    public ChunkedTransferService(AgentConfig config) throws RocksDBException {
         String baseDir = config.getFileBaseDirectory();
         this.baseDirectory = Path.of(baseDir).toAbsolutePath().normalize();
         this.allowOutsideBase = config.isAllowOutsideBaseDirectory();
@@ -55,11 +57,25 @@ public class ChunkedTransferService {
         try {
             if(!Files.exists(tempDirectory)) {
                 Files.createDirectories(tempDirectory);
-                logger.info("Chunked transfer service initialized. Temp dir: {}", tempDirectory);
+                logger.info("Chunked transfer service initialized base dir: {}", tempDirectory);
             }
         } catch (IOException e) {
-            logger.error("Failed to create temp directory: {}", tempDirectory, e);
+            logger.error("Failed to create base directory: {}", tempDirectory, e);
         }
+
+        Path uploadSessionDbPath = baseDirectory.resolve(config.getUploadSessionsDbPath());
+        try {
+            if(!Files.exists(uploadSessionDbPath)) {
+                Files.createDirectories(uploadSessionDbPath);
+                logger.info("Chunked transfer service initialized upload session db dir: {}", uploadSessionDbPath);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to create upload session db directory: {}", uploadSessionDbPath, e);
+        }
+
+        this.uploadSessions = new PersistentMap<>(uploadSessionDbPath.toAbsolutePath().normalize().toString(), "upload-sessions", String.class, UploadSession.class);
+        logger.info("Persistent upload sessions initialized at: {}", config.getUploadSessionsDbPath());
+        this.uploadSessions.getValues(1, 10).forEach(session -> logger.info("Loaded Session: {}", session));
 
         cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "chunk-cleanup");
@@ -71,11 +87,11 @@ public class ChunkedTransferService {
 
     /**
      * 初始化分片上传会话
-     * 
+     * --------------------
      * 该方法用于创建一个新的分片上传会话或恢复已存在的上传会话。分片上传机制允许大文件被分割成多个小块进行上传，
      * 支持断点续传和网络中断后的重试。每个上传会话都有唯一的transferId标识，客户端可以使用自定义的transferId
      * 或由系统自动生成。
-     * 
+     * --------------------
      * 方法执行流程：
      * 1. 验证文件总大小是否合法（不能为负数且不能超过最大文件大小限制）
      * 2. 解析并验证目标目录路径，确保路径在允许的范围内
@@ -112,7 +128,7 @@ public class ChunkedTransferService {
      *         - TEMP_DIR_VERIFICATION_FAILED: 临时目录验证失败
      *         - INIT_UPLOAD_FAILED: 初始化上传失败（其他未预期的错误）
      */
-    public ApiResponse<com.cq.agent.dto.ChunkInitResponse> initUpload(String traceId, String transferId, String destFileDir, String destFileName, long totalSize) {
+    public ApiResponse<ChunkInitResponse> initUpload(String traceId, String transferId, String destFileDir, String destFileName, long totalSize) {
         try {
             logger.debug("[traceId={}] Initializing upload: transferId={}, destFileDir={}, destFileName={}, totalSize={}", 
                     traceId, transferId, destFileDir, destFileName, totalSize);
@@ -143,7 +159,7 @@ public class ChunkedTransferService {
 
             ApiResponse<ChunkStatusResponse> existingSessionCheck = handleExistingSession(finalTransferId, resolvedPath, totalSize, traceId);
             if (existingSessionCheck != null) {
-                com.cq.agent.dto.ChunkInitResponse response = new com.cq.agent.dto.ChunkInitResponse(
+                ChunkInitResponse response = new ChunkInitResponse(
                         existingSessionCheck.getData().getTransferId(),
                         existingSessionCheck.getData().getTotalSize(),
                         existingSessionCheck.getData().getTotalChunks(),
@@ -350,17 +366,20 @@ public class ChunkedTransferService {
                 totalSize,
                 totalChunks,
                 defaultChunkSize,
-                sessionTempDir.toString()
+                sessionTempDir.toString(),
+                System.currentTimeMillis(),
+                System.currentTimeMillis(),
+                ConcurrentHashMap.newKeySet(),
+                false,
+                false
         );
     }
 
     /**
      * 上传单个文件分片
-     * 
      * 该方法用于接收并存储大文件的一个分片。分片上传机制允许大文件被分割成多个小块进行独立上传，
      * 每个分片都有唯一的索引标识。方法会验证分片的合法性，检查是否重复上传，将分片数据写入临时文件，
      * 并更新上传会话状态。支持重试机制以应对临时的IO错误，确保数据完整性。
-     * 
      * 方法执行流程：
      * 1. 验证上传会话是否存在（通过transferId查找）
      * 2. 检查会话是否已经合并完成，如果已完成则拒绝接收新分片
@@ -372,7 +391,6 @@ public class ChunkedTransferService {
      * 8. 重试失败后删除可能存在的不完整文件
      * 9. 分片验证通过后，标记该分片已接收
      * 10. 构建并返回上传结果，包含完成状态和缺失分片数量
-     * 
      * 重试机制说明：
      * - 最多重试3次，每次间隔1秒
      * - 每次写入后都会验证文件大小，确保数据完整性
@@ -434,19 +452,18 @@ public class ChunkedTransferService {
             ApiResponse<Void> duplicateCheck = checkDuplicateChunk(session, chunkFile, chunkIndex, expectedChunkSize, traceId, transferId);
             if (duplicateCheck.isSuccess()) {
                 logger.debug("[traceId={}] Chunk {} already uploaded for session {}, skipping duplicate upload", traceId, chunkIndex, transferId);
-                return buildChunkUploadResult(session, transferId, traceId);
+                return buildChunkUploadResult(session, transferId, traceId, chunkIndex);
             }
             
             ApiResponse<Void> writeResult = writeChunkWithRetry(chunkFile, content, traceId, transferId, chunkIndex);
             if (!writeResult.isSuccess()) {
                 return ApiResponse.failure(writeResult.getCode(), writeResult.getMsg());
             }
-            
-            session.markChunkReceived(chunkIndex);
+
             logger.debug("[traceId={}] Chunk {} received for session {}, total received: {}/{}", 
                     traceId, chunkIndex, transferId, session.getReceivedChunkCount(), session.getTotalChunks());
 
-            return buildChunkUploadResult(session, transferId, traceId);
+            return buildChunkUploadResult(session, transferId, traceId, chunkIndex);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("[traceId={}] Chunk write interrupted for session {}: chunkIndex={}", traceId, transferId, chunkIndex, e);
@@ -502,10 +519,9 @@ public class ChunkedTransferService {
 
     /**
      * 校验分片是否重复上传
-     * 
      * 该方法用于检查指定分片是否已经成功上传过，避免重复写入和浪费资源。
      * 通过检查 UploadSession 中的已接收分片索引集合以及物理文件的存在性和大小来验证。
-     * 
+     * -------
      * 方法执行流程：
      * 1. 检查分片索引是否已在 UploadSession 的已接收集合中
      * 2. 如果不在集合中，说明该分片未上传过，返回失败（需要上传）
@@ -625,12 +641,14 @@ public class ChunkedTransferService {
         }
     }
 
-    private ApiResponse<ChunkUploadResponse> buildChunkUploadResult(UploadSession session, String transferId, String traceId) {
+    private ApiResponse<ChunkUploadResponse> buildChunkUploadResult(UploadSession session, String transferId, String traceId, int chunkIndex) {
         ChunkUploadResponse result = new ChunkUploadResponse();
         result.setTransferId(transferId);
         result.setCompleted(session.isCompleted());
         result.setMissingChunksCount(session.getTotalChunks() - session.getReceivedChunkCount());
+        result.setChunkIndex(chunkIndex);
 
+        this.uploadSessions.put(transferId, session);
         if (session.isCompleted()) {
             logger.debug("[traceId={}] All chunks received for session: {}", traceId, transferId);
         }
@@ -647,7 +665,7 @@ public class ChunkedTransferService {
 
         logger.debug("[traceId={}] Processing chunk merge: transferId={}", traceId, transferId);
         session.updateLastAccessTime();
-
+        this.uploadSessions.put(transferId, session);
         if (!session.isCompleted()) {
             logger.debug("[traceId={}] Upload not completed for session {}: missing chunks {}", traceId, transferId, session.getMissingChunks());
             return ApiResponse.failure(ApiCode.UPLOAD_NOT_COMPLETED.getCode(), "Upload not completed. Missing chunks: " + session.getMissingChunks());
@@ -694,6 +712,7 @@ public class ChunkedTransferService {
                 return ApiResponse.failure(ApiCode.MERGE_SIZE_MISMATCH.getCode(), "Merged file size does not match original file size");
             }
             session.setMerged(true);
+            this.uploadSessions.put(transferId, session);
             logger.info("[traceId={}] Chunks merged for session {}: {}", traceId, transferId, targetFullFileName);
 
             logger.debug("[traceId={}] Cleaning up temp files for session: {}", traceId, transferId);
@@ -718,17 +737,19 @@ public class ChunkedTransferService {
             return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "Upload session not found: " + transferId);
         }
         session.updateLastAccessTime();
+        this.uploadSessions.put(transferId, session);
+        logger.debug("[traceId={}] Get upload original status for session: {}", traceId, session);
         verifySession(session, traceId);
+        logger.debug("[traceId={}] Get upload verified status for session: {}", traceId, session);
         return ApiResponse.success(session.toChunkStatusResponse());
     }
 
     private void verifySession(UploadSession session, String traceId) {
-        List<Integer> corruptedChunks = new ArrayList<>();
 
         for (int chunkIndex : session.getReceivedChunks()) {
-            Path chunkFile = Path.of(session.getTempDirectory(), "chunk_" + chunkIndex);
+            String chunkFileStr = session.getDestFileName() + "_chunk_" + chunkIndex;
+            Path chunkFile = Path.of(session.getTempDirectory(), chunkFileStr);
             if (!Files.exists(chunkFile)) {
-                corruptedChunks.add(chunkIndex);
                 continue;
             }
 
@@ -742,18 +763,12 @@ public class ChunkedTransferService {
                     logger.warn("[traceId={}] Corrupted chunk detected: session={}, chunk={}, expected size={}, actual size={}",
                             traceId, session.getTransferId(), chunkIndex, expectedSize, actualSize);
                     Files.deleteIfExists(chunkFile);
-                    corruptedChunks.add(chunkIndex);
                 }
             } catch (IOException e) {
                 logger.warn("[traceId={}] Failed to verify chunk file {}: {}", traceId, chunkFile, e.getMessage(), e);
-                corruptedChunks.add(chunkIndex);
             }
         }
-
-        if (!corruptedChunks.isEmpty()) {
-            // Remove corrupted chunks from session
-            corruptedChunks.forEach(session::removeChunk);
-        }
+        this.uploadSessions.put(session.getTransferId(), session);
     }
 
     public ApiResponse<Void> cancelUpload(String transferId, String traceId) {
@@ -912,6 +927,9 @@ public class ChunkedTransferService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             cleanupExecutor.shutdownNow();
+        }
+        if (uploadSessions != null) {
+            uploadSessions.close();
         }
     }
 

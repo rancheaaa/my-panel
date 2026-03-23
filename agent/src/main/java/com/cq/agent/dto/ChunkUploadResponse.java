@@ -12,6 +12,7 @@ public class ChunkUploadResponse {
     private String transferId;
     private Boolean completed;
     private final AtomicInteger missingChunksCount =  new AtomicInteger(0);
+    private int chunkIndex;
 
     public String getTransferId() {
         return transferId;
@@ -37,12 +38,21 @@ public class ChunkUploadResponse {
         this.missingChunksCount.set(missingChunksCount);
     }
 
+    public int getChunkIndex() {
+        return chunkIndex;
+    }
+
+    public void setChunkIndex(int chunkIndex) {
+        this.chunkIndex = chunkIndex;
+    }
+
     @Override
     public String toString() {
         return "ChunkUploadResponse{" +
                 "transferId='" + transferId + '\'' +
                 ", completed=" + completed +
                 ", missingChunksCount=" + missingChunksCount +
+                ", chunkIndex=" + chunkIndex +
                 '}';
     }
 }

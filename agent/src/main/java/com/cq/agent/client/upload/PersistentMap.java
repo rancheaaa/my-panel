@@ -7,9 +7,10 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
-final class PersistentMap<K, V> {
+public class PersistentMap<K, V> {
 
     private static final Logger logger = LoggerFactory.getLogger(PersistentMap.class);
 
@@ -21,7 +22,7 @@ final class PersistentMap<K, V> {
     private final Class<V> valueType;
     private static final String KEY_PREFIX = "map:";
 
-    PersistentMap(String dbPath, String mapName, Class<K> keyType, Class<V> valueType) throws RocksDBException {
+    public PersistentMap(String dbPath, String mapName, Class<K> keyType, Class<V> valueType) throws RocksDBException {
         this.mapName = mapName;
         this.keyType = keyType;
         this.valueType = valueType;
@@ -45,7 +46,7 @@ final class PersistentMap<K, V> {
         }
     }
 
-    void put(K key, V value) {
+    public void put(K key, V value) {
         lock.lock();
         try {
             String dbKey = KEY_PREFIX + serializeKey(key);
@@ -58,7 +59,7 @@ final class PersistentMap<K, V> {
         }
     }
 
-    V get(K key) {
+    public V get(K key) {
         lock.lock();
         try {
             String dbKey = KEY_PREFIX + serializeKey(key);
@@ -75,20 +76,27 @@ final class PersistentMap<K, V> {
         }
     }
 
-    void remove(K key) {
+    public V remove(K key) {
         lock.lock();
         try {
             String dbKey = KEY_PREFIX + serializeKey(key);
-            db.delete(dbKey.getBytes(StandardCharsets.UTF_8));
-            logger.debug("Map '{}' removed key: {}", mapName, key);
+            byte[] value = db.get(dbKey.getBytes(StandardCharsets.UTF_8));
+            V result = null;
+            if (value != null) {
+                result = deserializeValue(value);
+                db.delete(dbKey.getBytes(StandardCharsets.UTF_8));
+                logger.debug("Map '{}' removed key: {}", mapName, key);
+            }
+            return result;
         } catch (Exception e) {
             logger.error("Failed to remove from map '{}': {}", mapName, e.getMessage(), e);
+            return null;
         } finally {
             lock.unlock();
         }
     }
 
-    boolean containsKey(K key) {
+    public boolean containsKey(K key) {
         lock.lock();
         try {
             String dbKey = KEY_PREFIX + serializeKey(key);
@@ -101,7 +109,7 @@ final class PersistentMap<K, V> {
         }
     }
 
-    int size() {
+    public int size() {
         lock.lock();
         try {
             int count = 0;
@@ -119,11 +127,86 @@ final class PersistentMap<K, V> {
         }
     }
 
-    boolean isEmpty() {
+    public boolean isEmpty() {
         return size() == 0;
     }
 
-    void clear() {
+    public List<V> values() {
+        return getAllValues();
+    }
+
+    public List<Map.Entry<K, V>> entrySet() {
+        lock.lock();
+        try {
+            List<Map.Entry<K, V>> entries = new ArrayList<>();
+            RocksIterator iterator = db.newIterator();
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                String key = new String(iterator.key(), StandardCharsets.UTF_8);
+                if (key.startsWith(KEY_PREFIX)) {
+                    String keyWithoutPrefix = key.substring(KEY_PREFIX.length());
+                    K deserializedKey = deserializeKey(keyWithoutPrefix);
+                    V value = deserializeValue(iterator.value());
+                    entries.add(new Map.Entry<K, V>() {
+                        @Override
+                        public K getKey() {
+                            return deserializedKey;
+                        }
+
+                        @Override
+                        public V getValue() {
+                            return value;
+                        }
+
+                        @Override
+                        public V setValue(V value) {
+                            throw new UnsupportedOperationException("setValue not supported");
+                        }
+                    });
+                }
+            }
+            iterator.close();
+            logger.debug("Map '{}' entrySet: size={}", mapName, entries.size());
+            return entries;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public List<V> getAllValues() {
+        return getValues(0, Integer.MAX_VALUE);
+    }
+
+    public List<V> getValues(int offset, int limit) {
+        lock.lock();
+        try {
+            List<V> values = new ArrayList<>();
+            int count = 0;
+            int skipped = 0;
+            RocksIterator iterator = db.newIterator();
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+                String key = new String(iterator.key(), StandardCharsets.UTF_8);
+                if (key.startsWith(KEY_PREFIX)) {
+                    if (skipped < offset) {
+                        skipped++;
+                        continue;
+                    }
+                    if (count >= limit) {
+                        break;
+                    }
+                    byte[] value = iterator.value();
+                    values.add(deserializeValue(value));
+                    count++;
+                }
+            }
+            iterator.close();
+            logger.debug("Map '{}' getValues: offset={}, limit={}, returned={}", mapName, offset, limit, values.size());
+            return values;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void clear() {
         lock.lock();
         try {
             RocksIterator iterator = db.newIterator();
@@ -143,7 +226,7 @@ final class PersistentMap<K, V> {
         }
     }
 
-    void close() {
+    public void close() {
         lock.lock();
         try {
             if (db != null) {
@@ -162,6 +245,14 @@ final class PersistentMap<K, V> {
             return (String) key;
         }
         return gson.toJson(key);
+    }
+
+    @SuppressWarnings("unchecked")
+    private K deserializeKey(String key) {
+        if (keyType == String.class) {
+            return (K) key;
+        }
+        return gson.fromJson(key, keyType);
     }
 
     private byte[] serializeValue(V value) {

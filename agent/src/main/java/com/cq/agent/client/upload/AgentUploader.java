@@ -18,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -39,7 +40,6 @@ public class AgentUploader {
     private final Gson gson = new Gson();
     private final PersistentQueue<UploadTask> taskQueue;
     private final PersistentMap<String, UploadTask> taskInflightMap;
-    private final PersistentMap<String, String> listenerClassNames;
     private final ConcurrentHashMap<String, UploadListener> listenerCache = new ConcurrentHashMap<>();
     private final ExecutorService uploadExecutor;
     private final ExecutorService workerExecutor;
@@ -82,7 +82,6 @@ public class AgentUploader {
         try {
             this.taskQueue = new PersistentQueue<>(agentConfig.getUploadQueueDbPath(), "upload-tasks", UploadTask.class);
             this.taskInflightMap = new PersistentMap<>(agentConfig.getUploadMapDbPath(), "upload-inflight", String.class, UploadTask.class);
-            this.listenerClassNames = new PersistentMap<>(agentConfig.getUploadListenerDbPath(), "listener-classnames", String.class, String.class);
             logger.info("Persistent queue initialized at: {}", agentConfig.getUploadQueueDbPath());
             logger.info("Queue size on startup: {}", taskQueue.size());
             if (!taskQueue.isEmpty()) {
@@ -157,7 +156,6 @@ public class AgentUploader {
                     TimeUnit.SECONDS.sleep(1);
                     continue;
                 }
-//                String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
                 processTask(task);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -167,31 +165,30 @@ public class AgentUploader {
                     String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
                     handleListenerError(taskKey, t.getMessage());
                     listenerCache.remove(taskKey);
-                    listenerClassNames.remove(taskKey);
                 }
                 logger.error("Worker {} error", id, t);
             }
         }
     }
 
-    public void uploadFile(String localFilePath, String remoteTargetPath, UploadListener listener) {
+    public boolean uploadFile(String localFilePath, String remoteTargetPath, UploadListener listener) {
         // Generate traceid for this upload
         String traceId = java.util.UUID.randomUUID().toString().replace("-", "");
 
         try {
             if (localFilePath == null || localFilePath.isBlank()) {
                 handleListenerError(listener, "localFilePath must not be null or blank");
-                return;
+                return false;
             }
             if (remoteTargetPath == null || remoteTargetPath.isBlank()) {
                 handleListenerError(listener, "remoteTargetPath must not be null or blank");
-                return;
+                return false;
             }
 
             // Validate absolute paths
             if (!new File(localFilePath).isAbsolute()) {
                 handleListenerError(listener, "localFilePath must be an absolute path: " + localFilePath);
-                return;
+                return false;
             }
 
             // Validate local file exists and is readable
@@ -199,7 +196,7 @@ public class AgentUploader {
             if (fileCheck != null) {
                 logger.error("[traceId={}] Local file validation failed: {}", traceId, fileCheck);
                 handleListenerError(listener, fileCheck);
-                return;
+                return false;
             }
 
             File localFile = new File(localFilePath);
@@ -210,7 +207,7 @@ public class AgentUploader {
                 String errorMsg = "File size exceeds maximum allowed size: " + maxFileSize + "bytes";
                 logger.error("[traceId={}] {}", traceId, errorMsg);
                 handleListenerError(listener, errorMsg);
-                return;
+                return false;
             }
 
             logger.debug("[traceId={}] Local file validated: path={}, size={} bytes", traceId, localFilePath, fileSize);
@@ -218,8 +215,6 @@ public class AgentUploader {
             String taskKey = Util.md5(localFilePath + ":" + remoteTargetPath);
 
             if (listener != null) {
-                String listenerClassName = listener.getClass().getName();
-                listenerClassNames.put(taskKey, listenerClassName);
                 listenerCache.put(taskKey, listener);
             }
             UploadTask task = new UploadTask(localFilePath, remoteTargetPath, fileSize);
@@ -231,10 +226,11 @@ public class AgentUploader {
             if (!this.taskInflightMap.containsKey(task.getTransferId())) {
                 this.taskInflightMap.put(task.getTransferId(), task);
             }
-            taskQueue.offer(task);
+            return taskQueue.offer(task);
         } catch (Exception e) {
             logger.error("upload file with error!", e);
             handleListenerError(listener, "upload file with error!");
+            return false;
         }
     }
 
@@ -304,6 +300,14 @@ public class AgentUploader {
                 this.taskInflightMap.put(task.getTransferId(), task);
                 uploadChunks(task, file, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
 
+                state = fetchLatestStatus(task.getTransferId(), traceId);
+                if (state.getData() != null) {
+                    final List<Integer> missingChunks2 = state.getData().getMissingChunks();
+                    task.setMissingChunks(new ArrayList<>(missingChunks2));
+                    if (!missingChunks2.isEmpty()) {
+                        throw new IllegalStateException("Upload failed, missing chunks: " + missingChunks2);
+                    }
+                }
                 task.setUploadChunksEndTime(Util.currentTime());
                 task.setStatus(UploadTaskStatus.UPLOAD_CHUNKS_COMPLETED);
                 task.updateTimestamp();
@@ -318,31 +322,37 @@ public class AgentUploader {
                 task.setStatus(UploadTaskStatus.MERGING_CHUNKS);
                 task.updateTimestamp();
                 task.setMergeChunksStartTime(Util.currentTime());
+                this.taskInflightMap.put(task.getTransferId(), task);
+
                 mergeChunks(task.getTransferId(), traceId);
+
                 task.setMergeChunksEndTime(Util.currentTime());
                 task.setStatus(UploadTaskStatus.MERGE_CHUNKS_COMPLETED);
                 task.updateTimestamp();
+                this.taskInflightMap.put(task.getTransferId(), task);
             } catch (IOException e) {
                 state = fetchLatestStatus(task.getTransferId(), traceId);
                 logger.error("[traceId={}] Merge failed, status:{}  {}", traceId, state, e.getMessage());
                 throw e;
             }
             if (verifyRemoteFileExists(task.getRemoteTargetPath(), traceId)) {
+                task.setUploadSuccessTime(Util.currentTime());
+                task.setStatus(UploadTaskStatus.UPLOAD_SUCCESS);
+                task.updateTimestamp();
+                this.taskInflightMap.put(task.getTransferId(), task);
                 handleListenerSuccess(taskKey, task);
             } else {
                 logger.error("[traceId={}] Verify remote file {} failed", traceId, task.getRemoteTargetPath());
                 throw new IOException("Upload failed after all retries, but no result was produced.");
             }
             logger.info("[traceId={}] Upload task completed: {}", traceId, taskKey);
-            listenerCache.remove(taskKey);
-            listenerClassNames.remove(taskKey);
         } catch (Exception e) {
             logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
             task.setStatus(UploadTaskStatus.FAILED);
             task.updateTimestamp();
             handleListenerError(taskKey, e.getMessage());
+        } finally {
             listenerCache.remove(taskKey);
-            listenerClassNames.remove(taskKey);
         }
     }
 
@@ -355,6 +365,7 @@ public class AgentUploader {
 
         AtomicInteger uploadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
         UploadListener listener = listenerCache.get(taskKey);
+        task.setUploadChunksCount(uploadedCount);
 
         try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(file.toPath(), java.nio.file.StandardOpenOption.READ)) {
             CompletableFuture<?>[] uploadFutures = missingChunks.stream()
@@ -393,7 +404,6 @@ public class AgentUploader {
             } catch (TimeoutException e) {
                 throw new IOException("Chunk uploads timed out after " + timeoutSeconds + " seconds", e);
             }
-
         } catch (Exception e) {
             throw new IOException("Failed to upload chunks", e);
         }
@@ -587,6 +597,7 @@ public class AgentUploader {
         return Boolean.TRUE.equals(data);
     }
 
+    @SuppressWarnings("all")
     private <T> ApiResponse<T> postApi(String path, Object body, Type responseType, String traceId) throws IOException, InterruptedException {
         String jsonPayload = body instanceof String ? (String) body : gson.toJson(body);
         logger.debug("[traceId={}] Sending POST request to {}", traceId, path);
@@ -607,10 +618,11 @@ public class AgentUploader {
             throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
         }
         ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
-        logger.debug("[traceId={}] Received response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
+        logger.debug("[traceId={}] Received post response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
         return obj;
     }
 
+    @SuppressWarnings("all")
     private <T> ApiResponse<T> getApi(String path, Type responseType, String traceId) throws IOException, InterruptedException {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(agentApiUrl + path))
@@ -620,6 +632,7 @@ public class AgentUploader {
 
         // Add traceid header if provided
         if (traceId != null && !traceId.isEmpty()) {
+            // set trace id header
             requestBuilder.header("X-Trace-Id", traceId);
         }
 
@@ -629,8 +642,35 @@ public class AgentUploader {
             throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
         }
         ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
-        logger.debug("[traceId={}] Received response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
+        logger.debug("[traceId={}] Received get response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
         return obj;
+    }
+
+    public List<UploadTask> getInflightTasks(int page, int pageSize) {
+        if (page < 1) {
+            throw new IllegalArgumentException("page must be >= 1");
+        }
+        if (pageSize < 1 || pageSize > 1000) {
+            throw new IllegalArgumentException("pageSize must be between 1 and 1000");
+        }
+        int offset = (page - 1) * pageSize;
+        return taskInflightMap.getValues(offset, pageSize);
+    }
+
+    public List<UploadTask> getAllInflightTasks() {
+        return taskInflightMap.getAllValues();
+    }
+
+    public int getInflightTasksCount() {
+        return taskInflightMap.size();
+    }
+
+    public boolean isInflightTasksEmpty() {
+        return taskInflightMap.isEmpty();
+    }
+
+    void clearAllInflightTasks() {
+        taskInflightMap.clear();
     }
 
     public void shutdown() {
@@ -655,6 +695,9 @@ public class AgentUploader {
         }
         if (taskQueue != null) {
             taskQueue.close();
+        }
+        if (taskInflightMap != null) {
+            taskInflightMap.close();
         }
         logger.info("AgentUploader shut down");
     }

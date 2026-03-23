@@ -2,9 +2,7 @@ package com.cq.agent.client.upload;
 
 import com.cq.agent.client.BaseIntegrationTest;
 import com.cq.agent.config.AgentConfig;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import com.google.gson.JsonObject;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.*;
@@ -20,15 +18,26 @@ import java.util.concurrent.TimeUnit;
  */
 class AgentUploaderIntegrationTest extends BaseIntegrationTest {
 
-    @Test
-    @DisplayName("测试文件上传集成 - 用法: 测试分块上传文件到agent服务")
-    public void testUpload() throws IOException {
+    private AgentUploader uploader;
+
+    @BeforeEach
+    void setUp() {
         // Change this to your agent's address
         int concurrentUploads = 2;
 
         AgentConfig config = new AgentConfig();
-        AgentUploader uploader = new AgentUploader(config, AGENT_URL, concurrentUploads);
-        uploader.init();
+        this.uploader = new AgentUploader(config, AGENT_URL, concurrentUploads);
+        this.uploader.init();
+    }
+
+    @AfterEach
+    void tearDown() {
+        this.uploader.shutdown();
+    }
+
+    @Test
+    @DisplayName("测试文件上传集成 - 用法: 测试分块上传文件到agent服务")
+    public void testUpload() throws IOException {
         final int random = ThreadLocalRandom.current().nextInt(2, 6);
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB
         // Standard remote path, relative to agent's base directory
@@ -58,7 +67,10 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
         };
 
         try {
-            uploader.uploadFile(testFile.getAbsolutePath(), remotePath, listener);
+            uploader.getAllInflightTasks().forEach(task -> logger.info("Inflight task: {}", task));
+
+            boolean success = uploader.uploadFile(testFile.getAbsolutePath(), remotePath, listener);
+            assertTrue(success, "Upload failed");
 
             if (!latch.await(5, TimeUnit.MINUTES)) {
                 logger.error("Upload timed out after 5 minutes");
@@ -71,10 +83,25 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            uploader.shutdown();
             final boolean count = testFile.delete();
             logger.debug("test file delete {} count", count);
         }
+    }
+
+    @Test
+    @DisplayName("测试文件上传集成 - 用法: 测试清除所有上传中的任务")
+    public void testClearAllInflightTasks() {
+        logger.info("agent uploader inflight task is empty {}", uploader.isInflightTasksEmpty());
+        uploader.getAllInflightTasks().forEach(task -> logger.info("Inflight task: {}", task));
+        uploader.clearAllInflightTasks();
+        logger.info("agent uploader inflight task is empty {}", uploader.isInflightTasksEmpty());
+    }
+
+    @Test
+    @DisplayName("测试文件上传集成 - 用法: 打印当前所有上传中或已完成的任务")
+    public void testPrintAllInflightTasks() {
+        logger.info("agent uploader inflight task is empty: {}", uploader.isInflightTasksEmpty());
+        uploader.getAllInflightTasks().forEach(task -> logger.info("Current Inflight task: {}", task));
     }
 
     private File createDummyFile(long size) throws IOException {

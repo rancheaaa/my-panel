@@ -53,6 +53,7 @@ public class AgentConfig {
     // Upload queue configuration
     private String uploadQueueDbPath;
     private String uploadMapDbPath;
+    private String uploadListenerDbPath;
 
     public AgentConfig() {
         this.properties = new Properties();
@@ -134,6 +135,7 @@ public class AgentConfig {
         // Upload queue configuration
         this.uploadQueueDbPath = getStringProperty("upload.queue.db.path", "upload_queue_db");
         this.uploadMapDbPath = getStringProperty("upload.map.db.path", "upload_map_db");
+        this.uploadListenerDbPath = getStringProperty("upload.listener.db.path", "upload_listener_db");
         // Validate configuration
         validateConfiguration();
     }
@@ -324,6 +326,10 @@ public class AgentConfig {
         this.uploadMapDbPath = uploadMapDbPath;
     }
 
+    public String getUploadListenerDbPath() {
+        return uploadListenerDbPath;
+    }
+
     @Override
     public String toString() {
         return "AgentConfig{" +
@@ -346,6 +352,7 @@ public class AgentConfig {
                 ", maxUploadRateKBPerSecond=" + maxUploadRateKBPerSecond +
                 ", uploadQueueDbPath='" + uploadQueueDbPath + '\'' +
                 ", uploadMapDbPath='" + uploadMapDbPath + '\'' +
+                ", uploadListenerDbPath='" + uploadListenerDbPath + '\'' +
                 '}';
     }
 }

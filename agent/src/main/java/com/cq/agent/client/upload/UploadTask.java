@@ -1,5 +1,6 @@
 package com.cq.agent.client.upload;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +16,10 @@ class UploadTask {
     private String transferId;
     private String traceId;
     private UploadTaskStatus status;
+    private String listenerClassName;
 
+    private String createTime;
+    private String updateTime;
     private String enqueuedTime;
     private String initUploadStartTime;
     private String initUploadEndTime;
@@ -39,6 +43,8 @@ class UploadTask {
         this.remoteTargetPath = remoteTargetPath;
         this.totalSize = totalSize;
         this.status = UploadTaskStatus.PREPARED;
+        this.createTime = FORMATTER.format(LocalDateTime.now());
+        this.updateTime = this.createTime;
     }
 
     // Getters and Setters
@@ -84,6 +90,34 @@ class UploadTask {
 
     public void setStatus(UploadTaskStatus status) {
         this.status = status;
+    }
+
+    public String getListenerClassName() {
+        return listenerClassName;
+    }
+
+    public void setListenerClassName(String listenerClassName) {
+        this.listenerClassName = listenerClassName;
+    }
+
+    public String getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(String createTime) {
+        this.createTime = createTime;
+    }
+
+    public String getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(String updateTime) {
+        this.updateTime = updateTime;
+    }
+
+    public void updateTimestamp() {
+        this.updateTime = FORMATTER.format(java.time.LocalDateTime.now());
     }
 
     public String getEnqueuedTime() {
@@ -212,6 +246,8 @@ class UploadTask {
                 ", transferId='" + transferId + '\'' +
                 ", traceId='" + traceId + '\'' +
                 ", status=" + status +
+                ", createTime='" + createTime + '\'' +
+                ", updateTime='" + updateTime + '\'' +
                 ", enqueuedTime='" + enqueuedTime + '\'' +
                 ", initUploadStartTime='" + initUploadStartTime + '\'' +
                 ", initUploadEndTime='" + initUploadEndTime + '\'' +

@@ -39,7 +39,8 @@ public class AgentUploader {
     private final Gson gson = new Gson();
     private final PersistentQueue<UploadTask> taskQueue;
     private final PersistentMap<String, UploadTask> taskInflightMap;
-    private final ConcurrentHashMap<String, UploadListener> listeners = new ConcurrentHashMap<>();
+    private final PersistentMap<String, String> listenerClassNames;
+    private final ConcurrentHashMap<String, UploadListener> listenerCache = new ConcurrentHashMap<>();
     private final ExecutorService uploadExecutor;
     private final ExecutorService workerExecutor;
     private final int workerCount;
@@ -81,6 +82,7 @@ public class AgentUploader {
         try {
             this.taskQueue = new PersistentQueue<>(agentConfig.getUploadQueueDbPath(), "upload-tasks", UploadTask.class);
             this.taskInflightMap = new PersistentMap<>(agentConfig.getUploadMapDbPath(), "upload-inflight", String.class, UploadTask.class);
+            this.listenerClassNames = new PersistentMap<>(agentConfig.getUploadListenerDbPath(), "listener-classnames", String.class, String.class);
             logger.info("Persistent queue initialized at: {}", agentConfig.getUploadQueueDbPath());
             logger.info("Queue size on startup: {}", taskQueue.size());
             if (!taskQueue.isEmpty()) {
@@ -164,7 +166,8 @@ public class AgentUploader {
                 if (task != null) {
                     String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
                     handleListenerError(taskKey, t.getMessage());
-                    listeners.remove(taskKey);
+                    listenerCache.remove(taskKey);
+                    listenerClassNames.remove(taskKey);
                 }
                 logger.error("Worker {} error", id, t);
             }
@@ -215,12 +218,19 @@ public class AgentUploader {
             String taskKey = Util.md5(localFilePath + ":" + remoteTargetPath);
 
             if (listener != null) {
-                listeners.put(taskKey, listener);
+                String listenerClassName = listener.getClass().getName();
+                listenerClassNames.put(taskKey, listenerClassName);
+                listenerCache.put(taskKey, listener);
             }
             UploadTask task = new UploadTask(localFilePath, remoteTargetPath, fileSize);
             task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
             task.setTraceId(traceId);
             task.setEnqueuedTime(Util.currentTime());
+            task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
+            task.updateTimestamp();
+            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
+                this.taskInflightMap.put(task.getTransferId(), task);
+            }
             taskQueue.offer(task);
         } catch (Exception e) {
             logger.error("upload file with error!", e);
@@ -234,10 +244,18 @@ public class AgentUploader {
 
         try {
             task.setStatus(UploadTaskStatus.SCANNED);
+            task.updateTimestamp();
             task.incrementRetryCount();
-            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
-                this.taskInflightMap.put(task.getTransferId(), task);
+            this.taskInflightMap.put(task.getTransferId(), task);
+
+            String listenerClassName = task.getListenerClassName();
+            if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
+                UploadListener listener = createListenerInstance(listenerClassName);
+                if (listener != null) {
+                    listenerCache.put(taskKey, listener);
+                }
             }
+
             String fileCheck = Util.checkLocalFileReadable(task.getLocalFilePath());
             if (fileCheck != null) {
                 throw new IOException(fileCheck);
@@ -247,6 +265,7 @@ public class AgentUploader {
 
             ApiResponse<ChunkStatusResponse> state;
             task.setStatus(UploadTaskStatus.INIT_UPLOADING);
+            task.updateTimestamp();
             task.setInitUploadStartTime(Util.currentTime());
             this.taskInflightMap.put(task.getTransferId(), task);
 
@@ -255,10 +274,8 @@ public class AgentUploader {
             int totalChunks;
             List<Integer> missingChunks;
             logger.debug("[traceId={}] Get upload session status with transferId: {}", traceId, transferId);
-            // 查询是否存在上传会话
             ApiResponse<ChunkStatusResponse> resp = getUploadStatus(transferId, traceId);
             if(resp.getData() == null) {
-                // 第一次初始化上传会话
                 ApiResponse<ChunkInitResponse> chunkInitResponse = initUpload(task);
                 logger.debug("[traceId={}] First time to Upload initialized successfully: transferId={}, totalChunks={}, chunkSize={}, initTime={}",
                         traceId, chunkInitResponse.getData().getTransferId(), chunkInitResponse.getData().getTotalChunks(), chunkInitResponse.getData().getChunkSize(), chunkInitResponse.getData().getInitTime());
@@ -266,7 +283,6 @@ public class AgentUploader {
                 totalChunks = chunkInitResponse.getData().getTotalChunks();
                 missingChunks = chunkInitResponse.getData().getMissingChunks();
             } else {
-                // 从上传会话状态中获取chunkSize和totalChunks
                 chunkSize = resp.getData().getChunkSize();
                 totalChunks = resp.getData().getTotalChunks();
                 missingChunks = resp.getData().getMissingChunks();
@@ -274,6 +290,7 @@ public class AgentUploader {
 
             task.setInitUploadEndTime(Util.currentTime());
             task.setStatus(UploadTaskStatus.INIT_UPLOAD_COMPLETED);
+            task.updateTimestamp();
 
             task.setChunkSize(chunkSize);
             task.setTotalChunks(totalChunks);
@@ -282,13 +299,14 @@ public class AgentUploader {
 
             try {
                 task.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
+                task.updateTimestamp();
                 task.setUploadChunksStartTime(Util.currentTime());
                 this.taskInflightMap.put(task.getTransferId(), task);
-                // 上传分片逻辑
                 uploadChunks(task, file, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
 
                 task.setUploadChunksEndTime(Util.currentTime());
                 task.setStatus(UploadTaskStatus.UPLOAD_CHUNKS_COMPLETED);
+                task.updateTimestamp();
                 this.taskInflightMap.put(task.getTransferId(), task);
             } catch (IOException e) {
                 state = fetchLatestStatus(task.getTransferId(), traceId);
@@ -298,10 +316,12 @@ public class AgentUploader {
 
             try {
                 task.setStatus(UploadTaskStatus.MERGING_CHUNKS);
+                task.updateTimestamp();
                 task.setMergeChunksStartTime(Util.currentTime());
                 mergeChunks(task.getTransferId(), traceId);
                 task.setMergeChunksEndTime(Util.currentTime());
                 task.setStatus(UploadTaskStatus.MERGE_CHUNKS_COMPLETED);
+                task.updateTimestamp();
             } catch (IOException e) {
                 state = fetchLatestStatus(task.getTransferId(), traceId);
                 logger.error("[traceId={}] Merge failed, status:{}  {}", traceId, state, e.getMessage());
@@ -314,12 +334,15 @@ public class AgentUploader {
                 throw new IOException("Upload failed after all retries, but no result was produced.");
             }
             logger.info("[traceId={}] Upload task completed: {}", traceId, taskKey);
-            listeners.remove(taskKey);
+            listenerCache.remove(taskKey);
+            listenerClassNames.remove(taskKey);
         } catch (Exception e) {
             logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
             task.setStatus(UploadTaskStatus.FAILED);
+            task.updateTimestamp();
             handleListenerError(taskKey, e.getMessage());
-            listeners.remove(taskKey);
+            listenerCache.remove(taskKey);
+            listenerClassNames.remove(taskKey);
         }
     }
 
@@ -331,7 +354,7 @@ public class AgentUploader {
         }
 
         AtomicInteger uploadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
-        UploadListener listener = listeners.get(taskKey);
+        UploadListener listener = listenerCache.get(taskKey);
 
         try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(file.toPath(), java.nio.file.StandardOpenOption.READ)) {
             CompletableFuture<?>[] uploadFutures = missingChunks.stream()
@@ -345,6 +368,7 @@ public class AgentUploader {
                             }
                             int currentUploaded = uploadedCount.incrementAndGet();
                             task.incrementUploadChunksCount();
+                            task.updateTimestamp();
                             this.taskInflightMap.put(task.getTransferId(), task);
                             if (listener != null) {
                                 double progress = (double) currentUploaded / task.getTotalChunks() * 100.0;
@@ -383,7 +407,7 @@ public class AgentUploader {
     }
 
     private void handleListenerProgress(String taskKey, int total, int uploaded, double progress) {
-        UploadListener listener = listeners.get(taskKey);
+        UploadListener listener = listenerCache.get(taskKey);
         if (listener == null) return;
         try {
             listener.onProgress(total, uploaded, progress);
@@ -393,7 +417,7 @@ public class AgentUploader {
     }
 
     private void handleListenerSuccess(String taskKey, UploadTask result) {
-        UploadListener listener = listeners.get(taskKey);
+        UploadListener listener = listenerCache.get(taskKey);
         if (listener == null) return;
         try {
             listener.onComplete(result);
@@ -403,7 +427,7 @@ public class AgentUploader {
     }
 
     private void handleListenerError(String taskKey, String message) {
-        UploadListener listener = taskKey != null ? listeners.get(taskKey) : null;
+        UploadListener listener = taskKey != null ? listenerCache.get(taskKey) : null;
         handleListenerError(listener, message);
     }
 
@@ -413,6 +437,28 @@ public class AgentUploader {
             listener.onError(message);
         } catch (Exception e) {
             logger.warn("UploadListener.onError failed: {}", e.getMessage());
+        }
+    }
+
+    private UploadListener createListenerInstance(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            Object instance = clazz.getDeclaredConstructor().newInstance();
+            if (instance instanceof UploadListener) {
+                return (UploadListener) instance;
+            } else {
+                logger.error("Class {} does not implement UploadListener interface", className);
+                return null;
+            }
+        } catch (ClassNotFoundException e) {
+            logger.error("Listener class not found: {}", className, e);
+            return null;
+        } catch (NoSuchMethodException e) {
+            logger.error("Listener class {} has no default constructor", className, e);
+            return null;
+        } catch (Exception e) {
+            logger.error("Failed to create listener instance: {}", className, e);
+            return null;
         }
     }
 

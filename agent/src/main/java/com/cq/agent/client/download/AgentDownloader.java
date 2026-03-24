@@ -360,7 +360,7 @@ public class AgentDownloader {
         
         try {
             List<Integer> missingChunks = scanDownloadedChunks(tmpDir, targetFile.getName(), 
-                    task.getChunkSize(), task.getTotalSize(), task.getTotalChunks());
+                    task.getChunkSize(), task.getTotalSize(), task.getTotalChunks(), traceId);
             
             if (!missingChunks.isEmpty()) {
                 throw new IOException("Cannot merge: missing chunks " + missingChunks);
@@ -484,7 +484,7 @@ public class AgentDownloader {
             tmpDir.mkdirs();
         }
         
-        List<Integer> missingChunks = scanDownloadedChunks(tmpDir, file.getName(), task.getChunkSize(), task.getTotalSize(), task.getTotalChunks());
+        List<Integer> missingChunks = scanDownloadedChunks(tmpDir, file.getName(), task.getChunkSize(), task.getTotalSize(), task.getTotalChunks(), traceId);
         AtomicInteger downloadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
         DownloadListener listener = listenerCache.get(taskKey);
         task.setDownloadedChunksCount(downloadedCount.get());
@@ -543,11 +543,11 @@ public class AgentDownloader {
         }
     }
     
-    private List<Integer> scanDownloadedChunks(File tmpDir, String fileName, int chunkSize, long totalSize, int totalChunks) {
+    private List<Integer> scanDownloadedChunks(File tmpDir, String fileName, int chunkSize, long totalSize, int totalChunks, String traceId) {
         List<Integer> downloadedChunks = new ArrayList<>();
         
         if (!tmpDir.exists() || !tmpDir.isDirectory()) {
-            logger.debug("Tmp directory does not exist: {}", tmpDir.getAbsolutePath());
+            logger.debug("[traceId={}] Tmp directory does not exist: {}", traceId, tmpDir.getAbsolutePath());
             for (int i = 0; i < totalChunks; i++) {
                 downloadedChunks.add(i);
             }
@@ -573,19 +573,19 @@ public class AgentDownloader {
                                     
                                     if (fileSize == expectedSize) {
                                         downloadedChunks.add(chunkIndex);
-                                        logger.debug("Found valid chunk file: {} (index={}, size={})", 
-                                                chunkFileName, chunkIndex, fileSize);
+                                        logger.debug("[traceId={}] Found valid chunk file: {} (index={}, size={})",
+                                                traceId, chunkFileName, chunkIndex, fileSize);
                                     } else {
-                                        logger.warn("Chunk file size mismatch: {} (index={}, expected={}, actual={})", 
-                                                chunkFileName, chunkIndex, expectedSize, fileSize);
+                                        logger.warn("[traceId={}] Chunk file size mismatch: {} (index={}, expected={}, actual={})",
+                                                traceId, chunkFileName, chunkIndex, expectedSize, fileSize);
                                         Files.deleteIfExists(file);
                                     }
                                 } else {
-                                    logger.warn("Invalid chunk index in file name: {} (index={}, totalChunks={})", 
-                                            chunkFileName, chunkIndex, totalChunks);
+                                    logger.warn("[traceId={}] Invalid chunk index in file name: {} (index={}, totalChunks={})",
+                                            traceId, chunkFileName, chunkIndex, totalChunks);
                                 }
                             } catch (Exception e) {
-                                logger.error("Error processing chunk file {}: {}", chunkFileName, e.getMessage());
+                                logger.error("[traceId={}] Error processing chunk file {}: {}", traceId, chunkFileName, e.getMessage());
                             }
                         }
                     });

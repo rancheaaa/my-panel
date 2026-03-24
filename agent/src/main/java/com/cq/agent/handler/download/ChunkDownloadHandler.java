@@ -123,11 +123,11 @@ public class ChunkDownloadHandler extends BaseHandler {
             lastContentFuture.addListener((ChannelFutureListener) future -> {
                 try {
                     if (future.isSuccess()) {
-                        logger.info("[traceId={}] Chunk downloaded successfully using zero-copy: transferId={}, chunkIndex={}, range={}-{}, size={}",
-                                traceId, transferId, chunkIndex, position, position + bytesToRead - 1, bytesToRead);
+                        logger.info("[traceId={}] Chunk downloaded successfully using zero-copy: transferId={}, chunkIndex={}, totalChunks={}, range={}-{}, size={}",
+                                traceId, transferId, chunkIndex + 1, (int) fileSize / chunkSize, (int) position, position + bytesToRead - 1, bytesToRead);
                     } else {
-                        logger.error("[traceId={}] Chunk downloaded failed using zero-copy: transferId={}, chunkIndex={}, range={}-{}, size={}",
-                                traceId, transferId, chunkIndex, position, position + bytesToRead - 1, bytesToRead, future.cause());
+                        logger.error("[traceId={}] Chunk downloaded failed using zero-copy: transferId={}, chunkIndex={}, totalChunks={}, range={}-{}, size={}",
+                                traceId, transferId, chunkIndex + 1, (int) fileSize / chunkSize, (int) position, position + bytesToRead - 1, bytesToRead, future.cause());
                     }
                 } finally {
                     try {

@@ -1,5 +1,6 @@
 package com.cq.agent.client.download;
 
+import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.client.upload.PersistentMap;
 import com.cq.agent.client.upload.PersistentQueue;
 import com.cq.agent.client.upload.UploadRateLimiter;
@@ -32,33 +33,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class AgentDownloader {
+public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentDownloader.class);
     private static final int DEFAULT_MAX_QUEUE_DEPTH = 500;
     private static final int DEFAULT_WORKER_COUNT = 4;
-
-    private final String agentApiUrl;
-    private final HttpClient httpClient;
-    private final Gson gson = new Gson();
-    private final PersistentQueue<DownloadTask> taskQueue;
-    private final PersistentMap<String, DownloadTask> taskInflightMap;
-    private final ConcurrentHashMap<String, DownloadListener> listenerCache = new ConcurrentHashMap<>();
-    private final ExecutorService downloadExecutor;
-    private final ExecutorService workerExecutor;
-    private final int workerCount;
-    private final int concurrentDownloads;
-    private volatile boolean shutdown;
-
-    private final AgentConfig agentConfig;
-
-    private final int maxRetries;
-    private final long retryDelayMs;
-    private final int connectTimeoutSeconds;
-    private final int requestTimeoutSeconds;
-
-    private final int maxDownloadRateKBPerSecond;
-    private final UploadRateLimiter rateLimiter;
 
     public AgentDownloader(AgentConfig agentConfig, String agentApiUrl, int concurrentDownloads) {
         this(agentConfig, agentApiUrl, concurrentDownloads, DEFAULT_MAX_QUEUE_DEPTH, DEFAULT_WORKER_COUNT, 3, 2000, 10, 60);
@@ -66,166 +45,29 @@ public class AgentDownloader {
 
     public AgentDownloader(AgentConfig agentConfig, String agentApiUrl, int concurrentDownloads, int maxQueueDepth, int workerCount,
                            int maxRetries, long retryDelayMs, int connectTimeoutSeconds, int requestTimeoutSeconds) {
-        if (agentApiUrl == null || agentApiUrl.isBlank()) {
-            throw new IllegalArgumentException("agentApiUrl must not be null or blank");
-        }
-        if (concurrentDownloads < 1 || concurrentDownloads > 64) {
-            throw new IllegalArgumentException("concurrentDownloads must be between 1 and 64");
-        }
-        if (maxQueueDepth < 1 || maxQueueDepth > 100_000) {
-            throw new IllegalArgumentException("maxQueueDepth must be between 1 and 100000");
-        }
-        if (workerCount < 1 || workerCount > 32) {
-            throw new IllegalArgumentException("workerCount must be between 1 and 32");
-        }
-
-        this.agentConfig = agentConfig;
-
-        this.agentApiUrl = agentApiUrl.endsWith("/") ? agentApiUrl : agentApiUrl + "/";
-        try {
-            this.taskQueue = new PersistentQueue<>(agentConfig.getDownloadQueueDbPath(), "download-tasks", DownloadTask.class);
-            this.taskInflightMap = new PersistentMap<>(agentConfig.getDownloadMapDbPath(), "download-inflight", String.class, DownloadTask.class);
-            logger.info("Persistent queue initialized at: {}", agentConfig.getDownloadQueueDbPath());
-            logger.info("Queue size on startup: {}", taskQueue.size());
-            if (!taskQueue.isEmpty()) {
-                logger.info("Resuming {} pending download tasks from previous session", taskQueue.size());
-            }
-            this.maxRetries = Math.max(1, maxRetries);
-            this.retryDelayMs = Math.max(500, retryDelayMs);
-            this.connectTimeoutSeconds = Math.max(5, connectTimeoutSeconds);
-            this.requestTimeoutSeconds = Math.max(30, requestTimeoutSeconds);
-
-            this.maxDownloadRateKBPerSecond = agentConfig.getMaxDownloadRateKBPerSecond();
-            if (this.maxDownloadRateKBPerSecond > 0) {
-                long bytesPerSecond = (long) this.maxDownloadRateKBPerSecond * 1024;
-                this.rateLimiter = new UploadRateLimiter(bytesPerSecond);
-                logger.info("Rate limiting enabled: max download rate = {} KB/s", this.maxDownloadRateKBPerSecond);
-            } else {
-                this.rateLimiter = null;
-                logger.info("Rate limiting disabled (maxDownloadRateKBPerSecond = 0)");
-            }
-
-            this.httpClient = HttpClient.newBuilder()
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .connectTimeout(Duration.ofSeconds(this.connectTimeoutSeconds))
-                    .build();
-
-            this.downloadExecutor = new ThreadPoolExecutor(
-                    concurrentDownloads,
-                    concurrentDownloads,
-                    0L,
-                    TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<>(),
-                    r -> {
-                        Thread t = new Thread(r, "agent-downloader-chunk");
-                        t.setDaemon(false);
-                        return t;
-                    }
-            );
-            this.workerExecutor = new ThreadPoolExecutor(
-                    workerCount,
-                    workerCount,
-                    0L,
-                    TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<>(),
-                    r -> {
-                        Thread t = new Thread(r, "agent-downloader-worker");
-                        t.setDaemon(false);
-                        return t;
-                    }
-            );
-            this.workerCount = workerCount;
-            this.concurrentDownloads = concurrentDownloads;
-        } catch (Exception e) {
-            logger.error("Failed to initialize AgentDownloader: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to initialize AgentDownloader", e);
-        }
+        super(agentConfig, agentApiUrl, concurrentDownloads, maxQueueDepth, workerCount,
+                maxRetries, retryDelayMs, connectTimeoutSeconds, requestTimeoutSeconds,
+                "download-tasks", "download-inflight", DownloadTask.class, "download");
     }
 
-    public void init() {
-        for (int i = 0; i < workerCount; i++) {
-            final int id = i;
-            workerExecutor.submit(() -> runWorker(id));
-        }
-        logger.info("AgentDownloader initialized, queue size={}, workers={}", taskQueue.size(), workerCount);
+    @Override
+    protected String getQueuePath(AgentConfig config, String queueName) {
+        return config.getDownloadQueueDbPath();
     }
 
-    private void runWorker(int id) {
-        while (!shutdown) {
-            DownloadTask task = null;
-            try {
-                task = taskQueue.poll();
-                if (task == null) {
-                    TimeUnit.SECONDS.sleep(1);
-                    continue;
-                }
-                processTask(task);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Throwable t) {
-                if (task != null) {
-                    String taskKey = Util.md5(task.getRemoteFilePath() + ":" + task.getLocalFilePath());
-                    handleListenerError(taskKey, t.getMessage());
-                    listenerCache.remove(taskKey);
-                }
-                logger.error("Worker {} error", id, t);
-            }
-        }
+    @Override
+    protected String getMapPath(AgentConfig config, String mapName) {
+        return config.getDownloadMapDbPath();
     }
 
-    public boolean downloadFile(String remoteFilePath, String localFilePath, DownloadListener listener) {
-        String traceId = UUID.randomUUID().toString().replace("-", "");
-
-        try {
-            if (remoteFilePath == null || remoteFilePath.isBlank()) {
-                handleListenerError(listener, "remoteFilePath must not be null or blank");
-                return false;
-            }
-            if (localFilePath == null || localFilePath.isBlank()) {
-                handleListenerError(listener, "localFilePath must not be null or blank");
-                return false;
-            }
-
-            File localFile = new File(localFilePath);
-            File parentDir = localFile.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
-            }
-
-            String taskKey = Util.md5(remoteFilePath + ":" + localFilePath);
-
-            if (listener != null) {
-                listenerCache.put(taskKey, listener);
-            }
-
-            long fileSize = getRemoteFileSize(remoteFilePath, traceId);
-            if (fileSize <= 0) {
-                handleListenerError(listener, "Failed to get remote file size");
-                return false;
-            }
-
-            DownloadTask task = new DownloadTask(remoteFilePath, localFilePath, fileSize);
-            task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
-            task.setTraceId(traceId);
-            task.setEnqueuedTime(Util.currentTime());
-            task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
-            task.updateTimestamp();
-
-            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
-                this.taskInflightMap.put(task.getTransferId(), task);
-            }
-
-            return taskQueue.offer(task);
-        } catch (Exception e) {
-            logger.error("download file with error!", e);
-            handleListenerError(listener, "download file with error!");
-            return false;
-        }
+    @Override
+    protected int getMaxRateKBPerSecond(AgentConfig config) {
+        return config.getMaxDownloadRateKBPerSecond();
     }
 
-    private void processTask(DownloadTask task) {
-        String taskKey = Util.md5(task.getRemoteFilePath() + ":" + task.getLocalFilePath());
+    @Override
+    protected void processTask(DownloadTask task) {
+        String taskKey = getTaskKey(task);
         String traceId = task.getTraceId();
 
         try {
@@ -236,7 +78,7 @@ public class AgentDownloader {
 
             String listenerClassName = task.getListenerClassName();
             if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
-                DownloadListener listener = createListenerInstance(listenerClassName);
+                DownloadListener listener = createListenerInstance(listenerClassName, DownloadListener.class);
                 if (listener != null) {
                     listenerCache.put(taskKey, listener);
                 }
@@ -336,6 +178,205 @@ public class AgentDownloader {
         } finally {
             listenerCache.remove(taskKey);
         }
+    }
+
+    @Override
+    protected String getTaskKey(DownloadTask task) {
+        return Util.md5(task.getRemoteFilePath() + ":" + task.getLocalFilePath());
+    }
+
+    @Override
+    protected void onListenerProgress(DownloadListener listener, int total, int processed, double progress) {
+        listener.onProgress(total, processed, progress);
+    }
+
+    @Override
+    protected void onListenerSuccess(DownloadListener listener, DownloadTask result) {
+        listener.onComplete(result);
+    }
+
+    @Override
+    protected void onListenerError(DownloadListener listener, String message) {
+        listener.onError(message);
+    }
+
+    public boolean downloadFile(String remoteFilePath, String localFilePath, DownloadListener listener) {
+        String traceId = UUID.randomUUID().toString().replace("-", "");
+
+        try {
+            if (remoteFilePath == null || remoteFilePath.isBlank()) {
+                handleListenerError(listener, "remoteFilePath must not be null or blank");
+                return false;
+            }
+            if (localFilePath == null || localFilePath.isBlank()) {
+                handleListenerError(listener, "localFilePath must not be null or blank");
+                return false;
+            }
+
+            File localFile = new File(localFilePath);
+            File parentDir = localFile.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+
+            String taskKey = getTaskKey(new DownloadTask(remoteFilePath, localFilePath, 0));
+
+            if (listener != null) {
+                listenerCache.put(taskKey, listener);
+            }
+
+            long fileSize = getRemoteFileSize(remoteFilePath, traceId);
+            if (fileSize <= 0) {
+                handleListenerError(listener, "Failed to get remote file size");
+                return false;
+            }
+
+            DownloadTask task = new DownloadTask(remoteFilePath, localFilePath, fileSize);
+            task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
+            task.setTraceId(traceId);
+            task.setEnqueuedTime(com.cq.agent.client.upload.Util.currentTime());
+            task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
+            task.updateTimestamp();
+
+            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
+                this.taskInflightMap.put(task.getTransferId(), task);
+            }
+
+            return taskQueue.offer(task);
+        } catch (Exception e) {
+            logger.error("download file with error!", e);
+            handleListenerError(listener, "download file with error!");
+            return false;
+        }
+    }
+
+    private static final Type API_RESPONSE_DOWNLOAD_INIT = com.google.gson.reflect.TypeToken.getParameterized(ApiResponse.class, ChunkDownloadInfoResponse.class).getType();
+    private static final Type API_RESPONSE_DOWNLOAD_CHUNK = com.google.gson.reflect.TypeToken.getParameterized(ApiResponse.class, ChunkDownloadResponse.class).getType();
+    private static final Type API_RESPONSE_LONG = com.google.gson.reflect.TypeToken.getParameterized(ApiResponse.class, Long.class).getType();
+
+    private long getRemoteFileSize(String remoteFilePath, String traceId) throws IOException, InterruptedException {
+        String encodedPath = java.net.URLEncoder.encode(remoteFilePath, StandardCharsets.UTF_8);
+        ApiResponse<Long> response = getApi("api/file/size?path=" + encodedPath, API_RESPONSE_LONG, traceId);
+        if (!response.isSuccess()) {
+            logger.error("[traceId={}] Failed to get remote file size: {}", traceId, response.getMsg());
+            return -1;
+        }
+        return response.getData() != null ? response.getData() : -1;
+    }
+
+    private ApiResponse<ChunkDownloadInfoResponse> getDownloadInfo(DownloadTask task) throws IOException, InterruptedException {
+        logger.debug("[traceId={}] Initializing download: remote={}, local={}, size={}",
+                task.getTraceId(), task.getRemoteFilePath(), task.getLocalFilePath(), task.getTotalSize());
+
+        ChunkDownloadInfoRequest req = new ChunkDownloadInfoRequest();
+        req.setTransferId(task.getTransferId());
+        req.setRemoteFilePath(task.getRemoteFilePath());
+        req.setTraceId(task.getTraceId());
+
+        if (agentConfig != null) {
+            req.setSourceAgentId(agentConfig.getAgentId());
+            req.setSourceAgentIp(agentConfig.getAgentIp());
+            req.setSourceAgentPort(agentConfig.getServerPort());
+        }
+
+        try {
+            URI uri = new URI(agentApiUrl);
+            req.setDestAgentIp(uri.getHost());
+            req.setDestAgentPort(uri.getPort());
+        } catch (java.net.URISyntaxException e) {
+            logger.warn("Could not parse agentApiUrl to extract host and port", e);
+        }
+
+        return postApi("api/file/chunk/download/info", req, API_RESPONSE_DOWNLOAD_INIT, task.getTraceId());
+    }
+
+    private File downloadChunk(DownloadTask task, int chunkIndex, String traceId) throws IOException, InterruptedException {
+        logger.debug("[traceId={}] Downloading chunk {} for transferId: {} using zero-copy", traceId, chunkIndex, task.getTransferId());
+
+        File destFile = Paths.get(task.getRemoteFilePath()).toFile();
+        String destFileDir = com.cq.agent.client.upload.Util.transferToLinuxPath(destFile.getParent());
+        String destFileName = destFile.getName();
+
+        ChunkDownloadRequest req = new ChunkDownloadRequest();
+        req.setTransferId(task.getTransferId());
+        req.setChunkIndex(chunkIndex);
+        req.setDestFileDir(destFileDir);
+        req.setDestFileName(destFileName);
+        req.setTraceId(traceId);
+
+        File tmpDir = new File(task.getTmpLocalFilePath());
+        if (!tmpDir.exists()) {
+            tmpDir.mkdirs();
+        }
+
+        File chunkFile = new File(tmpDir, destFileName + "_chunk_" + chunkIndex);
+
+        try {
+            String url = agentApiUrl + "api/file/chunk/download";
+            String jsonBody = gson.toJson(req);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
+                    .header("Content-Type", "application/json")
+                    .header("X-Trace-Id", traceId)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+
+            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(chunkFile.toPath()));
+
+            if (response.statusCode() != 200) {
+                throw new IOException("Chunk download failed with status code: " + response.statusCode());
+            }
+
+            long downloadedSize = Files.size(chunkFile.toPath());
+            if (downloadedSize == 0) {
+                throw new IOException("Empty chunk file downloaded");
+            }
+
+            int expectedChunkSize = calculateExpectedChunkSize(chunkIndex, task.getChunkSize(), task.getTotalSize());
+            if (downloadedSize != expectedChunkSize) {
+                throw new IOException(String.format(
+                        "Chunk size mismatch for chunk %d: expected=%d, actual=%d",
+                        chunkIndex, expectedChunkSize, downloadedSize));
+            }
+
+            logger.debug("[traceId={}] Chunk downloaded successfully using zero-copy: transferId={}, chunkIndex={}, size={}, file={}",
+                    traceId, task.getTransferId(), chunkIndex, downloadedSize, chunkFile.getAbsolutePath());
+
+            return chunkFile;
+        } catch (Exception e) {
+            logger.error("[traceId={}] Failed to download chunk", traceId, e);
+            if (chunkFile.exists()) {
+                try {
+                    Files.deleteIfExists(chunkFile.toPath());
+                } catch (IOException cleanupEx) {
+                    logger.warn("[traceId={}] Failed to cleanup chunk file: {}", traceId, chunkFile.getAbsolutePath(), cleanupEx);
+                }
+            }
+            throw new IOException("Failed to download chunk: " + e.getMessage(), e);
+        }
+    }
+
+    private void verifyDownload(DownloadTask task, String traceId) throws IOException {
+        File localFile = new File(task.getLocalFilePath());
+        if (!localFile.exists()) {
+            throw new IOException("Downloaded file does not exist: " + task.getLocalFilePath());
+        }
+
+        long actualSize = localFile.length();
+        if (actualSize != task.getTotalSize()) {
+            throw new IOException("Downloaded file size mismatch. Expected: " + task.getTotalSize() + ", Actual: " + actualSize);
+        }
+
+        logger.debug("[traceId={}] Download verification passed: file={}, size={}", traceId, task.getLocalFilePath(), actualSize);
+    }
+
+    private int calculateExpectedChunkSize(int chunkIndex, int chunkSize, long totalSize) {
+        if (chunkIndex == (totalSize + chunkSize -1) / chunkSize -1) {
+            return (int) (totalSize - (long) chunkIndex * chunkSize);
+        }
+        return chunkSize;
     }
 
     private void mergeChunks(DownloadTask task) throws IOException {
@@ -521,15 +562,15 @@ public class AgentDownloader {
                                 handleListenerProgress(taskKey, task.getTotalChunks(), currentDownloaded, progress);
                             }
                         } catch (Exception e) {
-                            throw new CompletionException("Failed to download chunk " + chunkIndex, e);
+                             throw new CompletionException("Failed to download chunk " + chunkIndex, e);
                         }
-                    }, downloadExecutor))
+                    }, chunkExecutor))
                     .toArray(CompletableFuture[]::new);
 
             CompletableFuture<Void> allDownloads = CompletableFuture.allOf(downloadFutures);
 
             int chunksToDownload = missingChunks.size();
-            long waves = (long) Math.ceil((double) chunksToDownload / this.concurrentDownloads);
+            long waves = (long) Math.ceil((double) chunksToDownload / this.concurrentOperations);
             long timeoutSeconds = (waves + 2) * this.requestTimeoutSeconds;
             timeoutSeconds = Math.max(60, timeoutSeconds);
 
@@ -547,7 +588,6 @@ public class AgentDownloader {
         List<Integer> downloadedChunks = new ArrayList<>();
         
         if (!tmpDir.exists() || !tmpDir.isDirectory()) {
-            logger.debug("[traceId={}] Tmp directory does not exist: {}", traceId, tmpDir.getAbsolutePath());
             for (int i = 0; i < totalChunks; i++) {
                 downloadedChunks.add(i);
             }
@@ -562,29 +602,22 @@ public class AgentDownloader {
                     .forEach(file -> {
                         String chunkFileName = file.getFileName().toString();
                         Matcher matcher = chunkPattern.matcher(chunkFileName);
-                        
                         if (matcher.matches()) {
                             try {
                                 int chunkIndex = Integer.parseInt(matcher.group(1));
-                                
                                 if (chunkIndex >= 0 && chunkIndex < totalChunks) {
                                     long fileSize = Files.size(file);
-                                    long expectedSize = calculateExpectedChunkSize(chunkIndex, chunkSize, totalSize);
-                                    
+                                    int expectedSize = calculateExpectedChunkSize(chunkIndex, chunkSize, totalSize);
                                     if (fileSize == expectedSize) {
                                         downloadedChunks.add(chunkIndex);
-                                        logger.debug("[traceId={}] Found valid chunk file: {} (index={}, size={})",
-                                                traceId, chunkFileName, chunkIndex, fileSize);
                                     } else {
-                                        logger.warn("[traceId={}] Chunk file size mismatch: {} (index={}, expected={}, actual={})",
-                                                traceId, chunkFileName, chunkIndex, expectedSize, fileSize);
-                                        Files.deleteIfExists(file);
+                                        logger.warn("[traceId={}] Chunk file size mismatch: {} (expected={}, actual={})", 
+                                                traceId, chunkFileName, expectedSize, fileSize);
                                     }
-                                } else {
-                                    logger.warn("[traceId={}] Invalid chunk index in file name: {} (index={}, totalChunks={})",
-                                            traceId, chunkFileName, chunkIndex, totalChunks);
                                 }
-                            } catch (Exception e) {
+                            } catch (NumberFormatException e) {
+                                logger.warn("[traceId={}] Invalid chunk file name: {}", traceId, chunkFileName);
+                            } catch (IOException e) {
                                 logger.error("[traceId={}] Error processing chunk file {}: {}", traceId, chunkFileName, e.getMessage());
                             }
                         }
@@ -601,284 +634,5 @@ public class AgentDownloader {
         }
         
         return missingChunks;
-    }
-    
-    private int calculateExpectedChunkSize(int chunkIndex, int chunkSize, long totalSize) {
-        if (chunkIndex == (totalSize + chunkSize -1) / chunkSize -1) {
-            return (int) (totalSize - (long) chunkIndex * chunkSize);
-        }
-        return chunkSize;
-    }
-
-    private void applyRateLimit(int dataSize, String traceId) throws InterruptedException {
-        if (rateLimiter == null || dataSize <= 0) {
-            return;
-        }
-        rateLimiter.acquire(dataSize, traceId);
-    }
-
-    private void handleListenerProgress(String taskKey, int total, int downloaded, double progress) {
-        DownloadListener listener = listenerCache.get(taskKey);
-        if (listener == null) return;
-        try {
-            listener.onProgress(total, downloaded, progress);
-        } catch (Exception e) {
-            logger.warn("DownloadListener.onProgress failed: {}", e.getMessage());
-        }
-    }
-
-    private void handleListenerSuccess(String taskKey, DownloadTask result) {
-        DownloadListener listener = listenerCache.get(taskKey);
-        if (listener == null) return;
-        try {
-            listener.onComplete(result);
-        } catch (Exception e) {
-            logger.warn("DownloadListener.onComplete failed: {}", e.getMessage());
-        }
-    }
-
-    private void handleListenerError(String taskKey, String message) {
-        DownloadListener listener = taskKey != null ? listenerCache.get(taskKey) : null;
-        handleListenerError(listener, message);
-    }
-
-    private void handleListenerError(DownloadListener listener, String message) {
-        if (listener == null) return;
-        try {
-            listener.onError(message);
-        } catch (Exception e) {
-            logger.warn("DownloadListener.onError failed: {}", e.getMessage());
-        }
-    }
-
-    private DownloadListener createListenerInstance(String className) {
-        try {
-            Class<?> clazz = Class.forName(className);
-            Object instance = clazz.getDeclaredConstructor().newInstance();
-            if (instance instanceof DownloadListener) {
-                return (DownloadListener) instance;
-            } else {
-                logger.error("Class {} does not implement DownloadListener interface", className);
-                return null;
-            }
-        } catch (ClassNotFoundException e) {
-            logger.error("Listener class not found: {}", className, e);
-            return null;
-        } catch (NoSuchMethodException e) {
-            logger.error("Listener class {} has no default constructor", className, e);
-            return null;
-        } catch (Exception e) {
-            logger.error("Failed to create listener instance: {}", className, e);
-            return null;
-        }
-    }
-
-    private static final Type API_RESPONSE_DOWNLOAD_INIT = TypeToken.getParameterized(ApiResponse.class, ChunkDownloadInfoResponse.class).getType();
-    private static final Type API_RESPONSE_DOWNLOAD_CHUNK = TypeToken.getParameterized(ApiResponse.class, ChunkDownloadResponse.class).getType();
-    private static final Type API_RESPONSE_LONG = TypeToken.getParameterized(ApiResponse.class, Long.class).getType();
-
-    private long getRemoteFileSize(String remoteFilePath, String traceId) throws IOException, InterruptedException {
-        String encodedPath = java.net.URLEncoder.encode(remoteFilePath, StandardCharsets.UTF_8);
-        ApiResponse<Long> response = getApi("api/file/size?path=" + encodedPath, API_RESPONSE_LONG, traceId);
-        if (!response.isSuccess()) {
-            logger.error("[traceId={}] Failed to get remote file size: {}", traceId, response.getMsg());
-            return -1;
-        }
-        return response.getData() != null ? response.getData() : -1;
-    }
-
-    private ApiResponse<ChunkDownloadInfoResponse> getDownloadInfo(DownloadTask task) throws IOException, InterruptedException {
-        logger.debug("[traceId={}] Initializing download: remote={}, local={}, size={}",
-                task.getTraceId(), task.getRemoteFilePath(), task.getLocalFilePath(), task.getTotalSize());
-
-        ChunkDownloadInfoRequest req = new ChunkDownloadInfoRequest();
-        req.setTransferId(task.getTransferId());
-        req.setRemoteFilePath(task.getRemoteFilePath());
-        req.setTraceId(task.getTraceId());
-
-        if (agentConfig != null) {
-            req.setSourceAgentId(agentConfig.getAgentId());
-            req.setSourceAgentIp(agentConfig.getAgentIp());
-            req.setSourceAgentPort(agentConfig.getServerPort());
-
-//            File destFile = Paths.get(task.getLocalFilePath()).toFile();
-//            req.setDestFileDir(Util.transferToLinuxPath(destFile.getParent()));
-//            req.setDestFileName(destFile.getName());
-        }
-
-        try {
-            URI uri = new URI(agentApiUrl);
-            req.setDestAgentIp(uri.getHost());
-            req.setDestAgentPort(uri.getPort());
-        } catch (java.net.URISyntaxException e) {
-            logger.warn("Could not parse agentApiUrl to extract host and port", e);
-        }
-
-        return postApi("api/file/chunk/download/info", req, API_RESPONSE_DOWNLOAD_INIT, task.getTraceId());
-    }
-
-    private File downloadChunk(DownloadTask task, int chunkIndex, String traceId) throws IOException, InterruptedException {
-        logger.debug("[traceId={}] Downloading chunk {} for transferId: {} using zero-copy", traceId, chunkIndex, task.getTransferId());
-
-        File destFile = Paths.get(task.getRemoteFilePath()).toFile();
-        String destFileDir = Util.transferToLinuxPath(destFile.getParent());
-        String destFileName = destFile.getName();
-
-        ChunkDownloadRequest req = new ChunkDownloadRequest();
-        req.setTransferId(task.getTransferId());
-        req.setChunkIndex(chunkIndex);
-        req.setDestFileDir(destFileDir);
-        req.setDestFileName(destFileName);
-        req.setTraceId(traceId);
-
-        File tmpDir = new File(task.getTmpLocalFilePath());
-        if (!tmpDir.exists()) {
-            tmpDir.mkdirs();
-        }
-
-        File chunkFile = new File(tmpDir, destFileName + "_chunk_" + chunkIndex);
-
-        try {
-            String url = agentApiUrl + "api/file/chunk/download";
-            String jsonBody = gson.toJson(req);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                    .header("Content-Type", "application/json")
-                    .header("X-Trace-Id", traceId)
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                    .build();
-
-            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(chunkFile.toPath()));
-
-            if (response.statusCode() != 200) {
-                throw new IOException("Chunk download failed with status code: " + response.statusCode());
-            }
-
-            long downloadedSize = Files.size(chunkFile.toPath());
-            if (downloadedSize == 0) {
-                throw new IOException("Empty chunk file downloaded");
-            }
-
-            int expectedChunkSize = calculateExpectedChunkSize(chunkIndex, task.getChunkSize(), task.getTotalSize());
-            if (downloadedSize != expectedChunkSize) {
-                throw new IOException(String.format(
-                        "Chunk size mismatch for chunk %d: expected=%d, actual=%d",
-                        chunkIndex, expectedChunkSize, downloadedSize));
-            }
-
-            logger.debug("[traceId={}] Chunk downloaded successfully using zero-copy: transferId={}, chunkIndex={}, size={}, file={}",
-                    traceId, task.getTransferId(), chunkIndex, downloadedSize, chunkFile.getAbsolutePath());
-
-            return chunkFile;
-        } catch (Exception e) {
-            logger.error("[traceId={}] Failed to download chunk", traceId, e);
-            if (chunkFile.exists()) {
-                try {
-                    Files.deleteIfExists(chunkFile.toPath());
-                } catch (IOException cleanupEx) {
-                    logger.warn("[traceId={}] Failed to cleanup chunk file: {}", traceId, chunkFile.getAbsolutePath(), cleanupEx);
-                }
-            }
-            throw new IOException("Failed to download chunk: " + e.getMessage(), e);
-        }
-    }
-
-    private void verifyDownload(DownloadTask task, String traceId) throws IOException {
-        File localFile = new File(task.getLocalFilePath());
-        if (!localFile.exists()) {
-            throw new IOException("Downloaded file does not exist: " + task.getLocalFilePath());
-        }
-
-        long actualSize = localFile.length();
-        if (actualSize != task.getTotalSize()) {
-            throw new IOException("Downloaded file size mismatch. Expected: " + task.getTotalSize() + ", Actual: " + actualSize);
-        }
-
-        logger.debug("[traceId={}] Download verification passed: file={}, size={}", traceId, task.getLocalFilePath(), actualSize);
-    }
-
-    private <T> ApiResponse<T> getApi(String endpoint, Type responseType, String traceId) throws IOException, InterruptedException {
-        try {
-            String url = agentApiUrl + endpoint;
-            if (!url.contains("traceId")) {
-                url += (url.contains("?") ? "&" : "?") + "traceId=" + traceId;
-            }
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            String responseBody = response.body();
-            ApiResponse<T> apiResponse = gson.fromJson(responseBody, responseType);
-
-            logger.debug("[traceId={}] GET {} - Status: {}, Response: {}", traceId, endpoint, response.statusCode(), apiResponse);
-
-            return apiResponse;
-        } catch (Exception e) {
-            logger.error("[traceId={}] GET {} failed", traceId, endpoint, e);
-            throw new IOException("API request failed: " + endpoint, e);
-        }
-    }
-
-    private <T> ApiResponse<T> postApi(String endpoint, Object requestBody, Type responseType, String traceId) throws IOException, InterruptedException {
-        try {
-            String url = agentApiUrl + endpoint;
-            String jsonBody = gson.toJson(requestBody);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                    .header("Content-Type", "application/json")
-                    .header("X-Trace-Id", traceId)
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            String responseBody = response.body();
-            ApiResponse<T> apiResponse = gson.fromJson(responseBody, responseType);
-
-            logger.debug("[traceId={}] POST {} - Status: {}, Response: {}", traceId, endpoint, response.statusCode(), apiResponse);
-
-            return apiResponse;
-        } catch (Exception e) {
-            logger.error("[traceId={}] POST {} failed", traceId, endpoint, e);
-            throw new IOException("API request failed: " + endpoint, e);
-        }
-    }
-
-    public void shutdown() {
-        logger.info("Shutting down AgentDownloader...");
-        shutdown = true;
-        workerExecutor.shutdown();
-        downloadExecutor.shutdown();
-        try {
-            if (!workerExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
-                workerExecutor.shutdownNow();
-            }
-            if (!downloadExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
-                downloadExecutor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            workerExecutor.shutdownNow();
-            downloadExecutor.shutdownNow();
-        }
-        if (rateLimiter != null) {
-            rateLimiter.shutdown();
-        }
-        if (taskQueue != null) {
-            taskQueue.close();
-        }
-        if (taskInflightMap != null) {
-            taskInflightMap.close();
-        }
-        logger.info("AgentDownloader shut down");
     }
 }

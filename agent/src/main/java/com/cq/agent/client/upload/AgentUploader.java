@@ -1,5 +1,6 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
 import com.google.gson.Gson;
@@ -29,33 +30,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Agent upload client for chunked file transfer.
  * Uses a persistent queue backed by RocksDB for durability.
  */
-public class AgentUploader {
+public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentUploader.class);
     private static final int DEFAULT_MAX_QUEUE_DEPTH = 500;
     private static final int DEFAULT_WORKER_COUNT = 4;
 
-    private final String agentApiUrl;
-    private final HttpClient httpClient;
-    private final Gson gson = new Gson();
-    private final PersistentQueue<UploadTask> taskQueue;
-    private final PersistentMap<String, UploadTask> taskInflightMap;
-    private final ConcurrentHashMap<String, UploadListener> listenerCache = new ConcurrentHashMap<>();
-    private final ExecutorService uploadExecutor;
-    private final ExecutorService workerExecutor;
-    private final int workerCount;
-    private final int concurrentUploads;
-    private volatile boolean shutdown;
-
     private final AgentConfig agentConfig;
-
-    private final int maxRetries;
-    private final long retryDelayMs;
-    private final int connectTimeoutSeconds;
-    private final int requestTimeoutSeconds;
-
-    private final int maxUploadRateKBPerSecond;
-    private final UploadRateLimiter rateLimiter;
 
     public AgentUploader(AgentConfig agentConfig, String agentApiUrl, int concurrentUploads) {
         this(agentConfig, agentApiUrl, concurrentUploads, DEFAULT_MAX_QUEUE_DEPTH, DEFAULT_WORKER_COUNT, 3, 2000, 10, 60);
@@ -63,179 +44,30 @@ public class AgentUploader {
 
     public AgentUploader(AgentConfig agentConfig, String agentApiUrl, int concurrentUploads, int maxQueueDepth, int workerCount,
                          int maxRetries, long retryDelayMs, int connectTimeoutSeconds, int requestTimeoutSeconds) {
-        if (agentApiUrl == null || agentApiUrl.isBlank()) {
-            throw new IllegalArgumentException("agentApiUrl must not be null or blank");
-        }
-        if (concurrentUploads < 1 || concurrentUploads > 64) {
-            throw new IllegalArgumentException("concurrentUploads must be between 1 and 64");
-        }
-        if (maxQueueDepth < 1 || maxQueueDepth > 100_000) {
-            throw new IllegalArgumentException("maxQueueDepth must be between 1 and 100000");
-        }
-        if (workerCount < 1 || workerCount > 32) {
-            throw new IllegalArgumentException("workerCount must be between 1 and 32");
-        }
-
+        super(agentConfig, agentApiUrl, concurrentUploads, maxQueueDepth, workerCount,
+                maxRetries, retryDelayMs, connectTimeoutSeconds, requestTimeoutSeconds,
+                "upload-tasks", "upload-inflight", UploadTask.class, "upload");
         this.agentConfig = agentConfig;
-
-        this.agentApiUrl = agentApiUrl.endsWith("/") ? agentApiUrl : agentApiUrl + "/";
-        try {
-            this.taskQueue = new PersistentQueue<>(agentConfig.getUploadQueueDbPath(), "upload-tasks", UploadTask.class);
-            this.taskInflightMap = new PersistentMap<>(agentConfig.getUploadMapDbPath(), "upload-inflight", String.class, UploadTask.class);
-            logger.info("Persistent queue initialized at: {}", agentConfig.getUploadQueueDbPath());
-            logger.info("Queue size on startup: {}", taskQueue.size());
-            if (!taskQueue.isEmpty()) {
-                logger.info("Resuming {} pending upload tasks from previous session", taskQueue.size());
-            }
-            this.maxRetries = Math.max(1, maxRetries);
-            this.retryDelayMs = Math.max(500, retryDelayMs);
-            this.connectTimeoutSeconds = Math.max(5, connectTimeoutSeconds);
-            this.requestTimeoutSeconds = Math.max(30, requestTimeoutSeconds);
-
-            this.maxUploadRateKBPerSecond = agentConfig.getMaxUploadRateKBPerSecond();
-            if (this.maxUploadRateKBPerSecond > 0) {
-                long bytesPerSecond = (long) this.maxUploadRateKBPerSecond * 1024;
-                this.rateLimiter = new UploadRateLimiter(bytesPerSecond);
-                logger.info("Rate limiting enabled: max upload rate = {} KB/s", this.maxUploadRateKBPerSecond);
-            } else {
-                this.rateLimiter = null;
-                logger.info("Rate limiting disabled (maxUploadRateKBPerSecond = 0)");
-            }
-
-            this.httpClient = HttpClient.newBuilder()
-                    .version(HttpClient.Version.HTTP_1_1)
-                    .connectTimeout(Duration.ofSeconds(this.connectTimeoutSeconds))
-                    .build();
-
-            this.uploadExecutor = new ThreadPoolExecutor(
-                    concurrentUploads,
-                    concurrentUploads,
-                    0L,
-                    TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<>(),
-                    r -> {
-                        Thread t = new Thread(r, "agent-uploader-chunk");
-                        t.setDaemon(false);
-                        return t;
-                    }
-            );
-            this.workerExecutor = new ThreadPoolExecutor(
-                    workerCount,
-                    workerCount,
-                    0L,
-                    TimeUnit.MILLISECONDS,
-                    new LinkedBlockingQueue<>(),
-                    r -> {
-                        Thread t = new Thread(r, "agent-uploader-worker");
-                        t.setDaemon(false);
-                        return t;
-                    }
-            );
-            this.workerCount = workerCount;
-            this.concurrentUploads = concurrentUploads;
-        } catch (Exception e) {
-            logger.error("Failed to initialize AgentUploader: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to initialize AgentUploader", e);
-        }
     }
 
-    public void init() {
-        for (int i = 0; i < workerCount; i++) {
-            final int id = i;
-            workerExecutor.submit(() -> runWorker(id));
-        }
-        logger.info("AgentUploader initialized, queue size={}, workers={}", taskQueue.size(), workerCount);
+    @Override
+    protected String getQueuePath(AgentConfig config, String queueName) {
+        return config.getUploadQueueDbPath();
     }
 
-    private void runWorker(int id) {
-        while (!shutdown) {
-            UploadTask task = null;
-            try {
-                task = taskQueue.poll();
-                if (task == null) {
-                    TimeUnit.SECONDS.sleep(1);
-                    continue;
-                }
-                processTask(task);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Throwable t) {
-                if (task != null) {
-                    String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
-                    handleListenerError(taskKey, t.getMessage());
-                    listenerCache.remove(taskKey);
-                }
-                logger.error("Worker {} error", id, t);
-            }
-        }
+    @Override
+    protected String getMapPath(AgentConfig config, String mapName) {
+        return config.getUploadMapDbPath();
     }
 
-    public boolean uploadFile(String localFilePath, String remoteTargetPath, UploadListener listener) {
-        // Generate traceid for this upload
-        String traceId = java.util.UUID.randomUUID().toString().replace("-", "");
-
-        try {
-            if (localFilePath == null || localFilePath.isBlank()) {
-                handleListenerError(listener, "localFilePath must not be null or blank");
-                return false;
-            }
-            if (remoteTargetPath == null || remoteTargetPath.isBlank()) {
-                handleListenerError(listener, "remoteTargetPath must not be null or blank");
-                return false;
-            }
-
-            // Validate absolute paths
-            if (!new File(localFilePath).isAbsolute()) {
-                handleListenerError(listener, "localFilePath must be an absolute path: " + localFilePath);
-                return false;
-            }
-
-            // Validate local file exists and is readable
-            String fileCheck = Util.checkLocalFileReadable(localFilePath);
-            if (fileCheck != null) {
-                logger.error("[traceId={}] Local file validation failed: {}", traceId, fileCheck);
-                handleListenerError(listener, fileCheck);
-                return false;
-            }
-
-            File localFile = new File(localFilePath);
-            long fileSize = localFile.length();
-            // Validate file size against maximum allowed size
-            long maxFileSize = agentConfig.getMaxFileSize();
-            if (maxFileSize > 0 && fileSize > maxFileSize) {
-                String errorMsg = "File size exceeds maximum allowed size: " + maxFileSize + "bytes";
-                logger.error("[traceId={}] {}", traceId, errorMsg);
-                handleListenerError(listener, errorMsg);
-                return false;
-            }
-
-            logger.debug("[traceId={}] Local file validated: path={}, size={} bytes", traceId, localFilePath, fileSize);
-
-            String taskKey = Util.md5(localFilePath + ":" + remoteTargetPath);
-
-            if (listener != null) {
-                listenerCache.put(taskKey, listener);
-            }
-            UploadTask task = new UploadTask(localFilePath, remoteTargetPath, fileSize);
-            task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
-            task.setTraceId(traceId);
-            task.setEnqueuedTime(Util.currentTime());
-            task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
-            task.updateTimestamp();
-            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
-                this.taskInflightMap.put(task.getTransferId(), task);
-            }
-            return taskQueue.offer(task);
-        } catch (Exception e) {
-            logger.error("upload file with error!", e);
-            handleListenerError(listener, "upload file with error!");
-            return false;
-        }
+    @Override
+    protected int getMaxRateKBPerSecond(AgentConfig config) {
+        return config.getMaxUploadRateKBPerSecond();
     }
 
-    private void processTask(UploadTask task) {
-        String taskKey = Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
+    @Override
+    protected void processTask(UploadTask task) {
+        String taskKey = getTaskKey(task);
         String traceId = task.getTraceId();
 
         try {
@@ -246,7 +78,7 @@ public class AgentUploader {
 
             String listenerClassName = task.getListenerClassName();
             if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
-                UploadListener listener = createListenerInstance(listenerClassName);
+                UploadListener listener = createListenerInstance(listenerClassName, UploadListener.class);
                 if (listener != null) {
                     listenerCache.put(taskKey, listener);
                 }
@@ -356,6 +188,85 @@ public class AgentUploader {
         }
     }
 
+    @Override
+    protected String getTaskKey(UploadTask task) {
+        return Util.md5(task.getLocalFilePath() + ":" + task.getRemoteTargetPath());
+    }
+
+    @Override
+    protected void onListenerProgress(UploadListener listener, int total, int processed, double progress) {
+        listener.onProgress(total, processed, progress);
+    }
+
+    @Override
+    protected void onListenerSuccess(UploadListener listener, UploadTask result) {
+        listener.onComplete(result);
+    }
+
+    @Override
+    protected void onListenerError(UploadListener listener, String message) {
+        listener.onError(message);
+    }
+
+    public boolean uploadFile(String localFilePath, String remoteTargetPath, UploadListener listener) {
+        String traceId = java.util.UUID.randomUUID().toString().replace("-", "");
+
+        try {
+            if (localFilePath == null || localFilePath.isBlank()) {
+                handleListenerError(listener, "localFilePath must not be null or blank");
+                return false;
+            }
+            if (remoteTargetPath == null || remoteTargetPath.isBlank()) {
+                handleListenerError(listener, "remoteTargetPath must not be null or blank");
+                return false;
+            }
+
+            if (!new File(localFilePath).isAbsolute()) {
+                handleListenerError(listener, "localFilePath must be an absolute path: " + localFilePath);
+                return false;
+            }
+
+            String fileCheck = Util.checkLocalFileReadable(localFilePath);
+            if (fileCheck != null) {
+                logger.error("[traceId={}] Local file validation failed: {}", traceId, fileCheck);
+                handleListenerError(listener, fileCheck);
+                return false;
+            }
+
+            File localFile = new File(localFilePath);
+            long fileSize = localFile.length();
+            long maxFileSize = agentConfig.getMaxFileSize();
+            if (maxFileSize > 0 && fileSize > maxFileSize) {
+                String errorMsg = "File size exceeds maximum allowed size: " + maxFileSize + "bytes";
+                logger.error("[traceId={}] {}", traceId, errorMsg);
+                handleListenerError(listener, errorMsg);
+                return false;
+            }
+
+            logger.debug("[traceId={}] Local file validated: path={}, size={} bytes", traceId, localFilePath, fileSize);
+
+            String taskKey = Util.md5(localFilePath + ":" + remoteTargetPath);
+
+            if (listener != null) {
+                listenerCache.put(taskKey, listener);
+            }
+            UploadTask task = new UploadTask(localFilePath, remoteTargetPath, fileSize);
+            task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
+            task.setTraceId(traceId);
+            task.setEnqueuedTime(Util.currentTime());
+            task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
+            task.updateTimestamp();
+            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
+                this.taskInflightMap.put(task.getTransferId(), task);
+            }
+            return taskQueue.offer(task);
+        } catch (Exception e) {
+            logger.error("upload file with error!", e);
+            handleListenerError(listener, "upload file with error!");
+            return false;
+        }
+    }
+
     private void uploadChunks(UploadTask task, File file, String taskKey, String localPath, String remotePath, String traceId) throws IOException {
         List<Integer> missingChunks = task.getMissingChunks();
         if (missingChunks.isEmpty()) {
@@ -388,14 +299,14 @@ public class AgentUploader {
                         } catch (Exception e) {
                             throw new CompletionException("Failed to upload chunk " + chunkIndex, e);
                         }
-                    }, uploadExecutor))
+                    }, chunkExecutor))
                     .toArray(CompletableFuture[]::new);
 
             CompletableFuture<Void> allUploads = CompletableFuture.allOf(uploadFutures);
 
             // Calculate a reasonable timeout
             int chunksToUpload = missingChunks.size();
-            long waves = (long) Math.ceil((double) chunksToUpload / this.concurrentUploads);
+            long waves = (long) Math.ceil((double) chunksToUpload / this.concurrentOperations);
             long timeoutSeconds = (waves + 2) * this.requestTimeoutSeconds; // Add a 2-request buffer
             timeoutSeconds = Math.max(60, timeoutSeconds); // Minimum 60 seconds
 
@@ -406,69 +317,6 @@ public class AgentUploader {
             }
         } catch (Exception e) {
             throw new IOException("Failed to upload chunks", e);
-        }
-    }
-
-    private void applyRateLimit(int dataSize, String traceId) throws InterruptedException {
-        if (rateLimiter == null || dataSize <= 0) {
-            return;
-        }
-        rateLimiter.acquire(dataSize, traceId);
-    }
-
-    private void handleListenerProgress(String taskKey, int total, int uploaded, double progress) {
-        UploadListener listener = listenerCache.get(taskKey);
-        if (listener == null) return;
-        try {
-            listener.onProgress(total, uploaded, progress);
-        } catch (Exception e) {
-            logger.warn("UploadListener.onProgress failed: {}", e.getMessage());
-        }
-    }
-
-    private void handleListenerSuccess(String taskKey, UploadTask result) {
-        UploadListener listener = listenerCache.get(taskKey);
-        if (listener == null) return;
-        try {
-            listener.onComplete(result);
-        } catch (Exception e) {
-            logger.warn("UploadListener.onComplete failed: {}", e.getMessage());
-        }
-    }
-
-    private void handleListenerError(String taskKey, String message) {
-        UploadListener listener = taskKey != null ? listenerCache.get(taskKey) : null;
-        handleListenerError(listener, message);
-    }
-
-    private void handleListenerError(UploadListener listener, String message) {
-        if (listener == null) return;
-        try {
-            listener.onError(message);
-        } catch (Exception e) {
-            logger.warn("UploadListener.onError failed: {}", e.getMessage());
-        }
-    }
-
-    private UploadListener createListenerInstance(String className) {
-        try {
-            Class<?> clazz = Class.forName(className);
-            Object instance = clazz.getDeclaredConstructor().newInstance();
-            if (instance instanceof UploadListener) {
-                return (UploadListener) instance;
-            } else {
-                logger.error("Class {} does not implement UploadListener interface", className);
-                return null;
-            }
-        } catch (ClassNotFoundException e) {
-            logger.error("Listener class not found: {}", className, e);
-            return null;
-        } catch (NoSuchMethodException e) {
-            logger.error("Listener class {} has no default constructor", className, e);
-            return null;
-        } catch (Exception e) {
-            logger.error("Failed to create listener instance: {}", className, e);
-            return null;
         }
     }
 
@@ -597,55 +445,6 @@ public class AgentUploader {
         return Boolean.TRUE.equals(data);
     }
 
-    @SuppressWarnings("all")
-    private <T> ApiResponse<T> postApi(String path, Object body, Type responseType, String traceId) throws IOException, InterruptedException {
-        String jsonPayload = body instanceof String ? (String) body : gson.toJson(body);
-        logger.debug("[traceId={}] Sending POST request to {}", traceId, path);
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(agentApiUrl + path))
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload, StandardCharsets.UTF_8));
-
-        // Add traceid header if provided
-        if (traceId != null && !traceId.isEmpty()) {
-            requestBuilder.header("X-Trace-Id", traceId);
-        }
-
-        HttpRequest request = requestBuilder.build();
-        HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        if (httpResponse.statusCode() >= 400 && httpResponse.statusCode() != 500) {
-            throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
-        }
-        ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
-        logger.debug("[traceId={}] Received post response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
-        return obj;
-    }
-
-    @SuppressWarnings("all")
-    private <T> ApiResponse<T> getApi(String path, Type responseType, String traceId) throws IOException, InterruptedException {
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(agentApiUrl + path))
-                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                .GET();
-        logger.debug("[traceId={}] Sending GET request to {}", traceId, path);
-
-        // Add traceid header if provided
-        if (traceId != null && !traceId.isEmpty()) {
-            // set trace id header
-            requestBuilder.header("X-Trace-Id", traceId);
-        }
-
-        HttpRequest request = requestBuilder.build();
-        HttpResponse<String> httpResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        if (httpResponse.statusCode() >= 400 && httpResponse.statusCode() != 500) {
-            throw new IOException("HTTP request failed with status " + httpResponse.statusCode() + ": " + httpResponse.body());
-        }
-        ApiResponse<T> obj = gson.fromJson(httpResponse.body(), responseType);
-        logger.debug("[traceId={}] Received get response {} for {} with status: {}", traceId, obj, path, obj.isSuccess());
-        return obj;
-    }
-
     public List<UploadTask> getInflightTasks(int page, int pageSize) {
         if (page < 1) {
             throw new IllegalArgumentException("page must be >= 1");
@@ -671,34 +470,5 @@ public class AgentUploader {
 
     void clearAllInflightTasks() {
         taskInflightMap.clear();
-    }
-
-    public void shutdown() {
-        logger.info("Shutting down AgentUploader...");
-        shutdown = true;
-        workerExecutor.shutdown();
-        uploadExecutor.shutdown();
-        try {
-            if (!workerExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
-                workerExecutor.shutdownNow();
-            }
-            if (!uploadExecutor.awaitTermination(60, TimeUnit.SECONDS)) {
-                uploadExecutor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            workerExecutor.shutdownNow();
-            uploadExecutor.shutdownNow();
-        }
-        if (rateLimiter != null) {
-            rateLimiter.shutdown();
-        }
-        if (taskQueue != null) {
-            taskQueue.close();
-        }
-        if (taskInflightMap != null) {
-            taskInflightMap.close();
-        }
-        logger.info("AgentUploader shut down");
     }
 }

@@ -49,11 +49,16 @@ public class AgentConfig {
     private int chunkSize;
     private long uploadSessionTimeoutMinutes;
     private int maxUploadRateKBPerSecond;
+    private int maxDownloadRateKBPerSecond;
 
     // Upload queue configuration
     private String uploadQueueDbPath;
     private String uploadMapDbPath;
     private String uploadSessionsDbPath;
+
+    // Download queue configuration
+    private String downloadQueueDbPath;
+    private String downloadMapDbPath;
 
     public AgentConfig() {
         this.properties = new Properties();
@@ -136,6 +141,12 @@ public class AgentConfig {
         this.uploadQueueDbPath = getStringProperty("upload.queue.db.path", "upload_queue_db");
         this.uploadMapDbPath = getStringProperty("upload.map.db.path", "upload_map_db");
         this.uploadSessionsDbPath = getStringProperty("upload.sessions.db.path", "upload_sessions_db");
+
+        // Download queue configuration
+        this.downloadQueueDbPath = getStringProperty("download.queue.db.path", "download_queue_db");
+        this.downloadMapDbPath = getStringProperty("download.map.db.path", "download_map_db");
+        this.maxDownloadRateKBPerSecond = getIntProperty("download.max.rate.kb.per.second", 0);
+
         // Validate configuration
         validateConfiguration();
     }
@@ -324,6 +335,18 @@ public class AgentConfig {
 
     public String getUploadSessionsDbPath() {
         return uploadSessionsDbPath;
+    }
+
+    public String getDownloadQueueDbPath() {
+        return downloadQueueDbPath;
+    }
+
+    public String getDownloadMapDbPath() {
+        return downloadMapDbPath;
+    }
+
+    public int getMaxDownloadRateKBPerSecond() {
+        return maxDownloadRateKBPerSecond;
     }
 
     public void setUploadMapDbPath(String uploadMapDbPath) {

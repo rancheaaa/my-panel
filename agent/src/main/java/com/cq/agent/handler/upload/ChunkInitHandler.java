@@ -1,11 +1,10 @@
-package com.cq.agent.handler.chunk;
+package com.cq.agent.handler.upload;
 
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ChunkInitRequest;
 import com.cq.agent.dto.ChunkInitResponse;
 import com.cq.agent.handler.BaseHandler;
-import com.cq.agent.model.UploadSession;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
 import com.google.gson.JsonSyntaxException;

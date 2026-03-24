@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
-final class PersistentQueue<T> {
+public class PersistentQueue<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(PersistentQueue.class);
 
@@ -25,7 +25,7 @@ final class PersistentQueue<T> {
     private static final String TAIL_KEY = "tail";
     private static final String DATA_PREFIX = "data:";
 
-    PersistentQueue(String dbPath, String queueName, Class<T> type) throws RocksDBException {
+    public PersistentQueue(String dbPath, String queueName, Class<T> type) throws RocksDBException {
         this.queueName = queueName;
         this.type = type;
         this.gson = new Gson();
@@ -61,7 +61,7 @@ final class PersistentQueue<T> {
         }
     }
 
-    boolean offer(T item) {
+    public boolean offer(T item) {
         lock.lock();
         try {
             byte[] data = serialize(item);
@@ -79,7 +79,7 @@ final class PersistentQueue<T> {
         }
     }
 
-    T poll() {
+    public T poll() {
         lock.lock();
         try {
             if (headIndex >= tailIndex) {
@@ -107,7 +107,7 @@ final class PersistentQueue<T> {
         }
     }
 
-    T peek() {
+    public T peek() {
         lock.lock();
         try {
             if (headIndex >= tailIndex) {
@@ -130,17 +130,13 @@ final class PersistentQueue<T> {
         }
     }
 
-    int size() {
+    public int size() {
         lock.lock();
         try {
             return (int) (tailIndex - headIndex);
         } finally {
             lock.unlock();
         }
-    }
-
-    boolean isEmpty() {
-        return size() == 0;
     }
 
     void clear() {
@@ -167,7 +163,16 @@ final class PersistentQueue<T> {
         }
     }
 
-    void close() {
+    public boolean isEmpty() {
+        lock.lock();
+        try {
+            return headIndex >= tailIndex;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public void close() {
         lock.lock();
         try {
             if (db != null) {

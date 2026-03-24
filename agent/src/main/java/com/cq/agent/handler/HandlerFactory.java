@@ -1,6 +1,8 @@
 package com.cq.agent.handler;
 
-import com.cq.agent.handler.chunk.*;
+import com.cq.agent.handler.download.ChunkDownloadHandler;
+import com.cq.agent.handler.download.ChunkDownloadInfoHandler;
+import com.cq.agent.handler.upload.*;
 import com.cq.agent.handler.file.*;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;

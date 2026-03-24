@@ -5,19 +5,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("all")
-final class UploadRateLimiter {
+public class UploadRateLimiter {
 
     private static final Logger logger = LoggerFactory.getLogger(UploadRateLimiter.class);
 
     private final RateLimiter rateLimiter;
     private final double maxRateKBPerSecond;
 
-    UploadRateLimiter(long bytesPerSecond) {
+    public UploadRateLimiter(long bytesPerSecond) {
         this.rateLimiter = RateLimiter.create(bytesPerSecond / 1000.0);
         this.maxRateKBPerSecond = bytesPerSecond / 1024.0;
     }
 
-    void acquire(int bytes, String traceId) throws InterruptedException {
+    public void acquire(int bytes, String traceId) throws InterruptedException {
         if (bytes <= 0) {
             return;
         }
@@ -29,6 +29,6 @@ final class UploadRateLimiter {
         }
     }
 
-    void shutdown() {
+    public void shutdown() {
     }
 }

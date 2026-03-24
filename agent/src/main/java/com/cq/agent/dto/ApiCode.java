@@ -10,6 +10,10 @@ public enum ApiCode {
     GENERIC_ERROR(500, "An unexpected error occurred"),
     NOT_FOUND(404, "Resource not found"),
     INVALID_REQUEST(400, "Invalid request format or parameters"),
+    INVALID_PARAMETER(400, "Invalid parameter"),
+    FILE_NOT_FOUND(1001, "File not found"),
+    INVALID_FILE_SIZE(1002, "Invalid file size"),
+
     // File Operations
     PATH_NOT_FOUND(1001, "Specified path does not exist"),
     PATH_IS_NOT_DIRECTORY(1002, "Specified path is not a directory"),

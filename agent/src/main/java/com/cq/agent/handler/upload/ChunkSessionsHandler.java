@@ -1,4 +1,4 @@
-package com.cq.agent.handler.chunk;
+package com.cq.agent.handler.upload;
 
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.model.UploadSession;

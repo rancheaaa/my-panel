@@ -8,7 +8,6 @@ import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,7 +15,6 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -782,80 +780,12 @@ public class ChunkedTransferService {
         return ApiResponse.success(null);
     }
 
-    public ApiResponse<ChunkedDownloadResult> downloadRange(String path, long start, long end) {
-        try {
-            Path targetPath = resolvePath(path);
-            if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "File not found: " + path);
-            }
-            if (Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.PATH_IS_NOT_FILE.getCode(), "Cannot download directory: " + path);
-            }
-
-            long fileSize = Files.size(targetPath);
-
-            // Validate range
-            if (start < 0) start = 0;
-            if (end < 0 || end >= fileSize) end = fileSize - 1;
-            if (start > end) {
-                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Invalid range: " + start + "-" + end);
-            }
-
-            long length = end - start + 1;
-
-            // Read the specified range
-            byte[] data = new byte[(int) length];
-            try (RandomAccessFile raf = new RandomAccessFile(targetPath.toFile(), "r")) {
-                raf.seek(start);
-                raf.readFully(data);
-            }
-
-            ChunkedDownloadResult result = new ChunkedDownloadResult(
-                    data, start, end, fileSize,
-                    targetPath.getFileName().toString()
-            );
-
-            return ApiResponse.success(result);
-        } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
-        } catch (IOException e) {
-            logger.error("Failed to read file range: {}", path, e);
-            return ApiResponse.failure(ApiCode.READ_FILE_FAILED.getCode(), "Failed to read file: " + e.getMessage());
-        }
-    }
-
-    public ApiResponse<Map<String, Object>> getDownloadInfo(String path) {
-        try {
-            Path targetPath = resolvePath(path);
-            if (!Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "File not found: " + path);
-            }
-            if (Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.DOWNLOAD_DIRECTORY_FAILED.getCode(), "Cannot download directory: " + path);
-            }
-
-            long fileSize = Files.size(targetPath);
-            int recommendedChunks = (int) Math.ceil((double) fileSize / defaultChunkSize);
-
-            Map<String, Object> info = new LinkedHashMap<>();
-            info.put("path", targetPath.toString());
-            info.put("fileName", targetPath.getFileName().toString());
-            info.put("size", fileSize);
-            info.put("chunkSize", defaultChunkSize);
-            info.put("totalChunks", recommendedChunks);
-            info.put("supportsRange", true);
-
-            return ApiResponse.success(info);
-        } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
-        } catch (IOException e) {
-            logger.error("Failed to get download info: {}", path, e);
-            return ApiResponse.failure(ApiCode.GET_DOWNLOAD_INFO_FAILED.getCode(), "Failed to get download info: " + e.getMessage());
-        }
-    }
-
     public List<UploadSession> listUploadSessions() {
         return new ArrayList<>(uploadSessions.values());
+    }
+
+    public UploadSession getUploadSession(String transferId) {
+        return uploadSessions.get(transferId);
     }
 
     private void cleanupExpiredSessions() {

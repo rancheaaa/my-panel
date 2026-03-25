@@ -2,7 +2,7 @@ package com.cq.agent.client;
 
 import com.cq.agent.client.upload.PersistentMap;
 import com.cq.agent.client.upload.PersistentQueue;
-import com.cq.agent.client.upload.UploadRateLimiter;
+import com.cq.agent.client.upload.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.ApiResponse;
 import com.google.gson.Gson;
@@ -15,15 +15,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.*;
 
 public abstract class BaseAgentClient<TASK, LISTENER> {
 
     protected static final Logger logger = LoggerFactory.getLogger(BaseAgentClient.class);
-    protected static final int DEFAULT_MAX_QUEUE_DEPTH = 500;
-    protected static final int DEFAULT_WORKER_COUNT = 4;
 
     protected final String agentApiUrl;
     protected final HttpClient httpClient;
@@ -34,7 +31,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     protected final ExecutorService chunkExecutor;
     protected final ExecutorService workerExecutor;
     protected final int workerCount;
-    protected final int concurrentOperations;
+    protected final int concurrentThreads;
     protected volatile boolean shutdown;
 
     protected final AgentConfig agentConfig;
@@ -45,17 +42,18 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     protected final int requestTimeoutSeconds;
 
     protected final int maxRateKBPerSecond;
-    protected final UploadRateLimiter rateLimiter;
+    protected final TrafficRateLimiter rateLimiter;
+    protected final int maxQueueDepth;
 
-    protected BaseAgentClient(AgentConfig agentConfig, String agentApiUrl, int concurrentOperations,
+    protected BaseAgentClient(AgentConfig agentConfig, String agentApiUrl, int concurrentThreads,
                             int maxQueueDepth, int workerCount, int maxRetries, long retryDelayMs,
-                            int connectTimeoutSeconds, int requestTimeoutSeconds, String queueName, String mapName,
-                            Class<TASK> taskClass, String operationType) {
+                            int connectTimeoutSeconds, int requestTimeoutSeconds, String queueDbPath, String mapDbPath,
+                            int maxRateKBPerSecond, Class<TASK> taskClass, String operationType) {
         if (agentApiUrl == null || agentApiUrl.isBlank()) {
             throw new IllegalArgumentException("agentApiUrl must not be null or blank");
         }
-        if (concurrentOperations < 1 || concurrentOperations > 64) {
-            throw new IllegalArgumentException("concurrentOperations must be between 1 and 64");
+        if (concurrentThreads < 1 || concurrentThreads > 64) {
+            throw new IllegalArgumentException("concurrentThreads must be between 1 and 64");
         }
         if (maxQueueDepth < 1 || maxQueueDepth > 100_000) {
             throw new IllegalArgumentException("maxQueueDepth must be between 1 and 100000");
@@ -66,13 +64,13 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
 
         this.agentConfig = agentConfig;
         this.agentApiUrl = agentApiUrl.endsWith("/") ? agentApiUrl : agentApiUrl + "/";
+        this.maxQueueDepth = maxQueueDepth;
 
         try {
-            String queuePath = getQueuePath(agentConfig, queueName);
-            String mapPath = getMapPath(agentConfig, mapName);
-            this.taskQueue = new PersistentQueue<>(queuePath, queueName, taskClass);
-            this.taskInflightMap = new PersistentMap<>(mapPath, mapName, String.class, taskClass);
-            logger.info("Persistent queue initialized at: {}", queuePath);
+
+            this.taskQueue = new PersistentQueue<>(Util.resolveAndCreatePathIfAbsent(agentConfig.getFileBaseDirectory(), queueDbPath), operationType + "QueueDb", taskClass);
+            this.taskInflightMap = new PersistentMap<>(Util.resolveAndCreatePathIfAbsent(agentConfig.getFileBaseDirectory(), mapDbPath), operationType + "MapDb", String.class, taskClass);
+            logger.info("Persistent queue initialized at: {}", queueDbPath);
             logger.info("Queue size on startup: {}", taskQueue.size());
             if (!taskQueue.isEmpty()) {
                 logger.info("Resuming {} pending {} tasks from previous session", taskQueue.size(), operationType);
@@ -83,10 +81,10 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             this.connectTimeoutSeconds = Math.max(5, connectTimeoutSeconds);
             this.requestTimeoutSeconds = Math.max(30, requestTimeoutSeconds);
 
-            this.maxRateKBPerSecond = getMaxRateKBPerSecond(agentConfig);
+            this.maxRateKBPerSecond = maxRateKBPerSecond;
             if (this.maxRateKBPerSecond > 0) {
                 long bytesPerSecond = (long) this.maxRateKBPerSecond * 1024;
-                this.rateLimiter = new UploadRateLimiter(bytesPerSecond);
+                this.rateLimiter = new TrafficRateLimiter(bytesPerSecond);
                 logger.info("Rate limiting enabled: max {} rate = {} KB/s", operationType, this.maxRateKBPerSecond);
             } else {
                 this.rateLimiter = null;
@@ -99,8 +97,8 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
                     .build();
 
             this.chunkExecutor = new ThreadPoolExecutor(
-                    concurrentOperations,
-                    concurrentOperations,
+                    concurrentThreads,
+                    concurrentThreads,
                     0L,
                     TimeUnit.MILLISECONDS,
                     new LinkedBlockingQueue<>(),
@@ -123,16 +121,12 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
                     }
             );
             this.workerCount = workerCount;
-            this.concurrentOperations = concurrentOperations;
+            this.concurrentThreads = concurrentThreads;
         } catch (Exception e) {
             logger.error("Failed to initialize BaseAgentClient: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to initialize BaseAgentClient", e);
         }
     }
-
-    protected abstract String getQueuePath(AgentConfig config, String queueName);
-    protected abstract String getMapPath(AgentConfig config, String mapName);
-    protected abstract int getMaxRateKBPerSecond(AgentConfig config);
 
     public void init() {
         for (int i = 0; i < workerCount; i++) {
@@ -248,7 +242,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
                     .header("X-Trace-Id", traceId)
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
-
+            logger.debug("[traceId={}] POST {} - Request: {}, body length {}", traceId, endpoint, request, jsonBody.length());
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             String responseBody = response.body();
@@ -273,6 +267,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(Duration.ofSeconds(requestTimeoutSeconds))
+                    .header("X-Trace-Id", traceId)
                     .GET()
                     .build();
 

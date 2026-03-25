@@ -49,7 +49,8 @@ public class FileHandler extends CommonNettyHandler {
                 if (handler != null) {
                     handler.handle(ctx, request);
                 } else {
-                    ctx.fireChannelRead(request.retain());
+                    sendResponse(ctx, request, HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                            createErrorResponse(ApiCode.URI_NOT_SUPPORT, "uri not support: " + uri));
                 }
             } catch (Exception e) {
                 logger.error("[traceId={}] Error processing file request: ", traceid, e);

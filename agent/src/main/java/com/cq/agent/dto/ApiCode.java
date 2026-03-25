@@ -13,6 +13,7 @@ public enum ApiCode {
     INVALID_PARAMETER(400, "Invalid parameter"),
     FILE_NOT_FOUND(1001, "File not found"),
     INVALID_FILE_SIZE(1002, "Invalid file size"),
+    URI_NOT_SUPPORT(1003, "URI not supported"),
 
     // File Operations
     PATH_NOT_FOUND(1001, "Specified path does not exist"),

@@ -28,14 +28,12 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        int concurrentDownloads = 2;
-        int concurrentUploads = 2;
-
         AgentConfig config = new AgentConfig();
-        this.downloader = new AgentDownloader(config, AGENT_URL, concurrentDownloads);
+        config.setAgentApiUrl(AGENT_URL);
+        this.downloader = new AgentDownloader(config);
         this.downloader.init();
 
-        this.uploader = new AgentUploader(config, AGENT_URL, concurrentUploads);
+        this.uploader = new AgentUploader(config);
         this.uploader.init();
     }
 
@@ -107,7 +105,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
         final int random = ThreadLocalRandom.current().nextInt(2, 6);
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB
         String remotePath = "/tmp/download-test/" + testFile.getName();
-        File localDownloadDir = new File(System.getProperty("java.io.tmpdir"), "download-test");
+        File localDownloadDir = new File("/tmp/my-panel", "download-test");
         if (!localDownloadDir.exists()) {
             localDownloadDir.mkdirs();
         }
@@ -205,7 +203,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
         final int random = ThreadLocalRandom.current().nextInt(2, 6);
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB
         String remotePath = "/tmp/resumable-download-test/" + testFile.getName();
-        File localDownloadDir = new File(System.getProperty("java.io.tmpdir"), "resumable-download-test");
+        File localDownloadDir = new File("/tmp/my-panel", "resumable-download-test");
         if (!localDownloadDir.exists()) {
             localDownloadDir.mkdirs();
         }
@@ -325,7 +323,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
             if (localDownloadFile.exists()) {
                 localDownloadFile.delete();
             }
-//            cleanupRemoteFile(remotePath);
+            cleanupRemoteFile(remotePath);
         }
     }
 
@@ -366,7 +364,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
 
     protected void cleanupRemoteFile(String remotePath) {
         try {
-            String url = AGENT_URL + "/api/file/delete?path=" + URLEncoder.encode(remotePath, "UTF-8");
+            String url = AGENT_URL + "/api/file/dele?path=" + URLEncoder.encode(remotePath, "UTF-8");
             logger.info("Cleaning up remote file: {}", url);
             JsonObject res = sendGetRequest(url);
             logger.info("Cleanup response: {}", res.toString());

@@ -22,11 +22,9 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Change this to your agent's address
-        int concurrentUploads = 2;
-
         AgentConfig config = new AgentConfig();
-        this.uploader = new AgentUploader(config, AGENT_URL, concurrentUploads);
+        config.setAgentApiUrl(AGENT_URL);
+        this.uploader = new AgentUploader(config);
         this.uploader.init();
     }
 

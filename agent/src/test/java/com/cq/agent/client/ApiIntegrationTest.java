@@ -161,4 +161,13 @@ public class ApiIntegrationTest extends BaseIntegrationTest {
         JsonObject response = sendGetRequest(url);
         assertTrue(response.has("success"), "Response should contain success field");
     }
+
+    @Test
+    public void testDeleteFile() throws IOException {
+        String testPath = "/tmp/uploaded-files/my-panel.10492851590453588022.dat";
+        String url = AGENT_URL + "/api/file/dele?path=" + URLEncoder.encode(testPath, "UTF-8");
+        logger.info("Testing delete file: {}", url);
+        JsonObject response = sendGetRequest(url);
+        assertNotNull(response.get("success"));
+    }
 }

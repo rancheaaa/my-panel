@@ -7,6 +7,8 @@ import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.UUID;
+
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -41,6 +43,7 @@ public class BaseIntegrationTest {
             connection.setReadTimeout(10000);
 //            connection.setRequestProperty("connection", "keep-alive");
             connection.setRequestProperty("connection", "close");
+            connection.setRequestProperty("X-Trace-Id", UUID.randomUUID().toString().replace("-", ""));
 
             int responseCode = connection.getResponseCode();
             logger.info("GET request response code: {}", responseCode);
@@ -82,6 +85,7 @@ public class BaseIntegrationTest {
             connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setRequestProperty("connection", "close");
+            connection.setRequestProperty("X-Trace-Id", UUID.randomUUID().toString().replace("-", ""));
 //            connection.setRequestProperty("connection", "keep-alive");
 
             // Send request body

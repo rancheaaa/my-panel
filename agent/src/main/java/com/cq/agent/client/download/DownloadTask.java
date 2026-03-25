@@ -28,6 +28,7 @@ public class DownloadTask {
     private int downloadedChunksCount;
     private int retryCount;
     private String listenerClassName;
+    private String exceptionDesc;
 
     public DownloadTask(String remoteFilePath, String localFilePath, long totalSize) {
         this.remoteFilePath = remoteFilePath;
@@ -244,6 +245,14 @@ public class DownloadTask {
         this.tmpLocalFilePath = tmpLocalFilePath;
     }
 
+    public String getExceptionDesc() {
+        return exceptionDesc;
+    }
+
+    public void setExceptionDesc(String exceptionDesc) {
+        this.exceptionDesc = exceptionDesc;
+    }
+
     @Override
     public String toString() {
         return "DownloadTask{" +
@@ -270,6 +279,7 @@ public class DownloadTask {
                 ", downloadedChunksCount=" + downloadedChunksCount +
                 ", retryCount=" + retryCount +
                 ", tmpLocalFilePath=" + tmpLocalFilePath +
+                ", exceptionDesc=" + exceptionDesc +
                 '}';
     }
 }

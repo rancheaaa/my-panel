@@ -300,6 +300,7 @@ public class FileService {
     public ApiResponse<Void> delete(String path) {
         try {
             Path targetPath = resolvePath(path);
+            logger.info("resolve path is: {}", targetPath);
             if (!Files.exists(targetPath)) {
                 return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "File does not exist: " + path);
             }

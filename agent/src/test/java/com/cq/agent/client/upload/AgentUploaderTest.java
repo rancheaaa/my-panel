@@ -31,7 +31,7 @@ class AgentUploaderTest {
         agentConfig.setUploadQueueDbPath(queueDbPath.toString());
         agentConfig.setUploadMapDbPath(mapDbPath.toString());
         
-        uploader = new AgentUploader(agentConfig, "http://localhost:8080", 2);
+        uploader = new AgentUploader(agentConfig);
         uploader.init();
         
         taskInflightMap = getTaskInflightMap(uploader);

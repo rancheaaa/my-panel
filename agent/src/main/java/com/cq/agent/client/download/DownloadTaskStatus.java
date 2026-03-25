@@ -3,6 +3,7 @@ package com.cq.agent.client.download;
 public enum DownloadTaskStatus {
 
     PREPARED,
+    SCANNED,
     INIT_DOWNLOADING,
     INIT_DOWNLOAD_COMPLETED,
     DOWNLOADING_CHUNKS,

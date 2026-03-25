@@ -1,6 +1,9 @@
 package com.cq.agent.client.upload;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
@@ -46,6 +49,15 @@ public class Util {
     public static String currentTime() {
         LocalDateTime now = LocalDateTime.now();
         return DATE_TIME_FORMATTER.format(now);
+    }
+
+    public static String resolveAndCreatePathIfAbsent(String basePath, String relativePath) throws IOException {
+        final Path base = Path.of(basePath).toAbsolutePath().normalize();
+        final Path relative = base.resolve(relativePath);
+        if (!Files.exists(relative)) {
+            Files.createDirectories(relative);
+        }
+        return relative.toString();
     }
 
 }

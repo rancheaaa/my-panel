@@ -27,6 +27,7 @@ public class AgentConfig {
     // Agent identifier
     private String agentId;
     private String agentIp;
+    private String agentApiUrl;
 
     // Server configuration
     private int serverPort;
@@ -59,6 +60,24 @@ public class AgentConfig {
     // Download queue configuration
     private String downloadQueueDbPath;
     private String downloadMapDbPath;
+
+    // Upload client configuration
+    private int uploadConcurrentUploads;
+    private int uploadMaxQueueDepth;
+    private int uploadWorkerCount;
+    private int uploadMaxRetries;
+    private long uploadRetryDelayMs;
+    private int uploadConnectTimeoutSeconds;
+    private int uploadRequestTimeoutSeconds;
+
+    // Download client configuration
+    private int downloadConcurrentDownloads;
+    private int downloadMaxQueueDepth;
+    private int downloadWorkerCount;
+    private int downloadMaxRetries;
+    private long downloadRetryDelayMs;
+    private int downloadConnectTimeoutSeconds;
+    private int downloadRequestTimeoutSeconds;
 
     public AgentConfig() {
         this.properties = new Properties();
@@ -112,13 +131,23 @@ public class AgentConfig {
         if (this.agentIp == null || this.agentIp.isBlank()) {
             this.agentIp = findFirstNonLoopbackAddress();
             logger.info("agent.ip is {}", this.agentIp);
+        }
 
+        this.agentApiUrl = getStringProperty("agent.api.url", null);
+        if (this.agentApiUrl == null || this.agentApiUrl.isBlank()) {
+            this.agentApiUrl = "http://" + this.agentIp + ":" + this.serverPort + "/";
+            logger.info("agent.api.url is not configured, using default: {}", this.agentApiUrl);
+        } else {
+            if (!this.agentApiUrl.endsWith("/")) {
+                this.agentApiUrl = this.agentApiUrl + "/";
+            }
+            logger.info("agent.api.url is {}", this.agentApiUrl);
         }
 
         // Server configuration
-        this.serverPort = getIntProperty("server.port", 8090);
+        this.serverPort = getIntProperty("server.port", 7777);
         this.bossThreads = getIntProperty("server.boss.threads", 1);
-        this.workerThreads = getIntProperty("server.worker.threads", 0);
+        this.workerThreads = getIntProperty("server.worker.threads", Runtime.getRuntime().availableProcessors() * 2);
 
         // Executor configuration
         this.executorThreadPoolSize = getIntProperty("executor.thread.pool.size", 10);
@@ -127,13 +156,13 @@ public class AgentConfig {
 
         // Connection configuration
         this.connectionIdleTimeoutSeconds = getIntProperty("connection.idle.timeout.seconds", 60);
-        this.maxContentLength = getIntProperty("connection.max.content.length", 1048576);
+        this.maxContentLength = getIntProperty("connection.max.content.length", 8 * 1024 * 1024);
 
         // File operation configuration
-        this.fileBaseDirectory = getStringProperty("file.base.directory", System.getProperty("user.home"));
+        this.fileBaseDirectory = getStringProperty("file.base.directory", "/tmp/my-panel/agent/agent_data");
         this.allowOutsideBaseDirectory = getBooleanProperty("file.allow.outside.base", true);
-        this.maxFileSize = getLongProperty("file.max.size", 104857600);
-        this.chunkSize = getIntProperty("file.chunk.size.bytes", 4 * 1024 * 1024);
+        this.maxFileSize = getLongProperty("file.max.size", 107374182400L);
+        this.chunkSize = getIntProperty("file.chunk.size.bytes", 5 * 1024 * 1024);
         this.uploadSessionTimeoutMinutes = getLongProperty("upload.session.timeout.minutes", 60);
         this.maxUploadRateKBPerSecond = getIntProperty("upload.max.rate.kb.per.second", 0);
 
@@ -145,7 +174,26 @@ public class AgentConfig {
         // Download queue configuration
         this.downloadQueueDbPath = getStringProperty("download.queue.db.path", "download_queue_db");
         this.downloadMapDbPath = getStringProperty("download.map.db.path", "download_map_db");
+
         this.maxDownloadRateKBPerSecond = getIntProperty("download.max.rate.kb.per.second", 0);
+
+        // Upload client configuration
+        this.uploadConcurrentUploads = getIntProperty("upload.concurrent.uploads", 4);
+        this.uploadMaxQueueDepth = getIntProperty("upload.max.queue.depth", 500);
+        this.uploadWorkerCount = getIntProperty("upload.worker.count", 4);
+        this.uploadMaxRetries = getIntProperty("upload.max.retries", 3);
+        this.uploadRetryDelayMs = getLongProperty("upload.retry.delay.ms", 2000);
+        this.uploadConnectTimeoutSeconds = getIntProperty("upload.connect.timeout.seconds", 10);
+        this.uploadRequestTimeoutSeconds = getIntProperty("upload.request.timeout.seconds", 60);
+
+        // Download client configuration
+        this.downloadConcurrentDownloads = getIntProperty("download.concurrent.downloads", 4);
+        this.downloadMaxQueueDepth = getIntProperty("download.max.queue.depth", 500);
+        this.downloadWorkerCount = getIntProperty("download.worker.count", 4);
+        this.downloadMaxRetries = getIntProperty("download.max.retries", 3);
+        this.downloadRetryDelayMs = getLongProperty("download.retry.delay.ms", 2000);
+        this.downloadConnectTimeoutSeconds = getIntProperty("download.connect.timeout.seconds", 10);
+        this.downloadRequestTimeoutSeconds = getIntProperty("download.request.timeout.seconds", 60);
 
         // Validate configuration
         validateConfiguration();
@@ -269,6 +317,10 @@ public class AgentConfig {
         return agentIp;
     }
 
+    public String getAgentApiUrl() {
+        return agentApiUrl;
+    }
+
     public int getServerPort() {
         return serverPort;
     }
@@ -349,6 +401,66 @@ public class AgentConfig {
         return maxDownloadRateKBPerSecond;
     }
 
+    public int getUploadConcurrentUploads() {
+        return uploadConcurrentUploads;
+    }
+
+    public int getUploadMaxQueueDepth() {
+        return uploadMaxQueueDepth;
+    }
+
+    public int getUploadWorkerCount() {
+        return uploadWorkerCount;
+    }
+
+    public int getUploadMaxRetries() {
+        return uploadMaxRetries;
+    }
+
+    public long getUploadRetryDelayMs() {
+        return uploadRetryDelayMs;
+    }
+
+    public int getUploadConnectTimeoutSeconds() {
+        return uploadConnectTimeoutSeconds;
+    }
+
+    public int getUploadRequestTimeoutSeconds() {
+        return uploadRequestTimeoutSeconds;
+    }
+
+    public int getDownloadConcurrentDownloads() {
+        return downloadConcurrentDownloads;
+    }
+
+    public int getDownloadMaxQueueDepth() {
+        return downloadMaxQueueDepth;
+    }
+
+    public int getDownloadWorkerCount() {
+        return downloadWorkerCount;
+    }
+
+    public int getDownloadMaxRetries() {
+        return downloadMaxRetries;
+    }
+
+    public long getDownloadRetryDelayMs() {
+        return downloadRetryDelayMs;
+    }
+
+    public int getDownloadConnectTimeoutSeconds() {
+        return downloadConnectTimeoutSeconds;
+    }
+
+    public int getDownloadRequestTimeoutSeconds() {
+        return downloadRequestTimeoutSeconds;
+    }
+
+    public void setAgentApiUrl(String agentApiUrl) {
+        this.agentApiUrl = agentApiUrl;
+    }
+
     public void setUploadMapDbPath(String uploadMapDbPath) {
         this.uploadMapDbPath = uploadMapDbPath;
     }
@@ -357,12 +469,14 @@ public class AgentConfig {
         this.uploadQueueDbPath = uploadQueueDbPath;
     }
 
+
     @Override
     public String toString() {
         return "AgentConfig{" +
                 "properties=" + properties +
                 ", agentId='" + agentId + '\'' +
                 ", agentIp='" + agentIp + '\'' +
+                ", agentApiUrl='" + agentApiUrl + '\'' +
                 ", serverPort=" + serverPort +
                 ", bossThreads=" + bossThreads +
                 ", workerThreads=" + workerThreads +
@@ -377,9 +491,26 @@ public class AgentConfig {
                 ", chunkSize=" + chunkSize +
                 ", uploadSessionTimeoutMinutes=" + uploadSessionTimeoutMinutes +
                 ", maxUploadRateKBPerSecond=" + maxUploadRateKBPerSecond +
+                ", maxDownloadRateKBPerSecond=" + maxDownloadRateKBPerSecond +
                 ", uploadQueueDbPath='" + uploadQueueDbPath + '\'' +
                 ", uploadMapDbPath='" + uploadMapDbPath + '\'' +
                 ", uploadSessionsDbPath='" + uploadSessionsDbPath + '\'' +
+                ", downloadQueueDbPath='" + downloadQueueDbPath + '\'' +
+                ", downloadMapDbPath='" + downloadMapDbPath + '\'' +
+                ", uploadConcurrentUploads=" + uploadConcurrentUploads +
+                ", uploadMaxQueueDepth=" + uploadMaxQueueDepth +
+                ", uploadWorkerCount=" + uploadWorkerCount +
+                ", uploadMaxRetries=" + uploadMaxRetries +
+                ", uploadRetryDelayMs=" + uploadRetryDelayMs +
+                ", uploadConnectTimeoutSeconds=" + uploadConnectTimeoutSeconds +
+                ", uploadRequestTimeoutSeconds=" + uploadRequestTimeoutSeconds +
+                ", downloadConcurrentDownloads=" + downloadConcurrentDownloads +
+                ", downloadMaxQueueDepth=" + downloadMaxQueueDepth +
+                ", downloadWorkerCount=" + downloadWorkerCount +
+                ", downloadMaxRetries=" + downloadMaxRetries +
+                ", downloadRetryDelayMs=" + downloadRetryDelayMs +
+                ", downloadConnectTimeoutSeconds=" + downloadConnectTimeoutSeconds +
+                ", downloadRequestTimeoutSeconds=" + downloadRequestTimeoutSeconds +
                 '}';
     }
 }

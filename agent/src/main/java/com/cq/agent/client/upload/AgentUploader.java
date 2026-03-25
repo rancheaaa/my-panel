@@ -3,7 +3,6 @@ package com.cq.agent.client.upload;
 import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
-import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -13,12 +12,10 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.time.Duration;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -33,36 +30,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentUploader.class);
-    private static final int DEFAULT_MAX_QUEUE_DEPTH = 500;
-    private static final int DEFAULT_WORKER_COUNT = 4;
 
     private final AgentConfig agentConfig;
 
-    public AgentUploader(AgentConfig agentConfig, String agentApiUrl, int concurrentUploads) {
-        this(agentConfig, agentApiUrl, concurrentUploads, DEFAULT_MAX_QUEUE_DEPTH, DEFAULT_WORKER_COUNT, 3, 2000, 10, 60);
-    }
-
-    public AgentUploader(AgentConfig agentConfig, String agentApiUrl, int concurrentUploads, int maxQueueDepth, int workerCount,
-                         int maxRetries, long retryDelayMs, int connectTimeoutSeconds, int requestTimeoutSeconds) {
-        super(agentConfig, agentApiUrl, concurrentUploads, maxQueueDepth, workerCount,
-                maxRetries, retryDelayMs, connectTimeoutSeconds, requestTimeoutSeconds,
-                "upload-tasks", "upload-inflight", UploadTask.class, "upload");
+    public AgentUploader(AgentConfig agentConfig) {
+        super(agentConfig, agentConfig.getAgentApiUrl(), agentConfig.getUploadConcurrentUploads(),
+                agentConfig.getUploadMaxQueueDepth(), agentConfig.getUploadWorkerCount(),
+                agentConfig.getUploadMaxRetries(), agentConfig.getUploadRetryDelayMs(),
+                agentConfig.getUploadConnectTimeoutSeconds(), agentConfig.getUploadRequestTimeoutSeconds(),
+                agentConfig.getUploadQueueDbPath(), agentConfig.getUploadMapDbPath(), agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload");
         this.agentConfig = agentConfig;
-    }
-
-    @Override
-    protected String getQueuePath(AgentConfig config, String queueName) {
-        return config.getUploadQueueDbPath();
-    }
-
-    @Override
-    protected String getMapPath(AgentConfig config, String mapName) {
-        return config.getUploadMapDbPath();
-    }
-
-    @Override
-    protected int getMaxRateKBPerSecond(AgentConfig config) {
-        return config.getMaxUploadRateKBPerSecond();
     }
 
     @Override
@@ -182,6 +159,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
             task.setStatus(UploadTaskStatus.FAILED);
             task.updateTimestamp();
+            task.setExceptionDesc(e.getMessage());
+            this.taskInflightMap.put(task.getTransferId(), task);
             handleListenerError(taskKey, e.getMessage());
         } finally {
             listenerCache.remove(taskKey);
@@ -212,6 +191,10 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         String traceId = java.util.UUID.randomUUID().toString().replace("-", "");
 
         try {
+            if (taskQueue.size() > maxQueueDepth) {
+                handleListenerError(listener, "Download queue depth is reached: " + maxQueueDepth);
+                return false;
+            }
             if (localFilePath == null || localFilePath.isBlank()) {
                 handleListenerError(listener, "localFilePath must not be null or blank");
                 return false;
@@ -278,7 +261,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         UploadListener listener = listenerCache.get(taskKey);
         task.setUploadChunksCount(uploadedCount);
 
-        try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(file.toPath(), java.nio.file.StandardOpenOption.READ)) {
+        try (FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             CompletableFuture<?>[] uploadFutures = missingChunks.stream()
                     .map(chunkIndex -> CompletableFuture.runAsync(() -> {
                         try {
@@ -306,7 +289,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
             // Calculate a reasonable timeout
             int chunksToUpload = missingChunks.size();
-            long waves = (long) Math.ceil((double) chunksToUpload / this.concurrentOperations);
+            long waves = (long) Math.ceil((double) chunksToUpload / this.concurrentThreads);
             long timeoutSeconds = (waves + 2) * this.requestTimeoutSeconds; // Add a 2-request buffer
             timeoutSeconds = Math.max(60, timeoutSeconds); // Minimum 60 seconds
 
@@ -321,7 +304,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
     }
 
     private static final Type API_RESPONSE_CHUNK_STATUS = TypeToken.getParameterized(ApiResponse.class, ChunkStatusResponse.class).getType();
-    private static final Type API_RESPONSE_CHUNK_INIT = TypeToken.getParameterized(ApiResponse.class, com.cq.agent.dto.ChunkInitResponse.class).getType();
+    private static final Type API_RESPONSE_CHUNK_INIT = TypeToken.getParameterized(ApiResponse.class, ChunkInitResponse.class).getType();
+    private static final Type API_RESPONSE_CHUNK_UPLOAD = TypeToken.getParameterized(ApiResponse.class, ChunkUploadResponse.class).getType();
     private static final Type API_RESPONSE_MERGE_RESULT = TypeToken.getParameterized(ApiResponse.class, ChunkMergeResponse.class).getType();
     private static final Type API_RESPONSE_BOOLEAN = TypeToken.getParameterized(ApiResponse.class, Boolean.class).getType();
 
@@ -329,7 +313,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         return getUploadStatus(transferId, traceId);
     }
 
-    private byte[] readChunk(java.nio.channels.FileChannel channel, int chunkIndex, int chunkSize, long totalSize) throws IOException {
+    private byte[] readChunk(FileChannel channel, int chunkIndex, int chunkSize, long totalSize) throws IOException {
         long start = (long) chunkIndex * chunkSize;
         long length = Math.min(chunkSize, totalSize - start);
 
@@ -411,7 +395,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             logger.warn("[traceId={}] Could not parse agentApiUrl to extract host and port", traceId, e);
         }
 
-        return postApi("api/file/chunk/upload", req, TypeToken.getParameterized(ApiResponse.class, Object.class).getType(), traceId);
+        return postApi("api/file/chunk/upload", req, API_RESPONSE_CHUNK_UPLOAD, traceId);
     }
 
     private void mergeChunks(String transferId, String traceId) throws IOException, InterruptedException {

@@ -31,6 +31,7 @@ public class UploadTask {
     private int chunkSize;
     private int totalChunks;
     private final long totalSize;
+    private String exceptionDesc;
 
     private List<Integer> missingChunks;
     private AtomicInteger uploadChunksCount = new AtomicInteger(0);
@@ -228,6 +229,14 @@ public class UploadTask {
         return totalSize;
     }
 
+    public String getExceptionDesc() {
+        return exceptionDesc;
+    }
+
+    public void setExceptionDesc(String exceptionDesc) {
+        this.exceptionDesc = exceptionDesc;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -266,6 +275,7 @@ public class UploadTask {
                 ", missingChunks=" + missingChunks +
                 ", uploadChunksCount=" + uploadChunksCount +
                 ", retryCount=" + retryCount +
+                ", exceptionDesc=" + exceptionDesc +
                 '}';
     }
 }

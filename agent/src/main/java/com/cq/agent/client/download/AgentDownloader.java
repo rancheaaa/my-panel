@@ -1,23 +1,15 @@
 package com.cq.agent.client.download;
 
 import com.cq.agent.client.BaseAgentClient;
-import com.cq.agent.client.upload.PersistentMap;
-import com.cq.agent.client.upload.PersistentQueue;
-import com.cq.agent.client.upload.UploadRateLimiter;
 import com.cq.agent.client.upload.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.lang.reflect.Type;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.channels.FileChannel;
@@ -25,7 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -36,33 +27,13 @@ import java.util.regex.Pattern;
 public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentDownloader.class);
-    private static final int DEFAULT_MAX_QUEUE_DEPTH = 500;
-    private static final int DEFAULT_WORKER_COUNT = 4;
 
-    public AgentDownloader(AgentConfig agentConfig, String agentApiUrl, int concurrentDownloads) {
-        this(agentConfig, agentApiUrl, concurrentDownloads, DEFAULT_MAX_QUEUE_DEPTH, DEFAULT_WORKER_COUNT, 3, 2000, 10, 60);
-    }
-
-    public AgentDownloader(AgentConfig agentConfig, String agentApiUrl, int concurrentDownloads, int maxQueueDepth, int workerCount,
-                           int maxRetries, long retryDelayMs, int connectTimeoutSeconds, int requestTimeoutSeconds) {
-        super(agentConfig, agentApiUrl, concurrentDownloads, maxQueueDepth, workerCount,
-                maxRetries, retryDelayMs, connectTimeoutSeconds, requestTimeoutSeconds,
-                "download-tasks", "download-inflight", DownloadTask.class, "download");
-    }
-
-    @Override
-    protected String getQueuePath(AgentConfig config, String queueName) {
-        return config.getDownloadQueueDbPath();
-    }
-
-    @Override
-    protected String getMapPath(AgentConfig config, String mapName) {
-        return config.getDownloadMapDbPath();
-    }
-
-    @Override
-    protected int getMaxRateKBPerSecond(AgentConfig config) {
-        return config.getMaxDownloadRateKBPerSecond();
+    public AgentDownloader(AgentConfig agentConfig) {
+        super(agentConfig, agentConfig.getAgentApiUrl(), agentConfig.getDownloadConcurrentDownloads(),
+                agentConfig.getDownloadMaxQueueDepth(), agentConfig.getDownloadWorkerCount(),
+                agentConfig.getDownloadMaxRetries(), agentConfig.getDownloadRetryDelayMs(),
+                agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
+                agentConfig.getDownloadQueueDbPath(), agentConfig.getDownloadMapDbPath(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
     }
 
     @Override
@@ -71,7 +42,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         String traceId = task.getTraceId();
 
         try {
-            task.setStatus(DownloadTaskStatus.INIT_DOWNLOADING);
+            task.setStatus(DownloadTaskStatus.SCANNED);
             task.updateTimestamp();
             task.incrementRetryCount();
             this.taskInflightMap.put(task.getTransferId(), task);
@@ -86,7 +57,11 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
             File localFile = new File(task.getLocalFilePath());
             File parentDir = localFile.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
+            if (parentDir == null) {
+                logger.error("[traceId={}] Failed to get parent directory: {}", traceId, parentDir.getAbsolutePath());
+                throw new IOException("Failed to get parent directory: " + parentDir.getAbsolutePath());
+            }
+            if (!parentDir.exists()) {
                 final boolean res = parentDir.mkdirs();
                 if(!res) {
                     logger.error("[traceId={}] Failed to create parent directory: {}", traceId, parentDir.getAbsolutePath());
@@ -99,6 +74,10 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
             int chunkSize;
             int totalChunks;
+            task.setInitDownloadStartTime(Util.currentTime());
+            task.setStatus(DownloadTaskStatus.INIT_DOWNLOAD_COMPLETED);
+            task.updateTimestamp();
+            this.taskInflightMap.put(task.getTransferId(), task);
 
             ApiResponse<ChunkDownloadInfoResponse> chunkInitResponse = getDownloadInfo(task);
             logger.debug("[traceId={}] Download initialized: transferId={}, totalChunks={}, chunkSize={}",
@@ -174,6 +153,8 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             logger.error("[traceId={}] Download task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
             task.setStatus(DownloadTaskStatus.FAILED);
             task.updateTimestamp();
+            task.setExceptionDesc(e.getMessage());
+            this.taskInflightMap.put(task.getTransferId(), task);
             handleListenerError(taskKey, e.getMessage());
         } finally {
             listenerCache.remove(taskKey);
@@ -202,8 +183,11 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
     public boolean downloadFile(String remoteFilePath, String localFilePath, DownloadListener listener) {
         String traceId = UUID.randomUUID().toString().replace("-", "");
-
         try {
+            if (taskQueue.size() > maxQueueDepth) {
+                handleListenerError(listener, "Download queue depth is reached: " + maxQueueDepth);
+                return false;
+            }
             if (remoteFilePath == null || remoteFilePath.isBlank()) {
                 handleListenerError(listener, "remoteFilePath must not be null or blank");
                 return false;
@@ -215,8 +199,20 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
             File localFile = new File(localFilePath);
             File parentDir = localFile.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
+            if (parentDir == null) {
+                handleListenerError(listener, "localFilePath must have a parent directory");
+                return false;
+            }
+            if (!parentDir.exists()) {
+                final boolean res = parentDir.mkdirs();
+                if (!res) {
+                    handleListenerError(listener, "Failed to create directory: " + parentDir.getAbsolutePath());
+                    return false;
+                }
+            }
+            if (!parentDir.canWrite()) {
+                handleListenerError(listener, "parent directory: " + parentDir.getAbsolutePath() + " must hava write permission!");
+                return false;
             }
 
             String taskKey = getTaskKey(new DownloadTask(remoteFilePath, localFilePath, 0));
@@ -570,7 +566,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             CompletableFuture<Void> allDownloads = CompletableFuture.allOf(downloadFutures);
 
             int chunksToDownload = missingChunks.size();
-            long waves = (long) Math.ceil((double) chunksToDownload / this.concurrentOperations);
+            long waves = (long) Math.ceil((double) chunksToDownload / this.concurrentThreads);
             long timeoutSeconds = (waves + 2) * this.requestTimeoutSeconds;
             timeoutSeconds = Math.max(60, timeoutSeconds);
 

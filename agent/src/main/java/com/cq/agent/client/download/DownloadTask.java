@@ -9,6 +9,9 @@ public class DownloadTask {
     private String remoteFilePath;
     private String localFilePath;
     private String tmpLocalFilePath;
+    private final String remoteAgentApiUrl;
+    private final String remoteAgentUsername;
+
     private long totalSize;
     private DownloadTaskStatus status;
     private String createTime;
@@ -30,7 +33,7 @@ public class DownloadTask {
     private String listenerClassName;
     private String exceptionDesc;
 
-    public DownloadTask(String remoteFilePath, String localFilePath, long totalSize) {
+    public DownloadTask(String remoteFilePath, String localFilePath, long totalSize, String remoteAgentApiUrl, String remoteAgentUsername) {
         this.remoteFilePath = remoteFilePath;
         this.localFilePath = localFilePath;
         this.totalSize = totalSize;
@@ -39,6 +42,8 @@ public class DownloadTask {
         this.updateTime = this.createTime;
         this.retryCount = -1;
         this.downloadedChunksCount = 0;
+        this.remoteAgentApiUrl = remoteAgentApiUrl;
+        this.remoteAgentUsername = remoteAgentUsername;
     }
 
     public String getTransferId() {
@@ -253,6 +258,14 @@ public class DownloadTask {
         this.exceptionDesc = exceptionDesc;
     }
 
+    public String getRemoteAgentApiUrl() {
+        return remoteAgentApiUrl;
+    }
+
+    public String getRemoteAgentUsername() {
+        return remoteAgentUsername;
+    }
+
     @Override
     public String toString() {
         return "DownloadTask{" +
@@ -280,6 +293,8 @@ public class DownloadTask {
                 ", retryCount=" + retryCount +
                 ", tmpLocalFilePath=" + tmpLocalFilePath +
                 ", exceptionDesc=" + exceptionDesc +
+                ", remoteAgentApiUrl='" + remoteAgentApiUrl + '\'' +
+                ", remoteAgentUsername='" + remoteAgentUsername + '\'' +
                 '}';
     }
 }

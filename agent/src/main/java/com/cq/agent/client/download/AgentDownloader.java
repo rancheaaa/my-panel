@@ -1,6 +1,7 @@
 package com.cq.agent.client.download;
 
 import com.cq.agent.client.BaseAgentClient;
+import com.cq.agent.client.RemoteAgentInfo;
 import com.cq.agent.client.upload.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
@@ -172,6 +173,11 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
     }
 
     @Override
+    protected void onListenerBeforeSend(DownloadListener listener, DownloadTask task) {
+        listener.onBeforeSend(task);
+    }
+
+    @Override
     protected void onListenerSuccess(DownloadListener listener, DownloadTask result) {
         listener.onComplete(result);
     }
@@ -181,17 +187,28 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         listener.onError(message);
     }
 
-    public boolean downloadFile(String remoteFilePath, String localFilePath, DownloadListener listener) {
+    public boolean downloadFile(String remoteFileInfo, String localFilePath, DownloadListener listener) {
         String traceId = UUID.randomUUID().toString().replace("-", "");
         try {
             if (taskQueue.size() > maxQueueDepth) {
                 handleListenerError(listener, "Download queue depth is reached: " + maxQueueDepth);
                 return false;
             }
-            if (remoteFilePath == null || remoteFilePath.isBlank()) {
+            // remoteTargetPath like 192.168.1.100:7777@root:/tmp/upload
+            // ip:port@username:destFilePath
+            if (remoteFileInfo == null || remoteFileInfo.isBlank()) {
                 handleListenerError(listener, "remoteFilePath must not be null or blank");
                 return false;
             }
+
+            RemoteAgentInfo remoteAgentInfo;
+            try {
+                remoteAgentInfo = Util.resolveRemoteAgentInfo(remoteFileInfo);
+            } catch (Exception e) {
+                handleListenerError(listener, e.getMessage());
+                return false;
+            }
+
             if (localFilePath == null || localFilePath.isBlank()) {
                 handleListenerError(listener, "localFilePath must not be null or blank");
                 return false;
@@ -215,24 +232,25 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 return false;
             }
 
-            String taskKey = getTaskKey(new DownloadTask(remoteFilePath, localFilePath, 0));
+            String remoteAgentApiUrl = "http://" + remoteAgentInfo.getIp() + ":" + remoteAgentInfo.getPort() + "/";
 
-            if (listener != null) {
-                listenerCache.put(taskKey, listener);
-            }
-
-            long fileSize = getRemoteFileSize(remoteFilePath, traceId);
+            long fileSize = getRemoteFileSize(remoteAgentApiUrl, remoteAgentInfo.getDestFilePath(), traceId);
             if (fileSize <= 0) {
                 handleListenerError(listener, "Failed to get remote file size");
                 return false;
             }
-
-            DownloadTask task = new DownloadTask(remoteFilePath, localFilePath, fileSize);
+            DownloadTask task = new DownloadTask(remoteAgentInfo.getDestFilePath(), localFilePath, fileSize,remoteAgentApiUrl , remoteAgentInfo.getUsername());
             task.setTransferId(UUID.randomUUID().toString().replace("-", ""));
             task.setTraceId(traceId);
-            task.setEnqueuedTime(com.cq.agent.client.upload.Util.currentTime());
+            task.setEnqueuedTime(Util.currentTime());
             task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
             task.updateTimestamp();
+
+            String taskKey = getTaskKey(task);
+
+            if (listener != null) {
+                listenerCache.put(taskKey, listener);
+            }
 
             if (!this.taskInflightMap.containsKey(task.getTransferId())) {
                 this.taskInflightMap.put(task.getTransferId(), task);
@@ -250,9 +268,9 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
     private static final Type API_RESPONSE_DOWNLOAD_CHUNK = com.google.gson.reflect.TypeToken.getParameterized(ApiResponse.class, ChunkDownloadResponse.class).getType();
     private static final Type API_RESPONSE_LONG = com.google.gson.reflect.TypeToken.getParameterized(ApiResponse.class, Long.class).getType();
 
-    private long getRemoteFileSize(String remoteFilePath, String traceId) throws IOException, InterruptedException {
+    private long getRemoteFileSize(String remoteAgentApiUrl, String remoteFilePath, String traceId) throws IOException, InterruptedException {
         String encodedPath = java.net.URLEncoder.encode(remoteFilePath, StandardCharsets.UTF_8);
-        ApiResponse<Long> response = getApi("api/file/size?path=" + encodedPath, API_RESPONSE_LONG, traceId);
+        ApiResponse<Long> response = getApi(remoteAgentApiUrl, "api/file/size?path=" + encodedPath, API_RESPONSE_LONG, traceId);
         if (!response.isSuccess()) {
             logger.error("[traceId={}] Failed to get remote file size: {}", traceId, response.getMsg());
             return -1;
@@ -283,7 +301,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             logger.warn("Could not parse agentApiUrl to extract host and port", e);
         }
 
-        return postApi("api/file/chunk/download/info", req, API_RESPONSE_DOWNLOAD_INIT, task.getTraceId());
+        return postApi(task.getRemoteAgentApiUrl(), "api/file/chunk/download/info", req, API_RESPONSE_DOWNLOAD_INIT, task.getTraceId());
     }
 
     private File downloadChunk(DownloadTask task, int chunkIndex, String traceId) throws IOException, InterruptedException {
@@ -532,6 +550,9 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             CompletableFuture<?>[] downloadFutures = missingChunks.stream()
                     .map(chunkIndex -> CompletableFuture.runAsync(() -> {
                         try {
+                            if (listener != null) {
+                                handleListenerBeforeSend(taskKey, task);
+                            }
                             File chunkFile = downloadChunk(task, chunkIndex, traceId);
                             
                             long chunkSize = chunkFile.length();

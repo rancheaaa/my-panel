@@ -1,6 +1,7 @@
 package com.cq.agent.client.upload;
 
 import com.cq.agent.client.BaseIntegrationTest;
+import com.cq.agent.client.RemoteAgentInfo;
 import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.*;
 import com.google.gson.JsonObject;
@@ -41,7 +42,7 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
         // Standard remote path, relative to agent's base directory
         // Standard remote path, must be absolute
 //        String remotePath = "test/" + testFile.getName();
-        String remotePath = "/tmp/uploaded-files/" + testFile.getName();
+        String remotePath = AGENT_URL + "@cq:" +  "/tmp/uploaded-files/" + testFile.getName();
         CountDownLatch latch = new CountDownLatch(1);
 
         UploadListener listener = new UploadListener() {
@@ -75,9 +76,10 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
             }
             
             // Verify file exists on agent
-            boolean fileExists = verifyFileExists(remotePath);
-            assertTrue(fileExists, "Uploaded file does not exist on agent: " + remotePath);
-            logger.info("File verification successful: {}", remotePath);
+            RemoteAgentInfo remoteAgentInfo = Util.resolveRemoteAgentInfo(remotePath);
+            boolean fileExists = verifyFileExists(remoteAgentInfo.getDestFilePath());
+            assertTrue(fileExists, "Uploaded file does not exist on agent: " + remoteAgentInfo.getDestFilePath());
+            logger.info("File verification successful: {}", remoteAgentInfo.getDestFilePath());
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {

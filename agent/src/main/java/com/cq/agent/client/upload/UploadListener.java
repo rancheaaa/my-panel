@@ -1,9 +1,13 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.client.download.DownloadTask;
+
 /**
  * Listener for tracking upload progress.
  */
 public interface UploadListener {
+
+    default void onBeforeSend(UploadTask task) {};
 
     /**
      * Called when the upload progress changes.

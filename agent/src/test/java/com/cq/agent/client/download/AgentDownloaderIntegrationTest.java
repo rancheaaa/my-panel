@@ -1,14 +1,15 @@
 package com.cq.agent.client.download;
 
 import com.cq.agent.client.BaseIntegrationTest;
+import com.cq.agent.client.RemoteAgentInfo;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
+import com.cq.agent.client.upload.Util;
 import com.cq.agent.config.AgentConfig;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
-
 import java.io.*;
 import java.net.URLEncoder;
 import java.util.concurrent.CountDownLatch;
@@ -45,66 +46,10 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName("测试文件下载集成 - 用法: 测试分块下载文件从agent服务")
-    public void testDownload() throws IOException {
-        String remotePath = "/tmp/uploaded-files/" + "my-panel.9705081671171337513.dat";
-        File localDownloadDir = new File("/tmp/my-panel");
-        if (!localDownloadDir.exists()) {
-            localDownloadDir.mkdirs();
-        }
-        File localDownloadFile = new File(localDownloadDir, "my-panel.9705081671171337513.dat");
-
-        CountDownLatch downloadLatch = new CountDownLatch(1);
-
-        DownloadListener downloadListener = new DownloadListener() {
-            @Override
-            public void onProgress(int total, int downloaded, double progress) {
-                logger.info("Download progress: {}% (chunk {}/{})", String.format("%.2f", progress), downloaded, total);
-            }
-
-            @Override
-            public void onComplete(DownloadTask result) {
-                logger.info("Download complete: remote={}, local={}, size={}, state={}",
-                        result.getRemoteFilePath(), result.getLocalFilePath(), result.getTotalSize(), result.getStatus());
-                downloadLatch.countDown();
-            }
-
-            @Override
-            public void onError(String errorMessage) {
-                logger.error("Download failed: {}", errorMessage);
-                downloadLatch.countDown();
-            }
-        };
-
-        try {
-            boolean fileExists = verifyFileExists(remotePath);
-            assertTrue(fileExists, "Uploaded file does not exist on agent: " + remotePath);
-            logger.info("File upload verification successful: {}", remotePath);
-
-            boolean downloadSuccess = downloader.downloadFile(remotePath, localDownloadFile.getAbsolutePath(), downloadListener);
-            assertTrue(downloadSuccess, "Download failed");
-
-            if (!downloadLatch.await(5, TimeUnit.MINUTES)) {
-                logger.error("Download timed out after 5 minutes");
-                fail("Download timed out");
-            }
-            assertTrue(localDownloadFile.exists(), "Downloaded file does not exist locally: " + localDownloadFile.getAbsolutePath());
-            logger.info("File download verification successful:");
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } finally {
-//            if (localDownloadFile.exists()) {
-//                localDownloadFile.delete();
-//            }
-//            cleanupRemoteFile(remotePath);
-        }
-    }
-
-    @Test
-    @DisplayName("测试文件下载集成 - 用法: 测试分块下载文件从agent服务")
     public void testDownload2() throws IOException {
         final int random = ThreadLocalRandom.current().nextInt(2, 6);
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB
-        String remotePath = "/tmp/download-test/" + testFile.getName();
+        String remotePath = AGENT_URL + "@cq:" +  "/tmp/download-test/" + testFile.getName();
         File localDownloadDir = new File("/tmp/my-panel", "download-test");
         if (!localDownloadDir.exists()) {
             localDownloadDir.mkdirs();
@@ -165,7 +110,8 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
                 fail("Upload timed out");
             }
 
-            boolean fileExists = verifyFileExists(remotePath);
+            final RemoteAgentInfo remoteAgentInfo = Util.resolveRemoteAgentInfo(remotePath);
+            boolean fileExists = verifyFileExists(remoteAgentInfo.getDestFilePath());
             assertTrue(fileExists, "Uploaded file does not exist on agent: " + remotePath);
             logger.info("File upload verification successful: {}", remotePath);
 
@@ -202,7 +148,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
     public void testResumableDownload() throws IOException {
         final int random = ThreadLocalRandom.current().nextInt(2, 6);
         File testFile = createDummyFile(random * 10 * 1024 * 1024L); // 20-50 MB
-        String remotePath = "/tmp/resumable-download-test/" + testFile.getName();
+        String remotePath = AGENT_URL + "@cq:" +  "/tmp/resumable-download-test/" + testFile.getName();
         File localDownloadDir = new File("/tmp/my-panel", "resumable-download-test");
         if (!localDownloadDir.exists()) {
             localDownloadDir.mkdirs();
@@ -240,7 +186,8 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
                 fail("Upload timed out");
             }
 
-            boolean fileExists = verifyFileExists(remotePath);
+            final RemoteAgentInfo remoteAgentInfo = Util.resolveRemoteAgentInfo(remotePath);
+            boolean fileExists = verifyFileExists(remoteAgentInfo.getDestFilePath());
             assertTrue(fileExists, "Uploaded file does not exist on agent: " + remotePath);
 
             CountDownLatch downloadLatch1 = new CountDownLatch(1);
@@ -248,12 +195,16 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
                 private boolean shouldFail = true;
 
                 @Override
-                public void onProgress(int total, int downloaded, double progress) {
-                    logger.info("Download 1 progress: {}% (chunk {}/{})", String.format("%.2f", progress), downloaded, total);
-                    if (shouldFail && progress > 30.0) {
+                public void onBeforeSend(DownloadTask task) {
+                    if (shouldFail && task.getDownloadedChunksCount() > 1) {
                         shouldFail = false;
                         throw new RuntimeException("Simulated download failure for resumable test");
                     }
+                }
+
+                @Override
+                public void onProgress(int total, int downloaded, double progress) {
+                    logger.info("Download 1 progress: {}% (chunk {}/{})", String.format("%.2f", progress), downloaded, total);
                 }
 
                 @Override

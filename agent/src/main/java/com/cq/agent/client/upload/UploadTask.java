@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -17,6 +16,8 @@ public class UploadTask {
     private String traceId;
     private UploadTaskStatus status;
     private String listenerClassName;
+    private final String remoteAgentApiUrl;
+    private final String remoteAgentUsername;
 
     private String createTime;
     private String updateTime;
@@ -39,13 +40,15 @@ public class UploadTask {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
-    public UploadTask(String localFilePath, String remoteTargetPath, long totalSize) {
+    public UploadTask(String localFilePath, String remoteTargetPath, long totalSize, String remoteAgentApiUrl, String remoteAgentUsername) {
         this.localFilePath = localFilePath;
         this.remoteTargetPath = remoteTargetPath;
         this.totalSize = totalSize;
         this.status = UploadTaskStatus.PREPARED;
         this.createTime = FORMATTER.format(LocalDateTime.now());
         this.updateTime = this.createTime;
+        this.remoteAgentApiUrl = remoteAgentApiUrl;
+        this.remoteAgentUsername = remoteAgentUsername;
     }
 
     // Getters and Setters
@@ -237,19 +240,14 @@ public class UploadTask {
         this.exceptionDesc = exceptionDesc;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        UploadTask that = (UploadTask) o;
-        return Objects.equals(localFilePath, that.localFilePath) &&
-               Objects.equals(remoteTargetPath, that.remoteTargetPath);
+    public String getRemoteAgentApiUrl() {
+        return remoteAgentApiUrl;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(localFilePath, remoteTargetPath);
+    public String getRemoteAgentUsername() {
+        return remoteAgentUsername;
     }
+
 
     @Override
     public String toString() {
@@ -276,6 +274,8 @@ public class UploadTask {
                 ", uploadChunksCount=" + uploadChunksCount +
                 ", retryCount=" + retryCount +
                 ", exceptionDesc=" + exceptionDesc +
+                ", remoteAgentApiUrl='" + remoteAgentApiUrl + '\'' +
+                ", remoteAgentUsername='" + remoteAgentUsername + '\'' +
                 '}';
     }
 }

@@ -210,7 +210,7 @@ class AgentUploaderTest {
             
             Files.writeString(Path.of(localPath), "Test content " + i);
             
-            UploadTask task = new UploadTask(localPath, remotePath, 100);
+            UploadTask task = new UploadTask(localPath, remotePath, 100,  "http://127.0.0.1:8080/", "admin");
             task.setTransferId("transfer-" + i);
             task.setTraceId("trace-" + i);
             task.setListenerClassName("com.cq.agent.client.upload.TestUploadListener");

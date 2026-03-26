@@ -180,6 +180,17 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         }
     }
 
+    protected void handleListenerBeforeSend(String taskKey, TASK task) {
+        LISTENER listener = listenerCache.get(taskKey);
+        if (listener == null) return;
+        try {
+            onListenerBeforeSend(listener, task);
+        } catch (Exception e) {
+            logger.warn("Listener.onBeforeSend failed: {}", e.getMessage());
+            throw e;
+        }
+    }
+
     protected void handleListenerSuccess(String taskKey, TASK result) {
         LISTENER listener = listenerCache.get(taskKey);
         if (listener == null) return;
@@ -205,6 +216,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     }
 
     protected abstract void onListenerProgress(LISTENER listener, int total, int processed, double progress);
+    protected abstract void onListenerBeforeSend(LISTENER listener, TASK task);
     protected abstract void onListenerSuccess(LISTENER listener, TASK result);
     protected abstract void onListenerError(LISTENER listener, String message);
 
@@ -230,9 +242,9 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         }
     }
 
-    protected <T> ApiResponse<T> postApi(String endpoint, Object requestBody, Type responseType, String traceId) throws IOException, InterruptedException {
+    protected <T> ApiResponse<T> postApi(String remoteAgentApiUrl, String endpoint, Object requestBody, Type responseType, String traceId) throws IOException, InterruptedException {
         try {
-            String url = agentApiUrl + endpoint;
+            String url = remoteAgentApiUrl + endpoint;
             String jsonBody = gson.toJson(requestBody);
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -257,9 +269,9 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         }
     }
 
-    protected <T> ApiResponse<T> getApi(String endpoint, Type responseType, String traceId) throws IOException, InterruptedException {
+    protected <T> ApiResponse<T> getApi(String remoteAgentApiUrl, String endpoint, Type responseType, String traceId) throws IOException, InterruptedException {
         try {
-            String url = agentApiUrl + endpoint;
+            String url = remoteAgentApiUrl + endpoint;
             if (!url.contains("traceId")) {
                 url += (url.contains("?") ? "&" : "?") + "traceId=" + traceId;
             }

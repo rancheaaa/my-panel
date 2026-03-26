@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper">
+    
+    <resultMap type="AgentRegistry" id="AgentRegistryResult">
+        <result property="id"    column="id"    />
+        <result property="nodeName"    column="node_name"    />
+        <result property="osType"    column="os_type"    />
+        <result property="appId"    column="app_id"    />
+        <result property="agentIp"    column="agent_ip"    />
+        <result property="agentPort"    column="agent_port"    />
+        <result property="nodeEnabled"    column="node_enabled"    />
+        <result property="nodeStatus"    column="node_status"    />
+        <result property="remark"    column="remark"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+    </resultMap>
+
+    <sql id="selectAgentRegistryVo">
+        select id, node_name, os_type, app_id, agent_ip, agent_port, node_enabled, node_status, remark, create_by, create_time, update_by, update_time
+        from agent_registry
+    </sql>
+
+    <select id="selectAgentRegistryList" parameterType="AgentRegistry" resultMap="AgentRegistryResult">
+        <include refid="selectAgentRegistryVo"/>
+        <where>  
+            <if test="nodeName != null  and nodeName != ''"> and node_name like concat('%', #{nodeName}, '%')</if>
+            <if test="osType != null  and osType != ''"> and os_type = #{osType}</if>
+            <if test="appId != null  and appId != ''"> and app_id = #{appId}</if>
+            <if test="agentIp != null  and agentIp != ''"> and agent_ip like concat('%', #{agentIp}, '%')</if>
+            <if test="agentPort != null"> and agent_port = #{agentPort}</if>
+            <if test="nodeEnabled != null"> and node_enabled = #{nodeEnabled}</if>
+            <if test="nodeStatus != null"> and node_status = #{nodeStatus}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectAgentRegistryById" parameterType="String" resultMap="AgentRegistryResult">
+        <include refid="selectAgentRegistryVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectAgentRegistryByIpAndPort" parameterType="AgentRegistry" resultMap="AgentRegistryResult">
+        <include refid="selectAgentRegistryVo"/>
+        where agent_ip = #{agentIp} and agent_port = #{agentPort}
+        limit 1
+    </select>
+        
+    <insert id="insertAgentRegistry" parameterType="AgentRegistry">
+        insert into agent_registry
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null and id != ''">id,</if>
+            <if test="nodeName != null and nodeName != ''">node_name,</if>
+            <if test="osType != null and osType != ''">os_type,</if>
+            <if test="appId != null and appId != ''">app_id,</if>
+            <if test="agentIp != null and agentIp != ''">agent_ip,</if>
+            <if test="agentPort != null">agent_port,</if>
+            <if test="nodeEnabled != null">node_enabled,</if>
+            <if test="nodeStatus != null">node_status,</if>
+            <if test="remark != null and remark != ''">remark,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null and updateBy != ''">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null and id != ''">#{id},</if>
+            <if test="nodeName != null and nodeName != ''">#{nodeName},</if>
+            <if test="osType != null and osType != ''">#{osType},</if>
+            <if test="appId != null and appId != ''">#{appId},</if>
+            <if test="agentIp != null and agentIp != ''">#{agentIp},</if>
+            <if test="agentPort != null">#{agentPort},</if>
+            <if test="nodeEnabled != null">#{nodeEnabled},</if>
+            <if test="nodeStatus != null">#{nodeStatus},</if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null and updateBy != ''">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAgentRegistry" parameterType="AgentRegistry">
+        update agent_registry
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="nodeName != null and nodeName != ''">node_name = #{nodeName},</if>
+            <if test="osType != null and osType != ''">os_type = #{osType},</if>
+            <if test="appId != null and appId != ''">app_id = #{appId},</if>
+            <if test="agentIp != null and agentIp != ''">agent_ip = #{agentIp},</if>
+            <if test="agentPort != null">agent_port = #{agentPort},</if>
+            <if test="nodeEnabled != null">node_enabled = #{nodeEnabled},</if>
+            <if test="nodeStatus != null">node_status = #{nodeStatus},</if>
+            <if test="remark != null and remark != ''">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteAgentRegistryById" parameterType="String">
+        delete from agent_registry where id = #{id}
+    </delete>
+
+    <delete id="deleteAgentRegistryByIds" parameterType="String">
+        delete from agent_registry where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <update id="updateNodeStatusByIpAndPort" parameterType="AgentRegistry">
+        update agent_registry
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="nodeStatus != null">node_status = #{nodeStatus},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where agent_ip = #{agentIp} and agent_port = #{agentPort}
+    </update>
+
+    <update id="updateNodeOfflineByTimeout" parameterType="Integer">
+        update agent_registry
+        set node_status = 0, update_time = now()
+        where node_status = 1 
+        and TIMESTAMPDIFF(SECOND, update_time, now()) &gt; #{timeoutSeconds}
+    </update>
+</mapper>

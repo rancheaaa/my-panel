@@ -3,7 +3,6 @@ package com.cq.agent.client;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-
 import java.io.IOException;
 import java.net.URLEncoder;
 import com.google.gson.JsonObject;

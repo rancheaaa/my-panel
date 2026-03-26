@@ -1,7 +1,8 @@
- package com.cq.agent;
+package com.cq.agent;
 
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
+import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
@@ -49,16 +50,24 @@ public class AgentApplication {
         }
 
         HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService);
+        
+        // Initialize registry service
+        AgentRegistryService registryService = new AgentRegistryService(config);
 
         // Add shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown signal received");
+            registryService.stop();
             server.stop();
         }));
 
         try {
             server.start();
             logger.info("Agent started successfully");
+            
+            // Start registry service after server is ready
+            registryService.start();
+            
             logger.info("");
             logger.info("Command API Endpoints:");
             logger.info("  GET  /api/health   - Health check");

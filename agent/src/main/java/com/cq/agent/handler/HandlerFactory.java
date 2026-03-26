@@ -23,7 +23,6 @@ public class HandlerFactory {
         handlerMap.put(apiPrefix + "/list", new ListHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/nlst", new NlstHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/retr", new RetrHandler(fileService, chunkedTransferService));
-        handlerMap.put(apiPrefix + "/retr-raw", new RetrRawHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/stor", new StorHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/stou", new StouHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/appe", new AppeHandler(fileService, chunkedTransferService));

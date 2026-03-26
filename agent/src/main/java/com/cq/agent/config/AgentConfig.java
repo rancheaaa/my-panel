@@ -79,6 +79,16 @@ public class AgentConfig {
     private int downloadConnectTimeoutSeconds;
     private int downloadRequestTimeoutSeconds;
 
+    // Registry configuration
+    private String registryServerUrl;
+    private String nodeName;
+    private String osType;
+    private String appId;
+    private String remark;
+    private int heartbeatIntervalSeconds;
+    private boolean autoRegister;
+    private boolean autoHeartbeat;
+
     public AgentConfig() {
         this.properties = new Properties();
         loadConfiguration();
@@ -148,6 +158,16 @@ public class AgentConfig {
         this.serverPort = getIntProperty("server.port", 7777);
         this.bossThreads = getIntProperty("server.boss.threads", 1);
         this.workerThreads = getIntProperty("server.worker.threads", Runtime.getRuntime().availableProcessors() * 2);
+
+        // Registry server configuration
+        this.registryServerUrl = getStringProperty("registry.server.url", "http://localhost:8888");
+        this.nodeName = getStringProperty("registry.node.name", null);
+        this.osType = getStringProperty("registry.os.type", null);
+        this.appId = getStringProperty("registry.app.id", null);
+        this.remark = getStringProperty("registry.remark", null);
+        this.heartbeatIntervalSeconds = getIntProperty("registry.heartbeat.interval.seconds", 300);
+        this.autoRegister = getBooleanProperty("registry.auto.register", true);
+        this.autoHeartbeat = getBooleanProperty("registry.auto.heartbeat", true);
 
         // Executor configuration
         this.executorThreadPoolSize = getIntProperty("executor.thread.pool.size", 10);
@@ -455,6 +475,38 @@ public class AgentConfig {
 
     public int getDownloadRequestTimeoutSeconds() {
         return downloadRequestTimeoutSeconds;
+    }
+
+    public String getRegistryServerUrl() {
+        return registryServerUrl;
+    }
+
+    public String getNodeName() {
+        return nodeName;
+    }
+
+    public String getOsType() {
+        return osType;
+    }
+
+    public String getAppId() {
+        return appId;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public int getHeartbeatIntervalSeconds() {
+        return heartbeatIntervalSeconds;
+    }
+
+    public boolean isAutoRegister() {
+        return autoRegister;
+    }
+
+    public boolean isAutoHeartbeat() {
+        return autoHeartbeat;
     }
 
     public void setAgentApiUrl(String agentApiUrl) {

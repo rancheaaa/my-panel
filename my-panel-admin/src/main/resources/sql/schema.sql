@@ -404,3 +404,23 @@ CREATE TABLE IF NOT EXISTS `rc_node` (
   UNIQUE KEY `idx_env_project_ip_port` (`env_id`,`project_id`,`node_ip`,`node_port`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='注册中心（节点管理）表';
 
+-- 创建 agent 客户端注册表
+CREATE TABLE IF NOT EXISTS `agent_registry` (
+    `id` varchar(64) NOT NULL COMMENT '节点ID（UUID字符串，主键）',
+    `node_name` varchar(128) NOT NULL COMMENT '节点名称',
+    `os_type` varchar(64) DEFAULT NULL COMMENT '所属操作系统（Linux/Windows/Mac等）',
+    `app_id` varchar(64) DEFAULT NULL COMMENT '所属应用ID',
+    `agent_ip` varchar(64) NOT NULL COMMENT 'Agent IP地址',
+    `agent_port` int NOT NULL COMMENT 'Agent端口',
+    `node_enabled` tinyint NOT NULL DEFAULt '0' COMMENT '节点是否启用：0-启用 1-临时关闭 2-永久关闭',
+    `node_status` tinyint NOT NULL DEFAULT '0' COMMENT '节点状态：0-离线 1-在线 2-未知',
+    `remark` varchar(512) DEFAULT NULL COMMENT '备注信息',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_node_name` (`node_name`),
+    KEY `idx_agent_ip` (`agent_ip`),
+    KEY `idx_app_id` (`app_id`),
+    KEY `idx_node_status` (`node_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent客户端注册表';
+

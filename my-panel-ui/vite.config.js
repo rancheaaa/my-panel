@@ -20,20 +20,20 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // 配置代理，用于连接真实后端
         '/api': {
-          target: 'http://localhost:8080', // 这里填写真实后端地址
+          target: 'http://localhost:8888', // 这里填写真实后端地址
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''), // 根据后端要求决定是否重写
         },
         '/admin': {
-          target: 'http://localhost:8080',
+          target: 'http://localhost:8888',
           changeOrigin: true,
         },
         '/swagger-ui': {
-          target: 'http://localhost:8080',
+          target: 'http://localhost:8888',
           changeOrigin: true,
         },
         '/v3': {
-          target: 'http://localhost:8080',
+          target: 'http://localhost:8888',
           changeOrigin: true,
         },
       },

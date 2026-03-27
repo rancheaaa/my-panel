@@ -10,6 +10,7 @@ import {
   exportAgentRegistry,
   offlineTimeoutNodes
 } from '../../../api/agent';
+import { getDicts } from '../../../api/dict/data';
 
 const { Option } = Select;
 
@@ -20,6 +21,8 @@ const AgentManage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [tableSize, setTableSize] = useState('large');
   const [expand, setExpand] = useState(false);
+  const [osTypeOptions, setOsTypeOptions] = useState([]);
+  const [nodeSwitchOptions, setNodeSwitchOptions] = useState([]);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -63,6 +66,19 @@ const AgentManage = () => {
   useEffect(() => {
     fetchData();
   }, [queryParams]);
+
+  useEffect(() => {
+    getDicts('agent_os_type').then(res => {
+      if (res.code === 200) {
+        setOsTypeOptions(res.data);
+      }
+    });
+    getDicts('agent_node_switch').then(res => {
+      if (res.code === 200) {
+        setNodeSwitchOptions(res.data);
+      }
+    });
+  }, []);
 
   const handleSearch = () => {
     form.validateFields().then(values => {
@@ -220,6 +236,7 @@ const AgentManage = () => {
           1: 'orange',
           2: 'red'
         };
+        const dictLabel = nodeSwitchOptions.find(d => Number(d.dictValue) === Number(nodeEnabled))?.dictLabel;
         const textMap = {
           0: '启用',
           1: '临时关闭',
@@ -227,7 +244,7 @@ const AgentManage = () => {
         };
         return (
           <Tag color={colorMap[nodeEnabled]}>
-            {textMap[nodeEnabled]}
+            {dictLabel ?? textMap[nodeEnabled]}
           </Tag>
         );
       }
@@ -289,10 +306,9 @@ const AgentManage = () => {
             <Col span={6}>
               <Form.Item name="osType" label="操作系统">
                 <Select placeholder="请选择操作系统" allowClear>
-                  <Option value="Linux">Linux</Option>
-                  <Option value="Windows">Windows</Option>
-                  <Option value="Mac">Mac</Option>
-                  <Option value="Other">其他</Option>
+                  {osTypeOptions.map(dict => (
+                    <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>
@@ -317,9 +333,14 @@ const AgentManage = () => {
                 <Col span={6}>
                   <Form.Item name="nodeEnabled" label="节点启用">
                     <Select placeholder="请选择状态" allowClear>
-                      <Option value={0}>启用</Option>
-                      <Option value={1}>临时关闭</Option>
-                      <Option value={2}>永久关闭</Option>
+                      {nodeSwitchOptions.map(dict => (
+                        <Option
+                          key={dict.dictValue}
+                          value={Number.isNaN(Number(dict.dictValue)) ? dict.dictValue : Number(dict.dictValue)}
+                        >
+                          {dict.dictLabel}
+                        </Option>
+                      ))}
                     </Select>
                   </Form.Item>
                 </Col>
@@ -444,10 +465,9 @@ const AgentManage = () => {
             label="操作系统"
           >
             <Select placeholder="请选择操作系统">
-              <Option value="Linux">Linux</Option>
-              <Option value="Windows">Windows</Option>
-              <Option value="Mac">Mac</Option>
-              <Option value="Other">其他</Option>
+              {osTypeOptions.map(dict => (
+                <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
+              ))}
             </Select>
           </Form.Item>
           <Form.Item
@@ -476,9 +496,14 @@ const AgentManage = () => {
             rules={[{ required: true, message: '请选择节点启用状态' }]}
           >
             <Select placeholder="请选择节点启用状态">
-              <Option value={0}>启用</Option>
-              <Option value={1}>临时关闭</Option>
-              <Option value={2}>永久关闭</Option>
+              {nodeSwitchOptions.map(dict => (
+                <Option
+                  key={dict.dictValue}
+                  value={Number.isNaN(Number(dict.dictValue)) ? dict.dictValue : Number(dict.dictValue)}
+                >
+                  {dict.dictLabel}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
           <Form.Item

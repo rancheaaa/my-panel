@@ -47,7 +47,14 @@ INSERT IGNORE INTO `sys_dict_data` VALUES (1, 1, '男', '0', 'sys_user_sex', '',
        (26, 8, '生成代码', '8', 'sys_oper_type', '', 'warning', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '生成操作'),
        (27, 9, '清空数据', '9', 'sys_oper_type', '', 'danger', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '清空操作'),
        (28, 1, '成功', '0', 'sys_common_status', '', 'primary', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '正常状态'),
-       (29, 2, '失败', '1', 'sys_common_status', '', 'danger', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '停用状态');
+       (29, 2, '失败', '1', 'sys_common_status', '', 'danger', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '停用状态'),
+       (100, 1, 'Windows', '0', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:10.339291', '', NULL, NULL),
+       (101, 2, 'Linux', '1', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:29.980307', '', NULL, NULL),
+       (102, 3, 'Mac', '2', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:53.705331', '', NULL, NULL),
+       (103, 4, '其他系统', '3', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:29:44.779131', 'admin', '2026-03-27 16:33:34.82214', NULL),
+       (104, 1, '启用', '0', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:35:33.036305', '', NULL, NULL),
+       (105, 2, '临时关闭', '1', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:36:50.903384', 'admin', '2026-03-27 16:36:58.52115', NULL),
+       (106, 3, '注销', '2', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:37:18.98585', '', NULL, NULL);
 
 INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '用户性别列表'),
        (2, '菜单状态', 'sys_show_hide', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '菜单状态列表'),
@@ -58,7 +65,9 @@ INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0
        (7, '通知类型', 'sys_notice_type', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '通知类型列表'),
        (8, '通知状态', 'sys_notice_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '通知状态列表'),
        (9, '操作类型', 'sys_oper_type', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '操作类型列表'),
-       (10, '系统状态', 'sys_common_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '登录状态列表');
+       (10, '系统状态', 'sys_common_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '登录状态列表'),
+       (100, 'Agent所在操作系统', 'agent_os_type', '0', 'admin', '2026-03-27 16:07:18.471015', '', NULL, NULL),
+       (132, 'Agent节点开关', 'agent_node_switch', '0', 'admin', '2026-03-27 16:34:36.442403', '', NULL, NULL);
 
 INSERT IGNORE INTO `sys_job` VALUES (1, '备份系统初始化数据表', 'DEFAULT', 'appTask.backupSystemAllTable', '0/10 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-13 10:13:34.873309', ''),
        (2, '系统默认（有参）', 'DEFAULT', 'appTask.ryParams(''ry'')', '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', ''),
@@ -221,7 +230,8 @@ INSERT IGNORE INTO `sys_user_post` VALUES (1, 1),
        (100, 2);
 
 INSERT IGNORE INTO `sys_user_role` VALUES (1, 1),
-       (2, 2);
+       (2, 2),
+       (100, 2);
 
 -- ----------------------------
 -- XXL-Conf 初始化数据

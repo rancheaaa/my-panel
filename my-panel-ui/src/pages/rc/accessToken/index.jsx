@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Switch, Select } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined } from '@ant-design/icons';
+import { Button, Card, Col, Dropdown, Form, Input, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tooltip, message } from 'antd';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { listAccessToken, getAccessToken, addAccessToken, updateAccessToken, delAccessToken, exportAccessToken, changeAccessTokenStatus } from '../../../api/rc/accessToken';
 
 const { Option } = Select;
@@ -10,6 +10,7 @@ const AccessToken = () => {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -188,22 +189,28 @@ const AccessToken = () => {
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
-        <Form form={form} layout="inline">
-          <Form.Item name="tokenValue" label="Token">
-            <Input placeholder="请输入Token" allowClear />
-          </Form.Item>
-          <Form.Item name="status" label="状态">
-            <Select placeholder="Token状态" allowClear style={{ width: 120 }}>
-              <Option value="0">启用</Option>
-              <Option value="1">禁用</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item name="tokenValue" label="Token">
+                <Input placeholder="请输入Token" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="status" label="状态">
+                <Select placeholder="请选择状态" allowClear>
+                  <Option value="0">正常</Option>
+                  <Option value="1">停用</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -223,6 +230,22 @@ const AccessToken = () => {
             <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
+            <Tooltip title="密度">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
+            </Tooltip>
           </Space>
         </div>
 
@@ -235,6 +258,7 @@ const AccessToken = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
+          size={tableSize}
           scroll={{ x: 1500 }}
           pagination={{
             total: total,

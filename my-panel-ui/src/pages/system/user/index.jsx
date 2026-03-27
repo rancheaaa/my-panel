@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Tag, Tooltip, Modal, message, Popconfirm, Row, Col, Switch, Tree, TreeSelect, DatePicker } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Tag, Tooltip, Modal, message, Popconfirm, Row, Col, Switch, Tree, TreeSelect, DatePicker, Dropdown } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -69,6 +69,7 @@ const User = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -441,21 +442,21 @@ const User = () => {
             </Card>
         </Col>
         <Col span={20} style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <Card bordered={false} className="search-card">
-                <Form form={form}>
-                    <Row gutter={[16, 16]}>
+            <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+                <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
+                    <Row gutter={[24, 16]}>
                         <Col span={6}>
-                            <Form.Item name="userName" label="用户名称" style={{marginBottom: 0}}>
+                            <Form.Item name="userName" label="用户名称">
                                 <Input placeholder="请输入用户名称" allowClear />
                             </Form.Item>
                         </Col>
                         <Col span={6}>
-                            <Form.Item name="phonenumber" label="手机号码" style={{marginBottom: 0}}>
+                            <Form.Item name="phonenumber" label="手机号码">
                                 <Input placeholder="请输入手机号码" allowClear />
                             </Form.Item>
                         </Col>
                         <Col span={6}>
-                            <Form.Item name="status" label="用户状态" style={{marginBottom: 0}}>
+                            <Form.Item name="status" label="用户状态">
                                 <Select placeholder="请选择状态" allowClear>
                                     {sysNormalDisable.map(dict => (
                                         <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
@@ -465,18 +466,22 @@ const User = () => {
                         </Col>
                         {expand && (
                              <Col span={6}>
-                                <Form.Item name="dateRange" label="创建时间" style={{marginBottom: 0}}>
+                                <Form.Item name="dateRange" label="创建时间">
                                     <DatePicker.RangePicker style={{ width: '100%' }} />
                                 </Form.Item>
                              </Col>
                         )}
-                        <Col span={6} style={{ textAlign: 'right', marginLeft: 'auto' }}>
+                        <Col span={expand ? 24 : 6} style={{ textAlign: 'right' }}>
                              <Space>
                                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
                                 <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-                                <a style={{ fontSize: 12, marginLeft: 8 }} onClick={() => setExpand(!expand)}>
-                                    {expand ? '收起' : '展开'} {expand ? <UpOutlined /> : <DownOutlined />}
-                                </a>
+                                <Button 
+                                    type="link" 
+                                    onClick={() => setExpand(!expand)}
+                                    icon={expand ? <UpOutlined /> : <DownOutlined />}
+                                >
+                                    {expand ? '收起' : '展开'}
+                                </Button>
                              </Space>
                         </Col>
                     </Row>
@@ -514,7 +519,20 @@ const User = () => {
                         <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
                     </Tooltip>
                     <Tooltip title="密度">
-                        <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                        <Dropdown
+                          menu={{
+                            items: [
+                              { key: 'large', label: '默认' },
+                              { key: 'middle', label: '中等' },
+                              { key: 'small', label: '紧凑' },
+                            ],
+                            onClick: ({ key }) => setTableSize(key),
+                            selectedKeys: [tableSize],
+                          }}
+                          trigger={['click']}
+                        >
+                          <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                        </Dropdown>
                     </Tooltip>
                 </Space>
                 </div>
@@ -525,6 +543,7 @@ const User = () => {
                 dataSource={data}
                 rowKey="userId"
                 loading={loading}
+                size={tableSize}
                 scroll={{ x: 1200 }}
                 pagination={{
                     current: queryParams.pageNum,

@@ -83,4 +83,7 @@ public class SysUserVO {
 
     @Schema(description = "角色ID")
     private Long roleId;
+
+    @Schema(description = "角色列表")
+    private java.util.List<SysRoleVO> roles;
 }

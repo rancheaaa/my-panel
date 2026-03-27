@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Modal, Popconfirm, Tag, Descriptions, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Modal, Popconfirm, Tag, Descriptions, Tooltip, Dropdown } from 'antd';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, EyeOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { list, delOperlog, cleanOperlog, exportOperlog } from '../../../api/monitor/operlog';
 import request from '../../../utils/request';
 
@@ -12,6 +12,8 @@ const Operlog = () => {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
+  const [expand, setExpand] = useState(false);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -168,68 +170,90 @@ const Operlog = () => {
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card">
-        <Form layout="inline">
-          <Form.Item label="系统模块">
-            <Input 
-                placeholder="请输入系统模块" 
-                value={queryParams.title}
-                onChange={e => setQueryParams({ ...queryParams, title: e.target.value })}
-                onPressEnter={handleSearch}
-                allowClear
-            />
-          </Form.Item>
-          <Form.Item label="操作人员">
-            <Input 
-                placeholder="请输入操作人员" 
-                value={queryParams.operName}
-                onChange={e => setQueryParams({ ...queryParams, operName: e.target.value })}
-                onPressEnter={handleSearch}
-                allowClear
-            />
-          </Form.Item>
-          <Form.Item label="类型">
-            <Select
-                placeholder="操作类型"
-                style={{ width: 120 }}
-                value={queryParams.businessType}
-                onChange={val => setQueryParams({ ...queryParams, businessType: val })}
-                allowClear
-            >
-                {sysOperType.map(d => (
-                    <Option key={d.dictValue} value={d.dictValue}>{d.dictLabel}</Option>
-                ))}
-            </Select>
-          </Form.Item>
-          <Form.Item label="状态">
-            <Select
-                placeholder="操作状态"
-                style={{ width: 120 }}
-                value={queryParams.status}
-                onChange={val => setQueryParams({ ...queryParams, status: val })}
-                allowClear
-            >
-                {sysCommonStatus.map(d => (
-                    <Option key={d.dictValue} value={d.dictValue}>{d.dictLabel}</Option>
-                ))}
-            </Select>
-          </Form.Item>
-          <Form.Item label="操作时间">
-            <RangePicker 
-                value={dateRange} 
-                onChange={setDateRange} 
-            />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+        <Form layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item label="系统模块">
+                <Input 
+                    placeholder="请输入系统模块" 
+                    value={queryParams.title}
+                    onChange={e => setQueryParams({ ...queryParams, title: e.target.value })}
+                    onPressEnter={handleSearch}
+                    allowClear
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="操作人员">
+                <Input 
+                    placeholder="请输入操作人员" 
+                    value={queryParams.operName}
+                    onChange={e => setQueryParams({ ...queryParams, operName: e.target.value })}
+                    onPressEnter={handleSearch}
+                    allowClear
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item label="操作类型">
+                <Select
+                    placeholder="操作类型"
+                    value={queryParams.businessType}
+                    onChange={val => setQueryParams({ ...queryParams, businessType: val })}
+                    allowClear
+                >
+                    {sysOperType.map(d => (
+                        <Option key={d.dictValue} value={d.dictValue}>{d.dictLabel}</Option>
+                    ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            {expand && (
+              <>
+                <Col span={6}>
+                  <Form.Item label="操作状态">
+                    <Select
+                        placeholder="操作状态"
+                        value={queryParams.status}
+                        onChange={val => setQueryParams({ ...queryParams, status: val })}
+                        allowClear
+                    >
+                        {sysCommonStatus.map(d => (
+                            <Option key={d.dictValue} value={d.dictValue}>{d.dictLabel}</Option>
+                        ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="操作时间">
+                    <RangePicker 
+                        value={dateRange} 
+                        onChange={setDateRange} 
+                        style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
+            <Col span={expand ? 12 : 6} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button 
+                    type="link" 
+                    onClick={() => setExpand(!expand)}
+                    icon={expand ? <UpOutlined /> : <DownOutlined />}
+                >
+                  {expand ? '收起' : '展开'}
+                </Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
       <Card bordered={false} className="table-card">
-        <Row style={{ marginBottom: 16 }}>
+        <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
             <Space>
                 <Popconfirm 
                     title="是否确认删除选中的数据项？" 
@@ -250,6 +274,27 @@ const Operlog = () => {
                     导出
                 </Button>
             </Space>
+            <Space>
+                <Tooltip title="刷新">
+                    <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
+                </Tooltip>
+                <Tooltip title="密度">
+                    <Dropdown
+                      menu={{
+                        items: [
+                          { key: 'large', label: '默认' },
+                          { key: 'middle', label: '中等' },
+                          { key: 'small', label: '紧凑' },
+                        ],
+                        onClick: ({ key }) => setTableSize(key),
+                        selectedKeys: [tableSize],
+                      }}
+                      trigger={['click']}
+                    >
+                      <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                    </Dropdown>
+                </Tooltip>
+            </Space>
         </Row>
 
         <Table
@@ -257,6 +302,7 @@ const Operlog = () => {
           columns={columns}
           dataSource={data}
           loading={loading}
+          size={tableSize}
           scroll={{ x: 1200 }}
           pagination={{
             current: queryParams.pageNum,

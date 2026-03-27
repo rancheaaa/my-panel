@@ -161,7 +161,7 @@ const Login = () => {
               name="code"
               rules={[{ required: true, message: '请输入验证码' }]}
             >
-              <Row gutter={8}>
+              <Row gutter={8} align="middle">
                 <Col span={16}>
                   <Input 
                     ref={codeRef}
@@ -174,7 +174,7 @@ const Login = () => {
                     src={codeUrl} 
                     alt="验证码" 
                     onClick={fetchCode}
-                    style={{ width: '100%', height: '32px', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '48px', cursor: 'pointer', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', background: '#1e222d' }}
                   />
                 </Col>
               </Row>

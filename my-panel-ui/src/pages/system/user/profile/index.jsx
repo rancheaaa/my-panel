@@ -82,6 +82,7 @@ const Profile = () => {
                     form={form}
                     layout="vertical"
                     onFinish={handleUpdateProfile}
+                    component="div"
                 >
                     <Form.Item label="用户昵称" name="nickName" rules={[{ required: true, message: '请输入用户昵称' }]}>
                         <Input placeholder="请输入用户昵称" />
@@ -119,6 +120,7 @@ const Profile = () => {
                     form={pwdForm}
                     layout="vertical"
                     onFinish={handleUpdatePwd}
+                    component="div"
                 >
                     <Form.Item label="旧密码" name="oldPassword" rules={[{ required: true, message: '请输入旧密码' }]}>
                         <Input.Password placeholder="请输入旧密码" />

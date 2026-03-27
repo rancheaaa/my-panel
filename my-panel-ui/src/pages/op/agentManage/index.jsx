@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber, Dropdown, Row, Col } from 'antd';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { 
   listAgentRegistry, 
   getAgentRegistry, 
@@ -18,6 +18,8 @@ const AgentManage = () => {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
+  const [expand, setExpand] = useState(false);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -109,23 +111,25 @@ const AgentManage = () => {
 
   const handleModalAfterOpenChange = (open) => {
     if (open) {
-      // Modal完全打开后，再设置表单值
-      setTimeout(() => {
-        if (currentId && editData) {
-          // 修改模式：设置编辑数据
-          modalForm.resetFields();
-          modalForm.setFieldsValue(editData);
-        } else {
-          // 新增模式：设置默认值
-          modalForm.resetFields();
-          modalForm.setFieldsValue({
-            nodeEnabled: "0"
-          });
-        }
-      }, 100);
+      if (currentId && editData) {
+        // 修改模式：确保 nodeEnabled 是数字类型以匹配 Select 选项
+        const formattedData = {
+          ...editData,
+          nodeEnabled: editData.nodeEnabled !== undefined ? Number(editData.nodeEnabled) : undefined
+        };
+        modalForm.setFieldsValue(formattedData);
+      } else {
+        // 新增模式：设置默认值
+        modalForm.resetFields();
+        modalForm.setFieldsValue({
+          nodeEnabled: 0
+        });
+      }
     } else {
-      // Modal关闭时，清空编辑数据
+      // Modal关闭时，清空数据
       setEditData(null);
+      setCurrentId(null);
+      modalForm.resetFields();
     }
   };
 
@@ -253,9 +257,7 @@ const AgentManage = () => {
       }
     },
     { title: '备注', dataIndex: 'remark', key: 'remark', align: 'center', width: 200, ellipsis: true },
-    { title: '创建人', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
     { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 180 },
-    { title: '更新人', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
     { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
     {
       title: '操作',
@@ -277,47 +279,76 @@ const AgentManage = () => {
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
-        <Form form={form} layout="inline">
-          <Form.Item name="nodeName" label="节点名称">
-            <Input placeholder="请输入节点名称" allowClear style={{ width: 150 }} />
-          </Form.Item>
-          <Form.Item name="osType" label="操作系统">
-            <Select placeholder="请选择操作系统" style={{ width: 120 }} allowClear>
-              <Option value="Linux">Linux</Option>
-              <Option value="Windows">Windows</Option>
-              <Option value="Mac">Mac</Option>
-              <Option value="Other">其他</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="appId" label="应用ID">
-            <Input placeholder="请输入应用ID" allowClear style={{ width: 150 }} />
-          </Form.Item>
-          <Form.Item name="agentIp" label="Agent IP">
-            <Input placeholder="请输入Agent IP" allowClear style={{ width: 150 }} />
-          </Form.Item>
-          <Form.Item name="agentPort" label="Agent端口">
-            <Input placeholder="请输入Agent端口" allowClear style={{ width: 120 }} />
-          </Form.Item>
-          <Form.Item name="nodeEnabled" label="节点启用">
-            <Select placeholder="请选择状态" style={{ width: 120 }} allowClear>
-              <Option value="0">启用</Option>
-              <Option value="1">临时关闭</Option>
-              <Option value="2">永久关闭</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="nodeStatus" label="节点状态">
-            <Select placeholder="请选择状态" style={{ width: 120 }} allowClear>
-              <Option value="0">离线</Option>
-              <Option value="1">在线</Option>
-              <Option value="2">未知</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+        <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
+          <Row gutter={[24, 16]}>
+            <Col span={6}>
+              <Form.Item name="nodeName" label="节点名称">
+                <Input placeholder="请输入节点名称" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="osType" label="操作系统">
+                <Select placeholder="请选择操作系统" allowClear>
+                  <Option value="Linux">Linux</Option>
+                  <Option value="Windows">Windows</Option>
+                  <Option value="Mac">Mac</Option>
+                  <Option value="Other">其他</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="appId" label="应用ID">
+                <Input placeholder="请输入应用ID" allowClear />
+              </Form.Item>
+            </Col>
+            
+            {expand && (
+              <>
+                <Col span={6}>
+                  <Form.Item name="agentIp" label="Agent IP">
+                    <Input placeholder="请输入Agent IP" allowClear />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="agentPort" label="Agent端口">
+                    <Input placeholder="请输入Agent端口" allowClear />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="nodeEnabled" label="节点启用">
+                    <Select placeholder="请选择状态" allowClear>
+                      <Option value={0}>启用</Option>
+                      <Option value={1}>临时关闭</Option>
+                      <Option value={2}>永久关闭</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="nodeStatus" label="节点状态">
+                    <Select placeholder="请选择状态" allowClear>
+                      <Option value={0}>离线</Option>
+                      <Option value={1}>在线</Option>
+                      <Option value={2}>未知</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </>
+            )}
+
+            <Col span={expand ? 24 : 6} style={{ textAlign: 'right' }}>
+              <Space size="small">
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button 
+                    type="link" 
+                    onClick={() => setExpand(!expand)}
+                    icon={expand ? <UpOutlined /> : <DownOutlined />}
+                >
+                  {expand ? '收起' : '展开'}
+                </Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -344,6 +375,22 @@ const AgentManage = () => {
             <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
+            <Tooltip title="密度">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
+            </Tooltip>
           </Space>
         </div>
 
@@ -356,7 +403,8 @@ const AgentManage = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1600 }}
+          size={tableSize}
+          scroll={{ x: 1400 }}
           pagination={{
             total: total,
             current: queryParams.pageNum,
@@ -378,14 +426,11 @@ const AgentManage = () => {
         afterOpenChange={handleModalAfterOpenChange}
         width={600}
         maskClosable={false}
-        keyboard={false}
-        autoFocus={false}
-        focusTrap={false}
-        getContainer={false}
       >
         <Form
           form={modalForm}
           layout="vertical"
+          component="div"
         >
           <Form.Item
             name="nodeName"
@@ -431,9 +476,9 @@ const AgentManage = () => {
             rules={[{ required: true, message: '请选择节点启用状态' }]}
           >
             <Select placeholder="请选择节点启用状态">
-              <Option value="0">启用</Option>
-              <Option value="1">临时关闭</Option>
-              <Option value="2">永久关闭</Option>
+              <Option value={0}>启用</Option>
+              <Option value={1}>临时关闭</Option>
+              <Option value={2}>永久关闭</Option>
             </Select>
           </Form.Item>
           <Form.Item

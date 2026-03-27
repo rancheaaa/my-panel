@@ -13,7 +13,7 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.factory.Mappers;
 import java.util.List;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {SysRoleConverter.class})
 public interface SysUserConverter {
     SysUserConverter INSTANCE = Mappers.getMapper(SysUserConverter.class);
 

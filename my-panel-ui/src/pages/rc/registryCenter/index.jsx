@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col } from 'antd';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { listNode, getNode, addNode, updateNode, delNode, exportNode } from '../../../api/rc/node';
 import { listEnv } from '../../../api/rc/env';
 import { listProject } from '../../../api/rc/project';
@@ -10,6 +10,8 @@ const RegistryCenter = () => {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
+  const [expand, setExpand] = useState(false);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -208,37 +210,56 @@ const RegistryCenter = () => {
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
-        <Form form={form} layout="inline">
-          <Form.Item name="envId" label="环境">
-            <Select placeholder="请选择环境" style={{ width: 150 }} allowClear>
-              {envs.map(env => (
-                <Select.Option key={env.id} value={env.id}>{env.envName}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="projectId" label="应用">
-            <Select placeholder="请选择应用" style={{ width: 150 }} allowClear>
-              {projects.map(p => (
-                <Select.Option key={p.id} value={p.id}>{p.projectName}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="nodeIp" label="节点IP">
-            <Input placeholder="请输入节点IP" allowClear />
-          </Form.Item>
-          <Form.Item name="status" label="状态">
-            <Select placeholder="请选择状态" style={{ width: 120 }} allowClear>
-              <Select.Option value="0">在线</Select.Option>
-              <Select.Option value="1">离线</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
-        </Form>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+           <Row gutter={[24, 16]} style={{ width: '100%' }}>
+             <Col span={6}>
+               <Form.Item name="envId" label="环境">
+                 <Select placeholder="请选择环境" allowClear>
+                   {envs.map(env => (
+                     <Select.Option key={env.id} value={env.id}>{env.envName}</Select.Option>
+                   ))}
+                 </Select>
+               </Form.Item>
+             </Col>
+             <Col span={6}>
+               <Form.Item name="projectId" label="应用">
+                 <Select placeholder="请选择应用" allowClear>
+                   {projects.map(p => (
+                     <Select.Option key={p.id} value={p.id}>{p.projectName}</Select.Option>
+                   ))}
+                 </Select>
+               </Form.Item>
+             </Col>
+             <Col span={6}>
+               <Form.Item name="nodeIp" label="节点IP">
+                 <Input placeholder="请输入节点IP" allowClear />
+               </Form.Item>
+             </Col>
+             {expand && (
+               <Col span={6}>
+                 <Form.Item name="status" label="状态">
+                   <Select placeholder="请选择状态" allowClear>
+                     <Select.Option value="0">在线</Select.Option>
+                     <Select.Option value="1">离线</Select.Option>
+                   </Select>
+                 </Form.Item>
+               </Col>
+             )}
+             <Col span={expand ? 18 : 6} style={{ textAlign: 'right' }}>
+               <Space>
+                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                 <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                 <Button 
+                    type="link" 
+                    onClick={() => setExpand(!expand)}
+                    icon={expand ? <UpOutlined /> : <DownOutlined />}
+                 >
+                   {expand ? '收起' : '展开'}
+                 </Button>
+               </Space>
+             </Col>
+           </Row>
+         </Form>
       </Card>
 
       <Card bordered={false} className="table-card">
@@ -257,6 +278,22 @@ const RegistryCenter = () => {
             <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
+            <Tooltip title="密度">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
+            </Tooltip>
           </Space>
         </div>
 
@@ -269,6 +306,7 @@ const RegistryCenter = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
+          size={tableSize}
           scroll={{ x: 1400 }}
           pagination={{
             total: total,

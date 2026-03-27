@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, message, Popconfirm, Tag, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, message, Popconfirm, Tag, Tooltip, Dropdown, Row, Col } from 'antd';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { listConfig, getConfig, addConfig, updateConfig, delConfig, refreshCache } from '../../../api/config';
 import { getDicts } from '../../../api/dict/data';
 
@@ -10,6 +10,8 @@ const Config = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -171,27 +173,35 @@ const Config = () => {
 
   return (
     <div className="app-container">
-      <Card bordered={false} className="search-card">
-        <Form form={form} layout="inline">
-          <Form.Item name="configName" label="参数名称">
-            <Input placeholder="请输入参数名称" allowClear />
-          </Form.Item>
-          <Form.Item name="configKey" label="参数键名">
-            <Input placeholder="请输入参数键名" allowClear />
-          </Form.Item>
-          <Form.Item name="configType" label="系统内置">
-             <Select placeholder="系统内置" allowClear style={{ width: 120 }}>
-                {sysYesNo.map(dict => (
-                    <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
-                ))}
-             </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item name="configName" label="参数名称">
+                <Input placeholder="请输入参数名称" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="configKey" label="参数键名">
+                <Input placeholder="请输入参数键名" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="configType" label="系统内置">
+                 <Select placeholder="系统内置" allowClear>
+                    {sysYesNo.map(dict => (
+                        <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
+                    ))}
+                 </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -204,7 +214,20 @@ const Config = () => {
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
              </Tooltip>
              <Tooltip title="密度">
-                <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
              </Tooltip>
           </Space>
         </div>
@@ -214,6 +237,7 @@ const Config = () => {
           dataSource={data}
           rowKey="configId"
           loading={loading}
+          size={tableSize}
           scroll={{ x: 1500 }}
           pagination={{
             current: queryParams.pageNum,

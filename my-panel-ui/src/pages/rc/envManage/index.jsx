@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Dropdown, Row, Col } from 'antd';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { listEnv, getEnv, addEnv, updateEnv, delEnv, exportEnv } from '../../../api/rc/env';
 
 const EnvManage = () => {
@@ -8,6 +8,7 @@ const EnvManage = () => {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -156,16 +157,20 @@ const EnvManage = () => {
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
-        <Form form={form} layout="inline">
-          <Form.Item name="envName" label="环境名称">
-            <Input placeholder="请输入环境名称" allowClear />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item name="envName" label="环境名称">
+                <Input placeholder="请输入环境名称" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={18} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -185,6 +190,22 @@ const EnvManage = () => {
             <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
+            <Tooltip title="密度">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
+            </Tooltip>
           </Space>
         </div>
 
@@ -197,6 +218,7 @@ const EnvManage = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
+          size={tableSize}
           scroll={{ x: 1300 }}
           pagination={{
             total: total,

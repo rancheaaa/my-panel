@@ -9,7 +9,6 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -134,7 +133,7 @@ public class AgentRegistryClient {
         logger.debug("Heartbeat response status: {}, body: {}", response.statusCode(), responseBody);
         
         if (response.statusCode() == 200) {
-            ApiResponse<?> apiResponse = gson.fromJson(responseBody, ApiResponse.class);
+            Result<?> apiResponse = gson.fromJson(responseBody, Result.class);
             boolean success = apiResponse != null && apiResponse.isSuccess();
             if (success) {
                 logger.debug("Heartbeat sent successfully");

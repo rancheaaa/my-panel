@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, message, Popconfirm, Tag, Tooltip } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, message, Popconfirm, Tag, Tooltip, Row, Col, Radio, Dropdown } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { listNotice, getNotice, addNotice, updateNotice, delNotice } from '../../../api/notice';
 import { getDicts } from '../../../api/dict/data';
@@ -10,6 +10,7 @@ const Notice = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -168,27 +169,35 @@ const Notice = () => {
 
   return (
     <div className="app-container">
-      <Card bordered={false} className="search-card">
-        <Form form={form} layout="inline">
-          <Form.Item name="noticeTitle" label="公告标题">
-            <Input placeholder="请输入公告标题" allowClear />
-          </Form.Item>
-          <Form.Item name="createBy" label="操作人员">
-            <Input placeholder="请输入操作人员" allowClear />
-          </Form.Item>
-          <Form.Item name="noticeType" label="类型">
-             <Select placeholder="公告类型" allowClear style={{ width: 120 }}>
-                {sysNoticeType.map(dict => (
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item name="noticeTitle" label="公告标题">
+                <Input placeholder="请输入公告标题" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="createBy" label="操作人员">
+                <Input placeholder="请输入操作人员" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="noticeType" label="公告类型">
+                <Select placeholder="公告类型" allowClear>
+                  {sysNoticeType.map(dict => (
                     <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
-                ))}
-             </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -200,7 +209,20 @@ const Notice = () => {
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
              </Tooltip>
              <Tooltip title="密度">
-                <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
              </Tooltip>
           </Space>
         </div>
@@ -210,6 +232,7 @@ const Notice = () => {
           dataSource={data}
           rowKey="noticeId"
           loading={loading}
+          size={tableSize}
           scroll={{ x: 1230 }}
           pagination={{
             current: queryParams.pageNum,
@@ -268,7 +291,5 @@ const Notice = () => {
   );
 };
 
-// Import needed components for the Modal form (Row, Col, Radio)
-import { Row, Col, Radio } from 'antd';
-
+// Export default
 export default Notice;

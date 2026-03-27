@@ -121,7 +121,7 @@ public class AgentRegistryService {
      * 发送心跳
      */
     public void heartbeat() {
-        if (!registered.get()) {
+        if (!isRegistered()) {
             logger.debug("Agent is not registered, skipping heartbeat");
             return;
         }

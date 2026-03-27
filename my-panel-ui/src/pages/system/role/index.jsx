@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, Tree, message, Popconfirm, Row, Col, Switch, InputNumber, Tooltip } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, Tree, message, Popconfirm, Row, Col, Switch, InputNumber, Tooltip, Dropdown } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -64,6 +64,7 @@ const Role = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -310,27 +311,35 @@ const Role = () => {
 
   return (
     <div className="app-container">
-      <Card bordered={false} className="search-card">
-        <Form form={form} layout="inline">
-          <Form.Item name="roleName" label="角色名称">
-            <Input placeholder="请输入角色名称" allowClear />
-          </Form.Item>
-          <Form.Item name="roleKey" label="权限字符">
-            <Input placeholder="请输入权限字符" allowClear />
-          </Form.Item>
-          <Form.Item name="status" label="状态">
-            <Select placeholder="请选择状态" allowClear style={{ width: 120 }}>
-              {sysNormalDisable.map(dict => (
-                <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item name="roleName" label="角色名称">
+                <Input placeholder="请输入角色名称" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="roleKey" label="权限字符">
+                <Input placeholder="请输入权限字符" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="status" label="状态">
+                <Select placeholder="请选择状态" allowClear>
+                  {sysNormalDisable.map(dict => (
+                    <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -350,7 +359,20 @@ const Role = () => {
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
              </Tooltip>
              <Tooltip title="密度">
-                <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
              </Tooltip>
           </Space>
         </div>
@@ -361,6 +383,7 @@ const Role = () => {
           dataSource={data}
           rowKey="roleId"
           loading={loading}
+          size={tableSize}
           scroll={{ x: 1000 }}
           pagination={{
             current: queryParams.pageNum,

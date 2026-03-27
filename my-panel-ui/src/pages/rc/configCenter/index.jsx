@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Upload, Row, Col, Dropdown } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ImportOutlined, FileTextOutlined, DownOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col, Upload } from 'antd';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ImportOutlined, FileTextOutlined, DownOutlined, EyeOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import Editor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { listConfig, getConfig, addConfig, updateConfig, delConfig, exportConfig, importConfig, previewConfig } from '../../../api/rc/config';
@@ -18,6 +18,7 @@ const ConfigCenter = () => {
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -425,30 +426,38 @@ const ConfigCenter = () => {
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
-        <Form form={form} layout="inline">
-          <Form.Item name="envId" label="环境">
-            <Select placeholder="请选择环境" style={{ width: 150 }} allowClear>
-              {envs.map(env => (
-                <Option key={env.id} value={env.id}>{env.envName}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="projectId" label="应用">
-            <Select placeholder="请选择应用" style={{ width: 150 }} allowClear>
-              {projects.map(project => (
-                <Option key={project.id} value={project.id}>{project.projectName}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="configKey" label="配置键">
-            <Input placeholder="请输入配置键" allowClear />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
+        <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+          <Row gutter={[24, 16]} style={{ width: '100%' }}>
+            <Col span={6}>
+              <Form.Item name="envId" label="环境">
+                <Select placeholder="请选择环境" allowClear>
+                  {envs.map(env => (
+                    <Option key={env.id} value={env.id}>{env.envName}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="projectId" label="应用">
+                <Select placeholder="请选择应用" allowClear>
+                  {projects.map(app => (
+                    <Option key={app.id} value={app.id}>{app.projectName}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="configKey" label="配置键">
+                <Input placeholder="请输入配置键" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              </Space>
+            </Col>
+          </Row>
         </Form>
       </Card>
 
@@ -482,9 +491,27 @@ const ConfigCenter = () => {
             <Button icon={<ImportOutlined />} onClick={handleImport}>批量导入</Button>
             <Button icon={<EyeOutlined />} onClick={handlePreview}>预览</Button>
           </Space>
-          <Tooltip title="刷新">
-            <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
-          </Tooltip>
+          <Space size="small">
+            <Tooltip title="刷新">
+              <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
+            </Tooltip>
+            <Tooltip title="密度">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
+            </Tooltip>
+          </Space>
         </div>
 
         <Table
@@ -496,6 +523,7 @@ const ConfigCenter = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
+          size={tableSize}
           scroll={{ x: 1600 }}
           pagination={{
             total: total,

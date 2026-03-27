@@ -415,6 +415,8 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
     `node_enabled` tinyint NOT NULL DEFAULt '0' COMMENT '节点是否启用：0-启用 1-临时关闭 2-永久关闭',
     `node_status` tinyint NOT NULL DEFAULT '0' COMMENT '节点状态：0-离线 1-在线 2-未知',
     `remark` varchar(512) DEFAULT NULL COMMENT '备注信息',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),

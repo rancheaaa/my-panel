@@ -37,6 +37,7 @@ const AgentManage = () => {
   const [modalTitle, setModalTitle] = useState('新增Agent');
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
+  const [editData, setEditData] = useState(null);
 
   // Offline Modal State
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
@@ -89,7 +90,6 @@ const AgentManage = () => {
   const handleAdd = () => {
     setModalTitle('新增Agent');
     setCurrentId(null);
-    modalForm.resetFields();
     setIsModalOpen(true);
   };
 
@@ -99,11 +99,33 @@ const AgentManage = () => {
     try {
         const res = await getAgentRegistry(record.id);
         if (res.code === 200) {
-            modalForm.setFieldsValue(res.data);
+            setEditData(res.data);
             setIsModalOpen(true);
         }
     } catch (error) {
         message.error('获取详情失败');
+    }
+  };
+
+  const handleModalAfterOpenChange = (open) => {
+    if (open) {
+      // Modal完全打开后，再设置表单值
+      setTimeout(() => {
+        if (currentId && editData) {
+          // 修改模式：设置编辑数据
+          modalForm.resetFields();
+          modalForm.setFieldsValue(editData);
+        } else {
+          // 新增模式：设置默认值
+          modalForm.resetFields();
+          modalForm.setFieldsValue({
+            nodeEnabled: "0"
+          });
+        }
+      }, 100);
+    } else {
+      // Modal关闭时，清空编辑数据
+      setEditData(null);
     }
   };
 
@@ -278,16 +300,16 @@ const AgentManage = () => {
           </Form.Item>
           <Form.Item name="nodeEnabled" label="节点启用">
             <Select placeholder="请选择状态" style={{ width: 120 }} allowClear>
-              <Option value={0}>启用</Option>
-              <Option value={1}>临时关闭</Option>
-              <Option value={2}>永久关闭</Option>
+              <Option value="0">启用</Option>
+              <Option value="1">临时关闭</Option>
+              <Option value="2">永久关闭</Option>
             </Select>
           </Form.Item>
           <Form.Item name="nodeStatus" label="节点状态">
             <Select placeholder="请选择状态" style={{ width: 120 }} allowClear>
-              <Option value={0}>离线</Option>
-              <Option value={1}>在线</Option>
-              <Option value={2}>未知</Option>
+              <Option value="0">离线</Option>
+              <Option value="1">在线</Option>
+              <Option value="2">未知</Option>
             </Select>
           </Form.Item>
           <Form.Item>
@@ -353,8 +375,13 @@ const AgentManage = () => {
         open={isModalOpen}
         onOk={handleModalOk}
         onCancel={() => setIsModalOpen(false)}
-        destroyOnClose
+        afterOpenChange={handleModalAfterOpenChange}
         width={600}
+        maskClosable={false}
+        keyboard={false}
+        autoFocus={false}
+        focusTrap={false}
+        getContainer={false}
       >
         <Form
           form={modalForm}
@@ -396,7 +423,7 @@ const AgentManage = () => {
             label="Agent端口"
             rules={[{ required: true, message: '请输入Agent端口' }]}
           >
-            <InputNumber placeholder="请输入Agent端口" style={{ width: '100%' }} min={1} max={65535} />
+            <Input placeholder="请输入Agent端口" type="number" min={1} max={65535} />
           </Form.Item>
           <Form.Item
             name="nodeEnabled"
@@ -404,9 +431,9 @@ const AgentManage = () => {
             rules={[{ required: true, message: '请选择节点启用状态' }]}
           >
             <Select placeholder="请选择节点启用状态">
-              <Option value={0}>启用</Option>
-              <Option value={1}>临时关闭</Option>
-              <Option value={2}>永久关闭</Option>
+              <Option value="0">启用</Option>
+              <Option value="1">临时关闭</Option>
+              <Option value="2">永久关闭</Option>
             </Select>
           </Form.Item>
           <Form.Item
@@ -423,6 +450,8 @@ const AgentManage = () => {
         open={isOfflineModalOpen}
         onOk={handleOfflineOk}
         onCancel={() => setIsOfflineModalOpen(false)}
+        maskClosable={false}
+        keyboard={false}
       >
         <Form
           form={offlineForm}
@@ -434,7 +463,7 @@ const AgentManage = () => {
             rules={[{ required: true, message: '请输入超时时间' }]}
             extra="超过此时间未发送心跳的节点将被标记为离线"
           >
-            <InputNumber placeholder="请输入超时时间" style={{ width: '100%' }} min={60} />
+            <Input placeholder="请输入超时时间" type="number" min={60} />
           </Form.Item>
         </Form>
       </Modal>

@@ -147,7 +147,7 @@ INSERT IGNORE INTO `sys_menu` VALUES (1, '系统管理', 0, 2, 'system', NULL, '
        (2000, '环境管理', 3, 4, 'env-manage', 'rc/envManage/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:envManage:list', 'EnvironmentTwoTone', 'admin', '2026-02-13 09:56:15.041545', '', NULL, ''),
        (2001, 'AccessToken', 3, 5, 'access-token', 'rc/accessToken/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:accessToken:list', 'KeyOutlined', 'admin', '2026-02-13 10:12:09.691179', '', NULL, ''),
        (1500, '运维管理', 0, 5, 'op', '', '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-26 15:32:27.562145', '运维工具目录'),
-       (2002, 'Agent管理', 1500, 1, 'op/agentManage', 'op/agentManage/index', NULL, '', 1, 0, 'C', '0', '0', 'op:agentManage:list', 'CreditCardOutlined', 'admin', '2026-03-26 15:34:13.105463', '', NULL, '');
+       (2002, 'Agent管理', 1500, 1, 'agentManage', 'op/agentManage/index', NULL, '', 1, 0, 'C', '0', '0', 'op:agentManage:list', 'CreditCardOutlined', 'admin', '2026-03-26 15:34:13.105463', '', NULL, '');
 
 INSERT IGNORE INTO `sys_menu` VALUES (1500, '运维工具', 0, 5, 'ops', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', '', NULL, '运维工具目录');
 

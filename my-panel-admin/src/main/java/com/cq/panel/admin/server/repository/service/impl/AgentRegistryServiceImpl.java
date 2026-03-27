@@ -4,8 +4,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import com.cq.panel.admin.server.common.utils.DateUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
@@ -18,10 +16,13 @@ import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
  * @author cq
  */
 @Service
-public class AgentRegistryServiceImpl implements IAgentRegistryService 
-{
-    @Autowired
-    private AgentRegistryMapper agentRegistryMapper;
+public class AgentRegistryServiceImpl implements IAgentRegistryService {
+
+    private final AgentRegistryMapper agentRegistryMapper;
+
+    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper) {
+        this.agentRegistryMapper = agentRegistryMapper;
+    }
 
     /**
      * 查询Agent注册信息

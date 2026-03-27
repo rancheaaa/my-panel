@@ -4,6 +4,7 @@ import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.AgentRegistryRequest;
 import com.cq.agent.dto.AgentRegistryResponse;
 import com.cq.agent.dto.ApiResponse;
+import com.cq.agent.dto.Result;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
@@ -26,8 +27,8 @@ public class AgentRegistryClient {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentRegistryClient.class);
     
-    private static final String REGISTER_ENDPOINT = "/agent/registry/register";
-    private static final String HEARTBEAT_ENDPOINT = "/agent/registry/heartbeat";
+    private static final String REGISTER_ENDPOINT = "agent/registry/register";
+    private static final String HEARTBEAT_ENDPOINT = "agent/registry/heartbeat";
     
     private final HttpClient httpClient;
     private final Gson gson;
@@ -85,19 +86,20 @@ public class AgentRegistryClient {
         logger.debug("Registry response status: {}, body: {}", response.statusCode(), responseBody);
         
         if (response.statusCode() == 200) {
-            ApiResponse<AgentRegistryResponse> apiResponse = gson.fromJson(responseBody, 
-                    new TypeToken<ApiResponse<AgentRegistryResponse>>(){}.getType());
+            Result<AgentRegistryResponse> apiResponse = gson.fromJson(responseBody,
+                    new TypeToken<Result<AgentRegistryResponse>>(){}.getType());
             if (apiResponse != null && apiResponse.isSuccess()) {
                 logger.info("Agent registered successfully: {}", apiResponse.getData());
+                return ApiResponse.success(apiResponse.getData());
             } else {
                 logger.warn("Agent registration failed: {}", apiResponse != null ? apiResponse.getMsg() : "Unknown error");
+                return ApiResponse.failure("Agent registration failed");
             }
-            return apiResponse;
         } else {
             logger.error("Agent registration failed with status code: {}, body: {}", response.statusCode(), responseBody);
             ApiResponse<AgentRegistryResponse> errorResponse = new ApiResponse<>();
             errorResponse.setCode(response.statusCode());
-            errorResponse.setMsg("HTTP error: " + response.statusCode());
+            errorResponse.setMsg("Agent registration failed, HTTP error: " + response.statusCode());
             return errorResponse;
         }
     }

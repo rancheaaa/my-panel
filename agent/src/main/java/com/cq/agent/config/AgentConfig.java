@@ -521,6 +521,9 @@ public class AgentConfig {
         this.uploadQueueDbPath = uploadQueueDbPath;
     }
 
+    public void setAppId(String appId) {
+        this.appId = appId;
+    }
 
     @Override
     public String toString() {

@@ -157,7 +157,7 @@ public class AgentRegistryService {
      */
     private AgentRegistryRequest buildRegistryRequest() {
         AgentRegistryRequest request = new AgentRegistryRequest();
-        
+
         // 节点名称
         String nodeName = config.getNodeName();
         if (nodeName == null || nodeName.isEmpty()) {
@@ -173,6 +173,12 @@ public class AgentRegistryService {
         request.setOsType(osType);
         
         // 应用ID
+        if (config.getAppId() == null || config.getAppId().isEmpty()) {
+            // 获取当前运行环境下操作系统用户名作为应用ID
+            final String userName = System.getProperty("user.name");
+            logger.debug("set appId to {}", userName);
+            config.setAppId(userName);
+        }
         request.setAppId(config.getAppId());
         
         // Agent IP

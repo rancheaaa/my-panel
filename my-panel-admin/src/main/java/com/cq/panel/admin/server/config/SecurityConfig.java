@@ -116,6 +116,10 @@ public class SecurityConfig
                     .requestMatchers("/actuator/**").permitAll()
                     // 允许 Spring Boot Admin 静态资源和 API 访问
                     .requestMatchers("/admin/server/**").permitAll()
+                    // 允许 agent 注册api接口访问
+                    .requestMatchers("/agent/registry/register").permitAll()
+                    // 允许 agent 心跳api接口访问
+                    .requestMatchers("/agent/registry/heartbeat").permitAll()
                     // 静态资源，可匿名访问
                     .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
                     .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**", "/doc.html").permitAll()

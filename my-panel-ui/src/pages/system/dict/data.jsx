@@ -176,6 +176,15 @@ const DictData = () => {
 
   const columns = [
     { title: '字典编码', dataIndex: 'dictCode', key: 'dictCode', align: 'center', width: 100 },
+    { 
+        title: '字典类型', 
+        dataIndex: 'dictType', 
+        key: 'dictType', 
+        align: 'center', 
+        width: 160, 
+        ellipsis: true,
+        render: (_, record) => record.dictType || queryParams.dictType
+    },
     { title: '字典标签', dataIndex: 'dictLabel', key: 'dictLabel', align: 'center', width: 150, ellipsis: true },
     { title: '字典键值', dataIndex: 'dictValue', key: 'dictValue', align: 'center', width: 150, ellipsis: true },
     { title: '字典排序', dataIndex: 'dictSort', key: 'dictSort', align: 'center', width: 100 },
@@ -289,7 +298,7 @@ const DictData = () => {
           rowKey="dictCode"
           loading={loading}
           size={tableSize}
-          scroll={{ x: 1140 }}
+          scroll={{ x: 1300 }}
           pagination={{
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,

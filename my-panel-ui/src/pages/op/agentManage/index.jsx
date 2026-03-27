@@ -11,6 +11,7 @@ import {
   offlineTimeoutNodes
 } from '../../../api/agent';
 import { getDicts } from '../../../api/dict/data';
+import { listType } from '../../../api/dict/type';
 
 const { Option } = Select;
 
@@ -23,6 +24,10 @@ const AgentManage = () => {
   const [expand, setExpand] = useState(false);
   const [osTypeOptions, setOsTypeOptions] = useState([]);
   const [nodeSwitchOptions, setNodeSwitchOptions] = useState([]);
+  const [dictTypeMeta, setDictTypeMeta] = useState({
+    agent_os_type: { dictType: 'agent_os_type', dictName: '' },
+    agent_node_switch: { dictType: 'agent_node_switch', dictName: '' },
+  });
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -77,6 +82,22 @@ const AgentManage = () => {
       if (res.code === 200) {
         setNodeSwitchOptions(res.data);
       }
+    });
+    Promise.all([
+      listType({ pageNum: 1, pageSize: 1, dictType: 'agent_os_type' }),
+      listType({ pageNum: 1, pageSize: 1, dictType: 'agent_node_switch' }),
+    ]).then(([osRes, nodeRes]) => {
+      setDictTypeMeta(prev => ({
+        ...prev,
+        agent_os_type: {
+          dictType: 'agent_os_type',
+          dictName: osRes?.data?.rows?.[0]?.dictName || prev.agent_os_type.dictName,
+        },
+        agent_node_switch: {
+          dictType: 'agent_node_switch',
+          dictName: nodeRes?.data?.rows?.[0]?.dictName || prev.agent_node_switch.dictName,
+        },
+      }));
     });
   }, []);
 
@@ -463,6 +484,7 @@ const AgentManage = () => {
           <Form.Item
             name="osType"
             label="操作系统"
+            extra={`字典来源：字典类型 ${dictTypeMeta.agent_os_type.dictType}${dictTypeMeta.agent_os_type.dictName ? `，字典名称 ${dictTypeMeta.agent_os_type.dictName}` : ''}`}
           >
             <Select placeholder="请选择操作系统">
               {osTypeOptions.map(dict => (
@@ -494,6 +516,7 @@ const AgentManage = () => {
             name="nodeEnabled"
             label="节点启用"
             rules={[{ required: true, message: '请选择节点启用状态' }]}
+            extra={`字典来源：字典类型 ${dictTypeMeta.agent_node_switch.dictType}${dictTypeMeta.agent_node_switch.dictName ? `，字典名称 ${dictTypeMeta.agent_node_switch.dictName}` : ''}`}
           >
             <Select placeholder="请选择节点启用状态">
               {nodeSwitchOptions.map(dict => (

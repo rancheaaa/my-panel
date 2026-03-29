@@ -51,6 +51,15 @@ export function updateMenu(data) {
   })
 }
 
+// 菜单排序
+export function sortMenu(data) {
+  return request({
+    url: '/system/menu/sort',
+    method: 'put',
+    data: data
+  })
+}
+
 // 删除菜单
 export function delMenu(menuId) {
   return request({

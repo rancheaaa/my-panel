@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Select, Modal, message, Popconfirm, Tag, Tooltip, Dropdown, Row, Col } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listConfig, getConfig, addConfig, updateConfig, delConfig, refreshCache } from '../../../api/config';
 import { getDicts } from '../../../api/dict/data';
 
@@ -28,6 +29,65 @@ const Config = () => {
   const [modalTitle, setModalTitle] = useState('新增参数');
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
+
+  // Resizable Columns State
+  const [columns, setColumns] = useState([
+    { title: '参数主键', dataIndex: 'configId', key: 'configId', align: 'center', width: 100 },
+    { title: '参数名称', dataIndex: 'configName', key: 'configName', align: 'center', width: 200, ellipsis: true },
+    { title: '参数键名', dataIndex: 'configKey', key: 'configKey', align: 'center', width: 200, ellipsis: true },
+    { title: '参数键值', dataIndex: 'configValue', key: 'configValue', align: 'center', width: 200, ellipsis: true },
+    { 
+        title: '系统内置', 
+        dataIndex: 'configType', 
+        key: 'configType', 
+        align: 'center',
+        width: 100,
+        render: (text) => (
+            <Tag color={text === 'Y' ? 'blue' : 'green'}>
+                {text === 'Y' ? '是' : '否'}
+            </Tag>
+        )
+    },
+    { title: '备注', dataIndex: 'remark', key: 'remark', align: 'center', width: 200, ellipsis: true },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 180,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size="middle">
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.configId)}>
+            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   const fetchData = async () => {
     setLoading(true);
@@ -132,45 +192,6 @@ const Config = () => {
     }
   };
 
-  const columns = [
-    { title: '参数主键', dataIndex: 'configId', key: 'configId', align: 'center', width: 100 },
-    { title: '参数名称', dataIndex: 'configName', key: 'configName', align: 'center', width: 200, ellipsis: true },
-    { title: '参数键名', dataIndex: 'configKey', key: 'configKey', align: 'center', width: 200, ellipsis: true },
-    { title: '参数键值', dataIndex: 'configValue', key: 'configValue', align: 'center', width: 200, ellipsis: true },
-    { 
-        title: '系统内置', 
-        dataIndex: 'configType', 
-        key: 'configType', 
-        align: 'center',
-        width: 100,
-        render: (text) => (
-            <Tag color={text === 'Y' ? 'blue' : 'green'}>
-                {text === 'Y' ? '是' : '否'}
-            </Tag>
-        )
-    },
-    { title: '备注', dataIndex: 'remark', key: 'remark', align: 'center', width: 200, ellipsis: true },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 180,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.configId)}>
-            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
@@ -233,7 +254,12 @@ const Config = () => {
         </div>
 
         <Table
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="configId"
           loading={loading}

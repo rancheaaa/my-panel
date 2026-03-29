@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber, Dropdown, Row, Col } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { 
   listAgentRegistry, 
   getAgentRegistry, 
@@ -142,6 +143,7 @@ const AgentManage = () => {
             setIsModalOpen(true);
         }
     } catch (error) {
+        console.error(error);
         message.error('获取详情失败');
     }
   };
@@ -182,6 +184,7 @@ const AgentManage = () => {
       setSelectedRowKeys([]);
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -196,6 +199,7 @@ const AgentManage = () => {
       link.click();
       message.success('导出成功');
     } catch (error) {
+      console.error(error);
       message.error('导出失败');
     }
   };
@@ -234,11 +238,12 @@ const AgentManage = () => {
         fetchData();
       }
     } catch (error) {
+      console.error(error);
       message.error('下线失败');
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: '节点ID', dataIndex: 'id', key: 'id', align: 'center', width: 200, ellipsis: true },
     { title: '节点名称', dataIndex: 'nodeName', key: 'nodeName', align: 'center', width: 150, ellipsis: true },
     { title: '操作系统', dataIndex: 'osType', key: 'osType', align: 'center', width: 100 },
@@ -312,7 +317,26 @@ const AgentManage = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -348,7 +372,7 @@ const AgentManage = () => {
                 </Col>
                 <Col span={6}>
                   <Form.Item name="agentPort" label="Agent端口">
-                    <Input placeholder="请输入Agent端口" allowClear />
+                    <InputNumber placeholder="请输入Agent端口" min={1} max={65535} style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
@@ -441,7 +465,12 @@ const AgentManage = () => {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
           }}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           rowKey="id"
@@ -508,9 +537,12 @@ const AgentManage = () => {
           <Form.Item
             name="agentPort"
             label="Agent端口"
-            rules={[{ required: true, message: '请输入Agent端口' }]}
+            rules={[
+              { required: true, message: '请输入Agent端口' },
+              { type: 'number', min: 1, max: 65535, message: '端口范围为1-65535' }
+            ]}
           >
-            <Input placeholder="请输入Agent端口" type="number" min={1} max={65535} />
+            <InputNumber placeholder="请输入Agent端口" min={1} max={65535} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item
             name="nodeEnabled"
@@ -553,10 +585,13 @@ const AgentManage = () => {
           <Form.Item
             name="timeoutSeconds"
             label="超时时间（秒）"
-            rules={[{ required: true, message: '请输入超时时间' }]}
+            rules={[
+              { required: true, message: '请输入超时时间' },
+              { type: 'number', min: 60, message: '超时时间不能少于60秒' }
+            ]}
             extra="超过此时间未发送心跳的节点将被标记为离线"
           >
-            <Input placeholder="请输入超时时间" type="number" min={60} />
+            <InputNumber placeholder="请输入超时时间" min={60} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>

@@ -13,9 +13,11 @@ import {
   DownloadOutlined,
   UsergroupAddOutlined
 } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listUser, addUser, updateUser, delUser, resetUserPwd, changeUserStatus, getUser, exportUser, getAuthRole, updateAuthRole } from '../../../api/user';
 import { listDept } from '../../../api/dept';
 import { getDicts } from '../../../api/dict/data';
+import './index.scss';
 
 const { Option } = Select;
 
@@ -358,7 +360,8 @@ const User = () => {
     }
   };
 
-  const columns = [
+  // Resizable Columns State
+  const [columns, setColumns] = useState([
     { title: '用户ID', dataIndex: 'userId', key: 'userId', align: 'center', width: 80 },
     { title: '用户名称', dataIndex: 'userName', key: 'userName', align: 'center', width: 120, ellipsis: true },
     { title: '用户昵称', dataIndex: 'nickName', key: 'nickName', align: 'center', width: 120, ellipsis: true },
@@ -425,7 +428,26 @@ const User = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -539,7 +561,12 @@ const User = () => {
 
                 <Table
                 rowSelection={rowSelection}
-                columns={columns}
+                components={{
+                  header: {
+                    cell: ResizableTitle,
+                  },
+                }}
+                columns={resizableColumns}
                 dataSource={data}
                 rowKey="userId"
                 loading={loading}

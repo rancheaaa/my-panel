@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Dropdown, Row, Col } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listProject, getProject, addProject, updateProject, delProject, exportProject } from '../../../api/rc/project';
 
 const AppManage = () => {
@@ -94,6 +95,7 @@ const AppManage = () => {
       setSelectedRowKeys([]);
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -107,6 +109,7 @@ const AppManage = () => {
       link.download = `应用数据_${new Date().getTime()}.xlsx`;
       link.click();
     } catch (error) {
+      console.error(error);
       message.error('导出失败');
     }
   };
@@ -129,7 +132,7 @@ const AppManage = () => {
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: '应用ID', dataIndex: 'id', key: 'id', align: 'center', width: 100 },
     { title: '应用名称', dataIndex: 'projectName', key: 'projectName', align: 'center', width: 200, ellipsis: true },
     { title: '应用描述', dataIndex: 'projectDesc', key: 'projectDesc', align: 'center', width: 300, ellipsis: true },
@@ -152,7 +155,26 @@ const AppManage = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -214,7 +236,12 @@ const AppManage = () => {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
           }}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           rowKey="id"

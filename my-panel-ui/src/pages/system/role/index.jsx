@@ -9,6 +9,7 @@ import {
   ColumnHeightOutlined,
   DatabaseOutlined
 } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listRole, getRole, addRole, updateRole, delRole, changeRoleStatus } from '../../../api/role';
 import { treeselect, roleMenuTreeselect } from '../../../api/menu';
 import { getDicts } from '../../../api/dict/data';
@@ -87,6 +88,67 @@ const Role = () => {
   const [menuOptions, setMenuOptions] = useState([]);
   const [sysNormalDisable, setSysNormalDisable] = useState([]);
   
+  // Resizable Columns State
+  const [columns, setColumns] = useState([
+    { title: '角色编号', dataIndex: 'roleId', key: 'roleId', align: 'center', width: 100 },
+    { title: '角色名称', dataIndex: 'roleName', key: 'roleName', align: 'center', width: 150, ellipsis: true },
+    { title: '权限字符', dataIndex: 'roleKey', key: 'roleKey', align: 'center', width: 150, ellipsis: true },
+    { title: '显示顺序', dataIndex: 'roleSort', key: 'roleSort', align: 'center', width: 100 },
+    { 
+        title: '状态', 
+        dataIndex: 'status', 
+        key: 'status', 
+        align: 'center',
+        width: 100,
+        render: (text, record) => (
+            <Switch 
+                checked={text === '0'} 
+                onChange={(checked) => handleStatusChange(checked, record)}
+                checkedChildren="正常"
+                unCheckedChildren="停用"
+            />
+        )
+    },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 160,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size="middle">
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>编辑</Button>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.roleId)}>
+             <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
+
   // Data Scope Modal
   const [isDataScopeOpen, setIsDataScopeOpen] = useState(false);
   const [dataScopeForm] = Form.useForm();
@@ -268,47 +330,6 @@ const Role = () => {
       setMenuHalfCheckedKeys(info.halfCheckedKeys);
   };
 
-  const columns = [
-    { title: '角色编号', dataIndex: 'roleId', key: 'roleId', align: 'center', width: 100 },
-    { title: '角色名称', dataIndex: 'roleName', key: 'roleName', align: 'center', width: 150, ellipsis: true },
-    { title: '权限字符', dataIndex: 'roleKey', key: 'roleKey', align: 'center', width: 150, ellipsis: true },
-    { title: '显示顺序', dataIndex: 'roleSort', key: 'roleSort', align: 'center', width: 100 },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 100,
-        render: (text, record) => (
-            <Switch 
-                checked={text === '0'} 
-                onChange={(checked) => handleStatusChange(checked, record)}
-                checkedChildren="正常"
-                unCheckedChildren="停用"
-            />
-        )
-    },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 160,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>编辑</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.roleId)}>
-             <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <div className="app-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
@@ -379,7 +400,12 @@ const Role = () => {
 
         <Table
           rowSelection={rowSelection}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="roleId"
           loading={loading}

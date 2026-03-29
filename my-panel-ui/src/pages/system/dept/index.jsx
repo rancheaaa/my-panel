@@ -8,6 +8,7 @@ import {
   EditOutlined,
   ColumnHeightOutlined
 } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listDept, getDept, addDept, updateDept, delDept, listDeptExcludeChild } from '../../../api/dept';
 import { getDicts } from '../../../api/dict/data';
 import './Dept.scss';
@@ -77,6 +78,62 @@ const Dept = () => {
   const [currentId, setCurrentId] = useState(null);
   const [deptOptions, setDeptOptions] = useState([]);
   const [sysNormalDisable, setSysNormalDisable] = useState([]);
+
+  const [columns, setColumns] = useState([
+    { title: '部门名称', dataIndex: 'deptName', key: 'deptName', width: 260, ellipsis: true },
+    { title: '排序', dataIndex: 'orderNum', key: 'orderNum', align: 'center', width: 100 },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      align: 'center',
+      width: 100,
+      render: (text) => (
+        <Tag color={text === '0' ? 'success' : 'error'}>
+          {text === '0' ? '正常' : '停用'}
+        </Tag>
+      )
+    },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 200,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => handleAdd(record)} style={{ color: '#1890ff' }}>新增</Button>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.deptId)}>
+            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   const fetchData = async () => {
     setLoading(true);
@@ -163,6 +220,7 @@ const Dept = () => {
             setIsModalOpen(true);
         }
     } catch (error) {
+        console.error(error);
         message.error('获取部门详情失败');
     }
   };
@@ -174,6 +232,7 @@ const Dept = () => {
       message.success('删除成功');
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -196,43 +255,6 @@ const Dept = () => {
       message.error('操作失败');
     }
   };
-
-  const columns = [
-    { title: '部门名称', dataIndex: 'deptName', key: 'deptName', width: 260, ellipsis: true },
-    { title: '排序', dataIndex: 'orderNum', key: 'orderNum', align: 'center', width: 100 },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 100,
-        render: (text) => (
-            <Tag color={text === '0' ? 'success' : 'error'}>
-                {text === '0' ? '正常' : '停用'}
-            </Tag>
-        )
-    },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 200,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Button type="text" icon={<PlusOutlined />} onClick={() => handleAdd(record)} style={{ color: '#1890ff' }}>新增</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.deptId)}>
-             <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
 
   return (
     <div className="dept-container">
@@ -290,7 +312,12 @@ const Dept = () => {
         </div>
 
         <Table
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="deptId"
           loading={loading}

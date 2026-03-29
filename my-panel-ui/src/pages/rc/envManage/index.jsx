@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Dropdown, Row, Col } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listEnv, getEnv, addEnv, updateEnv, delEnv, exportEnv } from '../../../api/rc/env';
 
 const EnvManage = () => {
@@ -94,6 +95,7 @@ const EnvManage = () => {
       setSelectedRowKeys([]);
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -107,6 +109,7 @@ const EnvManage = () => {
       link.download = `环境数据_${new Date().getTime()}.xlsx`;
       link.click();
     } catch (error) {
+      console.error(error);
       message.error('导出失败');
     }
   };
@@ -129,7 +132,7 @@ const EnvManage = () => {
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: '环境ID', dataIndex: 'id', key: 'id', align: 'center', width: 100 },
     { title: '环境名称', dataIndex: 'envName', key: 'envName', align: 'center', width: 150, ellipsis: true },
     { title: '环境描述', dataIndex: 'envDesc', key: 'envDesc', align: 'center', width: 300, ellipsis: true },
@@ -152,7 +155,26 @@ const EnvManage = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -214,7 +236,12 @@ const EnvManage = () => {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
           }}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           rowKey="id"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Popconfirm, Tag, Tooltip, Dropdown } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, UnlockOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, delLogininfor, cleanLogininfor, unlockLogininfor, exportLogininfor } from '../../../api/monitor/logininfor';
 import request from '../../../utils/request';
 
@@ -115,47 +116,79 @@ const Logininfor = () => {
     exportLogininfor(queryParams);
   };
 
-  const columns = [
-    { title: '访问编号', dataIndex: 'infoId', key: 'infoId', align: 'center', width: 100 },
-    { title: '用户名称', dataIndex: 'userName', key: 'userName', align: 'center', width: 120 },
-    { title: '登录地址', dataIndex: 'ipaddr', key: 'ipaddr', align: 'center', width: 150, ellipsis: true },
-    { title: '登录地点', dataIndex: 'loginLocation', key: 'loginLocation', align: 'center', width: 150, ellipsis: true },
-    { title: '浏览器', dataIndex: 'browser', key: 'browser', align: 'center', width: 120, ellipsis: true },
-    { title: '操作系统', dataIndex: 'os', key: 'os', align: 'center', width: 120, ellipsis: true },
-    { 
-        title: '登录状态', 
-        dataIndex: 'status', 
-        key: 'status', 
+  const buildColumns = (prevColumns = []) => {
+    const getWidth = (key, defaultWidth) => {
+      const prev = prevColumns.find((c) => c.key === key);
+      return prev?.width ?? defaultWidth;
+    };
+
+    return [
+      { title: '访问编号', dataIndex: 'infoId', key: 'infoId', align: 'center', width: getWidth('infoId', 100) },
+      { title: '用户名称', dataIndex: 'userName', key: 'userName', align: 'center', width: getWidth('userName', 120) },
+      { title: '登录地址', dataIndex: 'ipaddr', key: 'ipaddr', align: 'center', width: getWidth('ipaddr', 150), ellipsis: true },
+      { title: '登录地点', dataIndex: 'loginLocation', key: 'loginLocation', align: 'center', width: getWidth('loginLocation', 150), ellipsis: true },
+      { title: '浏览器', dataIndex: 'browser', key: 'browser', align: 'center', width: getWidth('browser', 120), ellipsis: true },
+      { title: '操作系统', dataIndex: 'os', key: 'os', align: 'center', width: getWidth('os', 120), ellipsis: true },
+      {
+        title: '登录状态',
+        dataIndex: 'status',
+        key: 'status',
         align: 'center',
-        width: 100,
+        width: getWidth('status', 100),
         render: (text) => {
-            const dict = sysCommonStatus.find(d => d.dictValue == text);
-            return dict ? <Tag color={String(text) === '0' ? 'success' : 'error'}>{dict.dictLabel}</Tag> : text;
+          const dict = sysCommonStatus.find(d => d.dictValue == text);
+          return dict ? <Tag color={String(text) === '0' ? 'success' : 'error'}>{dict.dictLabel}</Tag> : text;
         }
-    },
-    { title: '操作信息', dataIndex: 'msg', key: 'msg', align: 'center', width: 150, ellipsis: true },
-    { title: '登录日期', dataIndex: 'loginTime', key: 'loginTime', align: 'center', width: 180 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-             {String(record.status) === '1' && (
-                 <Button 
-                    type="link" 
-                    icon={<UnlockOutlined />} 
-                    onClick={() => handleUnlock(record.userName)}
-                 >
-                    解锁
-                 </Button>
-             )}
-        </Space>
-      ),
-    },
-  ];
+      },
+      { title: '操作信息', dataIndex: 'msg', key: 'msg', align: 'center', width: getWidth('msg', 150), ellipsis: true },
+      { title: '登录日期', dataIndex: 'loginTime', key: 'loginTime', align: 'center', width: getWidth('loginTime', 180) },
+      {
+        title: '操作',
+        key: 'action',
+        align: 'center',
+        width: getWidth('action', 100),
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="middle">
+            {String(record.status) === '1' && (
+              <Button
+                type="link"
+                icon={<UnlockOutlined />}
+                onClick={() => handleUnlock(record.userName)}
+              >
+                解锁
+              </Button>
+            )}
+          </Space>
+        ),
+      },
+    ];
+  };
+
+  const [columns, setColumns] = useState(() => buildColumns());
+
+  useEffect(() => {
+    setColumns((prev) => buildColumns(prev));
+  }, [sysCommonStatus]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -273,7 +306,12 @@ const Logininfor = () => {
 
         <Table
           rowKey="infoId"
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           size={tableSize}

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Tooltip, Switch, Modal, Radio, InputNumber, Row, Col, Descriptions, Dropdown } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, ColumnHeightOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob } from '../../../api/monitor/job';
 import JobLog from './JobLog';
 import { getDicts } from '../../../api/dict/data';
 import dayjs from 'dayjs';
+import './index.scss';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -39,6 +41,90 @@ const Job = () => {
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+
+  const [columns, setColumns] = useState([
+    { title: '任务编号', dataIndex: 'jobId', key: 'jobId', align: 'center', width: 100 },
+    { title: '任务名称', dataIndex: 'jobName', key: 'jobName', align: 'center', width: 150, ellipsis: true },
+    {
+      title: '任务组名',
+      dataIndex: 'jobGroup',
+      key: 'jobGroup',
+      align: 'center',
+      width: 120,
+      render: (text) => {
+        const dict = sysJobGroup.find(d => d.dictValue === text);
+        return dict ? <Tag>{dict.dictLabel}</Tag> : <Tag>{text}</Tag>;
+      }
+    },
+    { title: '调用目标字符串', dataIndex: 'invokeTarget', key: 'invokeTarget', align: 'center', width: 250, ellipsis: true },
+    { title: 'Cron执行表达式', dataIndex: 'cronExpression', key: 'cronExpression', align: 'center', width: 200, ellipsis: true },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      align: 'center',
+      width: 100,
+      render: (text, record) => (
+        <Switch
+          checked={text === '0'}
+          onChange={() => handleStatusChange(record)}
+          checkedChildren="正常"
+          unCheckedChildren="暂停"
+        />
+      )
+    },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 220,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="修改">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleUpdate(record)} />
+          </Tooltip>
+          <Tooltip title="执行一次">
+            <Button type="text" icon={<PlayCircleOutlined />} onClick={() => handleRun(record)} />
+          </Tooltip>
+          <Tooltip title="详情">
+            <Button type="text" icon={<EyeOutlined />} onClick={() => handleView(record)} />
+          </Tooltip>
+          <Tooltip title="调度日志">
+            <Button type="text" icon={<FileTextOutlined />} onClick={() => handleJobLog(record)} />
+          </Tooltip>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.jobId)}>
+            <Tooltip title="删除">
+              <Button type="text" icon={<DeleteOutlined />} danger />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   const fetchData = async () => {
     setLoading(true);
@@ -180,73 +266,8 @@ const Job = () => {
       }
   };
 
-  const columns = [
-    { title: '任务编号', dataIndex: 'jobId', key: 'jobId', align: 'center', width: 80 },
-    { title: '任务名称', dataIndex: 'jobName', key: 'jobName', align: 'center', width: 150, ellipsis: true },
-    { 
-        title: '任务组名', 
-        dataIndex: 'jobGroup', 
-        key: 'jobGroup', 
-        align: 'center',
-        width: 120,
-        render: (text) => {
-            const dict = sysJobGroup.find(d => d.dictValue === text);
-            return dict ? <Tag>{dict.dictLabel}</Tag> : <Tag>{text}</Tag>;
-        }
-    },
-    { title: '调用目标字符串', dataIndex: 'invokeTarget', key: 'invokeTarget', align: 'center', width: 250, ellipsis: true },
-    { title: 'Cron执行表达式', dataIndex: 'cronExpression', key: 'cronExpression', align: 'center', width: 150, ellipsis: true },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 100,
-        render: (text, record) => (
-            <Switch 
-                checked={text === '0'} 
-                onChange={() => handleStatusChange(record)} 
-                checkedChildren="正常" 
-                unCheckedChildren="暂停" 
-            />
-        )
-    },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 220,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space>
-          <Tooltip title="修改">
-            <Button type="text" icon={<EditOutlined />} onClick={() => handleUpdate(record)} />
-          </Tooltip>
-          <Tooltip title="执行一次">
-            <Button type="text" icon={<PlayCircleOutlined />} onClick={() => handleRun(record)} />
-          </Tooltip>
-          <Tooltip title="详情">
-            <Button type="text" icon={<EyeOutlined />} onClick={() => handleView(record)} />
-          </Tooltip>
-          <Tooltip title="调度日志">
-            <Button type="text" icon={<FileTextOutlined />} onClick={() => handleJobLog(record)} />
-          </Tooltip>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.jobId)}>
-            <Tooltip title="删除">
-                 <Button type="text" icon={<DeleteOutlined />} danger />
-            </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   return (
-    <div className="app-container">
+    <div className="app-container monitor-job">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
         <Form form={searchForm} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
@@ -312,7 +333,12 @@ const Job = () => {
         </div>
 
         <Table
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="jobId"
           loading={loading}

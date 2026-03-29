@@ -10,6 +10,7 @@ import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.repository.service.ISysMenuService;
 import com.cq.panel.admin.server.web.domain.dto.system.SysMenuDTO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysMenuQueryDTO;
+import com.cq.panel.admin.server.web.domain.dto.system.SysMenuSortDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.system.SysMenuVO;
 import com.cq.panel.admin.server.web.domain.vo.system.RoleMenuTreeSelectVO;
@@ -136,6 +137,26 @@ public class SysMenuController extends BaseController
         }
         menu.setUpdateBy(getUsername());
         menuService.updateMenu(menu);
+        return Result.success();
+    }
+
+    /**
+     * 菜单排序
+     */
+    @Operation(summary = "菜单排序", description = "批量修改菜单排序")
+    @PreAuthorize("@ss.hasPermi('system:menu:edit')")
+    @Log(title = "菜单管理", businessType = BusinessType.UPDATE)
+    @PutMapping("/sort")
+    public Result<Void> sort(@Validated @RequestBody List<SysMenuSortDTO> sortList)
+    {
+        for (SysMenuSortDTO sort : sortList)
+        {
+            SysMenu menu = new SysMenu();
+            menu.setMenuId(sort.getMenuId());
+            menu.setOrderNum(sort.getOrderNum());
+            menu.setUpdateBy(getUsername());
+            menuService.updateMenu(menu);
+        }
         return Result.success();
     }
 

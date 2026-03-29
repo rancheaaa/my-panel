@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Select, Modal, message, Popconfirm, Tag, Tooltip, Row, Col, Radio, Dropdown } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listNotice, getNotice, addNotice, updateNotice, delNotice } from '../../../api/notice';
 import { getDicts } from '../../../api/dict/data';
 
@@ -28,6 +29,85 @@ const Notice = () => {
   const [modalTitle, setModalTitle] = useState('新增公告');
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
+
+  const buildColumns = (prevColumns = []) => {
+    const getWidth = (key, defaultWidth) => {
+      const prev = prevColumns.find((c) => c.key === key);
+      return prev?.width ?? defaultWidth;
+    };
+
+    return [
+      { title: '序号', dataIndex: 'noticeId', key: 'noticeId', align: 'center', width: getWidth('noticeId', 80) },
+      { title: '公告标题', dataIndex: 'noticeTitle', key: 'noticeTitle', align: 'center', width: getWidth('noticeTitle', 250), ellipsis: true },
+      {
+        title: '公告类型',
+        dataIndex: 'noticeType',
+        key: 'noticeType',
+        align: 'center',
+        width: getWidth('noticeType', 120),
+        render: (text) => {
+          const dict = sysNoticeType.find((d) => d.dictValue === text);
+          return <Tag>{dict ? dict.dictLabel : text}</Tag>;
+        }
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        key: 'status',
+        align: 'center',
+        width: getWidth('status', 100),
+        render: (text) => (
+          <Tag color={text === '0' ? 'success' : 'error'}>
+            {text === '0' ? '正常' : '关闭'}
+          </Tag>
+        )
+      },
+      { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: getWidth('createBy', 100), ellipsis: true },
+      { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: getWidth('createTime', 160) },
+      { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: getWidth('updateBy', 100), ellipsis: true },
+      { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: getWidth('updateTime', 160) },
+      {
+        title: '操作',
+        key: 'action',
+        align: 'center',
+        width: getWidth('action', 160),
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="middle">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
+            <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.noticeId)}>
+              <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ];
+  };
+
+  const [columns, setColumns] = useState(() => buildColumns());
+
+  useEffect(() => {
+    setColumns((prev) => buildColumns(prev));
+  }, [sysNoticeType]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   const fetchData = async () => {
     setLoading(true);
@@ -88,6 +168,7 @@ const Notice = () => {
             setIsModalOpen(true);
         }
     } catch (error) {
+        console.error(error);
         message.error('获取详情失败');
     }
   };
@@ -98,6 +179,7 @@ const Notice = () => {
       message.success('删除成功');
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -119,53 +201,6 @@ const Notice = () => {
       message.error('操作失败');
     }
   };
-
-  const columns = [
-    { title: '序号', dataIndex: 'noticeId', key: 'noticeId', align: 'center', width: 80 },
-    { title: '公告标题', dataIndex: 'noticeTitle', key: 'noticeTitle', align: 'center', width: 250, ellipsis: true },
-    { 
-        title: '公告类型', 
-        dataIndex: 'noticeType', 
-        key: 'noticeType', 
-        align: 'center',
-        width: 120,
-        render: (text) => {
-            const dict = sysNoticeType.find(d => d.dictValue === text);
-            return <Tag>{dict ? dict.dictLabel : text}</Tag>;
-        }
-    },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 100,
-        render: (text) => (
-            <Tag color={text === '0' ? 'success' : 'error'}>
-                {text === '0' ? '正常' : '关闭'}
-            </Tag>
-        )
-    },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 160,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.noticeId)}>
-            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
 
   return (
     <div className="app-container">
@@ -228,7 +263,12 @@ const Notice = () => {
         </div>
 
         <Table
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="noticeId"
           loading={loading}

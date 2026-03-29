@@ -93,11 +93,11 @@ INSERT IGNORE INTO `sys_menu` VALUES (1, '系统管理', 0, 2, 'system', NULL, '
        (112, '服务监控', 2, 4, 'server', 'monitor/server/index', '', '', 1, 0, 'C', '0', '0', 'monitor:server:list', 'server', 'admin', '2026-02-07 14:13:09.0', '', NULL, '服务监控菜单'),
        (113, '缓存监控', 2, 5, 'cache', 'monitor/cache/index', '', '', 1, 0, 'C', '0', '0', 'monitor:cache:list', 'redis', 'admin', '2026-02-07 14:13:09.0', '', NULL, '缓存监控菜单'),
        (114, '缓存列表', 2, 6, 'cacheList', 'monitor/cacheList/index', '', '', 1, 0, 'C', '0', '0', 'monitor:cache:list', 'redis-list', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-08 16:46:53.0', '缓存列表菜单'),
-       (115, '配置中心', 3, 1, 'config-center', 'rc/configCenter/index', '', '', 1, 0, 'C', '0', '0', 'rc:configCenter:list', 'FileFilled', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-13 09:53:47.597378', '表单构建菜单'),
-       (116, '应用管理', 3, 3, 'app-manage', 'rc/appManage/index', '', '', 1, 0, 'C', '0', '0', 'rc:appManage:list', 'code', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-13 09:52:41.079733', '代码生成菜单'),
-       (117, '注册中心', 3, 2, 'swagger', 'rc/registryCenter/index', '', '', 1, 0, 'C', '0', '0', 'rc:registryCenter:list', 'PhoneTwoTone', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-13 09:54:02.139301', '系统接口菜单'),
-       (500, '操作日志', 108, 1, 'operlog', 'monitor/operlog/index', '', '', 1, 0, 'C', '0', '0', 'monitor:operlog:list', 'form', 'admin', '2026-02-07 14:13:09.0', '', NULL, '操作日志菜单'),
-       (501, '登录日志', 108, 2, 'logininfor', 'monitor/logininfor/index', '', '', 1, 0, 'C', '0', '0', 'monitor:logininfor:list', 'logininfor', 'admin', '2026-02-07 14:13:09.0', '', NULL, '登录日志菜单'),
+       (115, '配置中心', 3, 2, 'config-center', 'rc/configCenter/index', '', '', 1, 0, 'C', '0', '0', 'rc:configCenter:list', 'FileFilled', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-27 18:46:31.008615', '表单构建菜单'),
+       (116, '应用管理', 3, 4, 'app-manage', 'rc/appManage/index', '', '', 1, 0, 'C', '0', '0', 'rc:appManage:list', 'code', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-27 18:46:31.011183', '代码生成菜单'),
+       (117, '注册中心', 3, 1, 'swagger', 'rc/registryCenter/index', '', '', 1, 0, 'C', '0', '0', 'rc:registryCenter:list', 'PhoneTwoTone', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-27 18:46:31.007147', '系统接口菜单'),
+       (500, '操作日志', 108, 2, 'operlog', 'monitor/operlog/index', '', '', 1, 0, 'C', '0', '0', 'monitor:operlog:list', 'form', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-27 18:47:07.34962', '操作日志菜单'),
+       (501, '登录日志', 108, 1, 'logininfor', 'monitor/logininfor/index', '', '', 1, 0, 'C', '0', '0', 'monitor:logininfor:list', 'logininfor', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-27 18:47:07.34759', '登录日志菜单'),
        (1000, '用户查询', 100, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:query', '#', 'admin', '2026-02-07 14:13:09.0', '', NULL, ''),
        (1001, '用户新增', 100, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:add', '#', 'admin', '2026-02-07 14:13:09.0', '', NULL, ''),
        (1002, '用户修改', 100, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'system:user:edit', '#', 'admin', '2026-02-07 14:13:09.0', '', NULL, ''),
@@ -153,9 +153,9 @@ INSERT IGNORE INTO `sys_menu` VALUES (1, '系统管理', 0, 2, 'system', NULL, '
        (1052, '任务删除', 110, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:job:remove', '#', 'admin', '2026-02-07 14:13:09.0', '', NULL, ''),
        (1053, '状态修改', 110, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:job:changeStatus', '#', 'admin', '2026-02-07 14:13:09.0', '', NULL, ''),
        (1054, '任务导出', 110, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:job:export', '#', 'admin', '2026-02-07 14:13:09.0', '', NULL, ''),
-       (2000, '环境管理', 3, 4, 'env-manage', 'rc/envManage/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:envManage:list', 'EnvironmentTwoTone', 'admin', '2026-02-13 09:56:15.041545', '', NULL, ''),
-       (2001, 'AccessToken', 3, 5, 'access-token', 'rc/accessToken/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:accessToken:list', 'KeyOutlined', 'admin', '2026-02-13 10:12:09.691179', '', NULL, ''),
        (1500, '运维管理', 0, 5, 'op', '', '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-26 15:32:27.562145', '运维工具目录'),
+       (2000, '环境管理', 3, 3, 'env-manage', 'rc/envManage/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:envManage:list', 'EnvironmentTwoTone', 'admin', '2026-02-13 09:56:15.041545', 'admin', '2026-03-27 18:46:31.008615', ''),
+       (2001, 'AccessToken', 3, 5, 'access-token', 'rc/accessToken/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:accessToken:list', 'KeyOutlined', 'admin', '2026-02-13 10:12:09.691179', 'admin', '2026-03-27 18:46:31.01306', ''),
        (2002, 'Agent管理', 1500, 1, 'agentManage', 'op/agentManage/index', NULL, '', 1, 0, 'C', '0', '0', 'op:agentManage:list', 'CreditCardOutlined', 'admin', '2026-03-26 15:34:13.105463', '', NULL, '');
 
 INSERT IGNORE INTO `sys_menu` VALUES (1500, '运维工具', 0, 5, 'ops', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', '', NULL, '运维工具目录');

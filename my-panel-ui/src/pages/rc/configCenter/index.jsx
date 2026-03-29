@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col, Upload } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ImportOutlined, FileTextOutlined, DownOutlined, EyeOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import Editor, { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { listConfig, getConfig, addConfig, updateConfig, delConfig, exportConfig, importConfig, previewConfig } from '../../../api/rc/config';
@@ -143,6 +144,7 @@ const ConfigCenter = () => {
             setIsModalOpen(true);
         }
     } catch (error) {
+        console.error(error);
         message.error('获取详情失败');
     }
   };
@@ -159,6 +161,7 @@ const ConfigCenter = () => {
       setSelectedRowKeys([]);
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -371,7 +374,7 @@ const ConfigCenter = () => {
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: '配置ID', dataIndex: 'id', key: 'id', align: 'center', width: 80 },
     { 
       title: '环境', 
@@ -421,7 +424,26 @@ const ConfigCenter = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -519,7 +541,12 @@ const ConfigCenter = () => {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
           }}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           rowKey="id"

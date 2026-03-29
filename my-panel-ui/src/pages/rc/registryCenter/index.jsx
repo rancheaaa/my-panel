@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col, InputNumber } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listNode, getNode, addNode, updateNode, delNode, exportNode } from '../../../api/rc/node';
 import { listEnv } from '../../../api/rc/env';
 import { listProject } from '../../../api/rc/project';
@@ -116,6 +117,7 @@ const RegistryCenter = () => {
             setIsModalOpen(true);
         }
     } catch (error) {
+        console.error(error);
         message.error('获取详情失败');
     }
   };
@@ -132,6 +134,7 @@ const RegistryCenter = () => {
       setSelectedRowKeys([]);
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -145,6 +148,7 @@ const RegistryCenter = () => {
       link.download = `注册中心节点_${new Date().getTime()}.xlsx`;
       link.click();
     } catch (error) {
+      console.error(error);
       message.error('导出失败');
     }
   };
@@ -167,7 +171,7 @@ const RegistryCenter = () => {
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: '节点ID', dataIndex: 'id', key: 'id', align: 'center', width: 80 },
     { title: '环境', dataIndex: 'envName', key: 'envName', align: 'center', width: 120, ellipsis: true },
     { title: '应用', dataIndex: 'projectName', key: 'projectName', align: 'center', width: 150, ellipsis: true },
@@ -205,7 +209,26 @@ const RegistryCenter = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -302,7 +325,12 @@ const RegistryCenter = () => {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
           }}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           rowKey="id"
@@ -364,9 +392,12 @@ const RegistryCenter = () => {
           <Form.Item
             name="nodePort"
             label="节点端口"
-            rules={[{ required: true, message: '请输入节点端口' }]}
+            rules={[
+              { required: true, message: '请输入节点端口' },
+              { type: 'number', min: 1, max: 65535, message: '端口范围为1-65535' }
+            ]}
           >
-            <Input placeholder="请输入节点端口" type="number" />
+            <InputNumber placeholder="请输入节点端口" min={1} max={65535} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>

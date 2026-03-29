@@ -21,8 +21,8 @@ import com.google.gson.JsonParser;
 public class BaseIntegrationTest {
 
     protected static final Logger logger = LoggerFactory.getLogger(BaseIntegrationTest.class);
-    protected static final String AGENT_URL = "http://172.19.200.130:7777";
-//    protected static final String AGENT_URL = "http://172.31.140.63:7777";
+//    protected static final String AGENT_URL = "http://172.19.200.130:7777";
+    protected static final String AGENT_URL = "http://172.31.140.63:7777";
 
     /**
      * 发送GET请求

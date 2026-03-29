@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Card, Col, Dropdown, Form, Input, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tooltip, message } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listAccessToken, getAccessToken, addAccessToken, updateAccessToken, delAccessToken, exportAccessToken, changeAccessTokenStatus } from '../../../api/rc/accessToken';
 
 const { Option } = Select;
@@ -98,6 +99,7 @@ const AccessToken = () => {
       setSelectedRowKeys([]);
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -111,6 +113,7 @@ const AccessToken = () => {
       link.download = `AccessToken数据_${new Date().getTime()}.xlsx`;
       link.click();
     } catch (error) {
+      console.error(error);
       message.error('导出失败');
     }
   };
@@ -124,6 +127,7 @@ const AccessToken = () => {
         fetchData();
       }
     } catch (error) {
+      console.error(error);
       message.error('状态更新失败');
     }
   };
@@ -146,7 +150,7 @@ const AccessToken = () => {
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: 'ID', dataIndex: 'id', key: 'id', align: 'center', width: 80 },
     { title: 'AccessToken', dataIndex: 'tokenValue', key: 'tokenValue', align: 'center', width: 300, ellipsis: true },
     { title: '描述', dataIndex: 'tokenDesc', key: 'tokenDesc', align: 'center', width: 250, ellipsis: true },
@@ -184,7 +188,26 @@ const AccessToken = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -254,7 +277,12 @@ const AccessToken = () => {
             selectedRowKeys,
             onChange: (keys) => setSelectedRowKeys(keys),
           }}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           rowKey="id"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Modal, Popconfirm, Tag, Descriptions, Tooltip, Dropdown } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, EyeOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, delOperlog, cleanOperlog, exportOperlog } from '../../../api/monitor/operlog';
 import request from '../../../utils/request';
 
@@ -95,6 +96,7 @@ const Operlog = () => {
       fetchData();
       setSelectedRowKeys([]);
     } catch (error) {
+      console.error(error);
       message.error('删除失败');
     }
   };
@@ -105,6 +107,7 @@ const Operlog = () => {
       message.success('清空成功');
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('清空失败');
     }
   };
@@ -114,58 +117,90 @@ const Operlog = () => {
     exportOperlog(queryParams);
   };
 
-  const columns = [
-    { title: '日志编号', dataIndex: 'operId', key: 'operId', align: 'center', width: 100 },
-    { title: '系统模块', dataIndex: 'title', key: 'title', align: 'center', width: 120, ellipsis: true },
-    { 
-        title: '操作类型', 
-        dataIndex: 'businessType', 
-        key: 'businessType', 
+  const buildColumns = (prevColumns = []) => {
+    const getWidth = (key, defaultWidth) => {
+      const prev = prevColumns.find((c) => c.key === key);
+      return prev?.width ?? defaultWidth;
+    };
+
+    return [
+      { title: '日志编号', dataIndex: 'operId', key: 'operId', align: 'center', width: getWidth('operId', 100) },
+      { title: '系统模块', dataIndex: 'title', key: 'title', align: 'center', width: getWidth('title', 120), ellipsis: true },
+      {
+        title: '操作类型',
+        dataIndex: 'businessType',
+        key: 'businessType',
         align: 'center',
-        width: 100,
+        width: getWidth('businessType', 100),
         render: (text) => {
-            const dict = sysOperType.find(d => d.dictValue == text);
-            return dict ? <Tag>{dict.dictLabel}</Tag> : text;
+          const dict = sysOperType.find(d => d.dictValue == text);
+          return dict ? <Tag>{dict.dictLabel}</Tag> : text;
         }
-    },
-    { title: '请求方式', dataIndex: 'requestMethod', key: 'requestMethod', align: 'center', width: 100 },
-    { title: '操作人员', dataIndex: 'operName', key: 'operName', align: 'center', width: 120 },
-    { title: '主机', dataIndex: 'operIp', key: 'operIp', align: 'center', width: 130, ellipsis: true },
-    { title: '操作地点', dataIndex: 'operLocation', key: 'operLocation', align: 'center', width: 150, ellipsis: true },
-    { 
-        title: '操作状态', 
-        dataIndex: 'status', 
-        key: 'status', 
+      },
+      { title: '请求方式', dataIndex: 'requestMethod', key: 'requestMethod', align: 'center', width: getWidth('requestMethod', 100) },
+      { title: '操作人员', dataIndex: 'operName', key: 'operName', align: 'center', width: getWidth('operName', 120) },
+      { title: '主机', dataIndex: 'operIp', key: 'operIp', align: 'center', width: getWidth('operIp', 130), ellipsis: true },
+      { title: '操作地点', dataIndex: 'operLocation', key: 'operLocation', align: 'center', width: getWidth('operLocation', 150), ellipsis: true },
+      {
+        title: '操作状态',
+        dataIndex: 'status',
+        key: 'status',
         align: 'center',
-        width: 100,
+        width: getWidth('status', 100),
         render: (text) => {
-            const dict = sysCommonStatus.find(d => d.dictValue == text);
-            return dict ? <Tag color={String(text) === '0' ? 'success' : 'error'}>{dict.dictLabel}</Tag> : text;
+          const dict = sysCommonStatus.find(d => d.dictValue == text);
+          return dict ? <Tag color={String(text) === '0' ? 'success' : 'error'}>{dict.dictLabel}</Tag> : text;
         }
-    },
-    { title: '操作日期', dataIndex: 'operTime', key: 'operTime', align: 'center', width: 180 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button 
-            type="link" 
-            icon={<EyeOutlined />} 
-            onClick={() => {
+      },
+      { title: '操作日期', dataIndex: 'operTime', key: 'operTime', align: 'center', width: getWidth('operTime', 180) },
+      {
+        title: '操作',
+        key: 'action',
+        align: 'center',
+        width: getWidth('action', 100),
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="middle">
+            <Button
+              type="link"
+              icon={<EyeOutlined />}
+              onClick={() => {
                 setCurrentRecord(record);
                 setOpen(true);
-            }}
-          >
-            详细
-          </Button>
-        </Space>
-      ),
-    },
-  ];
+              }}
+            >
+              详细
+            </Button>
+          </Space>
+        ),
+      },
+    ];
+  };
+
+  const [columns, setColumns] = useState(() => buildColumns());
+
+  useEffect(() => {
+    setColumns((prev) => buildColumns(prev));
+  }, [sysOperType, sysCommonStatus]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -299,7 +334,12 @@ const Operlog = () => {
 
         <Table
           rowKey="operId"
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           loading={loading}
           size={tableSize}

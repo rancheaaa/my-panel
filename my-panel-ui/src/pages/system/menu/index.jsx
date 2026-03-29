@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, TreeSelect, message, Popconfirm, Tag, Tooltip, Row, Col, Dropdown } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, TreeSelect, message, Popconfirm, Tag, Tooltip, Row, Col, Dropdown, Switch } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -7,14 +7,39 @@ import {
   DeleteOutlined, 
   EditOutlined,
   ColumnHeightOutlined,
-  MenuOutlined
+  MenuOutlined,
+  HolderOutlined
 } from '@ant-design/icons';
-import { listMenu, getMenu, addMenu, updateMenu, delMenu } from '../../../api/menu';
+import { ResizableTitle } from '../../../components/ResizableTable';
+import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { listMenu, getMenu, addMenu, updateMenu, delMenu, sortMenu } from '../../../api/menu';
 import { getRouters } from '../../../api/auth';
 import { getDicts } from '../../../api/dict/data';
 import { getIcon } from '../../../utils/menuUtils';
 import IconSelect from '../../../components/IconSelect';
 import './Menu.scss';
+
+const SortableRow = (props) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props['data-row-key'],
+  });
+  const style = {
+    ...props.style,
+    transform: CSS.Translate.toString(transform),
+    transition,
+    cursor: 'move',
+    ...(isDragging ? { position: 'relative', zIndex: 9999 } : {}),
+  };
+  return <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners} />;
+};
 
 const { Option } = Select;
 
@@ -69,7 +94,8 @@ const Menu = () => {
   const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
     menuName: undefined,
-    status: undefined
+    status: undefined,
+    path: undefined
   });
   
   const [form] = Form.useForm();
@@ -79,19 +105,184 @@ const Menu = () => {
   const [modalTitle, setModalTitle] = useState('新增菜单');
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
+
+  // Resizable Columns State
+  const [columns, setColumns] = useState([
+    {
+      title: '排序',
+      key: 'drag',
+      width: 60,
+      align: 'center',
+      render: () => <HolderOutlined style={{ cursor: 'move', color: '#999' }} />,
+    },
+    { 
+      title: '菜单名称', 
+      dataIndex: 'menuName', 
+      key: 'menuName', 
+      width: 250, 
+      ellipsis: true,
+      render: (text, record) => {
+        const levelColors = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f'];
+        const typeColors = { 'M': 'blue', 'C': 'green', 'F': 'orange' };
+        const typeLabels = { 'M': '目录', 'C': '菜单', 'F': '按钮' };
+        
+        return (
+          <Space>
+            <span style={{ 
+              color: levelColors[record.level] || '#666',
+              fontWeight: record.level === 0 ? 600 : 400,
+              fontSize: record.level === 0 ? '15px' : '14px'
+            }}>
+              {text}
+            </span>
+            <Tag color={typeColors[record.menuType]} bordered={false} style={{ fontSize: '11px', padding: '0 4px' }}>
+              {typeLabels[record.menuType]}
+            </Tag>
+          </Space>
+        );
+      }
+    },
+    { 
+        title: '图标', 
+        dataIndex: 'icon', 
+        key: 'icon', 
+        align: 'center', 
+        width: 100,
+        render: (text) => text ? <span style={{ fontSize: '18px' }}>{getIcon(text)}</span> : null
+    },
+    { title: '排序', dataIndex: 'orderNum', key: 'orderNum', align: 'center', width: 80 },
+    { title: '路由地址', dataIndex: 'path', key: 'path', width: 200, ellipsis: true },
+    { title: '组件路径', dataIndex: 'component', key: 'component', width: 200, ellipsis: true },
+    { title: '权限标识', dataIndex: 'perms', key: 'perms', width: 200, ellipsis: true },
+    { 
+        title: '显示状态', 
+        dataIndex: 'visible', 
+        key: 'visible', 
+        align: 'center',
+        width: 100,
+        render: (text, record) => (
+            <Switch
+                checked={text === '0'}
+                onChange={async (checked) => {
+                    const newVisible = checked ? '0' : '1';
+                    try {
+                        await updateMenu({ ...record, visible: newVisible });
+                        message.success('显示状态更新成功');
+                        fetchData();
+                        refreshMenuCache();
+                    } catch (error) {
+                        console.error(error);
+                        message.error('显示状态更新失败');
+                    }
+                }}
+                checkedChildren="显示"
+                unCheckedChildren="隐藏"
+            />
+        )
+    },
+    { 
+        title: '菜单状态', 
+        dataIndex: 'status', 
+        key: 'status', 
+        align: 'center',
+        width: 100,
+        render: (text, record) => (
+            <Switch
+                checked={text === '0'}
+                onChange={async (checked) => {
+                    const newStatus = checked ? '0' : '1';
+                    try {
+                        await updateMenu({ ...record, status: newStatus });
+                        message.success('状态更新成功');
+                        fetchData();
+                        refreshMenuCache();
+                    } catch (error) {
+                        console.error(error);
+                        message.error('状态更新失败');
+                    }
+                }}
+                checkedChildren="正常"
+                unCheckedChildren="停用"
+            />
+        )
+    },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 200,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => handleAdd(record)} style={{ color: '#1890ff' }}>新增</Button>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.menuId)}>
+             <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
+
   const [menuOptions, setMenuOptions] = useState([]);
   const [showIcon, setShowIcon] = useState(false);
   const [sysNormalDisable, setSysNormalDisable] = useState([]);
   const [sysShowHide, setSysShowHide] = useState([]);
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
+  const [dragLoading, setDragLoading] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const res = await listMenu(queryParams);
       if (res.code === 200) {
-        const treeData = handleTree(res.data, "menuId", "parentId");
-        setData(treeData);
+        // Sort by orderNum before tree construction to ensure children are in order
+        const sortedData = [...res.data].sort((a, b) => a.orderNum - b.orderNum);
+        const treeData = handleTree(sortedData, "menuId", "parentId");
+        
+        // Add level information for styling
+        const addLevel = (nodes, level = 0) => {
+          return nodes.map(node => {
+            const newNode = { ...node, level };
+            if (newNode.children && newNode.children.length > 0) {
+              newNode.children = addLevel(newNode.children, level + 1);
+            }
+            return newNode;
+          });
+        };
+        
+        setData(addLevel(treeData));
       }
     } catch (error) {
       console.error(error);
@@ -105,7 +296,8 @@ const Menu = () => {
           const res = await listMenu();
           if (res.code === 200) {
               const menu = { menuId: 0, menuName: '主类目', children: [] };
-              menu.children = handleTree(res.data, "menuId", "parentId");
+              const sortedData = [...res.data].sort((a, b) => a.orderNum - b.orderNum);
+              menu.children = handleTree(sortedData, "menuId", "parentId");
               setMenuOptions([menu]);
           }
       } catch (error) {
@@ -140,21 +332,99 @@ const Menu = () => {
     form.resetFields();
     setQueryParams({
       menuName: undefined,
-      status: undefined
+      status: undefined,
+      path: undefined
     });
   };
 
+  // Find all siblings of a menu item
+  const findSiblings = (tree, menuId) => {
+    for (const node of tree) {
+      if (node.children && node.children.some(child => child.menuId === menuId)) {
+        return node.children;
+      }
+      if (node.children) {
+        const result = findSiblings(node.children, menuId);
+        if (result) return result;
+      }
+    }
+    // If not found in children, check if it's a root node
+    if (tree.some(node => node.menuId === menuId)) {
+      return tree;
+    }
+    return null;
+  };
+
+  const onDragEnd = async ({ active, over }) => {
+    if (active.id !== over?.id) {
+      const siblings = findSiblings(data, active.id);
+      if (!siblings) return;
+
+      // Ensure 'over' is also in the same sibling group
+      if (!siblings.some(s => s.menuId === over.id)) {
+        message.warning('只能在同级菜单内拖拽排序');
+        return;
+      }
+
+      const oldIndex = siblings.findIndex((i) => i.menuId === active.id);
+      const newIndex = siblings.findIndex((i) => i.menuId === over.id);
+      const newSiblings = arrayMove(siblings, oldIndex, newIndex);
+
+      // Prepare batch update data
+      const sortData = newSiblings.map((item, index) => ({
+        menuId: item.menuId,
+        orderNum: index + 1
+      }));
+
+      setDragLoading(true);
+      try {
+        const res = await sortMenu(sortData);
+        if (res.code === 200) {
+          message.success('排序更新成功');
+          fetchData();
+          refreshMenuCache();
+        } else {
+          message.error(res.msg || '排序更新失败');
+        }
+      } catch (error) {
+        console.error(error);
+        message.error('排序更新失败，请重试');
+      } finally {
+        setDragLoading(false);
+      }
+    }
+  };
+
   // Add Menu
-  const handleAdd = (row) => {
+  const handleAdd = async (row) => {
     setModalTitle('新增菜单');
     setCurrentId(null);
     modalForm.resetFields();
     getTreeselect();
+    
+    let parentId = 0;
     if (row != null && row.menuId) {
-      modalForm.setFieldsValue({ parentId: row.menuId });
-    } else {
-      modalForm.setFieldsValue({ parentId: 0 });
+      parentId = row.menuId;
     }
+    
+    // Calculate auto sort order
+    let maxSort = 0;
+    try {
+      const res = await listMenu();
+      if (res.code === 200) {
+        const siblings = res.data.filter(item => item.parentId === parentId);
+        if (siblings.length > 0) {
+          maxSort = Math.max(...siblings.map(item => item.orderNum || 0));
+        }
+      }
+    } catch (e) {
+      console.error('Calculate sort order failed:', e);
+    }
+
+    modalForm.setFieldsValue({ 
+      parentId: parentId,
+      orderNum: maxSort + 1
+    });
     setIsModalOpen(true);
   };
 
@@ -220,61 +490,54 @@ const Menu = () => {
     }
   };
 
-  const columns = [
-    { title: '菜单名称', dataIndex: 'menuName', key: 'menuName', width: 200, ellipsis: true },
-    { 
-        title: '图标', 
-        dataIndex: 'icon', 
-        key: 'icon', 
-        align: 'center', 
-        width: 100,
-        render: (text) => text ? <span style={{ fontSize: '18px' }}>{getIcon(text)}</span> : null
-    },
-    { title: '排序', dataIndex: 'orderNum', key: 'orderNum', align: 'center', width: 80 },
-    { title: '权限标识', dataIndex: 'perms', key: 'perms', width: 200, ellipsis: true },
-    { title: '组件路径', dataIndex: 'component', key: 'component', width: 200, ellipsis: true },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 80,
-        render: (text) => (
-            <Tag color={text === '0' ? 'success' : 'error'}>
-                {text === '0' ? '正常' : '停用'}
-            </Tag>
-        )
-    },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 200,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Button type="text" icon={<PlusOutlined />} onClick={() => handleAdd(record)} style={{ color: '#1890ff' }}>新增</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.menuId)}>
-             <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+  // Flatten visible tree data for SortableContext
+  const getFlattenIds = (tree) => {
+    let ids = [];
+    tree.forEach(node => {
+      ids.push(node.menuId);
+      if (node.children && expandedRowKeys.includes(node.menuId)) {
+        ids = ids.concat(getFlattenIds(node.children));
+      }
+    });
+    return ids;
+  };
 
   return (
     <div className="menu-container">
+      {dragLoading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <div className="ant-spin ant-spin-spinning">
+            <span className="ant-spin-dot ant-spin-dot-spin">
+              <i className="ant-spin-dot-item"></i>
+              <i className="ant-spin-dot-item"></i>
+              <i className="ant-spin-dot-item"></i>
+              <i className="ant-spin-dot-item"></i>
+            </span>
+          </div>
+        </div>
+      )}
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
         <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
               <Form.Item name="menuName" label="菜单名称">
                 <Input placeholder="请输入菜单名称" allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="path" label="路由地址">
+                <Input placeholder="请输入路由地址" allowClear />
               </Form.Item>
             </Col>
             <Col span={6}>
@@ -322,26 +585,40 @@ const Menu = () => {
           </Space>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="menuId"
-          loading={loading}
-          size={tableSize}
-          pagination={false}
-          scroll={{ x: 1220 }}
-          expandable={{
-              childrenColumnName: 'children',
-              expandedRowKeys: expandedRowKeys,
-              onExpand: (expanded, record) => {
-                  if (expanded) {
-                      setExpandedRowKeys([...expandedRowKeys, record.menuId]);
-                  } else {
-                      setExpandedRowKeys(expandedRowKeys.filter(k => k !== record.menuId));
+        <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+          <SortableContext items={getFlattenIds(data)} strategy={verticalListSortingStrategy}>
+            <Table
+              components={{
+                header: {
+                  cell: ResizableTitle,
+                },
+                body: {
+                  row: SortableRow,
+                },
+              }}
+              rowClassName={(record) => `menu-level-${record.level}`}
+              columns={resizableColumns}
+              dataSource={data}
+              rowKey="menuId"
+              loading={loading}
+              size={tableSize}
+              pagination={false}
+              scroll={{ x: 1220, y: 'calc(100vh - 350px)' }}
+              sticky
+              expandable={{
+                  childrenColumnName: 'children',
+                  expandedRowKeys: expandedRowKeys,
+                  onExpand: (expanded, record) => {
+                      if (expanded) {
+                          setExpandedRowKeys([...expandedRowKeys, record.menuId]);
+                      } else {
+                          setExpandedRowKeys(expandedRowKeys.filter(k => k !== record.menuId));
+                      }
                   }
-              }
-          }}
-        />
+              }}
+            />
+          </SortableContext>
+        </DndContext>
       </Card>
 
       <Modal
@@ -368,8 +645,17 @@ const Menu = () => {
                   <Radio.Button value="F">按钮</Radio.Button>
               </Radio.Group>
           </Form.Item>
-          <Form.Item name="icon" label="菜单图标">
-             <IconSelect placeholder="点击选择图标" />
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, curValues) => prevValues.menuType !== curValues.menuType}
+          >
+            {({ getFieldValue }) => {
+              return getFieldValue('menuType') !== 'F' ? (
+                <Form.Item name="icon" label="菜单图标">
+                  <IconSelect placeholder="点击选择图标" />
+                </Form.Item>
+              ) : null;
+            }}
           </Form.Item>
           <Row gutter={16}>
               <Col span={12}>
@@ -378,8 +664,19 @@ const Menu = () => {
                   </Form.Item>
               </Col>
               <Col span={12}>
-                  <Form.Item name="orderNum" label="显示排序" rules={[{ required: true, message: '请输入显示排序' }]}>
-                    <InputNumber min={0} style={{ width: '100%' }} />
+                  <Form.Item 
+                    name="orderNum" 
+                    label={
+                      <span>
+                        显示排序
+                        <Tooltip title="系统自动生成，无需填写">
+                          <span style={{ marginLeft: 4, color: '#999', cursor: 'help', fontSize: '12px' }}> (系统自动生成)</span>
+                        </Tooltip>
+                      </span>
+                    } 
+                    rules={[{ required: true, message: '请输入显示排序' }]}
+                  >
+                    <InputNumber min={0} style={{ width: '100%' }} disabled />
                   </Form.Item>
               </Col>
           </Row>

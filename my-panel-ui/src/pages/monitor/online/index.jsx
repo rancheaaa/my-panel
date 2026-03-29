@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, message, Popconfirm, Tooltip, Dropdown, Row, Col } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ColumnHeightOutlined } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, forceLogout } from '../../../api/monitor/online';
 import dayjs from 'dayjs';
 
@@ -63,11 +64,12 @@ const Online = () => {
       message.success('强退成功');
       fetchData();
     } catch (error) {
+      console.error(error);
       message.error('强退失败');
     }
   };
 
-  const columns = [
+  const [columns, setColumns] = useState([
     { title: '序号', dataIndex: 'index', key: 'index', align: 'center', width: 60, render: (text, record, index) => (queryParams.pageNum - 1) * queryParams.pageSize + index + 1 },
     { title: '会话编号', dataIndex: 'tokenId', key: 'tokenId', align: 'center', width: 250, ellipsis: true },
     { title: '用户名称', dataIndex: 'userName', key: 'userName', align: 'center', width: 120 },
@@ -97,7 +99,26 @@ const Online = () => {
         </Space>
       ),
     },
-  ];
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="app-container">
@@ -150,7 +171,12 @@ const Online = () => {
         </div>
 
         <Table
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="tokenId"
           loading={loading}

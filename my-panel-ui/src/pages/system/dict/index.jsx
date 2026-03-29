@@ -10,6 +10,7 @@ import {
   UnorderedListOutlined,
   SyncOutlined
 } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { useNavigate } from 'react-router-dom';
 import { listType, getType, addType, updateType, delType, refreshCache } from '../../../api/dict/type';
 import './Dict.scss';
@@ -38,6 +39,75 @@ const Dict = () => {
   const [modalTitle, setModalTitle] = useState('新增字典类型');
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
+
+  // Resizable Columns State
+  const [columns, setColumns] = useState([
+    { title: '字典编号', dataIndex: 'dictId', key: 'dictId', align: 'center', width: 100 },
+    { title: '字典名称', dataIndex: 'dictName', key: 'dictName', align: 'center', width: 200, ellipsis: true },
+    { 
+        title: '字典类型', 
+        dataIndex: 'dictType', 
+        key: 'dictType', 
+        align: 'center',
+        width: 200,
+        ellipsis: true,
+        render: (text) => (
+            <a onClick={() => navigate(`/system/dict-data/${text}`)}>{text}</a>
+        )
+    },
+    { 
+        title: '状态', 
+        dataIndex: 'status', 
+        key: 'status', 
+        align: 'center',
+        width: 100,
+        render: (text) => (
+            <Tag color={text === '0' ? 'success' : 'error'}>
+                {text === '0' ? '正常' : '停用'}
+            </Tag>
+        )
+    },
+    { title: '备注', dataIndex: 'remark', key: 'remark', align: 'center', width: 200, ellipsis: true },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 180 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 200,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size="small">
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
+          <Button type="text" icon={<UnorderedListOutlined />} onClick={() => navigate(`/system/dict-data/${record.dictType}`)} style={{ color: '#1890ff' }}>列表</Button>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.dictId)}>
+            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
+
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   const fetchData = async () => {
     setLoading(true);
@@ -163,55 +233,6 @@ const Dict = () => {
     }
   };
 
-  const columns = [
-    { title: '字典编号', dataIndex: 'dictId', key: 'dictId', align: 'center', width: 100 },
-    { title: '字典名称', dataIndex: 'dictName', key: 'dictName', align: 'center', width: 200, ellipsis: true },
-    { 
-        title: '字典类型', 
-        dataIndex: 'dictType', 
-        key: 'dictType', 
-        align: 'center',
-        width: 200,
-        ellipsis: true,
-        render: (text) => (
-            <a onClick={() => navigate(`/system/dict-data/${text}`)}>{text}</a>
-        )
-    },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 100,
-        render: (text) => (
-            <Tag color={text === '0' ? 'success' : 'error'}>
-                {text === '0' ? '正常' : '停用'}
-            </Tag>
-        )
-    },
-    { title: '备注', dataIndex: 'remark', key: 'remark', align: 'center', width: 200, ellipsis: true },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 180 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 200,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Button type="text" icon={<UnorderedListOutlined />} onClick={() => navigate(`/system/dict-data/${record.dictType}`)} style={{ color: '#1890ff' }}>列表</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.dictId)}>
-            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <div className="dict-container">
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
@@ -288,7 +309,12 @@ const Dict = () => {
 
         <Table
           rowSelection={rowSelection}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="dictId"
           loading={loading}

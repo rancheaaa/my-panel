@@ -8,6 +8,7 @@ import {
   EditOutlined,
   ColumnHeightOutlined
 } from '@ant-design/icons';
+import { ResizableTitle } from '../../../components/ResizableTable';
 import { listPost, getPost, addPost, updatePost, delPost } from '../../../api/post';
 import { getDicts } from '../../../api/dict/data';
 import './Post.scss';
@@ -36,6 +37,56 @@ const Post = () => {
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
   const [sysNormalDisable, setSysNormalDisable] = useState([]);
+
+  // Resizable Columns State
+  const [columns, setColumns] = useState([
+    { title: '岗位编号', dataIndex: 'postId', key: 'postId', align: 'center', width: 100 },
+    { title: '岗位编码', dataIndex: 'postCode', key: 'postCode', align: 'center', width: 150, ellipsis: true },
+    { title: '岗位名称', dataIndex: 'postName', key: 'postName', align: 'center', width: 150, ellipsis: true },
+    { title: '岗位排序', dataIndex: 'postSort', key: 'postSort', align: 'center', width: 100 },
+    { 
+        title: '状态', 
+        dataIndex: 'status', 
+        key: 'status', 
+        align: 'center',
+        width: 100,
+        render: (text) => (
+            <Tag color={text === '0' ? 'success' : 'error'}>
+                {text === '0' ? '正常' : '停用'}
+            </Tag>
+        )
+    },
+    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
+    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
+    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
+    {
+      title: '操作',
+      key: 'action',
+      align: 'center',
+      width: 160,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space size="middle">
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
+          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.postId)}>
+            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ]);
+
+  const handleResize = (index) => (e, { size }) => {
+    setColumns((prevColumns) => {
+      const nextColumns = [...prevColumns];
+      nextColumns[index] = {
+        ...nextColumns[index],
+        width: size.width,
+      };
+      return nextColumns;
+    });
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -157,43 +208,13 @@ const Post = () => {
     }
   };
 
-  const columns = [
-    { title: '岗位编号', dataIndex: 'postId', key: 'postId', align: 'center', width: 100 },
-    { title: '岗位编码', dataIndex: 'postCode', key: 'postCode', align: 'center', width: 150, ellipsis: true },
-    { title: '岗位名称', dataIndex: 'postName', key: 'postName', align: 'center', width: 150, ellipsis: true },
-    { title: '岗位排序', dataIndex: 'postSort', key: 'postSort', align: 'center', width: 100 },
-    { 
-        title: '状态', 
-        dataIndex: 'status', 
-        key: 'status', 
-        align: 'center',
-        width: 100,
-        render: (text) => (
-            <Tag color={text === '0' ? 'success' : 'error'}>
-                {text === '0' ? '正常' : '停用'}
-            </Tag>
-        )
-    },
-    { title: '创建者', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 160 },
-    { title: '更新者', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 160 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 160,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.postId)}>
-            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+  const resizableColumns = columns.map((col, index) => ({
+    ...col,
+    onHeaderCell: (column) => ({
+      width: column.width,
+      onResize: handleResize(index),
+    }),
+  }));
 
   return (
     <div className="post-container">
@@ -221,8 +242,8 @@ const Post = () => {
             </Col>
             <Col span={6} style={{ textAlign: 'right' }}>
               <Space>
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button type="primary" icon="<SearchOutlined />" onClick={handleSearch}>搜索</Button>
+                <Button icon="<ReloadOutlined />" onClick={handleReset}>重置</Button>
               </Space>
             </Col>
           </Row>
@@ -265,7 +286,12 @@ const Post = () => {
 
         <Table
           rowSelection={rowSelection}
-          columns={columns}
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          columns={resizableColumns}
           dataSource={data}
           rowKey="postId"
           loading={loading}

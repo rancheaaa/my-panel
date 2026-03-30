@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.DefaultedRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
@@ -46,7 +47,7 @@ public class CacheController
         caches.add(new SysCache(CacheConstants.PWD_ERR_CNT_KEY, "密码错误次数"));
     }
 
-    public CacheController(RedisTemplate<String, String> redisTemplate, CacheService cacheService) {
+    public CacheController(@Autowired(required = false) RedisTemplate<String, String> redisTemplate, CacheService cacheService) {
         this.redisTemplate = redisTemplate;
         this.cacheService = cacheService;
     }

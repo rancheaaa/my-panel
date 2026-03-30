@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Role;
 import org.springframework.beans.factory.config.BeanDefinition;
 
 @Configuration
+@Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 public class AuthLiteConfiguration {
     
     @Bean

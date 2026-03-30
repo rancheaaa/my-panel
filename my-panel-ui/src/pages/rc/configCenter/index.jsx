@@ -611,13 +611,13 @@ const ConfigCenter = () => {
             label="配置值"
             rules={[{ required: true, message: '请输入配置值' }]}
           >
-            <Input.TextArea placeholder="请输入配置值" rows={6} />
+            <Input.TextArea placeholder="请输入配置值" rows={1} />
           </Form.Item>
           <Form.Item
             name="configDesc"
             label="配置描述"
           >
-            <Input placeholder="请输入配置描述" />
+            <Input.TextArea placeholder="请输入配置描述" rows={8} />
           </Form.Item>
         </Form>
       </Modal>

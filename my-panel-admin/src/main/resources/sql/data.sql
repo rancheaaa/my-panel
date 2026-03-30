@@ -237,13 +237,13 @@ INSERT IGNORE INTO `sys_user_role` VALUES (1, 1),
 -- XXL-Conf 初始化数据
 -- ----------------------------
 -- 1. 默认环境
-INSERT IGNORE INTO `rc_env` (`id`, `env_name`, `env_desc`, `create_by`, `create_time`) 
-VALUES (1, 'default', '默认环境', 'admin', NOW());
+INSERT IGNORE INTO `rc_env` (`id`, `env_name`, `env_desc`, `create_by`, `create_time`, `update_by`, `update_time`)
+VALUES (1, 'default', '默认环境', 'admin', NOW(), 'admin', NOW());
 
 -- 2. 默认AccessToken
-INSERT IGNORE INTO `rc_access_token` (`id`, `token_value`, `token_desc`, `status`, `create_by`, `create_time`) 
-VALUES (1, 'default_token_123456', '系统内置默认Token', '0', 'admin', NOW());
+INSERT IGNORE INTO `rc_access_token` (`id`, `token_value`, `token_desc`, `status`, `create_by`, `create_time`, `update_by`, `update_time`)
+VALUES (1, 'default_token_123456', '系统内置默认应用my-panel-agent的token', '0', 'admin', NOW(), 'admin', NOW());
 
 -- 3. 默认应用
-INSERT IGNORE INTO `rc_project` (`id`, `project_name`, `project_desc`, `create_by`, `create_time`) 
-VALUES (1, 'my-panel-service', '系统内置默认应用', 'admin', NOW());
+INSERT IGNORE INTO `rc_project` (`id`, `project_name`, `project_desc`, `create_by`, `create_time`, `update_by`, `update_time`)
+VALUES (1, 'my-panel-agent', '系统内置默认应用，my-panel-agent', 'admin', NOW(), 'admin', NOW());

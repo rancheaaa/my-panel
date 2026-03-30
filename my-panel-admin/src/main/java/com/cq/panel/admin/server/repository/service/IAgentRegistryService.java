@@ -16,7 +16,7 @@ public interface IAgentRegistryService
      * @param id Agent注册信息主键
      * @return Agent注册信息
      */
-    public AgentRegistry selectAgentRegistryById(String id);
+    AgentRegistry selectAgentRegistryById(String id);
 
     /**
      * 查询Agent注册信息列表
@@ -24,7 +24,7 @@ public interface IAgentRegistryService
      * @param agentRegistry Agent注册信息
      * @return Agent注册信息集合
      */
-    public List<AgentRegistry> selectAgentRegistryList(AgentRegistry agentRegistry);
+    List<AgentRegistry> selectAgentRegistryList(AgentRegistry agentRegistry);
 
     /**
      * 新增Agent注册信息
@@ -32,7 +32,7 @@ public interface IAgentRegistryService
      * @param agentRegistry Agent注册信息
      * @return 结果
      */
-    public int insertAgentRegistry(AgentRegistry agentRegistry);
+    int insertAgentRegistry(AgentRegistry agentRegistry);
 
     /**
      * 修改Agent注册信息
@@ -40,7 +40,7 @@ public interface IAgentRegistryService
      * @param agentRegistry Agent注册信息
      * @return 结果
      */
-    public int updateAgentRegistry(AgentRegistry agentRegistry);
+    int updateAgentRegistry(AgentRegistry agentRegistry);
 
     /**
      * 批量删除Agent注册信息
@@ -48,7 +48,7 @@ public interface IAgentRegistryService
      * @param ids 需要删除的Agent注册信息主键集合
      * @return 结果
      */
-    public int deleteAgentRegistryByIds(String[] ids);
+    int deleteAgentRegistryByIds(String[] ids);
 
     /**
      * 删除Agent注册信息信息
@@ -56,7 +56,7 @@ public interface IAgentRegistryService
      * @param id Agent注册信息主键
      * @return 结果
      */
-    public int deleteAgentRegistryById(String id);
+    int deleteAgentRegistryById(String id);
 
     /**
      * Agent注册
@@ -64,7 +64,7 @@ public interface IAgentRegistryService
      * @param agentRegistry Agent注册信息
      * @return 结果
      */
-    public AgentRegistry registerAgent(AgentRegistry agentRegistry);
+    AgentRegistry registerAgent(AgentRegistry agentRegistry);
 
     /**
      * Agent心跳
@@ -73,7 +73,7 @@ public interface IAgentRegistryService
      * @param agentPort Agent端口
      * @return 结果
      */
-    public boolean heartbeat(String agentIp, Integer agentPort);
+    boolean heartbeat(String agentIp, Integer agentPort);
 
     /**
      * 下线超时节点
@@ -81,5 +81,5 @@ public interface IAgentRegistryService
      * @param timeoutSeconds 超时时间（秒）
      * @return 结果
      */
-    public int offlineTimeoutNodes(Integer timeoutSeconds);
+    int offlineTimeoutNodes(Integer timeoutSeconds);
 }

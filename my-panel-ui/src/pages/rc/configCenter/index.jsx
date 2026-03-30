@@ -374,57 +374,72 @@ const ConfigCenter = () => {
     }
   };
 
-  const [columns, setColumns] = useState([
-    { title: '配置ID', dataIndex: 'id', key: 'id', align: 'center', width: 80 },
-    { 
-      title: '环境', 
-      dataIndex: 'envId', 
-      key: 'envId', 
-      align: 'center',
-      width: 100,
-      ellipsis: true,
-      render: (envId) => envs.find(e => e.id === envId)?.envName || envId
-    },
-    { 
-      title: '应用', 
-      dataIndex: 'projectId', 
-      key: 'projectId', 
-      align: 'center',
-      width: 150,
-      ellipsis: true,
-      render: (projectId) => projects.find(p => p.id === projectId)?.projectName || projectId
-    },
-    { title: '配置键', dataIndex: 'configKey', key: 'configKey', align: 'center', width: 200, ellipsis: true },
-    { title: '配置值', dataIndex: 'configValue', key: 'configValue', align: 'center', width: 250, ellipsis: true },
-    { title: '配置描述', dataIndex: 'configDesc', key: 'configDesc', align: 'center', width: 200, ellipsis: true },
-    { 
-      title: '来源', 
-      dataIndex: 'source', 
-      key: 'source', 
-      align: 'center',
-      width: 100,
-      render: (source) => source === '1' ? '批量导入' : '手工新增'
-    },
-    { title: '更新人', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
-    { title: '创建人', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 180 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 180,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id)}>
-            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]);
+  const buildColumns = (prevColumns = []) => {
+    const widthByKey = new Map(prevColumns.map((c) => [c.key ?? c.dataIndex, c.width]));
+    const getWidth = (key, defaultWidth) => widthByKey.get(key) ?? defaultWidth;
+
+    return [
+      { title: '配置ID', dataIndex: 'id', key: 'id', align: 'center', width: getWidth('id', 80) },
+      {
+        title: '环境',
+        dataIndex: 'envId',
+        key: 'envId',
+        align: 'center',
+        width: getWidth('envId', 100),
+        ellipsis: true,
+        render: (envId) => envs.find((e) => String(e.id) === String(envId))?.envName || '-',
+      },
+      {
+        title: '应用',
+        dataIndex: 'projectId',
+        key: 'projectId',
+        align: 'center',
+        width: getWidth('projectId', 150),
+        ellipsis: true,
+        render: (projectId) => projects.find((p) => String(p.id) === String(projectId))?.projectName || '-',
+      },
+      { title: '配置键', dataIndex: 'configKey', key: 'configKey', align: 'center', width: getWidth('configKey', 200), ellipsis: true },
+      { title: '配置值', dataIndex: 'configValue', key: 'configValue', align: 'center', width: getWidth('configValue', 250), ellipsis: true },
+      { title: '配置描述', dataIndex: 'configDesc', key: 'configDesc', align: 'center', width: getWidth('configDesc', 200), ellipsis: true },
+      {
+        title: '来源',
+        dataIndex: 'source',
+        key: 'source',
+        align: 'center',
+        width: getWidth('source', 100),
+        render: (source) => (source === '1' ? '批量导入' : '手工新增'),
+      },
+      { title: '更新人', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: getWidth('updateBy', 100), ellipsis: true },
+      { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: getWidth('updateTime', 180) },
+      { title: '创建人', dataIndex: 'createBy', key: 'createBy', align: 'center', width: getWidth('createBy', 100), ellipsis: true },
+      { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: getWidth('createTime', 180) },
+      {
+        title: '操作',
+        key: 'action',
+        align: 'center',
+        width: getWidth('action', 180),
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="middle">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>
+              修改
+            </Button>
+            <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id)}>
+              <Button type="text" icon={<DeleteOutlined />} danger>
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ];
+  };
+
+  const [columns, setColumns] = useState(() => buildColumns());
+
+  useEffect(() => {
+    setColumns((prev) => buildColumns(prev));
+  }, [envs, projects]);
 
   const handleResize = (index) => (e, { size }) => {
     setColumns((prevColumns) => {

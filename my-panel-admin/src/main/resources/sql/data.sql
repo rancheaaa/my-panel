@@ -72,7 +72,8 @@ INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0
 INSERT IGNORE INTO `sys_job` VALUES (1, '备份系统初始化数据表', 'DEFAULT', 'appTask.backupSystemAllTable', '0/10 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-13 10:13:34.873309', ''),
        (2, '系统默认（有参）', 'DEFAULT', 'appTask.ryParams(''ry'')', '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', ''),
        (3, '系统默认（多参）', 'DEFAULT', 'appTask.ryMultipleParams(''ry'', true, 2000L, 316.50D, 100)', '0/20 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:14.0', ''),
-       (4, '扫描并下线超时节点', 'DEFAULT', 'rcNodeTask.scanOfflineNodes(60)', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-02-13 11:00:00.0', 'admin', '2026-02-13 11:00:00.0', '扫描注册中心表中超时未刷新的节点并设为下线状态');
+       (4, '扫描并下线超时节点', 'DEFAULT', 'rcNodeTask.scanOfflineNodes(60)', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-02-13 11:00:00.0', 'admin', '2026-02-13 11:00:00.0', '扫描注册中心表中超时未刷新的节点并设为下线状态'),
+       (5, '扫描并下线Agent超时节点', 'DEFAULT', 'agentTask.scanOfflineAgents(60)', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-03-30 00:00:00.0', 'admin', '2026-03-30 00:00:00.0', '扫描Agent注册表中超时未更新的节点并设为下线状态');
 
 INSERT IGNORE INTO `sys_menu` VALUES (1, '系统管理', 0, 2, 'system', NULL, '', '', 1, 0, 'M', '0', '0', '', 'SettingOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:11:52.0', '系统管理目录'),
        (2, '系统监控', 0, 3, 'monitor', NULL, '', '', 1, 0, 'M', '0', '0', '', 'DashboardOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:12:03.0', '系统监控目录'),

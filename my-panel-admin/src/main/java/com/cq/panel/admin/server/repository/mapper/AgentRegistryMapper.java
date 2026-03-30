@@ -75,10 +75,9 @@ public interface AgentRegistryMapper
     int updateNodeStatusByIpAndPort(AgentRegistry agentRegistry);
 
     /**
-     * 批量下线超时节点
+     * 查询在线节点列表（用于超时检测）
      * 
-     * @param timeoutSeconds 超时时间（秒）
-     * @return 结果
+     * @return 在线节点列表
      */
-    int updateNodeOfflineByTimeout(Integer timeoutSeconds);
+    List<AgentRegistry> selectOnlineNodes();
 }

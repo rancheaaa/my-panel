@@ -175,6 +175,38 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int offlineTimeoutNodes(Integer timeoutSeconds)
     {
-        return agentRegistryMapper.updateNodeOfflineByTimeout(timeoutSeconds);
+        Date now = DateUtils.getNowDate();
+        long timeoutMillis = timeoutSeconds * 1000L;
+        
+        List<AgentRegistry> onlineNodes = agentRegistryMapper.selectOnlineNodes();
+        if (onlineNodes == null || onlineNodes.isEmpty())
+        {
+            return 0;
+        }
+        
+        int offlineCount = 0;
+        for (AgentRegistry node : onlineNodes)
+        {
+            Date updateTime = node.getUpdateTime();
+            if (updateTime == null)
+            {
+                node.setNodeStatus(0);
+                node.setUpdateTime(DateUtils.getNowDate());
+                agentRegistryMapper.updateAgentRegistry(node);
+                offlineCount++;
+                continue;
+            }
+            
+            long timeDiff = now.getTime() - updateTime.getTime();
+            if (timeDiff > timeoutMillis)
+            {
+                node.setNodeStatus(0);
+                node.setUpdateTime(DateUtils.getNowDate());
+                agentRegistryMapper.updateAgentRegistry(node);
+                offlineCount++;
+            }
+        }
+        
+        return offlineCount;
     }
 }

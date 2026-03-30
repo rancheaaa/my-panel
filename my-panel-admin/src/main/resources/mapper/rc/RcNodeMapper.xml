@@ -105,10 +105,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
-    <update id="updateNodeOfflineByTimeout" parameterType="Integer">
-        update rc_node
-        set status = '1', update_time = now()
-        where status = '0' 
-        and TIMESTAMPDIFF(SECOND, last_refresh_time, now()) &gt; #{timeoutSeconds}
-    </update>
+    <select id="selectOnlineNodes" resultMap="RcNodeResult">
+        <include refid="selectRcNodeVo"/>
+        where n.status = '0'
+    </select>
 </mapper>

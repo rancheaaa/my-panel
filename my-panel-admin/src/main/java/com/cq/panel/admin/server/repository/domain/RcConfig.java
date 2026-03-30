@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
+import java.io.Serial;
+
 /**
  * 配置中心对象 rc_config
  * 
@@ -14,6 +16,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
  */
 public class RcConfig extends BaseEntity
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 配置ID */
@@ -84,7 +87,7 @@ public class RcConfig extends BaseEntity
     }
 
     @NotBlank(message = "配置键不能为空")
-    @Size(min = 0, max = 200, message = "配置键长度不能超过200个字符")
+    @Size(max = 200, message = "配置键长度不能超过200个字符")
     public String getConfigKey() 
     {
         return configKey;
@@ -103,7 +106,7 @@ public class RcConfig extends BaseEntity
         this.configDesc = configDesc;
     }
 
-    @Size(min = 0, max = 200, message = "配置描述长度不能超过200个字符")
+    @Size(max = 200, message = "配置描述长度不能超过200个字符")
     public String getConfigDesc() 
     {
         return configDesc;

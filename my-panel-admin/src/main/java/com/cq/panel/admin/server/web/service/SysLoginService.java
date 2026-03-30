@@ -14,16 +14,13 @@ import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.ip.IpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.factory.AsyncFactory;
-import com.cq.panel.admin.server.repository.service.ISysConfigService;
-import com.cq.panel.admin.server.repository.service.ISysUserService;
 import com.cq.panel.admin.server.security.context.AuthenticationContextHolder;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
+import com.cq.panel.authlite.AuthenticationToken;
+import com.cq.panel.admin.server.repository.service.ISysConfigService;
+import com.cq.panel.admin.server.repository.service.ISysUserService;
 
 
 /**
@@ -38,16 +35,16 @@ public class SysLoginService
     private TokenService tokenService;
 
     @Resource
-    private AuthenticationManager authenticationManager;
+    private LoginUserService loginUserService;
 
     @Autowired
     private CacheService cacheService;
     
     @Autowired
-    private ISysUserService userService;
+    private ISysConfigService configService;
 
     @Autowired
-    private ISysConfigService configService;
+    private ISysUserService userService;
 
     /**
      * 登录验证
@@ -64,37 +61,23 @@ public class SysLoginService
         validateCaptcha(username, code, uuid);
         // 登录前置校验
         loginPreCheck(username, password);
-        // 用户验证
-        Authentication authentication = null;
         try
         {
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username, password);
-            AuthenticationContextHolder.setContext(authenticationToken);
-            // 该方法会去调用UserDetailsServiceImpl.loadUserByUsername
-            authentication = authenticationManager.authenticate(authenticationToken);
+            AuthenticationContextHolder.setContext(new AuthenticationToken(username, password, false));
+            LoginUser loginUser = loginUserService.loadLoginUserByUsername(username);
+            AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
+            recordLoginInfo(loginUser.getUserId());
+            return tokenService.createToken(loginUser);
         }
-        catch (Exception e)
+        catch (ServiceException e)
         {
-            if (e instanceof BadCredentialsException)
-            {
-                AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, MessageUtils.message("user.password.not.match")));
-                throw new UserPasswordNotMatchException();
-            }
-            else
-            {
-                AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, e.getMessage()));
-                throw new ServiceException(e.getMessage());
-            }
+            AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, e.getMessage()));
+            throw e;
         }
         finally
         {
             AuthenticationContextHolder.clearContext();
         }
-        AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
-        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        recordLoginInfo(loginUser.getUserId());
-        // 生成token
-        return tokenService.createToken(loginUser);
     }
 
     /**

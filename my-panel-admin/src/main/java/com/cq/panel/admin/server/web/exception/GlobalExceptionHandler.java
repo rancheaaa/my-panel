@@ -6,13 +6,14 @@ import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import com.cq.panel.authlite.exception.ForbiddenException;
 
 /**
  * 全局异常处理器
@@ -27,12 +28,12 @@ public class GlobalExceptionHandler
     /**
      * 权限校验异常
      */
-    @ExceptionHandler(AccessDeniedException.class)
-    public Result<Void> handleAccessDeniedException(AccessDeniedException e, HttpServletRequest request)
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Result<Void>> handleForbiddenException(ForbiddenException e, HttpServletRequest request)
     {
         String requestURI = request.getRequestURI();
         log.error("请求地址'{}',权限校验失败'{}'", requestURI, e.getMessage());
-        return Result.error(HttpStatus.FORBIDDEN, "没有权限，请联系管理员授权");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(HttpStatus.FORBIDDEN, "没有权限，请联系管理员授权"));
     }
 
     /**

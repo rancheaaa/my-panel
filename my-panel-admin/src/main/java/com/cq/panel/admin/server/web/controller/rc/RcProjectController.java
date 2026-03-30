@@ -17,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -33,17 +32,20 @@ import java.util.List;
 @RequestMapping("/rc/project")
 public class RcProjectController extends BaseController
 {
-    @Autowired
-    private IRcProjectService rcProjectService;
+    private final IRcProjectService rcProjectService;
 
-    @Autowired
-    private RcProjectConverter rcProjectConverter;
+    private final RcProjectConverter rcProjectConverter;
+
+    public RcProjectController(IRcProjectService rcProjectService, RcProjectConverter rcProjectConverter) {
+        this.rcProjectService = rcProjectService;
+        this.rcProjectConverter = rcProjectConverter;
+    }
 
     /**
      * 查询应用管理列表
      */
     @Operation(summary = "查询应用管理列表", description = "根据条件分页获取应用管理列表")
-    @PreAuthorize("@ss.hasPermi('rc:appManage:list')")
+    @RequirePermission("rc:appManage:list")
     @GetMapping("/list")
     public Result<PageVO<RcProjectVO>> list(@Parameter(description = "查询参数") RcProjectQueryDTO query)
     {
@@ -51,7 +53,7 @@ public class RcProjectController extends BaseController
         RcProject rcProject = rcProjectConverter.toEntity(query);
         List<RcProject> list = rcProjectService.selectRcProjectList(rcProject);
         List<RcProjectVO> voList = rcProjectConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
@@ -59,13 +61,13 @@ public class RcProjectController extends BaseController
      */
     @Operation(summary = "导出应用管理列表", description = "导出符合条件的应用管理数据")
     @Log(title = "应用管理", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('rc:appManage:export')")
+    @RequirePermission("rc:appManage:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") RcProjectQueryDTO query)
     {
         RcProject rcProject = rcProjectConverter.toEntity(query);
         List<RcProject> list = rcProjectService.selectRcProjectList(rcProject);
-        ExcelUtil<RcProject> util = new ExcelUtil<RcProject>(RcProject.class);
+        ExcelUtil<RcProject> util = new ExcelUtil<>(RcProject.class);
         util.exportExcel(response, list, "应用管理数据");
     }
 
@@ -73,7 +75,7 @@ public class RcProjectController extends BaseController
      * 获取应用管理详细信息
      */
     @Operation(summary = "获取应用管理详细信息", description = "根据项目ID获取应用管理详细信息")
-    @PreAuthorize("@ss.hasPermi('rc:appManage:query')")
+    @RequirePermission("rc:appManage:query")
     @GetMapping(value = "/{id}")
     public Result<RcProjectVO> getInfo(@Parameter(description = "项目ID", required = true) @PathVariable("id") Long id)
     {
@@ -84,7 +86,7 @@ public class RcProjectController extends BaseController
      * 新增应用管理
      */
     @Operation(summary = "新增应用管理", description = "新增应用管理信息")
-    @PreAuthorize("@ss.hasPermi('rc:appManage:add')")
+    @RequirePermission("rc:appManage:add")
     @Log(title = "应用管理", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody RcProjectDTO dto)
@@ -103,7 +105,7 @@ public class RcProjectController extends BaseController
      * 修改应用管理
      */
     @Operation(summary = "修改应用管理", description = "修改应用管理信息")
-    @PreAuthorize("@ss.hasPermi('rc:appManage:edit')")
+    @RequirePermission("rc:appManage:edit")
     @Log(title = "应用管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody RcProjectDTO dto)
@@ -122,7 +124,7 @@ public class RcProjectController extends BaseController
      * 删除应用管理
      */
     @Operation(summary = "删除应用管理", description = "批量删除应用管理")
-    @PreAuthorize("@ss.hasPermi('rc:appManage:remove')")
+    @RequirePermission("rc:appManage:remove")
     @Log(title = "应用管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public Result<Void> remove(@Parameter(description = "项目ID数组", required = true) @PathVariable Long[] ids)

@@ -32,8 +32,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.commons.lang3.ArrayUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,28 +49,31 @@ import java.util.stream.Collectors;
 @RequestMapping("/system/user")
 public class SysUserController extends BaseController
 {
-    @Autowired
-    private ISysUserService userService;
+    private final ISysUserService userService;
 
-    @Autowired
-    private ISysRoleService roleService;
+    private final ISysRoleService roleService;
 
-    @Autowired
-    private ISysDeptService deptService;
+    private final ISysDeptService deptService;
 
-    @Autowired
-    private ISysPostService postService;
+    private final ISysPostService postService;
 
-    @Autowired
-    private SysUserConverter userConverter;
+    private final SysUserConverter userConverter;
 
-    @Autowired
-    private SysRoleConverter roleConverter;
+    private final SysRoleConverter roleConverter;
+
+    public SysUserController(ISysUserService userService, ISysRoleService roleService, ISysDeptService deptService, ISysPostService postService, SysUserConverter userConverter, SysRoleConverter roleConverter) {
+        this.userService = userService;
+        this.roleService = roleService;
+        this.deptService = deptService;
+        this.postService = postService;
+        this.userConverter = userConverter;
+        this.roleConverter = roleConverter;
+    }
 
     /**
      * 获取用户列表
      */
-    @PreAuthorize("@ss.hasPermi('system:user:list')")
+    @RequirePermission("system:user:list")
     @GetMapping("/list")
     @Operation(summary = "获取用户列表", description = "分页获取用户列表")
     public Result<PageVO<SysUserVO>> list(@Parameter(description = "查询参数") SysUserQueryDTO query)
@@ -79,28 +81,28 @@ public class SysUserController extends BaseController
         startPage();
         SysUser user = userConverter.toEntity(query);
         List<SysUser> list = userService.selectUserList(user);
-        return Result.success(new PageVO<>(userConverter.toVOList(list), new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(userConverter.toVOList(list), new PageInfo<>(list).getTotal()));
     }
 
     @Log(title = "用户管理", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('system:user:export')")
+    @RequirePermission("system:user:export")
     @PostMapping("/export")
     @Operation(summary = "导出用户数据", description = "导出所有符合查询条件的用户数据")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") SysUserQueryDTO query)
     {
         SysUser user = userConverter.toEntity(query);
         List<SysUser> list = userService.selectUserList(user);
-        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        ExcelUtil<SysUser> util = new ExcelUtil<>(SysUser.class);
         util.exportExcel(response, list, "用户数据");
     }
 
     @Log(title = "用户管理", businessType = BusinessType.IMPORT)
-    @PreAuthorize("@ss.hasPermi('system:user:import')")
+    @RequirePermission("system:user:import")
     @PostMapping("/importData")
     @Operation(summary = "导入用户数据", description = "导入用户数据，支持覆盖更新")
     public Result<String> importData(@Parameter(description = "上传文件") MultipartFile file, @Parameter(description = "是否覆盖更新") boolean updateSupport) throws Exception
     {
-        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        ExcelUtil<SysUser> util = new ExcelUtil<>(SysUser.class);
         List<SysUser> userList = util.importExcel(file.getInputStream());
         String operName = getUsername();
         return Result.success(userService.importUser(userList, updateSupport, operName));
@@ -113,7 +115,7 @@ public class SysUserController extends BaseController
     @PostMapping("/importTemplate")
     public void importTemplate(HttpServletResponse response)
     {
-        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        ExcelUtil<SysUser> util = new ExcelUtil<>(SysUser.class);
         util.importTemplateExcel(response, "用户数据");
     }
 
@@ -121,7 +123,7 @@ public class SysUserController extends BaseController
      * 根据用户编号获取详细信息
      */
     @Operation(summary = "根据用户编号获取详细信息", description = "获取用户详细信息，包括角色、岗位等")
-    @PreAuthorize("@ss.hasPermi('system:user:query')")
+    @RequirePermission("system:user:query")
     @GetMapping(value = { "/", "/{userId}" })
     public Result<SysUserDetailVO> getInfo(@Parameter(description = "用户ID") @PathVariable(value = "userId", required = false) Long userId)
     {
@@ -144,7 +146,7 @@ public class SysUserController extends BaseController
      * 新增用户
      */
     @Operation(summary = "新增用户", description = "创建新用户")
-    @PreAuthorize("@ss.hasPermi('system:user:add')")
+    @RequirePermission("system:user:add")
     @Log(title = "用户管理", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysUserDTO dto)
@@ -174,7 +176,7 @@ public class SysUserController extends BaseController
      * 修改用户
      */
     @Operation(summary = "修改用户", description = "修改用户信息")
-    @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @RequirePermission("system:user:edit")
     @Log(title = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysUserDTO dto)
@@ -205,7 +207,7 @@ public class SysUserController extends BaseController
      * 删除用户
      */
     @Operation(summary = "删除用户", description = "批量删除用户")
-    @PreAuthorize("@ss.hasPermi('system:user:remove')")
+    @RequirePermission("system:user:remove")
     @Log(title = "用户管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{userIds}")
     public Result<Void> remove(@Parameter(description = "用户ID数组") @PathVariable Long[] userIds)
@@ -222,7 +224,7 @@ public class SysUserController extends BaseController
      * 重置密码
      */
     @Operation(summary = "重置密码", description = "重置用户密码")
-    @PreAuthorize("@ss.hasPermi('system:user:resetPwd')")
+    @RequirePermission("system:user:resetPwd")
     @Log(title = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/resetPwd")
     public Result<Void> resetPwd(@RequestBody SysUserResetPwdDTO dto)
@@ -240,7 +242,7 @@ public class SysUserController extends BaseController
      * 状态修改
      */
     @Operation(summary = "状态修改", description = "修改用户状态（正常/停用）")
-    @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @RequirePermission("system:user:edit")
     @Log(title = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/changeStatus")
     public Result<Void> changeStatus(@RequestBody SysUserStatusDTO dto)
@@ -257,7 +259,7 @@ public class SysUserController extends BaseController
      * 根据用户编号获取授权角色
      */
     @Operation(summary = "根据用户编号获取授权角色", description = "获取用户已授权的角色列表")
-    @PreAuthorize("@ss.hasPermi('system:user:query')")
+    @RequirePermission("system:user:query")
     @GetMapping("/authRole/{userId}")
     public Result<UserAuthRoleVO> authRole(@Parameter(description = "用户ID") @PathVariable("userId") Long userId)
     {
@@ -273,7 +275,7 @@ public class SysUserController extends BaseController
      * 用户授权角色
      */
     @Operation(summary = "用户授权角色", description = "为用户分配角色")
-    @PreAuthorize("@ss.hasPermi('system:user:edit')")
+    @RequirePermission("system:user:edit")
     @Log(title = "用户管理", businessType = BusinessType.GRANT)
     @PutMapping("/authRole")
     public Result<Void> insertAuthRole(@RequestBody UserAuthRoleDTO dto)
@@ -288,7 +290,7 @@ public class SysUserController extends BaseController
      * 获取部门树列表
      */
     @Operation(summary = "获取部门树列表", description = "获取部门树结构列表")
-    @PreAuthorize("@ss.hasPermi('system:user:list')")
+    @RequirePermission("system:user:list")
     @GetMapping("/deptTree")
     public Result<List<TreeSelect>> deptTree(@Parameter(description = "部门查询参数") SysDept dept)
     {

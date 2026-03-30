@@ -17,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -30,63 +29,66 @@ import java.util.List;
 @Tag(name = "登录日志", description = "系统登录日志管理接口")
 @RestController
 @RequestMapping("/monitor/logininfor")
-public class SysLogininforController extends BaseController
+public class SysLoginInfoController extends BaseController
 {
-    @Autowired
-    private ISysLogininforService logininforService;
+    private final ISysLogininforService loginInfoService;
 
-    @Autowired
-    private SysPasswordService passwordService;
+    private final SysPasswordService passwordService;
 
-    @Autowired
-    private SysLogininforConverter logininforConverter;
+    private final SysLogininforConverter loginInfoConverter;
+
+    public SysLoginInfoController(ISysLogininforService loginInfoService, SysPasswordService passwordService, SysLogininforConverter loginInfoConverter) {
+        this.loginInfoService = loginInfoService;
+        this.passwordService = passwordService;
+        this.loginInfoConverter = loginInfoConverter;
+    }
 
     @Operation(summary = "查询系统访问记录列表", description = "获取登录日志列表，支持分页和条件查询")
-    @PreAuthorize("@ss.hasPermi('monitor:logininfor:list')")
+    @RequirePermission("monitor:logininfor:list")
     @GetMapping("/list")
     public Result<PageVO<SysLogininforVO>> list(@Parameter(description = "查询条件") SysLogininforQueryDTO query)
     {
         startPage();
-        SysLogininfor sysLogininfor = logininforConverter.toEntity(query);
-        List<SysLogininfor> list = logininforService.selectLogininforList(sysLogininfor);
-        List<SysLogininforVO> voList = logininforConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        SysLogininfor sysLogininfor = loginInfoConverter.toEntity(query);
+        List<SysLogininfor> list = loginInfoService.selectLogininforList(sysLogininfor);
+        List<SysLogininforVO> voList = loginInfoConverter.toVOList(list);
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     @Operation(summary = "导出系统访问记录列表", description = "导出符合条件的登录日志数据")
-    @PreAuthorize("@ss.hasPermi('monitor:logininfor:export')")
+    @RequirePermission("monitor:logininfor:export")
     @Log(title = "登录日志", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询条件") SysLogininforQueryDTO query)
     {
-        SysLogininfor sysLogininfor = logininforConverter.toEntity(query);
-        List<SysLogininfor> list = logininforService.selectLogininforList(sysLogininfor);
-        ExcelUtil<SysLogininfor> util = new ExcelUtil<SysLogininfor>(SysLogininfor.class);
+        SysLogininfor sysLogininfor = loginInfoConverter.toEntity(query);
+        List<SysLogininfor> list = loginInfoService.selectLogininforList(sysLogininfor);
+        ExcelUtil<SysLogininfor> util = new ExcelUtil<>(SysLogininfor.class);
         util.exportExcel(response, list, "登录日志");
     }
 
     @Operation(summary = "删除系统访问记录", description = "批量删除登录日志")
-    @PreAuthorize("@ss.hasPermi('monitor:logininfor:remove')")
+    @RequirePermission("monitor:logininfor:remove")
     @Log(title = "登录日志", businessType = BusinessType.DELETE)
     @DeleteMapping("/{infoIds}")
     public Result<Void> remove(@Parameter(description = "日志ID串", required = true) @PathVariable Long[] infoIds)
     {
-        logininforService.deleteLogininforByIds(infoIds);
+        loginInfoService.deleteLogininforByIds(infoIds);
         return Result.success();
     }
 
     @Operation(summary = "清空系统访问记录", description = "清空所有登录日志")
-    @PreAuthorize("@ss.hasPermi('monitor:logininfor:remove')")
+    @RequirePermission("monitor:logininfor:remove")
     @Log(title = "登录日志", businessType = BusinessType.CLEAN)
     @DeleteMapping("/clean")
     public Result<Void> clean()
     {
-        logininforService.cleanLogininfor();
+        loginInfoService.cleanLogininfor();
         return Result.success();
     }
 
     @Operation(summary = "账户解锁", description = "解锁被锁定的用户账户")
-    @PreAuthorize("@ss.hasPermi('monitor:logininfor:unlock')")
+    @RequirePermission("monitor:logininfor:unlock")
     @Log(title = "账户解锁", businessType = BusinessType.OTHER)
     @GetMapping("/unlock/{userName}")
     public Result<Void> unlock(@Parameter(description = "用户账号", required = true) @PathVariable("userName") String userName)

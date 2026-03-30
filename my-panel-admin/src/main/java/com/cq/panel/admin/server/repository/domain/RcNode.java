@@ -4,6 +4,8 @@ import com.cq.panel.admin.server.common.annotation.Excel;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+
+import java.io.Serial;
 import java.util.Date;
 
 /**
@@ -13,6 +15,7 @@ import java.util.Date;
  */
 public class RcNode extends BaseEntity
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 节点ID */

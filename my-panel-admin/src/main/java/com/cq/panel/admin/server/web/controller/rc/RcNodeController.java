@@ -17,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -33,17 +32,20 @@ import java.util.List;
 @RequestMapping("/rc/node")
 public class RcNodeController extends BaseController
 {
-    @Autowired
-    private IRcNodeService rcNodeService;
+    private final IRcNodeService rcNodeService;
 
-    @Autowired
-    private RcNodeConverter rcNodeConverter;
+    private final RcNodeConverter rcNodeConverter;
+
+    public RcNodeController(IRcNodeService rcNodeService, RcNodeConverter rcNodeConverter) {
+        this.rcNodeService = rcNodeService;
+        this.rcNodeConverter = rcNodeConverter;
+    }
 
     /**
      * 查询注册中心节点列表
      */
     @Operation(summary = "查询注册中心节点列表", description = "根据条件分页获取注册中心节点列表")
-    @PreAuthorize("@ss.hasPermi('rc:registryCenter:list')")
+    @RequirePermission("rc:registryCenter:list")
     @GetMapping("/list")
     public Result<PageVO<RcNodeVO>> list(@Parameter(description = "查询参数") RcNodeQueryDTO query)
     {
@@ -51,7 +53,7 @@ public class RcNodeController extends BaseController
         RcNode rcNode = rcNodeConverter.toEntity(query);
         List<RcNode> list = rcNodeService.selectRcNodeList(rcNode);
         List<RcNodeVO> voList = rcNodeConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
@@ -59,13 +61,13 @@ public class RcNodeController extends BaseController
      */
     @Operation(summary = "导出注册中心节点列表", description = "导出符合条件的注册中心节点数据")
     @Log(title = "注册中心", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('rc:registryCenter:export')")
+    @RequirePermission("rc:registryCenter:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") RcNodeQueryDTO query)
     {
         RcNode rcNode = rcNodeConverter.toEntity(query);
         List<RcNode> list = rcNodeService.selectRcNodeList(rcNode);
-        ExcelUtil<RcNode> util = new ExcelUtil<RcNode>(RcNode.class);
+        ExcelUtil<RcNode> util = new ExcelUtil<>(RcNode.class);
         util.exportExcel(response, list, "注册中心数据");
     }
 
@@ -73,7 +75,7 @@ public class RcNodeController extends BaseController
      * 获取注册中心节点详细信息
      */
     @Operation(summary = "获取注册中心节点详细信息", description = "根据节点ID获取注册中心节点详细信息")
-    @PreAuthorize("@ss.hasPermi('rc:registryCenter:query')")
+    @RequirePermission("rc:registryCenter:query")
     @GetMapping(value = "/{id}")
     public Result<RcNodeVO> getInfo(@Parameter(description = "节点ID", required = true) @PathVariable("id") Long id)
     {
@@ -84,7 +86,7 @@ public class RcNodeController extends BaseController
      * 新增注册中心节点
      */
     @Operation(summary = "新增注册中心节点", description = "新增注册中心节点信息")
-    @PreAuthorize("@ss.hasPermi('rc:registryCenter:add')")
+    @RequirePermission("rc:registryCenter:add")
     @Log(title = "注册中心", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody RcNodeDTO dto)
@@ -102,7 +104,7 @@ public class RcNodeController extends BaseController
      * 修改注册中心节点
      */
     @Operation(summary = "修改注册中心节点", description = "修改注册中心节点信息")
-    @PreAuthorize("@ss.hasPermi('rc:registryCenter:edit')")
+    @RequirePermission("rc:registryCenter:edit")
     @Log(title = "注册中心", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody RcNodeDTO dto)
@@ -120,7 +122,7 @@ public class RcNodeController extends BaseController
      * 删除注册中心节点
      */
     @Operation(summary = "删除注册中心节点", description = "批量删除注册中心节点")
-    @PreAuthorize("@ss.hasPermi('rc:registryCenter:remove')")
+    @RequirePermission("rc:registryCenter:remove")
     @Log(title = "注册中心", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public Result<Void> remove(@Parameter(description = "节点ID数组", required = true) @PathVariable Long[] ids)

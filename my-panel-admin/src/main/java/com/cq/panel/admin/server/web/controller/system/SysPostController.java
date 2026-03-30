@@ -2,7 +2,6 @@ package com.cq.panel.admin.server.web.controller.system;
 
 import com.cq.panel.admin.server.common.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
-import com.cq.panel.admin.server.web.domain.page.TableDataInfo;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.domain.SysPost;
@@ -18,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -34,17 +32,20 @@ import java.util.List;
 @RequestMapping("/system/post")
 public class SysPostController extends BaseController
 {
-    @Autowired
-    private ISysPostService postService;
+    private final ISysPostService postService;
 
-    @Autowired
-    private SysPostConverter postConverter;
+    private final SysPostConverter postConverter;
+
+    public SysPostController(ISysPostService postService, SysPostConverter postConverter) {
+        this.postService = postService;
+        this.postConverter = postConverter;
+    }
 
     /**
      * 获取岗位列表
      */
     @Operation(summary = "获取岗位列表", description = "根据条件分页获取岗位列表")
-    @PreAuthorize("@ss.hasPermi('system:post:list')")
+    @RequirePermission("system:post:list")
     @GetMapping("/list")
     public Result<PageVO<SysPostVO>> list(@Parameter(description = "查询参数") SysPostQueryDTO query)
     {
@@ -52,18 +53,18 @@ public class SysPostController extends BaseController
         SysPost post = postConverter.toEntity(query);
         List<SysPost> list = postService.selectPostList(post);
         List<SysPostVO> voList = postConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
     
     @Operation(summary = "导出岗位数据", description = "导出符合条件的岗位数据")
     @Log(title = "岗位管理", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('system:post:export')")
+    @RequirePermission("system:post:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") SysPostQueryDTO query)
     {
         SysPost post = postConverter.toEntity(query);
         List<SysPost> list = postService.selectPostList(post);
-        ExcelUtil<SysPost> util = new ExcelUtil<SysPost>(SysPost.class);
+        ExcelUtil<SysPost> util = new ExcelUtil<>(SysPost.class);
         util.exportExcel(response, list, "岗位数据");
     }
 
@@ -71,7 +72,7 @@ public class SysPostController extends BaseController
      * 根据岗位编号获取详细信息
      */
     @Operation(summary = "根据岗位编号获取详细信息", description = "根据岗位ID获取岗位详细信息")
-    @PreAuthorize("@ss.hasPermi('system:post:query')")
+    @RequirePermission("system:post:query")
     @GetMapping(value = "/{postId}")
     public Result<SysPostVO> getInfo(@Parameter(description = "岗位ID", required = true) @PathVariable Long postId)
     {
@@ -81,7 +82,7 @@ public class SysPostController extends BaseController
     /**
      * 新增岗位
      */
-    @PreAuthorize("@ss.hasPermi('system:post:add')")
+    @RequirePermission("system:post:add")
     @Log(title = "岗位管理", businessType = BusinessType.INSERT)
     @Operation(summary = "新增岗位", description = "新增岗位信息")
     @PostMapping
@@ -104,7 +105,7 @@ public class SysPostController extends BaseController
     /**
      * 修改岗位
      */
-    @PreAuthorize("@ss.hasPermi('system:post:edit')")
+    @RequirePermission("system:post:edit")
     @Log(title = "岗位管理", businessType = BusinessType.UPDATE)
     @Operation(summary = "修改岗位", description = "修改岗位信息")
     @PutMapping
@@ -128,7 +129,7 @@ public class SysPostController extends BaseController
      * 删除岗位
      */
     @Operation(summary = "删除岗位", description = "批量删除岗位")
-    @PreAuthorize("@ss.hasPermi('system:post:remove')")
+    @RequirePermission("system:post:remove")
     @Log(title = "岗位管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{postIds}")
     public Result<Void> remove(@Parameter(description = "岗位ID数组", required = true) @PathVariable Long[] postIds)

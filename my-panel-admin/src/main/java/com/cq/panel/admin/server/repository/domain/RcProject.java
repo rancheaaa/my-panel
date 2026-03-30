@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
+import java.io.Serial;
+
 /**
  * 应用管理对象 rc_project
  * 
@@ -13,6 +15,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
  */
 public class RcProject extends BaseEntity
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 应用ID */
@@ -41,7 +44,7 @@ public class RcProject extends BaseEntity
     }
 
     @NotBlank(message = "应用名称不能为空")
-    @Size(min = 0, max = 100, message = "应用名称长度不能超过100个字符")
+    @Size(max = 100, message = "应用名称长度不能超过100个字符")
     public String getProjectName() 
     {
         return projectName;
@@ -51,7 +54,7 @@ public class RcProject extends BaseEntity
         this.projectDesc = projectDesc;
     }
 
-    @Size(min = 0, max = 200, message = "应用描述长度不能超过200个字符")
+    @Size(max = 200, message = "应用描述长度不能超过200个字符")
     public String getProjectDesc() 
     {
         return projectDesc;

@@ -10,9 +10,7 @@ import com.cq.panel.admin.server.web.exception.ServiceException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,10 +26,9 @@ import java.util.Map;
 @RequestMapping("/test/user")
 public class TestController extends BaseController
 {
-    @Autowired
-    private TestUserConverter testUserConverter;
+    private final TestUserConverter testUserConverter;
 
-    private final static Map<Integer, TestUserVO> users = new LinkedHashMap<Integer, TestUserVO>();
+    private final static Map<Integer, TestUserVO> users = new LinkedHashMap<>();
     {
         TestUserVO user1 = new TestUserVO();
         user1.setUserId(1);
@@ -47,7 +44,11 @@ public class TestController extends BaseController
         user2.setMobile("15666666666");
         users.put(2, user2);
     }
-    
+
+    public TestController(TestUserConverter testUserConverter) {
+        this.testUserConverter = testUserConverter;
+    }
+
     @Operation(summary = "获取用户列表", description = "获取所有测试用户列表")
     @GetMapping("/list")
     public Result<List<TestUserVO>> userList()

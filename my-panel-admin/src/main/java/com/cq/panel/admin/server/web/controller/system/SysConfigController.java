@@ -2,7 +2,6 @@ package com.cq.panel.admin.server.web.controller.system;
 
 import com.cq.panel.admin.server.common.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
-import com.cq.panel.admin.server.web.domain.page.TableDataInfo;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.domain.SysConfig;
@@ -14,14 +13,12 @@ import com.cq.panel.admin.server.web.domain.vo.system.SysConfigVO;
 import com.cq.panel.admin.server.web.domain.vo.system.ConfigValueVO;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.web.converter.system.SysConfigConverter;
-import com.cq.panel.admin.server.web.exception.ServiceException;
 import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -36,17 +33,20 @@ import java.util.List;
 @RequestMapping("/system/config")
 public class SysConfigController extends BaseController
 {
-    @Autowired
-    private ISysConfigService configService;
+    private final ISysConfigService configService;
 
-    @Autowired
-    private SysConfigConverter configConverter;
+    private final SysConfigConverter configConverter;
+
+    public SysConfigController(ISysConfigService configService, SysConfigConverter configConverter) {
+        this.configService = configService;
+        this.configConverter = configConverter;
+    }
 
     /**
      * 获取参数配置列表
      */
     @Operation(summary = "获取参数配置列表", description = "根据条件分页获取参数配置列表")
-    @PreAuthorize("@ss.hasPermi('system:config:list')")
+    @RequirePermission("system:config:list")
     @GetMapping("/list")
     public Result<PageVO<SysConfigVO>> list(@Parameter(description = "查询参数") SysConfigQueryDTO query)
     {
@@ -55,18 +55,18 @@ public class SysConfigController extends BaseController
         List<SysConfig> list = configService.selectConfigList(config);
         List<SysConfigVO> voList = configConverter.toVOList(list);
         
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(voList).getTotal()));
     }
 
     @Operation(summary = "导出参数配置", description = "导出符合条件的参数配置数据")
     @Log(title = "参数管理", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('system:config:export')")
+    @RequirePermission("system:config:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") SysConfigQueryDTO query)
     {
         SysConfig config = configConverter.toEntity(query);
         List<SysConfig> list = configService.selectConfigList(config);
-        ExcelUtil<SysConfig> util = new ExcelUtil<SysConfig>(SysConfig.class);
+        ExcelUtil<SysConfig> util = new ExcelUtil<>(SysConfig.class);
         util.exportExcel(response, list, "参数数据");
     }
 
@@ -74,7 +74,7 @@ public class SysConfigController extends BaseController
      * 根据参数编号获取详细信息
      */
     @Operation(summary = "根据参数编号获取详细信息", description = "根据参数ID获取参数详细信息")
-    @PreAuthorize("@ss.hasPermi('system:config:query')")
+    @RequirePermission("system:config:query")
     @GetMapping(value = "/{configId}")
     public Result<SysConfigVO> getInfo(@Parameter(description = "参数ID", required = true) @PathVariable Long configId)
     {
@@ -95,7 +95,7 @@ public class SysConfigController extends BaseController
      * 新增参数配置
      */
     @Operation(summary = "新增参数配置", description = "新增参数配置信息")
-    @PreAuthorize("@ss.hasPermi('system:config:add')")
+    @RequirePermission("system:config:add")
     @Log(title = "参数管理", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysConfigDTO dto)
@@ -114,7 +114,7 @@ public class SysConfigController extends BaseController
      * 修改参数配置
      */
     @Operation(summary = "修改参数配置", description = "修改参数配置信息")
-    @PreAuthorize("@ss.hasPermi('system:config:edit')")
+    @RequirePermission("system:config:edit")
     @Log(title = "参数管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysConfigDTO dto)
@@ -133,7 +133,7 @@ public class SysConfigController extends BaseController
      * 删除参数配置
      */
     @Operation(summary = "删除参数配置", description = "批量删除参数配置")
-    @PreAuthorize("@ss.hasPermi('system:config:remove')")
+    @RequirePermission("system:config:remove")
     @Log(title = "参数管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{configIds}")
     public Result<Void> remove(@Parameter(description = "参数ID数组", required = true) @PathVariable Long[] configIds)
@@ -146,7 +146,7 @@ public class SysConfigController extends BaseController
      * 刷新参数缓存
      */
     @Operation(summary = "刷新参数缓存", description = "清除并重新加载所有参数缓存")
-    @PreAuthorize("@ss.hasPermi('system:config:remove')")
+    @RequirePermission("system:config:remove")
     @Log(title = "参数管理", businessType = BusinessType.CLEAN)
     @DeleteMapping("/refreshCache")
     public Result<Void> refreshCache()

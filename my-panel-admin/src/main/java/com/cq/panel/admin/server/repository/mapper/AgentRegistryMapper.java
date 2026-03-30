@@ -16,7 +16,7 @@ public interface AgentRegistryMapper
      * @param id Agent注册信息主键
      * @return Agent注册信息
      */
-    public AgentRegistry selectAgentRegistryById(String id);
+    AgentRegistry selectAgentRegistryById(String id);
 
     /**
      * 查询Agent注册信息列表
@@ -24,7 +24,7 @@ public interface AgentRegistryMapper
      * @param agentRegistry Agent注册信息
      * @return Agent注册信息集合
      */
-    public List<AgentRegistry> selectAgentRegistryList(AgentRegistry agentRegistry);
+    List<AgentRegistry> selectAgentRegistryList(AgentRegistry agentRegistry);
 
     /**
      * 根据IP和端口查询Agent注册信息
@@ -32,7 +32,7 @@ public interface AgentRegistryMapper
      * @param agentRegistry Agent注册信息
      * @return Agent注册信息
      */
-    public AgentRegistry selectAgentRegistryByIpAndPort(AgentRegistry agentRegistry);
+    AgentRegistry selectAgentRegistryByIpAndPort(AgentRegistry agentRegistry);
 
     /**
      * 新增Agent注册信息
@@ -40,7 +40,7 @@ public interface AgentRegistryMapper
      * @param agentRegistry Agent注册信息
      * @return 结果
      */
-    public int insertAgentRegistry(AgentRegistry agentRegistry);
+    int insertAgentRegistry(AgentRegistry agentRegistry);
 
     /**
      * 修改Agent注册信息
@@ -48,7 +48,7 @@ public interface AgentRegistryMapper
      * @param agentRegistry Agent注册信息
      * @return 结果
      */
-    public int updateAgentRegistry(AgentRegistry agentRegistry);
+    int updateAgentRegistry(AgentRegistry agentRegistry);
 
     /**
      * 删除Agent注册信息
@@ -56,7 +56,7 @@ public interface AgentRegistryMapper
      * @param id Agent注册信息主键
      * @return 结果
      */
-    public int deleteAgentRegistryById(String id);
+    int deleteAgentRegistryById(String id);
 
     /**
      * 批量删除Agent注册信息
@@ -64,7 +64,7 @@ public interface AgentRegistryMapper
      * @param ids 需要删除的数据主键集合
      * @return 结果
      */
-    public int deleteAgentRegistryByIds(String[] ids);
+    int deleteAgentRegistryByIds(String[] ids);
 
     /**
      * 根据IP和端口更新节点状态
@@ -72,7 +72,7 @@ public interface AgentRegistryMapper
      * @param agentRegistry Agent注册信息
      * @return 结果
      */
-    public int updateNodeStatusByIpAndPort(AgentRegistry agentRegistry);
+    int updateNodeStatusByIpAndPort(AgentRegistry agentRegistry);
 
     /**
      * 批量下线超时节点
@@ -80,5 +80,5 @@ public interface AgentRegistryMapper
      * @param timeoutSeconds 超时时间（秒）
      * @return 结果
      */
-    public int updateNodeOfflineByTimeout(Integer timeoutSeconds);
+    int updateNodeOfflineByTimeout(Integer timeoutSeconds);
 }

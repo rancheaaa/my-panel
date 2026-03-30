@@ -16,8 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -31,17 +30,20 @@ import java.util.List;
 @RequestMapping("/monitor/jobLog")
 public class SysJobLogController extends BaseController
 {
-    @Autowired
-    private ISysJobLogService jobLogService;
+    private final ISysJobLogService jobLogService;
 
-    @Autowired
-    private SysJobLogConverter jobLogConverter;
+    private final SysJobLogConverter jobLogConverter;
+
+    public SysJobLogController(ISysJobLogService jobLogService, SysJobLogConverter jobLogConverter) {
+        this.jobLogService = jobLogService;
+        this.jobLogConverter = jobLogConverter;
+    }
 
     /**
      * 查询定时任务调度日志列表
      */
     @Operation(summary = "查询定时任务调度日志列表", description = "获取调度日志列表，支持分页和条件查询")
-    @PreAuthorize("@ss.hasPermi('monitor:job:list')")
+    @RequirePermission("monitor:job:list")
     @GetMapping("/list")
     public Result<PageVO<SysJobLogVO>> list(@Parameter(description = "查询条件") SysJobLogQueryDTO query)
     {
@@ -49,21 +51,21 @@ public class SysJobLogController extends BaseController
         SysJobLog sysJobLog = jobLogConverter.toEntity(query);
         List<SysJobLog> list = jobLogService.selectJobLogList(sysJobLog);
         List<SysJobLogVO> voList = jobLogConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
      * 导出定时任务调度日志列表
      */
     @Operation(summary = "导出定时任务调度日志列表", description = "导出符合条件的调度日志数据")
-    @PreAuthorize("@ss.hasPermi('monitor:job:export')")
+    @RequirePermission("monitor:job:export")
     @Log(title = "任务调度日志", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询条件") SysJobLogQueryDTO query)
     {
         SysJobLog sysJobLog = jobLogConverter.toEntity(query);
         List<SysJobLog> list = jobLogService.selectJobLogList(sysJobLog);
-        ExcelUtil<SysJobLog> util = new ExcelUtil<SysJobLog>(SysJobLog.class);
+        ExcelUtil<SysJobLog> util = new ExcelUtil<>(SysJobLog.class);
         util.exportExcel(response, list, "调度日志");
     }
 
@@ -71,7 +73,7 @@ public class SysJobLogController extends BaseController
      * 根据调度编号获取详细信息
      */
     @Operation(summary = "根据调度编号获取详细信息", description = "根据日志ID获取详细信息")
-    @PreAuthorize("@ss.hasPermi('monitor:job:query')")
+    @RequirePermission("monitor:job:query")
     @GetMapping(value = "/{jobLogId}")
     public Result<SysJobLogVO> getInfo(@Parameter(description = "日志ID", required = true) @PathVariable Long jobLogId)
     {
@@ -82,7 +84,7 @@ public class SysJobLogController extends BaseController
      * 删除定时任务调度日志
      */
     @Operation(summary = "删除定时任务调度日志", description = "批量删除调度日志")
-    @PreAuthorize("@ss.hasPermi('monitor:job:remove')")
+    @RequirePermission("monitor:job:remove")
     @Log(title = "定时任务调度日志", businessType = BusinessType.DELETE)
     @DeleteMapping("/{jobLogIds}")
     public Result<Void> remove(@Parameter(description = "日志ID串", required = true) @PathVariable Long[] jobLogIds)
@@ -95,7 +97,7 @@ public class SysJobLogController extends BaseController
      * 清空定时任务调度日志
      */
     @Operation(summary = "清空定时任务调度日志", description = "清空所有调度日志")
-    @PreAuthorize("@ss.hasPermi('monitor:job:remove')")
+    @RequirePermission("monitor:job:remove")
     @Log(title = "调度日志", businessType = BusinessType.CLEAN)
     @DeleteMapping("/clean")
     public Result<Void> clean()

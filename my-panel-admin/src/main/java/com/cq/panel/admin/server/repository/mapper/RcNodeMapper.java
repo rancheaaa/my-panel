@@ -16,7 +16,7 @@ public interface RcNodeMapper
      * @param id 注册中心节点主键
      * @return 注册中心节点
      */
-    public RcNode selectRcNodeById(Long id);
+    RcNode selectRcNodeById(Long id);
 
     /**
      * 查询注册中心节点列表
@@ -24,7 +24,7 @@ public interface RcNodeMapper
      * @param rcNode 注册中心节点
      * @return 注册中心节点集合
      */
-    public List<RcNode> selectRcNodeList(RcNode rcNode);
+    List<RcNode> selectRcNodeList(RcNode rcNode);
 
     /**
      * 新增注册中心节点
@@ -32,7 +32,7 @@ public interface RcNodeMapper
      * @param rcNode 注册中心节点
      * @return 结果
      */
-    public int insertRcNode(RcNode rcNode);
+    int insertRcNode(RcNode rcNode);
 
     /**
      * 修改注册中心节点
@@ -40,7 +40,7 @@ public interface RcNodeMapper
      * @param rcNode 注册中心节点
      * @return 结果
      */
-    public int updateRcNode(RcNode rcNode);
+    int updateRcNode(RcNode rcNode);
 
     /**
      * 删除注册中心节点
@@ -48,7 +48,7 @@ public interface RcNodeMapper
      * @param id 注册中心节点主键
      * @return 结果
      */
-    public int deleteRcNodeById(Long id);
+    int deleteRcNodeById(Long id);
 
     /**
      * 批量删除注册中心节点
@@ -56,7 +56,7 @@ public interface RcNodeMapper
      * @param ids 需要删除的数据主键集合
      * @return 结果
      */
-    public int deleteRcNodeByIds(Long[] ids);
+    int deleteRcNodeByIds(Long[] ids);
 
     /**
      * 校验节点是否唯一
@@ -64,7 +64,7 @@ public interface RcNodeMapper
      * @param rcNode 节点信息
      * @return 结果
      */
-    public RcNode checkNodeUnique(RcNode rcNode);
+    RcNode checkNodeUnique(RcNode rcNode);
 
     /**
      * 批量下线超时节点
@@ -72,5 +72,5 @@ public interface RcNodeMapper
      * @param timeoutSeconds 超时时间（秒）
      * @return 结果
      */
-    public int updateNodeOfflineByTimeout(Integer timeoutSeconds);
+    int updateNodeOfflineByTimeout(Integer timeoutSeconds);
 }

@@ -1,5 +1,6 @@
 package com.cq.panel.admin.server.web.domain.page;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
@@ -10,6 +11,7 @@ import java.util.List;
  */
 public class TableDataInfo implements Serializable
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 总记录数 */
@@ -29,18 +31,6 @@ public class TableDataInfo implements Serializable
      */
     public TableDataInfo()
     {
-    }
-
-    /**
-     * 分页
-     * 
-     * @param list 列表数据
-     * @param total 总记录数
-     */
-    public TableDataInfo(List<?> list, int total)
-    {
-        this.rows = list;
-        this.total = total;
     }
 
     public long getTotal()

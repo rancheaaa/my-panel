@@ -1,10 +1,9 @@
 package com.cq.panel.admin.server.repository.domain;
 
 import com.cq.panel.admin.server.common.annotation.Excel;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import java.util.Date;
+import java.io.Serial;
 
 /**
  * Agent注册信息对象 agent_registry
@@ -13,6 +12,7 @@ import java.util.Date;
  */
 public class AgentRegistry extends BaseEntity
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 节点ID */

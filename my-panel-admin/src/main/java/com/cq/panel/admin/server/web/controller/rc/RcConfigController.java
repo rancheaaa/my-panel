@@ -19,24 +19,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.repository.domain.RcEnv;
-import com.cq.panel.admin.server.repository.domain.RcProject;
-import com.cq.panel.admin.server.repository.service.IRcEnvService;
-import com.cq.panel.admin.server.repository.service.IRcProjectService;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONWriter;
-import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
-import java.util.stream.Collectors;
-
-import com.cq.panel.admin.server.repository.service.impl.RcConfigServiceImpl.ConfigValueWithDesc;
 
 /**
  * 配置中心 Controller
@@ -48,23 +37,20 @@ import com.cq.panel.admin.server.repository.service.impl.RcConfigServiceImpl.Con
 @RequestMapping("/rc/config")
 public class RcConfigController extends BaseController
 {
-    @Autowired
-    private IRcConfigService rcConfigService;
+    private final IRcConfigService rcConfigService;
 
-    @Autowired
-    private IRcEnvService rcEnvService;
+    private final RcConfigConverter rcConfigConverter;
 
-    @Autowired
-    private IRcProjectService rcProjectService;
-
-    @Autowired
-    private RcConfigConverter rcConfigConverter;
+    public RcConfigController(IRcConfigService rcConfigService, RcConfigConverter rcConfigConverter) {
+        this.rcConfigService = rcConfigService;
+        this.rcConfigConverter = rcConfigConverter;
+    }
 
     /**
      * 查询配置中心列表
      */
     @Operation(summary = "查询配置中心列表", description = "根据条件分页获取配置中心列表")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:list')")
+    @RequirePermission("rc:configCenter:list")
     @GetMapping("/list")
     public Result<PageVO<RcConfigVO>> list(@Parameter(description = "查询参数") RcConfigQueryDTO query)
     {
@@ -72,7 +58,7 @@ public class RcConfigController extends BaseController
         RcConfig rcConfig = rcConfigConverter.toEntity(query);
         List<RcConfig> list = rcConfigService.selectRcConfigList(rcConfig);
         List<RcConfigVO> voList = rcConfigConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
@@ -80,7 +66,7 @@ public class RcConfigController extends BaseController
      */
     @Operation(summary = "导出配置中心列表", description = "导出符合条件的配置中心数据")
     @Log(title = "配置中心", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:export')")
+    @RequirePermission("rc:configCenter:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") RcConfigQueryDTO query) throws IOException
     {
@@ -91,7 +77,7 @@ public class RcConfigController extends BaseController
         
         if (result.isExcel())
         {
-            ExcelUtil<RcConfig> util = new ExcelUtil<RcConfig>(RcConfig.class);
+            ExcelUtil<RcConfig> util = new ExcelUtil<>(RcConfig.class);
             util.exportExcel(response, list, result.getFileName());
             return;
         }
@@ -110,7 +96,7 @@ public class RcConfigController extends BaseController
      * 预览配置内容
      */
     @Operation(summary = "预览配置内容", description = "预览符合条件的配置数据内容")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:export')")
+    @RequirePermission("rc:configCenter:export")
     @GetMapping("/preview")
     public Result<String> preview(@RequestParam Long envId, @RequestParam Long projectId, @RequestParam(required = false) String exportFormat)
     {
@@ -133,7 +119,7 @@ public class RcConfigController extends BaseController
         ExportResult result = rcConfigService.exportConfigs(list, format, envId, projectId);
         String content = result.getContent();
         logger.info("Export result content length: {}", (content != null ? content.length() : "null"));
-        if (content != null && content.length() > 0) {
+        if (content != null && !content.isEmpty()) {
             logger.debug("Export result content preview: {}", content.substring(0, Math.min(content.length(), 100)));
         }
         return Result.success("查询成功", content);
@@ -143,7 +129,7 @@ public class RcConfigController extends BaseController
      * 获取配置中心详细信息
      */
     @Operation(summary = "获取配置中心详细信息", description = "根据配置ID获取配置中心详细信息")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:query')")
+    @RequirePermission("rc:configCenter:query")
     @GetMapping(value = "/{id}")
     public Result<RcConfigVO> getInfo(@Parameter(description = "配置ID", required = true) @PathVariable("id") Long id)
     {
@@ -154,7 +140,7 @@ public class RcConfigController extends BaseController
      * 新增配置中心
      */
     @Operation(summary = "新增配置中心", description = "新增配置中心信息")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:add')")
+    @RequirePermission("rc:configCenter:add")
     @Log(title = "配置中心", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody RcConfigDTO dto)
@@ -174,7 +160,7 @@ public class RcConfigController extends BaseController
      * 修改配置中心
      */
     @Operation(summary = "修改配置中心", description = "修改配置中心信息")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:edit')")
+    @RequirePermission("rc:configCenter:edit")
     @Log(title = "配置中心", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody RcConfigDTO dto)
@@ -193,7 +179,7 @@ public class RcConfigController extends BaseController
      * 删除配置中心
      */
     @Operation(summary = "删除配置中心", description = "批量删除配置中心")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:remove')")
+    @RequirePermission("rc:configCenter:remove")
     @Log(title = "配置中心", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public Result<Void> remove(@Parameter(description = "配置ID数组", required = true) @PathVariable Long[] ids)
@@ -206,7 +192,7 @@ public class RcConfigController extends BaseController
      * 批量导入配置
      */
     @Operation(summary = "批量导入配置", description = "批量导入 .properties 或 .yml/.yaml 配置文件内容")
-    @PreAuthorize("@ss.hasPermi('rc:configCenter:import')")
+    @RequirePermission("rc:configCenter:import")
     @Log(title = "配置中心", businessType = BusinessType.IMPORT)
     @PostMapping("/import")
     public Result<Void> importConfig(@Validated @RequestBody RcConfigImportDTO dto)

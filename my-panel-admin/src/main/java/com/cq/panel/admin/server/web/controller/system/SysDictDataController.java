@@ -19,8 +19,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
@@ -36,17 +35,20 @@ import java.util.List;
 @RequestMapping("/system/dict/data")
 public class SysDictDataController extends BaseController
 {
-    @Autowired
-    private ISysDictDataService dictDataService;
+    private final ISysDictDataService dictDataService;
 
-    @Autowired
-    private ISysDictTypeService dictTypeService;
+    private final ISysDictTypeService dictTypeService;
 
-    @Autowired
-    private SysDictDataConverter dictDataConverter;
+    private final SysDictDataConverter dictDataConverter;
+
+    public SysDictDataController(ISysDictDataService dictDataService, ISysDictTypeService dictTypeService, SysDictDataConverter dictDataConverter) {
+        this.dictDataService = dictDataService;
+        this.dictTypeService = dictTypeService;
+        this.dictDataConverter = dictDataConverter;
+    }
 
     @Operation(summary = "查询字典数据列表", description = "根据条件分页获取字典数据列表")
-    @PreAuthorize("@ss.hasPermi('system:dict:list')")
+    @RequirePermission("system:dict:list")
     @GetMapping("/list")
     public Result<PageVO<SysDictDataVO>> list(@Parameter(description = "查询参数") SysDictDataQueryDTO query)
     {
@@ -54,18 +56,18 @@ public class SysDictDataController extends BaseController
         SysDictData dictData = dictDataConverter.toEntity(query);
         List<SysDictData> list = dictDataService.selectDictDataList(dictData);
         List<SysDictDataVO> voList = dictDataConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(voList).getPages()));
     }
 
     @Operation(summary = "导出字典数据", description = "导出符合条件的字典数据")
     @Log(title = "字典数据", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('system:dict:export')")
+    @RequirePermission("system:dict:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") SysDictDataQueryDTO query)
     {
         SysDictData dictData = dictDataConverter.toEntity(query);
         List<SysDictData> list = dictDataService.selectDictDataList(dictData);
-        ExcelUtil<SysDictData> util = new ExcelUtil<SysDictData>(SysDictData.class);
+        ExcelUtil<SysDictData> util = new ExcelUtil<>(SysDictData.class);
         util.exportExcel(response, list, "字典数据");
     }
 
@@ -73,7 +75,7 @@ public class SysDictDataController extends BaseController
      * 查询字典数据详细
      */
     @Operation(summary = "查询字典数据详细", description = "根据字典编码获取字典数据详细信息")
-    @PreAuthorize("@ss.hasPermi('system:dict:query')")
+    @RequirePermission("system:dict:query")
     @GetMapping(value = "/{dictCode}")
     public Result<SysDictDataVO> getInfo(@Parameter(description = "字典编码", required = true) @PathVariable Long dictCode)
     {
@@ -90,7 +92,7 @@ public class SysDictDataController extends BaseController
         List<SysDictData> data = dictTypeService.selectDictDataByType(dictType);
         if (StringUtils.isNull(data))
         {
-            data = new ArrayList<SysDictData>();
+            data = new ArrayList<>();
         }
         return Result.success(dictDataConverter.toVOList(data));
     }
@@ -99,7 +101,7 @@ public class SysDictDataController extends BaseController
      * 新增字典类型
      */
     @Operation(summary = "新增字典数据", description = "新增字典数据信息")
-    @PreAuthorize("@ss.hasPermi('system:dict:add')")
+    @RequirePermission("system:dict:add")
     @Log(title = "字典数据", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysDictDataDTO dto)
@@ -114,7 +116,7 @@ public class SysDictDataController extends BaseController
      * 修改保存字典类型
      */
     @Operation(summary = "修改字典数据", description = "修改字典数据信息")
-    @PreAuthorize("@ss.hasPermi('system:dict:edit')")
+    @RequirePermission("system:dict:edit")
     @Log(title = "字典数据", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysDictDataDTO dto)
@@ -129,7 +131,7 @@ public class SysDictDataController extends BaseController
      * 删除字典类型
      */
     @Operation(summary = "删除字典数据", description = "批量删除字典数据")
-    @PreAuthorize("@ss.hasPermi('system:dict:remove')")
+    @RequirePermission("system:dict:remove")
     @Log(title = "字典类型", businessType = BusinessType.DELETE)
     @DeleteMapping("/{dictCodes}")
     public Result<Void> remove(@Parameter(description = "字典编码数组", required = true) @PathVariable Long[] dictCodes)

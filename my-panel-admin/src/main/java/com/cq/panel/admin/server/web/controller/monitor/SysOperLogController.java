@@ -16,8 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -29,16 +28,19 @@ import java.util.List;
 @Tag(name = "操作日志", description = "系统操作日志管理接口")
 @RestController
 @RequestMapping("/monitor/operlog")
-public class SysOperlogController extends BaseController
+public class SysOperLogController extends BaseController
 {
-    @Autowired
-    private ISysOperLogService operLogService;
+    private final ISysOperLogService operLogService;
 
-    @Autowired
-    private SysOperLogConverter operLogConverter;
+    private final SysOperLogConverter operLogConverter;
+
+    public SysOperLogController(ISysOperLogService operLogService, SysOperLogConverter operLogConverter) {
+        this.operLogService = operLogService;
+        this.operLogConverter = operLogConverter;
+    }
 
     @Operation(summary = "查询操作日志记录列表", description = "获取操作日志列表，支持分页和条件查询")
-    @PreAuthorize("@ss.hasPermi('monitor:operlog:list')")
+    @RequirePermission("monitor:operlog:list")
     @GetMapping("/list")
     public Result<PageVO<SysOperLogVO>> list(@Parameter(description = "查询条件") SysOperLogQueryDTO query)
     {
@@ -46,24 +48,24 @@ public class SysOperlogController extends BaseController
         SysOperLog sysOperLog = operLogConverter.toEntity(query);
         List<SysOperLog> list = operLogService.selectOperLogList(sysOperLog);
         List<SysOperLogVO> voList = operLogConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     @Operation(summary = "导出操作日志记录列表", description = "导出符合条件的操作日志数据")
     @Log(title = "操作日志", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('monitor:operlog:export')")
+    @RequirePermission("monitor:operlog:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询条件") SysOperLogQueryDTO query)
     {
         SysOperLog sysOperLog = operLogConverter.toEntity(query);
         List<SysOperLog> list = operLogService.selectOperLogList(sysOperLog);
-        ExcelUtil<SysOperLog> util = new ExcelUtil<SysOperLog>(SysOperLog.class);
+        ExcelUtil<SysOperLog> util = new ExcelUtil<>(SysOperLog.class);
         util.exportExcel(response, list, "操作日志");
     }
 
     @Operation(summary = "删除操作日志记录", description = "批量删除操作日志")
     @Log(title = "操作日志", businessType = BusinessType.DELETE)
-    @PreAuthorize("@ss.hasPermi('monitor:operlog:remove')")
+    @RequirePermission("monitor:operlog:remove")
     @DeleteMapping("/{operIds}")
     public Result<Void> remove(@Parameter(description = "日志ID串", required = true) @PathVariable Long[] operIds)
     {
@@ -73,7 +75,7 @@ public class SysOperlogController extends BaseController
 
     @Operation(summary = "清空操作日志记录", description = "清空所有操作日志")
     @Log(title = "操作日志", businessType = BusinessType.CLEAN)
-    @PreAuthorize("@ss.hasPermi('monitor:operlog:remove')")
+    @RequirePermission("monitor:operlog:remove")
     @DeleteMapping("/clean")
     public Result<Void> clean()
     {

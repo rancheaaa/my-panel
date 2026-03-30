@@ -18,8 +18,7 @@ import com.cq.panel.admin.server.web.converter.system.SysMenuConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -34,17 +33,20 @@ import java.util.List;
 @RequestMapping("/system/menu")
 public class SysMenuController extends BaseController
 {
-    @Autowired
-    private ISysMenuService menuService;
+    private final ISysMenuService menuService;
 
-    @Autowired
-    private SysMenuConverter menuConverter;
+    private final SysMenuConverter menuConverter;
+
+    public SysMenuController(ISysMenuService menuService, SysMenuConverter menuConverter) {
+        this.menuService = menuService;
+        this.menuConverter = menuConverter;
+    }
 
     /**
      * 获取菜单列表
      */
     @Operation(summary = "获取菜单列表", description = "根据条件获取菜单列表")
-    @PreAuthorize("@ss.hasPermi('system:menu:list')")
+    @RequirePermission("system:menu:list")
     @GetMapping("/list")
     public Result<List<SysMenuVO>> list(@Parameter(description = "查询参数") SysMenuQueryDTO query)
     {
@@ -57,7 +59,7 @@ public class SysMenuController extends BaseController
      * 根据菜单编号获取详细信息
      */
     @Operation(summary = "根据菜单编号获取详细信息", description = "根据菜单ID获取菜单详细信息")
-    @PreAuthorize("@ss.hasPermi('system:menu:query')")
+    @RequirePermission("system:menu:query")
     @GetMapping(value = "/{menuId}")
     public Result<SysMenuVO> getInfo(@Parameter(description = "菜单ID", required = true) @PathVariable Long menuId)
     {
@@ -94,7 +96,7 @@ public class SysMenuController extends BaseController
      * 新增菜单
      */
     @Operation(summary = "新增菜单", description = "新增菜单信息")
-    @PreAuthorize("@ss.hasPermi('system:menu:add')")
+    @RequirePermission("system:menu:add")
     @Log(title = "菜单管理", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysMenuDTO dto)
@@ -117,7 +119,7 @@ public class SysMenuController extends BaseController
      * 修改菜单
      */
     @Operation(summary = "修改菜单", description = "修改菜单信息")
-    @PreAuthorize("@ss.hasPermi('system:menu:edit')")
+    @RequirePermission("system:menu:edit")
     @Log(title = "菜单管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysMenuDTO dto)
@@ -144,7 +146,7 @@ public class SysMenuController extends BaseController
      * 菜单排序
      */
     @Operation(summary = "菜单排序", description = "批量修改菜单排序")
-    @PreAuthorize("@ss.hasPermi('system:menu:edit')")
+    @RequirePermission("system:menu:edit")
     @Log(title = "菜单管理", businessType = BusinessType.UPDATE)
     @PutMapping("/sort")
     public Result<Void> sort(@Validated @RequestBody List<SysMenuSortDTO> sortList)
@@ -164,7 +166,7 @@ public class SysMenuController extends BaseController
      * 删除菜单
      */
     @Operation(summary = "删除菜单", description = "删除菜单")
-    @PreAuthorize("@ss.hasPermi('system:menu:remove')")
+    @RequirePermission("system:menu:remove")
     @Log(title = "菜单管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{menuId}")
     public Result<Void> remove(@Parameter(description = "菜单ID", required = true) @PathVariable("menuId") Long menuId)

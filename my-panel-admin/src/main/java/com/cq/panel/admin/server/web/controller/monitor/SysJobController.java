@@ -24,8 +24,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import org.quartz.SchedulerException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -40,17 +39,20 @@ import java.util.List;
 @RequestMapping("/monitor/job")
 public class SysJobController extends BaseController
 {
-    @Autowired
-    private ISysJobService jobService;
+    private final ISysJobService jobService;
 
-    @Autowired
-    private SysJobConverter jobConverter;
+    private final SysJobConverter jobConverter;
+
+    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter) {
+        this.jobService = jobService;
+        this.jobConverter = jobConverter;
+    }
 
     /**
      * 查询定时任务列表
      */
     @Operation(summary = "查询定时任务列表", description = "获取定时任务列表，支持分页和条件查询")
-    @PreAuthorize("@ss.hasPermi('monitor:job:list')")
+    @RequirePermission("monitor:job:list")
     @GetMapping("/list")
     public Result<PageVO<SysJobVO>> list(@Parameter(description = "查询条件") SysJobQueryDTO query)
     {
@@ -58,21 +60,21 @@ public class SysJobController extends BaseController
         SysJob sysJob = jobConverter.toEntity(query);
         List<SysJob> list = jobService.selectJobList(sysJob);
         List<SysJobVO> voList = jobConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
      * 导出定时任务列表
      */
     @Operation(summary = "导出定时任务列表", description = "导出符合条件的定时任务数据")
-    @PreAuthorize("@ss.hasPermi('monitor:job:export')")
+    @RequirePermission("monitor:job:export")
     @Log(title = "定时任务", businessType = BusinessType.EXPORT)
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询条件") SysJobQueryDTO query)
     {
         SysJob sysJob = jobConverter.toEntity(query);
         List<SysJob> list = jobService.selectJobList(sysJob);
-        ExcelUtil<SysJob> util = new ExcelUtil<SysJob>(SysJob.class);
+        ExcelUtil<SysJob> util = new ExcelUtil<>(SysJob.class);
         util.exportExcel(response, list, "定时任务");
     }
 
@@ -80,7 +82,7 @@ public class SysJobController extends BaseController
      * 获取定时任务详细信息
      */
     @Operation(summary = "获取定时任务详细信息", description = "根据任务ID获取详细信息")
-    @PreAuthorize("@ss.hasPermi('monitor:job:query')")
+    @RequirePermission("monitor:job:query")
     @GetMapping(value = "/{jobId}")
     public Result<SysJobVO> getInfo(@Parameter(description = "任务ID", required = true) @PathVariable("jobId") Long jobId)
     {
@@ -91,7 +93,7 @@ public class SysJobController extends BaseController
      * 新增定时任务
      */
     @Operation(summary = "新增定时任务", description = "创建新的定时任务")
-    @PreAuthorize("@ss.hasPermi('monitor:job:add')")
+    @RequirePermission("monitor:job:add")
     @Log(title = "定时任务", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysJobDTO dto) throws SchedulerException, TaskException
@@ -101,7 +103,7 @@ public class SysJobController extends BaseController
         {
             throw new ServiceException("新增任务'" + job.getJobName() + "'失败，Cron表达式不正确");
         }
-        else if (StringUtils.containsIgnoreCase(job.getInvokeTarget(), Constants.LOOKUP_RMI))
+        else if (StringUtils.contains(job.getInvokeTarget(), Constants.LOOKUP_RMI))
         {
             throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串不允许'rmi'调用");
         }
@@ -130,7 +132,7 @@ public class SysJobController extends BaseController
      * 修改定时任务
      */
     @Operation(summary = "修改定时任务", description = "修改现有的定时任务信息")
-    @PreAuthorize("@ss.hasPermi('monitor:job:edit')")
+    @RequirePermission("monitor:job:edit")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysJobDTO dto) throws SchedulerException, TaskException
@@ -140,7 +142,7 @@ public class SysJobController extends BaseController
         {
             throw new ServiceException("修改任务'" + job.getJobName() + "'失败，Cron表达式不正确");
         }
-        else if (StringUtils.containsIgnoreCase(job.getInvokeTarget(), Constants.LOOKUP_RMI))
+        else if (StringUtils.contains(job.getInvokeTarget(), Constants.LOOKUP_RMI))
         {
             throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串不允许'rmi'调用");
         }
@@ -169,7 +171,7 @@ public class SysJobController extends BaseController
      * 定时任务状态修改
      */
     @Operation(summary = "定时任务状态修改", description = "修改定时任务的启用/停用状态")
-    @PreAuthorize("@ss.hasPermi('monitor:job:changeStatus')")
+    @RequirePermission("monitor:job:changeStatus")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
     @PutMapping("/changeStatus")
     public Result<Void> changeStatus(@RequestBody SysJobDTO dto) throws SchedulerException
@@ -185,7 +187,7 @@ public class SysJobController extends BaseController
      * 定时任务立即执行一次
      */
     @Operation(summary = "定时任务立即执行一次", description = "立即执行一次选定的定时任务")
-    @PreAuthorize("@ss.hasPermi('monitor:job:changeStatus')")
+    @RequirePermission("monitor:job:changeStatus")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
     @PutMapping("/run")
     public Result<Void> run(@RequestBody SysJobDTO dto) throws SchedulerException
@@ -203,7 +205,7 @@ public class SysJobController extends BaseController
      * 删除定时任务
      */
     @Operation(summary = "删除定时任务", description = "批量删除定时任务")
-    @PreAuthorize("@ss.hasPermi('monitor:job:remove')")
+    @RequirePermission("monitor:job:remove")
     @Log(title = "定时任务", businessType = BusinessType.DELETE)
     @DeleteMapping("/{jobIds}")
     public Result<Void> remove(@Parameter(description = "任务ID串", required = true) @PathVariable Long[] jobIds) throws SchedulerException, TaskException

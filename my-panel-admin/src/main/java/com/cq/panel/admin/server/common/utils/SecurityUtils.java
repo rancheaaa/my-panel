@@ -3,12 +3,13 @@ package com.cq.panel.admin.server.common.utils;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.constant.HttpStatus;
 import com.cq.panel.admin.server.repository.domain.SysRole;
+import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.web.exception.ServiceException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.cq.panel.admin.server.web.service.TokenService;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.util.PatternMatchUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -73,20 +74,19 @@ public class SecurityUtils
     {
         try
         {
-            return (LoginUser) getAuthentication().getPrincipal();
+            TokenService tokenService = SpringUtils.getBean(TokenService.class);
+            HttpServletRequest request = ServletUtils.getRequest();
+            LoginUser loginUser = tokenService.getLoginUser(request);
+            if (loginUser == null)
+            {
+                throw new ServiceException("获取用户信息异常", HttpStatus.UNAUTHORIZED);
+            }
+            return loginUser;
         }
         catch (Exception e)
         {
             throw new ServiceException("获取用户信息异常", HttpStatus.UNAUTHORIZED);
         }
-    }
-
-    /**
-     * 获取Authentication
-     */
-    public static Authentication getAuthentication()
-    {
-        return SecurityContextHolder.getContext().getAuthentication();
     }
 
     /**
@@ -97,8 +97,7 @@ public class SecurityUtils
      */
     public static String encryptPassword(String password)
     {
-        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        return passwordEncoder.encode(password);
+        return BCrypt.hashpw(password, BCrypt.gensalt());
     }
 
     /**
@@ -110,8 +109,7 @@ public class SecurityUtils
      */
     public static boolean matchesPassword(String rawPassword, String encodedPassword)
     {
-        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        return passwordEncoder.matches(rawPassword, encodedPassword);
+        return BCrypt.checkpw(rawPassword, encodedPassword);
     }
 
     /**

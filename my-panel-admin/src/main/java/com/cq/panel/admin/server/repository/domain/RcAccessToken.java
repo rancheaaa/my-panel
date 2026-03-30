@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
+import java.io.Serial;
+
 /**
  * AccessToken管理对象 rc_access_token
  * 
@@ -13,6 +15,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
  */
 public class RcAccessToken extends BaseEntity
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** ID */
@@ -45,7 +48,7 @@ public class RcAccessToken extends BaseEntity
     }
 
     @NotBlank(message = "Token值不能为空")
-    @Size(min = 0, max = 200, message = "Token值长度不能超过200个字符")
+    @Size(max = 200, message = "Token值长度不能超过200个字符")
     public String getTokenValue() 
     {
         return tokenValue;
@@ -55,7 +58,7 @@ public class RcAccessToken extends BaseEntity
         this.tokenDesc = tokenDesc;
     }
 
-    @Size(min = 0, max = 200, message = "Token描述长度不能超过200个字符")
+    @Size(max = 200, message = "Token描述长度不能超过200个字符")
     public String getTokenDesc() 
     {
         return tokenDesc;

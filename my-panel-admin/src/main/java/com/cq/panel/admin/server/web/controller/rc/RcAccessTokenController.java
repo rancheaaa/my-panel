@@ -17,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -33,17 +32,20 @@ import java.util.List;
 @RequestMapping("/rc/accessToken")
 public class RcAccessTokenController extends BaseController
 {
-    @Autowired
-    private IRcAccessTokenService rcAccessTokenService;
+    private final IRcAccessTokenService rcAccessTokenService;
 
-    @Autowired
-    private RcAccessTokenConverter rcAccessTokenConverter;
+    private final RcAccessTokenConverter rcAccessTokenConverter;
+
+    public RcAccessTokenController(IRcAccessTokenService rcAccessTokenService, RcAccessTokenConverter rcAccessTokenConverter) {
+        this.rcAccessTokenService = rcAccessTokenService;
+        this.rcAccessTokenConverter = rcAccessTokenConverter;
+    }
 
     /**
      * 查询AccessToken管理列表
      */
     @Operation(summary = "查询AccessToken管理列表", description = "根据条件分页获取AccessToken管理列表")
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:list')")
+    @RequirePermission("rc:accessToken:list")
     @GetMapping("/list")
     public Result<PageVO<RcAccessTokenVO>> list(@Parameter(description = "查询参数") RcAccessTokenQueryDTO query)
     {
@@ -51,7 +53,7 @@ public class RcAccessTokenController extends BaseController
         RcAccessToken rcAccessToken = rcAccessTokenConverter.toEntity(query);
         List<RcAccessToken> list = rcAccessTokenService.selectRcAccessTokenList(rcAccessToken);
         List<RcAccessTokenVO> voList = rcAccessTokenConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
@@ -59,13 +61,13 @@ public class RcAccessTokenController extends BaseController
      */
     @Operation(summary = "导出AccessToken管理列表", description = "导出符合条件的AccessToken管理数据")
     @Log(title = "AccessToken管理", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:export')")
+    @RequirePermission("rc:accessToken:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") RcAccessTokenQueryDTO query)
     {
         RcAccessToken rcAccessToken = rcAccessTokenConverter.toEntity(query);
         List<RcAccessToken> list = rcAccessTokenService.selectRcAccessTokenList(rcAccessToken);
-        ExcelUtil<RcAccessToken> util = new ExcelUtil<RcAccessToken>(RcAccessToken.class);
+        ExcelUtil<RcAccessToken> util = new ExcelUtil<>(RcAccessToken.class);
         util.exportExcel(response, list, "AccessToken管理数据");
     }
 
@@ -73,7 +75,7 @@ public class RcAccessTokenController extends BaseController
      * 获取AccessToken管理详细信息
      */
     @Operation(summary = "获取AccessToken管理详细信息", description = "根据ID获取AccessToken管理详细信息")
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:query')")
+    @RequirePermission("rc:accessToken:query")
     @GetMapping(value = "/{id}")
     public Result<RcAccessTokenVO> getInfo(@Parameter(description = "ID", required = true) @PathVariable("id") Long id)
     {
@@ -84,7 +86,7 @@ public class RcAccessTokenController extends BaseController
      * 新增AccessToken管理
      */
     @Operation(summary = "新增AccessToken管理", description = "新增AccessToken管理信息")
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:add')")
+    @RequirePermission("rc:accessToken:add")
     @Log(title = "AccessToken管理", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody RcAccessTokenDTO dto)
@@ -103,7 +105,7 @@ public class RcAccessTokenController extends BaseController
      * 修改AccessToken管理
      */
     @Operation(summary = "修改AccessToken管理", description = "修改AccessToken管理信息")
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:edit')")
+    @RequirePermission("rc:accessToken:edit")
     @Log(title = "AccessToken管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody RcAccessTokenDTO dto)
@@ -122,7 +124,7 @@ public class RcAccessTokenController extends BaseController
      * 删除AccessToken管理
      */
     @Operation(summary = "删除AccessToken管理", description = "批量删除AccessToken管理")
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:remove')")
+    @RequirePermission("rc:accessToken:remove")
     @Log(title = "AccessToken管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public Result<Void> remove(@Parameter(description = "ID数组", required = true) @PathVariable Long[] ids)
@@ -135,7 +137,7 @@ public class RcAccessTokenController extends BaseController
      * 状态修改
      */
     @Operation(summary = "修改AccessToken状态", description = "修改AccessToken启用/禁用状态")
-    @PreAuthorize("@ss.hasPermi('rc:accessToken:edit')")
+    @RequirePermission("rc:accessToken:edit")
     @Log(title = "AccessToken管理", businessType = BusinessType.UPDATE)
     @PutMapping("/changeStatus")
     public Result<Void> changeStatus(@RequestBody RcAccessTokenDTO dto)

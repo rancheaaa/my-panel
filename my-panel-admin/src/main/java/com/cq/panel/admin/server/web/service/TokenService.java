@@ -63,23 +63,27 @@ public class TokenService
     {
         // 获取请求携带的令牌
         String token = getToken(request);
-        if (StringUtils.isNotEmpty(token))
+        return getLoginUser(token);
+    }
+
+    public LoginUser getLoginUser(String token)
+    {
+        if (StringUtils.isEmpty(token))
         {
-            try
-            {
-                Claims claims = parseToken(token);
-                // 解析对应的权限以及用户信息
-                String uuid = (String) claims.get(Constants.LOGIN_USER_KEY);
-                String userKey = getTokenKey(uuid);
-                LoginUser user = cacheService.get(userKey);
-                return user;
-            }
-            catch (Exception e)
-            {
-                log.error("获取用户信息异常'{}'", e.getMessage());
-            }
+            return null;
         }
-        return null;
+        try
+        {
+            Claims claims = parseToken(token);
+            String uuid = (String) claims.get(Constants.LOGIN_USER_KEY);
+            String userKey = getTokenKey(uuid);
+            return cacheService.get(userKey);
+        }
+        catch (Exception e)
+        {
+            log.error("获取用户信息异常'{}'", e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -214,7 +218,7 @@ public class TokenService
      * @param request
      * @return token
      */
-    private String getToken(HttpServletRequest request)
+    public String getToken(HttpServletRequest request)
     {
         String token = request.getHeader(header);
         if (StringUtils.isNotEmpty(token) && token.startsWith(Constants.TOKEN_PREFIX))

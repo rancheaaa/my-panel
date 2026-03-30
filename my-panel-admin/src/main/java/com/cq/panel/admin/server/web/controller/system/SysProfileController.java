@@ -21,7 +21,6 @@ import com.cq.panel.admin.server.web.converter.system.SysUserConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,17 +35,20 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/system/user/profile")
 public class SysProfileController extends BaseController
 {
-    @Autowired
-    private ISysUserService userService;
+    private final ISysUserService userService;
 
-    @Autowired
-    private TokenService tokenService;
+    private final TokenService tokenService;
 
-    @Autowired
-    private AppConfig appConfig;
+    private final AppConfig appConfig;
 
-    @Autowired
-    private SysUserConverter userConverter;
+    private final SysUserConverter userConverter;
+
+    public SysProfileController(ISysUserService userService, TokenService tokenService, AppConfig appConfig, SysUserConverter userConverter) {
+        this.userService = userService;
+        this.tokenService = tokenService;
+        this.appConfig = appConfig;
+        this.userConverter = userConverter;
+    }
 
     /**
      * 个人信息

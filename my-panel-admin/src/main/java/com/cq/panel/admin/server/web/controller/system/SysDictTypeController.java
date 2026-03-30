@@ -17,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -33,14 +32,17 @@ import java.util.List;
 @RequestMapping("/system/dict/type")
 public class SysDictTypeController extends BaseController
 {
-    @Autowired
-    private ISysDictTypeService dictTypeService;
+    private final ISysDictTypeService dictTypeService;
 
-    @Autowired
-    private SysDictTypeConverter dictTypeConverter;
+    private final SysDictTypeConverter dictTypeConverter;
+
+    public SysDictTypeController(ISysDictTypeService dictTypeService, SysDictTypeConverter dictTypeConverter) {
+        this.dictTypeService = dictTypeService;
+        this.dictTypeConverter = dictTypeConverter;
+    }
 
     @Operation(summary = "查询字典类型列表", description = "根据条件分页获取字典类型列表")
-    @PreAuthorize("@ss.hasPermi('system:dict:list')")
+    @RequirePermission("system:dict:list")
     @GetMapping("/list")
     public Result<PageVO<SysDictTypeVO>> list(@Parameter(description = "查询参数") SysDictTypeQueryDTO query)
     {
@@ -48,18 +50,18 @@ public class SysDictTypeController extends BaseController
         SysDictType dictType = dictTypeConverter.toEntity(query);
         List<SysDictType> list = dictTypeService.selectDictTypeList(dictType);
         List<SysDictTypeVO> voList = dictTypeConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     @Operation(summary = "导出字典类型", description = "导出符合条件的字典类型数据")
     @Log(title = "字典类型", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('system:dict:export')")
+    @RequirePermission("system:dict:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") SysDictTypeQueryDTO query)
     {
         SysDictType dictType = dictTypeConverter.toEntity(query);
         List<SysDictType> list = dictTypeService.selectDictTypeList(dictType);
-        ExcelUtil<SysDictType> util = new ExcelUtil<SysDictType>(SysDictType.class);
+        ExcelUtil<SysDictType> util = new ExcelUtil<>(SysDictType.class);
         util.exportExcel(response, list, "字典类型");
     }
 
@@ -67,7 +69,7 @@ public class SysDictTypeController extends BaseController
      * 查询字典类型详细
      */
     @Operation(summary = "查询字典类型详细", description = "根据字典ID获取字典类型详细信息")
-    @PreAuthorize("@ss.hasPermi('system:dict:query')")
+    @RequirePermission("system:dict:query")
     @GetMapping(value = "/{dictId}")
     public Result<SysDictTypeVO> getInfo(@Parameter(description = "字典ID", required = true) @PathVariable Long dictId)
     {
@@ -78,7 +80,7 @@ public class SysDictTypeController extends BaseController
      * 新增字典类型
      */
     @Operation(summary = "新增字典类型", description = "新增字典类型信息")
-    @PreAuthorize("@ss.hasPermi('system:dict:add')")
+    @RequirePermission("system:dict:add")
     @Log(title = "字典类型", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysDictTypeDTO dto)
@@ -97,7 +99,7 @@ public class SysDictTypeController extends BaseController
      * 修改字典类型
      */
     @Operation(summary = "修改字典类型", description = "修改字典类型信息")
-    @PreAuthorize("@ss.hasPermi('system:dict:edit')")
+    @RequirePermission("system:dict:edit")
     @Log(title = "字典类型", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysDictTypeDTO dto)
@@ -115,7 +117,7 @@ public class SysDictTypeController extends BaseController
     /**
      * 删除字典类型
      */
-    @PreAuthorize("@ss.hasPermi('system:dict:remove')")
+    @RequirePermission("system:dict:remove")
     @Log(title = "字典类型", businessType = BusinessType.DELETE)
     @Operation(summary = "删除字典类型", description = "批量删除字典类型")
     @DeleteMapping("/{dictIds}")
@@ -128,7 +130,7 @@ public class SysDictTypeController extends BaseController
     /**
      * 刷新字典缓存
      */
-    @PreAuthorize("@ss.hasPermi('system:dict:remove')")
+    @RequirePermission("system:dict:remove")
     @Log(title = "字典类型", businessType = BusinessType.CLEAN)
     @Operation(summary = "刷新字典缓存", description = "清除并重新加载所有字典缓存")
     @DeleteMapping("/refreshCache")

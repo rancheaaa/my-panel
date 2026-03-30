@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.common.utils;
 
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.domain.text.StrFormatter;
+import org.apache.commons.lang3.Strings;
 import org.springframework.util.AntPathMatcher;
 import java.util.*;
 
@@ -695,5 +696,17 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
             }
         }
         return 0;
+    }
+
+    public static boolean equals(String str1, String str2) {
+        return org.apache.commons.lang3.Strings.CS.equals(str1, str2);
+    }
+
+    public static boolean contains(final CharSequence seq, final CharSequence searchSeq) {
+        return Strings.CS.contains(seq, searchSeq);
+    }
+
+    public static boolean endsWith(final CharSequence str, final CharSequence suffix) {
+        return Strings.CS.endsWith(str, suffix);
     }
 }

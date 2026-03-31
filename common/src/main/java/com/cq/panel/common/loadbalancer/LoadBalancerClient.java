@@ -125,7 +125,7 @@ public class LoadBalancerClient {
      * @param responseType 响应类型
      * @return 响应实体
      */
-    public <T> HttpResponse<T> execute(String serviceName, LoadBalancerRequest<T> request, Class<T> responseType) {
+    private  <T> HttpResponse<T> execute(String serviceName, LoadBalancerRequest<T> request, Class<T> responseType) {
         List<Server> servers = serverList.getUpServers(serviceName);
         if (servers == null || servers.isEmpty()) {
             throw new IllegalStateException("No servers available for service: " + serviceName);

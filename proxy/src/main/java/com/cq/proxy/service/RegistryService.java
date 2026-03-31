@@ -1,11 +1,15 @@
 package com.cq.proxy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cq.proxy.api.dto.AgentRegisterRequest;
+import com.cq.proxy.api.dto.AgentRegisterResponse;
 import com.cq.proxy.api.dto.ServiceInstance;
 import com.cq.proxy.api.dto.ServiceRegisterRequest;
 import com.cq.proxy.config.ProxyRegistryProperties;
 import com.cq.proxy.exception.BusinessException;
+import com.cq.proxy.repository.entity.AgentRegistry;
 import com.cq.proxy.repository.entity.RcNode;
+import com.cq.proxy.repository.mapper.AgentRegistryMapper;
 import com.cq.proxy.repository.mapper.RcNodeMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -13,10 +17,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,22 +31,27 @@ public class RegistryService {
 
   private final RcDictionaryService dictionaryService;
   private final RcNodeMapper nodeMapper;
+  private final AgentRegistryMapper agentRegistryMapper;
   private final ProxyRegistryProperties registryProperties;
   private final Clock clock;
   private final Cache<String, List<ServiceInstance>> discoverCache;
+  private final DateTimeFormatter dateTimeFormatter;
 
   public RegistryService(
       RcDictionaryService dictionaryService,
       RcNodeMapper nodeMapper,
+      AgentRegistryMapper agentRegistryMapper,
       ProxyRegistryProperties registryProperties,
       Clock clock,
       Caffeine<Object, Object> caffeine
   ) {
     this.dictionaryService = dictionaryService;
     this.nodeMapper = nodeMapper;
+    this.agentRegistryMapper = agentRegistryMapper;
     this.registryProperties = registryProperties;
     this.clock = clock;
     this.discoverCache = caffeine.build();
+    this.dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   }
 
   @Transactional
@@ -155,5 +165,86 @@ public class RegistryService {
   private static String cacheKey(String serviceName, String environment) {
     return serviceName + "|" + environment;
   }
-}
 
+  @Transactional
+  public AgentRegisterResponse registerAgent(AgentRegisterRequest request) {
+    if (request == null) {
+      throw new BusinessException(400, "request body is required");
+    }
+    if (request.getAgentIp() == null || request.getAgentIp().isBlank()) {
+      throw new BusinessException(400, "agentIp is required");
+    }
+    if (request.getAgentPort() == null || request.getAgentPort() <= 0 || request.getAgentPort() > 65535) {
+      throw new BusinessException(400, "agentPort is invalid");
+    }
+
+    AgentRegistry existing = agentRegistryMapper.selectOne(new LambdaQueryWrapper<AgentRegistry>()
+        .eq(AgentRegistry::getAgentIp, request.getAgentIp())
+        .eq(AgentRegistry::getAgentPort, request.getAgentPort()));
+
+    LocalDateTime now = LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC);
+    
+    AgentRegistry result;
+    if (existing != null) {
+      existing.setNodeName(request.getNodeName());
+      existing.setOsType(request.getOsType());
+      existing.setAppId(request.getAppId());
+      existing.setRemark(request.getRemark());
+      existing.setNodeStatus(1);
+      existing.setUpdateTime(now);
+      agentRegistryMapper.updateById(existing);
+      result = existing;
+    } else {
+      AgentRegistry agentRegistry = new AgentRegistry();
+      agentRegistry.setId(UUID.randomUUID().toString().replace("-", ""));
+      agentRegistry.setNodeName(request.getNodeName());
+      agentRegistry.setOsType(request.getOsType());
+      agentRegistry.setAppId(request.getAppId());
+      agentRegistry.setAgentIp(request.getAgentIp());
+      agentRegistry.setAgentPort(request.getAgentPort());
+      agentRegistry.setNodeEnabled(0);
+      agentRegistry.setNodeStatus(1);
+      agentRegistry.setRemark(request.getRemark());
+      agentRegistry.setCreateTime(now);
+      agentRegistry.setUpdateTime(now);
+      agentRegistryMapper.insert(agentRegistry);
+      result = agentRegistry;
+    }
+
+    return AgentRegisterResponse.builder()
+        .id(result.getId())
+        .nodeName(result.getNodeName())
+        .osType(result.getOsType())
+        .appId(result.getAppId())
+        .agentIp(result.getAgentIp())
+        .agentPort(result.getAgentPort())
+        .nodeEnabled(result.getNodeEnabled())
+        .nodeStatus(result.getNodeStatus())
+        .remark(result.getRemark())
+        .createTime(result.getCreateTime() != null ? result.getCreateTime().format(dateTimeFormatter) : null)
+        .updateTime(result.getUpdateTime() != null ? result.getUpdateTime().format(dateTimeFormatter) : null)
+        .build();
+  }
+
+  @Transactional
+  public boolean heartbeatAgent(String agentIp, Integer agentPort) {
+    if (agentIp == null || agentIp.isBlank()) {
+      throw new BusinessException(400, "agentIp is required");
+    }
+    if (agentPort == null || agentPort <= 0 || agentPort > 65535) {
+      throw new BusinessException(400, "agentPort is invalid");
+    }
+
+    AgentRegistry existing = agentRegistryMapper.selectOne(new LambdaQueryWrapper<AgentRegistry>()
+        .eq(AgentRegistry::getAgentIp, agentIp)
+        .eq(AgentRegistry::getAgentPort, agentPort));
+
+    if (existing != null) {
+      existing.setNodeStatus(1);
+      existing.setUpdateTime(LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC));
+      agentRegistryMapper.updateById(existing);
+      return true;
+    }
+    return false;
+  }
+}

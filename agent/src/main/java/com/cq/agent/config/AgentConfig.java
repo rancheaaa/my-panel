@@ -8,7 +8,10 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -33,6 +36,7 @@ public class AgentConfig {
     private int serverPort;
     private int bossThreads;
     private int workerThreads;
+    private int portProbeMaxSteps;
 
     // Executor configuration
     private int executorThreadPoolSize;
@@ -80,7 +84,7 @@ public class AgentConfig {
     private int downloadRequestTimeoutSeconds;
 
     // Registry configuration
-    private String registryServerUrl;
+    private List<String> registryServerUrls;
     private String nodeName;
     private String osType;
     private String appId;
@@ -158,9 +162,23 @@ public class AgentConfig {
         this.serverPort = getIntProperty("server.port", 7777);
         this.bossThreads = getIntProperty("server.boss.threads", 1);
         this.workerThreads = getIntProperty("server.worker.threads", Runtime.getRuntime().availableProcessors() * 2);
+        this.portProbeMaxSteps = getIntProperty("server.port.probe.max.steps", 10);
 
         // Registry server configuration
-        this.registryServerUrl = getStringProperty("registry.server.url", "http://localhost:8888");
+        String registryServerUrlStr = getStringProperty("registry.server.url", "http://localhost:9876,http://localhost:9877");
+        if (registryServerUrlStr != null && !registryServerUrlStr.isEmpty()) {
+            String[] urls = registryServerUrlStr.split(",");
+            List<String> urlList = new ArrayList<>();
+            for (String url : urls) {
+                String trimmedUrl = url.trim();
+                if (!trimmedUrl.isEmpty()) {
+                    urlList.add(trimmedUrl);
+                }
+            }
+            this.registryServerUrls = urlList;
+        } else {
+            this.registryServerUrls = Collections.emptyList();
+        }
         this.nodeName = getStringProperty("registry.node.name", null);
         this.osType = getStringProperty("registry.os.type", null);
         this.appId = getStringProperty("registry.app.id", null);
@@ -353,6 +371,10 @@ public class AgentConfig {
         return workerThreads;
     }
 
+    public int getPortProbeMaxSteps() {
+        return portProbeMaxSteps;
+    }
+
     public int getExecutorThreadPoolSize() {
         return executorThreadPoolSize;
     }
@@ -478,7 +500,11 @@ public class AgentConfig {
     }
 
     public String getRegistryServerUrl() {
-        return registryServerUrl;
+        return registryServerUrls.isEmpty() ? null : registryServerUrls.get(0);
+    }
+
+    public List<String> getRegistryServerUrls() {
+        return registryServerUrls;
     }
 
     public String getNodeName() {

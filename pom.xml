@@ -57,7 +57,11 @@
                 <artifactId>my-panel-auth-lite</artifactId>
                 <version>${revision}</version>
             </dependency>
-
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>my-panel-common</artifactId>
+                <version>${revision}</version>
+            </dependency>
 
             <!-- SpringBoot的依赖配置-->
             <dependency>

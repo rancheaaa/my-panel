@@ -70,6 +70,13 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
         </dependency>
+
+        <!-- Common module -->
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>my-panel-common</artifactId>
+        </dependency>
+
         <!-- JUnit 5 -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

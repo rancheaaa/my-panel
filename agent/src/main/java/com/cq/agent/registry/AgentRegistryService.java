@@ -28,6 +28,7 @@ public class AgentRegistryService {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean registered;
     private final AtomicBoolean running;
+    private int actualPort;
     
     private AgentRegistryResponse registryInfo;
 
@@ -88,6 +89,8 @@ public class AgentRegistryService {
                 scheduler.shutdownNow();
                 Thread.currentThread().interrupt();
             }
+            
+            registryClient.close();
             logger.info("Agent registry service stopped");
         }
     }
@@ -128,7 +131,8 @@ public class AgentRegistryService {
         
         try {
             String agentIp = config.getAgentIp();
-            Integer agentPort = config.getServerPort();
+            int port = actualPort > 0 ? actualPort : config.getServerPort();
+            Integer agentPort = port;
             
             boolean success = registryClient.heartbeat(agentIp, agentPort);
             
@@ -193,7 +197,8 @@ public class AgentRegistryService {
         request.setAgentIp(agentIp);
         
         // Agent端口
-        request.setAgentPort(config.getServerPort());
+        int port = actualPort > 0 ? actualPort : config.getServerPort();
+        request.setAgentPort(port);
         
         // 备注
         request.setRemark(config.getRemark());
@@ -247,5 +252,14 @@ public class AgentRegistryService {
      */
     public boolean isRunning() {
         return running.get();
+    }
+    
+    /**
+     * 设置实际监听的端口号
+     * 
+     * @param actualPort 实际端口号
+     */
+    public void setActualPort(int actualPort) {
+        this.actualPort = actualPort;
     }
 }

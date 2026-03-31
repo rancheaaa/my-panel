@@ -48,9 +48,7 @@ public class AgentRegistryClient {
             logger.warn("Registry server URL is not configured, auto-registration and heartbeat will be disabled");
             this.loadBalancerClient = null;
         } else {
-            List<Server> servers = convertUrlsToServers(registryServerUrls);
-            ServerList serverList = createServerList(servers);
-            
+            ServerList serverList = createServerList(config);
             this.loadBalancerClient = loadBalancerManager.getClient(SERVICE_NAME, serverList, LoadBalancerAlgorithm.ROUND_ROBIN);
             logger.info("Agent registry client initialized with {} server URL(s): {}", registryServerUrls.size(), registryServerUrls);
         }
@@ -87,13 +85,11 @@ public class AgentRegistryClient {
     /**
      * 创建服务器列表
      * 
-     * @param servers Server列表
+     * @param config Agent配置
      * @return ServerList实例
      */
-    private ServerList createServerList(List<Server> servers) {
-        StaticServerList serverList = new StaticServerList();
-        serverList.addServers(SERVICE_NAME, servers);
-        return serverList;
+    private ServerList createServerList(AgentConfig config) {
+        return new DynamicServerList(config);
     }
 
     /**

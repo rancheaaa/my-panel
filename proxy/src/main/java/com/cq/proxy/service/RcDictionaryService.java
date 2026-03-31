@@ -1,6 +1,5 @@
 package com.cq.proxy.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cq.proxy.exception.BusinessException;
 import com.cq.proxy.repository.entity.RcEnv;
 import com.cq.proxy.repository.entity.RcProject;
@@ -29,7 +28,7 @@ public class RcDictionaryService {
     if (envName == null || envName.isBlank()) {
       throw new BusinessException(400, "environment is required");
     }
-    RcEnv existing = envMapper.selectOne(new LambdaQueryWrapper<RcEnv>().eq(RcEnv::getEnvName, envName));
+    RcEnv existing = envMapper.selectByName(envName);
     if (existing != null && existing.getId() != null) {
       return existing.getId();
     }
@@ -51,7 +50,7 @@ public class RcDictionaryService {
     if (projectName == null || projectName.isBlank()) {
       throw new BusinessException(400, "serviceName is required");
     }
-    RcProject existing = projectMapper.selectOne(new LambdaQueryWrapper<RcProject>().eq(RcProject::getProjectName, projectName));
+    RcProject existing = projectMapper.selectByName(projectName);
     if (existing != null && existing.getId() != null) {
       return existing.getId();
     }
@@ -68,4 +67,3 @@ public class RcDictionaryService {
     return project.getId();
   }
 }
-

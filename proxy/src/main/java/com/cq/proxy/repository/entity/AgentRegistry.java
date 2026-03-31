@@ -1,14 +1,9 @@
 package com.cq.proxy.repository.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("agent_registry")
 public class AgentRegistry {
 
-    @TableId(type = IdType.INPUT)
     private String id;
 
     private String nodeName;

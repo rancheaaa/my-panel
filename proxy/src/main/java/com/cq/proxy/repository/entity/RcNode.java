@@ -1,14 +1,9 @@
 package com.cq.proxy.repository.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("rc_node")
 public class RcNode {
 
-  @TableId(type = IdType.AUTO)
   private Long id;
 
   private Long envId;
@@ -110,4 +105,3 @@ public class RcNode {
     this.updateTime = updateTime;
   }
 }
-

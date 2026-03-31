@@ -1,6 +1,5 @@
 package com.cq.proxy.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cq.proxy.api.dto.ConfigUpdateRequest;
 import com.cq.proxy.api.dto.ConfigValueResponse;
 import com.cq.proxy.exception.BusinessException;
@@ -58,10 +57,7 @@ public class ConfigService {
     long envId = dictionaryService.getOrCreateEnvId(environment);
     long projectId = dictionaryService.getOrCreateProjectId(serviceName);
 
-    RcConfig config = configMapper.selectOne(new LambdaQueryWrapper<RcConfig>()
-        .eq(RcConfig::getEnvId, envId)
-        .eq(RcConfig::getProjectId, projectId)
-        .eq(RcConfig::getConfigKey, configKey));
+    RcConfig config = configMapper.selectByEnvProjectKey(envId, projectId, configKey);
 
     if (config == null) {
       throw new BusinessException(404, "config not found");
@@ -84,10 +80,7 @@ public class ConfigService {
     long envId = dictionaryService.getOrCreateEnvId(request.environment());
     long projectId = dictionaryService.getOrCreateProjectId(request.serviceName());
 
-    RcConfig existing = configMapper.selectOne(new LambdaQueryWrapper<RcConfig>()
-        .eq(RcConfig::getEnvId, envId)
-        .eq(RcConfig::getProjectId, projectId)
-        .eq(RcConfig::getConfigKey, configKey));
+    RcConfig existing = configMapper.selectByEnvProjectKey(envId, projectId, configKey);
 
     LocalDateTime now = LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC);
     if (existing == null) {
@@ -121,4 +114,3 @@ public class ConfigService {
     return serviceName + "|" + environment + "|" + configKey;
   }
 }
-

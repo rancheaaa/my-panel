@@ -1,6 +1,5 @@
 package com.cq.proxy.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cq.proxy.api.dto.AgentRegisterRequest;
 import com.cq.proxy.api.dto.AgentRegisterResponse;
 import com.cq.proxy.api.dto.ServiceInstance;
@@ -69,14 +68,10 @@ public class RegistryService {
     long envId = dictionaryService.getOrCreateEnvId(request.environment());
     long projectId = dictionaryService.getOrCreateProjectId(request.serviceName());
 
-    RcNode existing = nodeMapper.selectOne(new LambdaQueryWrapper<RcNode>()
-        .eq(RcNode::getEnvId, envId)
-        .eq(RcNode::getProjectId, projectId)
-        .eq(RcNode::getNodeIp, request.host())
-        .eq(RcNode::getNodePort, request.port()));
+    List<RcNode> existingNodes = nodeMapper.selectByEnvProjectIpPort(envId, projectId, request.host(), request.port());
 
     LocalDateTime now = LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC);
-    if (existing == null) {
+    if (existingNodes.isEmpty()) {
       RcNode node = new RcNode();
       node.setEnvId(envId);
       node.setProjectId(projectId);
@@ -88,10 +83,14 @@ public class RegistryService {
       node.setUpdateTime(now);
       nodeMapper.insert(node);
     } else {
-      existing.setStatus("0");
-      existing.setLastRefreshTime(now);
-      existing.setUpdateTime(now);
-      nodeMapper.updateById(existing);
+      for (RcNode existingNode : existingNodes) {
+        if (!Objects.equals(existingNode.getStatus(), "0")) {
+          existingNode.setStatus("0");
+          existingNode.setLastRefreshTime(now);
+          existingNode.setUpdateTime(now);
+          nodeMapper.updateById(existingNode);
+        }
+      }
     }
 
     discoverCache.invalidate(cacheKey(request.serviceName(), request.environment()));
@@ -116,10 +115,7 @@ public class RegistryService {
         Instant.now(clock).minusSeconds(registryProperties.heartbeatTimeoutSeconds()),
         ZoneOffset.UTC);
 
-    List<RcNode> nodes = nodeMapper.selectList(new LambdaQueryWrapper<RcNode>()
-        .eq(RcNode::getEnvId, envId)
-        .eq(RcNode::getProjectId, projectId)
-        .eq(RcNode::getStatus, "0"));
+    List<RcNode> nodes = nodeMapper.selectByEnvProjectStatus(envId, projectId, "0");
 
     List<ServiceInstance> instances = new ArrayList<>();
     for (RcNode node : nodes) {
@@ -144,19 +140,18 @@ public class RegistryService {
         Instant.now(clock).minusSeconds(registryProperties.heartbeatTimeoutSeconds()),
         ZoneOffset.UTC);
 
-    List<RcNode> onlineNodes = nodeMapper.selectList(new LambdaQueryWrapper<RcNode>()
-        .eq(RcNode::getStatus, "0")
-        .isNotNull(RcNode::getLastRefreshTime)
-        .lt(RcNode::getLastRefreshTime, timeoutAt));
+    List<RcNode> onlineNodes = nodeMapper.selectByStatus("0");
 
     if (onlineNodes.isEmpty()) {
       return;
     }
 
     for (RcNode node : onlineNodes) {
-      node.setStatus("1");
-      node.setUpdateTime(LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC));
-      nodeMapper.updateById(node);
+      if (node.getLastRefreshTime() != null && node.getLastRefreshTime().isBefore(timeoutAt)) {
+        node.setStatus("1");
+        node.setUpdateTime(LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC));
+        nodeMapper.updateById(node);
+      }
     }
 
     discoverCache.invalidateAll();
@@ -178,9 +173,7 @@ public class RegistryService {
       throw new BusinessException(400, "agentPort is invalid");
     }
 
-    AgentRegistry existing = agentRegistryMapper.selectOne(new LambdaQueryWrapper<AgentRegistry>()
-        .eq(AgentRegistry::getAgentIp, request.getAgentIp())
-        .eq(AgentRegistry::getAgentPort, request.getAgentPort()));
+    AgentRegistry existing = agentRegistryMapper.selectByIpPort(request.getAgentIp(), request.getAgentPort());
 
     LocalDateTime now = LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC);
     
@@ -235,9 +228,7 @@ public class RegistryService {
       throw new BusinessException(400, "agentPort is invalid");
     }
 
-    AgentRegistry existing = agentRegistryMapper.selectOne(new LambdaQueryWrapper<AgentRegistry>()
-        .eq(AgentRegistry::getAgentIp, agentIp)
-        .eq(AgentRegistry::getAgentPort, agentPort));
+    AgentRegistry existing = agentRegistryMapper.selectByIpPort(agentIp, agentPort);
 
     if (existing != null) {
       existing.setNodeStatus(1);

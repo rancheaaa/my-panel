@@ -176,6 +176,20 @@
                 <version>${rocksdb.version}</version>
             </dependency>
 
+            <!-- Testing -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>5.14.2</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>5.14.2</version>
+                <scope>test</scope>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -185,6 +199,7 @@
         <module>distribution</module>
         <module>agent</module>
         <module>proxy</module>
+        <module>common</module>
     </modules>
     <packaging>pom</packaging>
 

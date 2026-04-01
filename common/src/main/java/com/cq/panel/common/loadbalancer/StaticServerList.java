@@ -70,6 +70,7 @@ public class StaticServerList implements ServerList {
         if (servers == null) {
             throw new IllegalArgumentException("servers cannot be null");
         }
+        // 不再修改服务器ID，保持原始ID
         serverMap.put(serviceName, new ArrayList<>(servers));
     }
 
@@ -86,6 +87,7 @@ public class StaticServerList implements ServerList {
         if (server == null) {
             throw new IllegalArgumentException("server cannot be null");
         }
+        // 不再修改服务器ID，保持原始ID
         serverMap.compute(serviceName, (key, existingServers) -> {
             List<Server> servers = existingServers != null ? 
                     new ArrayList<>(existingServers) : new ArrayList<>();

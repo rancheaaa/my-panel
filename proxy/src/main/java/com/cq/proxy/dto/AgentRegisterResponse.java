@@ -1,24 +1,27 @@
-package com.cq.proxy.api.dto;
+package com.cq.proxy.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * Agent注册请求 DTO
+ * Agent注册响应 DTO
  * 
  * @author cq
  */
 @Data
-@Schema(description = "Agent注册请求DTO")
-public class AgentRegisterRequest {
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "Agent注册响应DTO")
+public class AgentRegisterResponse {
     
     @Schema(description = "节点ID")
     private String id;
 
-    @Schema(description = "节点名称", required = true)
-    @NotBlank(message = "节点名称不能为空")
+    @Schema(description = "节点名称")
     private String nodeName;
 
     @Schema(description = "操作系统")
@@ -27,12 +30,10 @@ public class AgentRegisterRequest {
     @Schema(description = "应用ID")
     private String appId;
 
-    @Schema(description = "Agent IP", required = true)
-    @NotBlank(message = "Agent IP不能为空")
+    @Schema(description = "Agent IP")
     private String agentIp;
 
-    @Schema(description = "Agent端口", required = true)
-    @NotNull(message = "Agent端口不能为空")
+    @Schema(description = "Agent端口")
     private Integer agentPort;
 
     @Schema(description = "节点是否启用")
@@ -43,4 +44,10 @@ public class AgentRegisterRequest {
 
     @Schema(description = "备注")
     private String remark;
+
+    @Schema(description = "创建时间")
+    private String createTime;
+
+    @Schema(description = "更新时间")
+    private String updateTime;
 }

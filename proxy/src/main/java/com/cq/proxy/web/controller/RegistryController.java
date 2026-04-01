@@ -1,9 +1,9 @@
 package com.cq.proxy.web.controller;
 
-import com.cq.proxy.api.ApiResponse;
-import com.cq.proxy.api.dto.ServiceInstance;
+import com.cq.proxy.dto.ApiResponse;
+import com.cq.proxy.dto.ServiceInstance;
 import com.cq.proxy.service.RegistryService;
-import com.cq.proxy.api.dto.ServiceRegisterRequest;
+import com.cq.proxy.dto.ServiceRegisterRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

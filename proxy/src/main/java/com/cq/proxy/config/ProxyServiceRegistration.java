@@ -1,6 +1,7 @@
 package com.cq.proxy.config;
 
-import com.cq.proxy.api.dto.ServiceRegisterRequest;
+import com.cq.panel.common.constant.EnvNameConstant;
+import com.cq.proxy.dto.ServiceRegisterRequest;
 import com.cq.proxy.service.RegistryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import static com.cq.panel.common.constant.ServiceNameConstant.PROXY_SERVICE_NAME;
 
 @Component
 public class ProxyServiceRegistration implements ApplicationRunner {
@@ -20,8 +23,8 @@ public class ProxyServiceRegistration implements ApplicationRunner {
 
   private String localHost;
   private int localPort;
-  private String serviceName = "proxy-service";
-  private String environmentName = "default";
+  private final String serviceName = PROXY_SERVICE_NAME;
+  private final String environmentName = EnvNameConstant.DEFAULT_ENV_NAME;
 
   public ProxyServiceRegistration(RegistryService registryService, Environment environment) {
     this.registryService = registryService;
@@ -48,7 +51,7 @@ public class ProxyServiceRegistration implements ApplicationRunner {
     }
   }
 
-  @Scheduled(fixedDelayString = "${proxy.registry.heartbeat-interval-seconds:30}000")
+  @Scheduled(fixedDelayString = "${proxy.registry.heartbeat-interval-seconds:10}000")
   public void heartbeat() {
     try {
       ServiceRegisterRequest request = new ServiceRegisterRequest(

@@ -1,9 +1,9 @@
 package com.cq.proxy.service;
 
-import com.cq.proxy.api.dto.AgentRegisterRequest;
-import com.cq.proxy.api.dto.AgentRegisterResponse;
-import com.cq.proxy.api.dto.ServiceInstance;
-import com.cq.proxy.api.dto.ServiceRegisterRequest;
+import com.cq.proxy.dto.AgentRegisterRequest;
+import com.cq.proxy.dto.AgentRegisterResponse;
+import com.cq.proxy.dto.ServiceInstance;
+import com.cq.proxy.dto.ServiceRegisterRequest;
 import com.cq.proxy.config.ProxyRegistryProperties;
 import com.cq.proxy.exception.BusinessException;
 import com.cq.proxy.repository.entity.AgentRegistry;
@@ -126,7 +126,7 @@ public class RegistryService {
           node.getNodeIp(),
           node.getNodePort() == null ? 0 : node.getNodePort(),
           available,
-          node.getLastRefreshTime() == null ? null : node.getLastRefreshTime().toInstant(ZoneOffset.UTC)));
+          node.getLastRefreshTime() == null ? null : dateTimeFormatter.format(node.getLastRefreshTime())));
     }
 
     discoverCache.put(key, instances);

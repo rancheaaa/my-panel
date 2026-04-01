@@ -6,17 +6,13 @@ import com.cq.panel.common.loadbalancer.HttpResponse;
 import com.cq.panel.common.loadbalancer.LoadBalancerAlgorithm;
 import com.cq.panel.common.loadbalancer.LoadBalancerClient;
 import com.cq.panel.common.loadbalancer.LoadBalancerManager;
-import com.cq.panel.common.loadbalancer.Server;
 import com.cq.panel.common.loadbalancer.ServerList;
-import com.cq.panel.common.loadbalancer.StaticServerList;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
+import java.lang.reflect.Type;
 import java.util.List;
 
 /**
@@ -34,52 +30,26 @@ public class AgentRegistryClient {
     private static final String SERVICE_NAME = "registry-service";
     
     private final Gson gson;
-    private final AgentConfig config;
     private final LoadBalancerClient loadBalancerClient;
+    private final ServerList serverList;
+
 
     public AgentRegistryClient(AgentConfig config) {
-        this.config = config;
         this.gson = new Gson();
 
         LoadBalancerManager loadBalancerManager = LoadBalancerManager.createDefault();
         
         List<String> registryServerUrls = config.getRegistryServerUrls();
+        ServerList serverList = createServerList(config);
+        this.serverList = serverList;
         if (registryServerUrls == null || registryServerUrls.isEmpty()) {
             logger.warn("Registry server URL is not configured, auto-registration and heartbeat will be disabled");
             this.loadBalancerClient = null;
         } else {
-            ServerList serverList = createServerList(config);
             this.loadBalancerClient = loadBalancerManager.getClient(SERVICE_NAME, serverList, LoadBalancerAlgorithm.ROUND_ROBIN);
             logger.info("Agent registry client initialized with {} server URL(s): {}", registryServerUrls.size(), registryServerUrls);
         }
 
-    }
-
-    /**
-     * 将URL列表转换为Server列表
-     * 
-     * @param urls URL列表
-     * @return Server列表
-     */
-    private List<Server> convertUrlsToServers(List<String> urls) {
-        List<Server> servers = new ArrayList<>();
-        int index = 0;
-        for (String url : urls) {
-            try {
-                URI uri = URI.create(url);
-                String host = uri.getHost();
-                int port = uri.getPort() > 0 ? uri.getPort() : (url.startsWith("https") ? 443 : 80);
-                String scheme = uri.getScheme() != null ? uri.getScheme() : "http";
-                String serverId = "registry-server-" + index;
-                
-                Server server = new Server(serverId, host, port, scheme, null);
-                servers.add(server);
-                index++;
-            } catch (Exception e) {
-                logger.error("Failed to parse registry server URL: {}, error: {}", url, e.getMessage());
-            }
-        }
-        return servers;
     }
 
     /**
@@ -89,7 +59,7 @@ public class AgentRegistryClient {
      * @return ServerList实例
      */
     private ServerList createServerList(AgentConfig config) {
-        return new DynamicServerList(config);
+        return new DynamicProxyServerList(config);
     }
 
     /**
@@ -110,17 +80,14 @@ public class AgentRegistryClient {
         try {
             String requestBody = gson.toJson(request);
             HttpResponse<String> response = loadBalancerClient.post(SERVICE_NAME, "/" + REGISTER_ENDPOINT, requestBody, String.class);
-            String responseBody = response.getBody();
+            String responseBodyStr = response.getBody();
             
-            logger.debug("Registry response status: {}, body: {}", response.getStatusCode(), responseBody);
+            logger.debug("Registry response status: {}, body: {}", response.getStatusCode(), responseBodyStr);
             
             if (response.getStatusCode() == 200) {
-                TypeToken<ProxyApiResponse<AgentRegistryResponse>> typeToken = new TypeToken<ProxyApiResponse<AgentRegistryResponse>>() {};
-                ProxyApiResponse<AgentRegistryResponse> apiResponse = new GsonBuilder()
-                        .registerTypeAdapter(typeToken.getType(), new ProxyApiResponse.ProxyApiResponseDeserializer<AgentRegistryResponse>(typeToken.getType()))
-                        .create()
-                        .fromJson(responseBody, typeToken.getType());
-                
+                final Type type = new TypeToken<ProxyApiResponse<AgentRegistryResponse>>() {
+                }.getType();
+                ProxyApiResponse<AgentRegistryResponse> apiResponse = gson.fromJson(responseBodyStr, type);
                 if (apiResponse != null && apiResponse.isSuccess()) {
                     logger.info("Agent registered successfully: {}", apiResponse.getData());
                     return ApiResponse.success(apiResponse.getData());
@@ -129,7 +96,7 @@ public class AgentRegistryClient {
                     return ApiResponse.failure("Agent registration failed");
                 }
             } else {
-                logger.error("Agent registration failed with status code: {}, body: {}", response.getStatusCode(), responseBody);
+                logger.error("Agent registration failed with status code: {}, body: {}", response.getStatusCode(), responseBodyStr);
             }
         } catch (Exception e) {
             logger.error("Agent registration failed with exception: {}", e.getMessage(), e);
@@ -159,6 +126,9 @@ public class AgentRegistryClient {
         logger.debug("Sending heartbeat to registry service");
         
         try {
+            // 刷新服务器列表
+            this.serverList.refresh();
+
             String path = "/" + HEARTBEAT_ENDPOINT + "?agentIp=" + agentIp + "&agentPort=" + agentPort;
             HttpResponse<String> response = loadBalancerClient.post(SERVICE_NAME, path, null, String.class);
             String responseBody = response.getBody();

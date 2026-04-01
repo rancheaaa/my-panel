@@ -10,6 +10,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,55 +37,55 @@ public class ApacheHttpClient implements HttpClient {
     }
 
     @Override
-    public <T> HttpResponse<T> get(String url, Class<T> responseType) {
+    public <T> HttpResponse<T> get(String url, Type responseType) {
         return executeRequest(new HttpGet(url), null, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> get(String url, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> get(String url, Map<String, String> headers, Type responseType) {
         HttpGet request = new HttpGet(url);
         setHeaders(request, headers);
         return executeRequest(request, null, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> post(String url, Object body, Class<T> responseType) {
+    public <T> HttpResponse<T> post(String url, Object body, Type responseType) {
         return executeRequest(new HttpPost(url), body, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> post(String url, Object body, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> post(String url, Object body, Map<String, String> headers, Type responseType) {
         HttpPost request = new HttpPost(url);
         setHeaders(request, headers);
         return executeRequest(request, body, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> put(String url, Object body, Class<T> responseType) {
+    public <T> HttpResponse<T> put(String url, Object body, Type responseType) {
         return executeRequest(new HttpPut(url), body, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> put(String url, Object body, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> put(String url, Object body, Map<String, String> headers, Type responseType) {
         HttpPut request = new HttpPut(url);
         setHeaders(request, headers);
         return executeRequest(request, body, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> delete(String url, Class<T> responseType) {
+    public <T> HttpResponse<T> delete(String url, Type responseType) {
         return executeRequest(new HttpDelete(url), null, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> delete(String url, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> delete(String url, Map<String, String> headers, Type responseType) {
         HttpDelete request = new HttpDelete(url);
         setHeaders(request, headers);
         return executeRequest(request, null, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> execute(String method, String url, Object body, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> execute(String method, String url, Object body, Map<String, String> headers, Type responseType) {
         HttpUriRequestBase request = switch (method.toUpperCase()) {
             case "GET" -> new HttpGet(url);
             case "POST" -> new HttpPost(url);
@@ -130,7 +131,7 @@ public class ApacheHttpClient implements HttpClient {
      * 执行HTTP请求
      */
     private <T> HttpResponse<T> executeRequest(HttpUriRequestBase request, Object body, 
-                                               Class<T> responseType, Map<String, String> headers) {
+                                               Type responseType, Map<String, String> headers) {
         try {
             // 设置请求体（如果是POST、PUT或PATCH请求）
             if (body != null && (request instanceof HttpPost || request instanceof HttpPut || request instanceof HttpPatch)) {

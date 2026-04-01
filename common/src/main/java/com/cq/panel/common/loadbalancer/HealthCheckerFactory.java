@@ -42,39 +42,36 @@ public class HealthCheckerFactory {
         if (type == null) {
             return createDefault();
         }
-        
-        switch (type) {
-            case TCP:
-                return new TcpHealthChecker(timeoutMs);
-            case HTTP:
-                return new HttpHealthChecker(healthCheckPath, timeoutMs);
-            default:
-                return createDefault();
-        }
+
+        return switch (type) {
+            case TCP -> new TcpHealthChecker(timeoutMs);
+            case HTTP -> new HttpHealthChecker(healthCheckPath, timeoutMs);
+            default -> createDefault();
+        };
     }
-    
+
     /**
-     * 根据配置创建健康检查器
+     * 根据负载均衡配置创建健康检查器
      * 
-     * @param config 健康检查配置
+     * @param config 负载均衡配置
      * @param type 健康检查器类型
      * @return 健康检查器实例
      */
-    public static HealthChecker create(HealthCheckConfig config, HealthCheckerType type) {
+    public static HealthChecker create(LoadBalancerConfig config, HealthCheckerType type) {
         if (config == null) {
             return createDefault();
         }
         
-        return create(type, config.getTimeoutMs(), config.getHealthCheckPath());
+        return create(type, config.getHealthCheckTimeout(), config.getHealthCheckPath());
     }
     
     /**
-     * 根据配置创建健康检查器（使用默认类型）
+     * 根据负载均衡配置创建健康检查器（使用默认类型）
      * 
-     * @param config 健康检查配置
+     * @param config 负载均衡配置
      * @return 健康检查器实例
      */
-    public static HealthChecker create(HealthCheckConfig config) {
+    public static HealthChecker create(LoadBalancerConfig config) {
         return create(config, HealthCheckerType.TCP);
     }
 }

@@ -3,25 +3,17 @@ package com.cq.agent.registry;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.ProxyApiResponse;
 import com.cq.agent.dto.ServiceInstance;
-import com.cq.panel.common.loadbalancer.HttpResponse;
-import com.cq.panel.common.loadbalancer.LoadBalancerAlgorithm;
-import com.cq.panel.common.loadbalancer.LoadBalancerClient;
-import com.cq.panel.common.loadbalancer.LoadBalancerManager;
-import com.cq.panel.common.loadbalancer.Server;
-import com.cq.panel.common.loadbalancer.ServerList;
-import com.cq.panel.common.loadbalancer.StaticServerList;
+import com.cq.panel.common.constant.EnvNameConstant;
+import com.cq.panel.common.constant.ServiceNameConstant;
+import com.cq.panel.common.constant.ZoneNameConstant;
+import com.cq.panel.common.loadbalancer.*;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.net.URI;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 动态服务器列表
@@ -29,23 +21,24 @@ import java.util.concurrent.ConcurrentHashMap;
  * 
  * @author cq 2026/3/31 22:51
  */
-public class DynamicServerList implements ServerList {
+public class DynamicProxyServerList implements ServerList {
 
-    private static final Logger logger = LoggerFactory.getLogger(DynamicServerList.class);
-    private static final String PROXY_SERVICE_NAME = "proxy-service";
-    private static final String DEFAULT_ENVIRONMENT = "default";
+    private static final Logger logger = LoggerFactory.getLogger(DynamicProxyServerList.class);
+    private static final String PROXY_SERVICE_NAME = ServiceNameConstant.PROXY_SERVICE_NAME;
+    private static final String DEFAULT_ENVIRONMENT = EnvNameConstant.DEFAULT_ENV_NAME;
+    private static final String DEFAULT_ZONE = ZoneNameConstant.DEFAULT_ZONE;
     private static final String DISCOVER_ENDPOINT = "/api/v1/registry/discover";
-    private static final String REGISTRY_SERVICE_NAME = "registry-service";
+    private static final String REGISTRY_SERVICE_NAME = "proxy-static-service";
 
     private final AgentConfig config;
     private final LoadBalancerClient loadBalancerClient;
-    private final Map<String, List<Server>> serviceServersCache;
     private volatile List<Server> proxyServers;
+    private static final Gson GSON = new Gson();
+    private static final TypeToken<ProxyApiResponse<List<ServiceInstance>>> TYPE_TOKEN = new TypeToken<>() {};
 
-    public DynamicServerList(AgentConfig config) {
+    public DynamicProxyServerList(AgentConfig config) {
         this.config = config;
         this.loadBalancerClient = createLoadBalancerClient();
-        this.serviceServersCache = new ConcurrentHashMap<>();
         this.proxyServers = new ArrayList<>();
         refresh();
     }
@@ -62,12 +55,15 @@ public class DynamicServerList implements ServerList {
             return null;
         }
 
-        LoadBalancerManager loadBalancerManager = LoadBalancerManager.createDefault();
+        LoadBalancerConfig loadBalancerConfig = LoadBalancerConfig.defaultConfig();
+        loadBalancerConfig.setHealthCheckerType(HealthCheckerFactory.HealthCheckerType.HTTP);
+        loadBalancerConfig.setHealthCheckPath("/api/health");
+        LoadBalancerManager loadBalancerManager = new LoadBalancerManager(loadBalancerConfig);
         List<Server> servers = convertUrlsToServers(registryUrls);
         ServerList serverList = createStaticServerList(servers);
 
         LoadBalancerClient client = loadBalancerManager.getClient(
-            REGISTRY_SERVICE_NAME, 
+            REGISTRY_SERVICE_NAME,
             serverList, 
             LoadBalancerAlgorithm.ROUND_ROBIN
         );
@@ -93,7 +89,7 @@ public class DynamicServerList implements ServerList {
                 String scheme = uri.getScheme() != null ? uri.getScheme() : "http";
                 String serverId = "registry-server-" + index;
                 
-                Server server = new Server(serverId, host, port, scheme, null);
+                Server server = new Server(serverId, host, port, scheme, ZoneNameConstant.DEFAULT_ZONE);
                 servers.add(server);
                 index++;
             } catch (Exception e) {
@@ -117,20 +113,12 @@ public class DynamicServerList implements ServerList {
 
     @Override
     public List<Server> getServers(String serviceName) {
-        if (serviceName == null || serviceName.isEmpty()) {
-            return List.of();
-        }
-
-        if (PROXY_SERVICE_NAME.equals(serviceName)) {
-            return new ArrayList<>(proxyServers);
-        }
-
-        return serviceServersCache.getOrDefault(serviceName, List.of());
+        return getUpServers(serviceName);
     }
 
     @Override
     public List<Server> getAllServers() {
-        return fetchProxyServers();
+        return this.proxyServers;
     }
 
     @Override
@@ -161,13 +149,8 @@ public class DynamicServerList implements ServerList {
     public void refresh() {
         logger.info("Refreshing dynamic server list from proxy service");
         try {
-            List<Server> newProxyServers = fetchProxyServers();
-            if (!newProxyServers.isEmpty()) {
-                this.proxyServers = newProxyServers;
-                logger.info("Successfully refreshed proxy servers: {}", proxyServers);
-            } else {
-                logger.warn("No proxy servers found from registry");
-            }
+            this.proxyServers = fetchProxyServers();
+            logger.info("Successfully refreshed proxy servers: {}", proxyServers);
         } catch (Exception e) {
             logger.error("Failed to refresh proxy server list", e);
         }
@@ -179,7 +162,6 @@ public class DynamicServerList implements ServerList {
         if (!proxyServers.isEmpty()) {
             serviceNames.add(PROXY_SERVICE_NAME);
         }
-        serviceNames.addAll(serviceServersCache.keySet());
         return serviceNames;
     }
 
@@ -190,13 +172,13 @@ public class DynamicServerList implements ServerList {
      */
     private List<Server> fetchProxyServers() {
         if (loadBalancerClient == null) {
-            logger.warn("LoadBalancerClient is not available");
+            logger.error("LoadBalancerClient is not available");
             return List.of();
         }
 
         try {
             String discoverPath = buildDiscoverPath();
-            logger.debug("Fetching proxy servers using LoadBalancerClient");
+            logger.debug("Fetching proxy servers {} using LoadBalancerClient", discoverPath);
 
             HttpResponse<String> response = loadBalancerClient.get(REGISTRY_SERVICE_NAME, discoverPath, String.class);
             
@@ -238,17 +220,7 @@ public class DynamicServerList implements ServerList {
      */
     private List<ServiceInstance> parseDiscoverResponse(String responseBody) {
         try {
-            TypeToken<ProxyApiResponse<List<ServiceInstance>>> typeToken = 
-                new TypeToken<ProxyApiResponse<List<ServiceInstance>>>() {};
-            
-            Gson gsonWithAdapter = new GsonBuilder()
-                .registerTypeAdapter(Instant.class, new ServiceInstance.InstantTypeAdapter())
-                .registerTypeAdapter(typeToken.getType(), 
-                    new ProxyApiResponse.ProxyApiResponseDeserializer<List<ServiceInstance>>(typeToken.getType()))
-                .create();
-            
-            ProxyApiResponse<List<ServiceInstance>> apiResponse = gsonWithAdapter.fromJson(responseBody, typeToken.getType());
-
+            ProxyApiResponse<List<ServiceInstance>> apiResponse = GSON.fromJson(responseBody, TYPE_TOKEN.getType());
             if (apiResponse != null && apiResponse.isSuccess() && apiResponse.getData() != null) {
                 return apiResponse.getData();
             }
@@ -265,8 +237,7 @@ public class DynamicServerList implements ServerList {
      * @return Server对象
      */
     private Server convertToServer(ServiceInstance instance) {
-        String serverId = "proxy-" + instance.host() + ":" + instance.port();
-        return new Server(serverId, instance.host(), instance.port(), "http", null);
+        return new Server(instance.serviceName(), instance.host(), instance.port(), "http", DEFAULT_ZONE);
     }
 
     /**

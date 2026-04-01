@@ -1,4 +1,4 @@
-package com.cq.proxy.api;
+package com.cq.proxy.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

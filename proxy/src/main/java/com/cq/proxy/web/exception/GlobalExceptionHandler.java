@@ -1,6 +1,6 @@
 package com.cq.proxy.web.exception;
 
-import com.cq.proxy.api.ApiResponse;
+import com.cq.proxy.dto.ApiResponse;
 import com.cq.proxy.exception.BusinessException;
 import com.cq.proxy.exception.SystemException;
 import org.slf4j.Logger;

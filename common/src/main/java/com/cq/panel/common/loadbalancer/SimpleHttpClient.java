@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -35,47 +36,47 @@ public class SimpleHttpClient implements HttpClient {
     }
 
     @Override
-    public <T> HttpResponse<T> get(String url, Class<T> responseType) {
+    public <T> HttpResponse<T> get(String url, Type responseType) {
         return executeRequest("GET", url, null, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> get(String url, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> get(String url, Map<String, String> headers, Type responseType) {
         return executeRequest("GET", url, null, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> post(String url, Object body, Class<T> responseType) {
+    public <T> HttpResponse<T> post(String url, Object body, Type responseType) {
         return executeRequest("POST", url, body, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> post(String url, Object body, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> post(String url, Object body, Map<String, String> headers, Type responseType) {
         return executeRequest("POST", url, body, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> put(String url, Object body, Class<T> responseType) {
+    public <T> HttpResponse<T> put(String url, Object body, Type responseType) {
         return executeRequest("PUT", url, body, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> put(String url, Object body, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> put(String url, Object body, Map<String, String> headers, Type responseType) {
         return executeRequest("PUT", url, body, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> delete(String url, Class<T> responseType) {
+    public <T> HttpResponse<T> delete(String url, Type responseType) {
         return executeRequest("DELETE", url, null, responseType, new HashMap<>());
     }
 
     @Override
-    public <T> HttpResponse<T> delete(String url, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> delete(String url, Map<String, String> headers, Type responseType) {
         return executeRequest("DELETE", url, null, responseType, headers);
     }
 
     @Override
-    public <T> HttpResponse<T> execute(String method, String url, Object body, Map<String, String> headers, Class<T> responseType) {
+    public <T> HttpResponse<T> execute(String method, String url, Object body, Map<String, String> headers, Type responseType) {
         return executeRequest(method, url, body, responseType, headers);
     }
 
@@ -103,7 +104,7 @@ public class SimpleHttpClient implements HttpClient {
      * 执行HTTP请求
      */
     private <T> HttpResponse<T> executeRequest(String method, String url, Object body, 
-                                              Class<T> responseType, Map<String, String> headers) {
+                                              Type responseType, Map<String, String> headers) {
         HttpURLConnection connection = null;
         try {
             URL requestUrl = new URI(url).toURL();

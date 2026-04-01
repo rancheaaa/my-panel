@@ -183,7 +183,7 @@ public class AgentConfig {
         this.osType = getStringProperty("registry.os.type", null);
         this.appId = getStringProperty("registry.app.id", null);
         this.remark = getStringProperty("registry.remark", null);
-        this.heartbeatIntervalSeconds = getIntProperty("registry.heartbeat.interval.seconds", 300);
+        this.heartbeatIntervalSeconds = getIntProperty("registry.heartbeat.interval.seconds", 30);
         this.autoRegister = getBooleanProperty("registry.auto.register", true);
         this.autoHeartbeat = getBooleanProperty("registry.auto.heartbeat", true);
 

@@ -52,7 +52,7 @@ class HttpHealthCheckerTest {
         
         assertNotNull(defaultChecker);
         assertEquals("httpHealthChecker", defaultChecker.getName());
-        assertEquals("/health", defaultChecker.getHealthCheckPath());
+        assertEquals("/api/health", defaultChecker.getHealthCheckPath());
         assertEquals(5000, defaultChecker.getTimeoutMs());
     }
     
@@ -70,7 +70,7 @@ class HttpHealthCheckerTest {
     @DisplayName("检查空路径和无效超时时间的默认值")
     void testCreateWithInvalidParameters() {
         HttpHealthChecker checker1 = new HttpHealthChecker(mockHttpClient, null, 5000);
-        assertEquals("/health", checker1.getHealthCheckPath());
+        assertEquals("/api/health", checker1.getHealthCheckPath());
         
         HttpHealthChecker checker2 = new HttpHealthChecker(mockHttpClient, "/health", -100);
         assertEquals(5000, checker2.getTimeoutMs());
@@ -101,7 +101,7 @@ class HttpHealthCheckerTest {
     @DisplayName("检查健康服务器（模拟成功响应）")
     void testCheckHealthyServer() {
         // 模拟成功的HTTP响应
-        HttpResponse<String> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
+        HttpResponse<Object> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
         when(mockHttpClient.get(eq("http://localhost:8080/health"), eq(String.class)))
                 .thenReturn(successResponse);
         
@@ -117,7 +117,7 @@ class HttpHealthCheckerTest {
     @DisplayName("检查不健康服务器（模拟失败响应）")
     void testCheckUnhealthyServer() {
         // 模拟失败的HTTP响应
-        HttpResponse<String> failureResponse = new HttpResponse<>("Service Unavailable", 503, new HashMap<>());
+        HttpResponse<Object> failureResponse = new HttpResponse<>("Service Unavailable", 503, new HashMap<>());
         when(mockHttpClient.get(eq("http://localhost:8080/health"), eq(String.class)))
                 .thenReturn(failureResponse);
         
@@ -170,7 +170,7 @@ class HttpHealthCheckerTest {
         Server httpsServer = new Server("https-server", "example.com", 443, "https", "zone1");
         httpsServer.setAlive(true);
         
-        HttpResponse<String> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
+        HttpResponse<Object> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
         when(mockHttpClient.get(eq("https://example.com:443/health"), eq(String.class)))
                 .thenReturn(successResponse);
         
@@ -192,7 +192,7 @@ class HttpHealthCheckerTest {
         // 创建使用自定义路径的健康检查器
         HttpHealthChecker customPathChecker = new HttpHealthChecker(mockHttpClient, "/api/health/status", 5000);
         
-        HttpResponse<String> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
+        HttpResponse<Object> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
         when(mockHttpClient.get(eq("http://localhost:8080/api/health/status"), eq(String.class)))
                 .thenReturn(successResponse);
         
@@ -208,7 +208,7 @@ class HttpHealthCheckerTest {
         // 创建使用空路径的健康检查器
         HttpHealthChecker emptyPathChecker = new HttpHealthChecker(mockHttpClient, "", 5000);
         
-        HttpResponse<String> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
+        HttpResponse<Object> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
         when(mockHttpClient.get(eq("http://localhost:8080"), eq(String.class)))
                 .thenReturn(successResponse);
         
@@ -224,7 +224,7 @@ class HttpHealthCheckerTest {
         // 创建使用根路径的健康检查器
         HttpHealthChecker rootPathChecker = new HttpHealthChecker(mockHttpClient, "/", 5000);
         
-        HttpResponse<String> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
+        HttpResponse<Object> successResponse = HttpResponse.ok("{\"status\":\"UP\"}");
         when(mockHttpClient.get(eq("http://localhost:8080/"), eq(String.class)))
                 .thenReturn(successResponse);
         
@@ -238,7 +238,7 @@ class HttpHealthCheckerTest {
      * 辅助方法：测试特定状态码
      */
     private void testStatusCode(int statusCode, boolean expectedResult) {
-        HttpResponse<String> response = new HttpResponse<>( "Test",statusCode, new HashMap<>());
+        HttpResponse<Object> response = new HttpResponse<>( "Test",statusCode, new HashMap<>());
         
         // 重置mock，确保每次调用都是独立的
         reset(mockHttpClient);

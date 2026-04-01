@@ -1,8 +1,8 @@
 package com.cq.proxy.web.controller;
 
-import com.cq.proxy.api.ApiResponse;
-import com.cq.proxy.api.dto.AgentRegisterRequest;
-import com.cq.proxy.api.dto.AgentRegisterResponse;
+import com.cq.proxy.dto.ApiResponse;
+import com.cq.proxy.dto.AgentRegisterRequest;
+import com.cq.proxy.dto.AgentRegisterResponse;
 import com.cq.proxy.service.RegistryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

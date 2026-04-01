@@ -19,6 +19,9 @@ public class LoadBalancerConfig {
     private int healthCheckFailureThreshold;
     private int healthCheckSuccessThreshold;
     private HealthCheckerFactory.HealthCheckerType healthCheckerType;
+    
+    // 新增健康检查配置字段（从HealthCheckConfig迁移）
+    private boolean healthCheckEnabled;
 
     public LoadBalancerConfig() {
         this.algorithm = LoadBalancerAlgorithm.ROUND_ROBIN;
@@ -28,13 +31,20 @@ public class LoadBalancerConfig {
         this.enableHealthCheck = true;
         this.connectTimeout = 5000; // 5秒
         this.readTimeout = 10000;   // 10秒
-        this.healthCheckPath = "/health";
+        this.healthCheckPath = "/api/health";
         this.healthCheckTimeout = 5000; // 5秒
-        this.healthCheckInterval = 30000; // 30秒
+        this.healthCheckInterval = 10000; // 10秒
         this.healthCheckRetryCount = 3;
         this.healthCheckFailureThreshold = 3;
         this.healthCheckSuccessThreshold = 2;
         this.healthCheckerType = HealthCheckerFactory.HealthCheckerType.TCP; // 默认使用TCP健康检查器
+        
+        // 初始化新增的健康检查配置字段
+        this.healthCheckEnabled = true;
+    }
+
+    public boolean isHealthCheckEnabled() {
+        return healthCheckEnabled;
     }
 
     public LoadBalancerAlgorithm getAlgorithm() {
@@ -159,9 +169,8 @@ public class LoadBalancerConfig {
         this.healthCheckerType = healthCheckerType;
     }
 
-    // 兼容性方法
-    public boolean isHealthCheckEnabled() {
-        return enableHealthCheck;
+    public void setHealthCheckEnabled(boolean healthCheckEnabled) {
+        this.healthCheckEnabled = healthCheckEnabled;
     }
 
     /**
@@ -169,31 +178,6 @@ public class LoadBalancerConfig {
      */
     public static LoadBalancerConfig defaultConfig() {
         return new LoadBalancerConfig();
-    }
-
-    /**
-     * 创建快速配置（较短的超时时间）
-     */
-    public static LoadBalancerConfig fastConfig() {
-        LoadBalancerConfig config = new LoadBalancerConfig();
-        config.setConnectTimeout(2000);
-        config.setReadTimeout(5000);
-        config.setHealthCheckTimeout(2000);
-        config.setHealthCheckInterval(15000);
-        return config;
-    }
-
-    /**
-     * 创建高可用配置（较多的重试次数）
-     */
-    public static LoadBalancerConfig highAvailabilityConfig() {
-        LoadBalancerConfig config = new LoadBalancerConfig();
-        config.setMaxRetries(5);
-        config.setHealthCheckRetryCount(5);
-        config.setHealthCheckFailureThreshold(5);
-        config.setHealthCheckSuccessThreshold(3);
-        config.setEnableHealthCheck(true);
-        return config;
     }
 
     /**
@@ -221,6 +205,9 @@ public class LoadBalancerConfig {
         private int healthCheckFailureThreshold = 3;
         private int healthCheckSuccessThreshold = 2;
         private HealthCheckerFactory.HealthCheckerType healthCheckerType = HealthCheckerFactory.HealthCheckerType.TCP;
+        
+        // 新增健康检查配置字段
+        private boolean healthCheckEnabled = true;
 
         public Builder algorithm(LoadBalancerAlgorithm algorithm) {
             this.algorithm = algorithm;
@@ -292,6 +279,12 @@ public class LoadBalancerConfig {
             return this;
         }
 
+        // 新增健康检查配置的builder方法
+        public Builder healthCheckEnabled(boolean healthCheckEnabled) {
+            this.healthCheckEnabled = healthCheckEnabled;
+            return this;
+        }
+
         public LoadBalancerConfig build() {
             LoadBalancerConfig config = new LoadBalancerConfig();
             config.setAlgorithm(this.algorithm);
@@ -308,6 +301,10 @@ public class LoadBalancerConfig {
             config.setHealthCheckFailureThreshold(this.healthCheckFailureThreshold);
             config.setHealthCheckSuccessThreshold(this.healthCheckSuccessThreshold);
             config.setHealthCheckerType(this.healthCheckerType);
+            
+            // 设置新增的健康检查配置字段
+            config.setHealthCheckEnabled(this.healthCheckEnabled);
+            
             return config;
         }
     }

@@ -1,11 +1,8 @@
 package com.cq.panel.common.loadbalancer;
 
+import com.cq.panel.common.utils.PortUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
 
 /**
  * TCP端口探测健康检查器
@@ -36,7 +33,7 @@ public class TcpHealthChecker implements HealthChecker {
     
     @Override
     public boolean isHealthy(Server server) {
-        if (server == null || !server.isAlive()) {
+        if (server == null) {
             return false;
         }
         
@@ -53,30 +50,10 @@ public class TcpHealthChecker implements HealthChecker {
             logger.warn("服务器端口无效，跳过健康检查: {}:{}", host, port);
             return false;
         }
-        
-        try (Socket socket = new Socket()) {
-            // 设置连接超时
-            socket.connect(new InetSocketAddress(host, port), timeoutMs);
-            
-            // 如果连接成功，立即关闭连接（我们只需要验证连接性）
-            boolean isHealthy = socket.isConnected();
-            
-            if (isHealthy) {
-                logger.debug("TCP健康检查成功: {}:{}", host, port);
-            }
-            
-            return isHealthy;
-            
-        } catch (SocketTimeoutException e) {
-            logger.debug("TCP健康检查超时: {}:{}, 超时时间: {}ms", host, port, timeoutMs);
-            return false;
-        } catch (IOException e) {
-            logger.debug("TCP健康检查失败: {}:{}, 错误: {}", host, port, e.getMessage());
-            return false;
-        } catch (Exception e) {
-            logger.warn("TCP健康检查异常: {}:{}, 异常: {}", host, port, e.getMessage());
-            return false;
-        }
+
+        final boolean healthy = PortUtils.portDetectFast(host, port, timeoutMs);
+        logger.debug("tcp端口健康检查完成: {} - {}:{} - {}", server.getId(), server.getHost(), server.getPort(), healthy ? "健康" : "不健康");
+        return healthy;
     }
     
     /**

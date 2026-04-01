@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 服务器实体类
  */
 public class Server {
-    private final String id;
+    private volatile String id;
     private final String host;
     private final int port;
     private final String scheme;
@@ -38,6 +38,10 @@ public class Server {
         this.lastHealthCheckTime = 0;
         this.consecutiveFailures = new AtomicLong(0);
         this.consecutiveSuccesses = new AtomicLong(0);
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getId() {

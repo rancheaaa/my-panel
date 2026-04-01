@@ -1,8 +1,8 @@
 package com.cq.proxy.web.controller;
 
-import com.cq.proxy.api.ApiResponse;
-import com.cq.proxy.api.dto.ConfigUpdateRequest;
-import com.cq.proxy.api.dto.ConfigValueResponse;
+import com.cq.proxy.dto.ApiResponse;
+import com.cq.proxy.dto.ConfigUpdateRequest;
+import com.cq.proxy.dto.ConfigValueResponse;
 import com.cq.proxy.service.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

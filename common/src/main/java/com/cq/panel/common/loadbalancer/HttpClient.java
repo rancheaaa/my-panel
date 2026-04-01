@@ -1,5 +1,6 @@
 package com.cq.panel.common.loadbalancer;
 
+import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
@@ -15,7 +16,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> get(String url, Class<T> responseType);
+    <T> HttpResponse<T> get(String url, Type responseType);
 
     /**
      * 执行带HTTP头的GET请求
@@ -25,7 +26,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> get(String url, Map<String, String> headers, Class<T> responseType);
+    <T> HttpResponse<T> get(String url, Map<String, String> headers, Type responseType);
 
     /**
      * 执行HTTP POST请求
@@ -35,7 +36,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> post(String url, Object body, Class<T> responseType);
+    <T> HttpResponse<T> post(String url, Object body, Type responseType);
 
     /**
      * 执行带HTTP头的POST请求
@@ -46,7 +47,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> post(String url, Object body, Map<String, String> headers, Class<T> responseType);
+    <T> HttpResponse<T> post(String url, Object body, Map<String, String> headers, Type responseType);
 
     /**
      * 执行HTTP PUT请求
@@ -56,7 +57,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> put(String url, Object body, Class<T> responseType);
+    <T> HttpResponse<T> put(String url, Object body, Type responseType);
 
     /**
      * 执行带HTTP头的PUT请求
@@ -67,7 +68,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> put(String url, Object body, Map<String, String> headers, Class<T> responseType);
+    <T> HttpResponse<T> put(String url, Object body, Map<String, String> headers, Type responseType);
 
     /**
      * 执行HTTP DELETE请求
@@ -76,7 +77,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> delete(String url, Class<T> responseType);
+    <T> HttpResponse<T> delete(String url, Type responseType);
 
     /**
      * 执行带HTTP头的DELETE请求
@@ -86,7 +87,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> delete(String url, Map<String, String> headers, Class<T> responseType);
+    <T> HttpResponse<T> delete(String url, Map<String, String> headers, Type responseType);
 
     /**
      * 执行通用HTTP请求
@@ -98,7 +99,7 @@ public interface HttpClient {
      * @param responseType 响应类型
      * @return HTTP响应
      */
-    <T> HttpResponse<T> execute(String method, String url, Object body, Map<String, String> headers, Class<T> responseType);
+    <T> HttpResponse<T> execute(String method, String url, Object body, Map<String, String> headers, Type responseType);
 
     /**
      * 设置连接超时时间（毫秒）

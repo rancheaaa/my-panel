@@ -59,23 +59,12 @@ public class LoadBalancerManager {
                 loadBalancer = new ZoneAwareLoadBalancer(defaultConfig.getLocalZone());
             }
             
-            // 创建健康检查配置
-            HealthCheckConfig healthCheckConfig = HealthCheckConfig.builder()
-                    .enabled(defaultConfig.isHealthCheckEnabled())
-                    .healthCheckPath(defaultConfig.getHealthCheckPath())
-                    .timeoutMs(defaultConfig.getHealthCheckTimeout())
-                    .intervalMs(defaultConfig.getHealthCheckInterval())
-                    .retryCount(defaultConfig.getHealthCheckRetryCount())
-                    .failureThreshold(defaultConfig.getHealthCheckFailureThreshold())
-                    .successThreshold(defaultConfig.getHealthCheckSuccessThreshold())
-                    .build();
-            
             // 使用工厂创建健康检查器
-            HealthChecker healthChecker = HealthCheckerFactory.create(healthCheckConfig, defaultConfig.getHealthCheckerType());
+            HealthChecker healthChecker = HealthCheckerFactory.create(defaultConfig, defaultConfig.getHealthCheckerType());
             
             logger.info("Created load balancer client for service: {}, algorithm: {}, health checker: {}", 
                     serviceName, algorithm.getName(), healthChecker.getName());
-            return new LoadBalancerClient(loadBalancer, serverList, httpClient, healthChecker, healthCheckConfig);
+            return new LoadBalancerClient(loadBalancer, serverList, httpClient, healthChecker, defaultConfig);
         });
     }
 
@@ -133,19 +122,5 @@ public class LoadBalancerManager {
      */
     public static LoadBalancerManager createDefault() {
         return new LoadBalancerManager();
-    }
-
-    /**
-     * 创建快速管理器
-     */
-    public static LoadBalancerManager createFast() {
-        return new LoadBalancerManager(LoadBalancerConfig.fastConfig());
-    }
-
-    /**
-     * 创建高可用管理器
-     */
-    public static LoadBalancerManager createHighAvailability() {
-        return new LoadBalancerManager(LoadBalancerConfig.highAvailabilityConfig());
     }
 }

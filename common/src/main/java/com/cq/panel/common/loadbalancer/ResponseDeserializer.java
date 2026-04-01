@@ -1,6 +1,7 @@
 package com.cq.panel.common.loadbalancer;
 
 import com.google.gson.Gson;
+import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -45,7 +46,7 @@ public class ResponseDeserializer {
      * @param responseType 目标类型
      * @return 反序列化后的对象
      */
-    public static <T> T deserialize(String responseBody, String contentType, Class<T> responseType) {
+    public static <T> T deserialize(String responseBody, String contentType, Type responseType) {
         if (responseBody == null || responseBody.isEmpty()) {
             return null;
         }
@@ -65,7 +66,7 @@ public class ResponseDeserializer {
      * @param responseType 目标类型
      * @return 反序列化后的对象
      */
-    public static <T> T deserialize(String responseBody, Map<String, String> headers, Class<T> responseType) {
+    public static <T> T deserialize(String responseBody, Map<String, String> headers, Type responseType) {
         String contentType = headers != null ? headers.get("Content-Type") : null;
         return deserialize(responseBody, contentType, responseType);
     }
@@ -97,19 +98,20 @@ public class ResponseDeserializer {
      * Content-Type处理器接口
      */
     private interface ContentTypeHandler {
-        <T> T deserialize(String responseBody, Class<T> responseType);
+        <T> T deserialize(String responseBody, Type responseType);
     }
     
     /**
      * JSON Content-Type处理器
      */
+    @SuppressWarnings("unchecked")
     private static class JsonContentTypeHandler implements ContentTypeHandler {
         @Override
-        public <T> T deserialize(String responseBody, Class<T> responseType) {
+        public <T> T deserialize(String responseBody, Type responseType) {
             try {
                 // 如果是String类型，直接返回
                 if (responseType == String.class) {
-                    return responseType.cast(responseBody);
+                    return (T) responseBody;
                 }
                 
                 // 使用Gson进行JSON反序列化
@@ -124,12 +126,13 @@ public class ResponseDeserializer {
     /**
      * 文本Content-Type处理器
      */
+    @SuppressWarnings("unchecked")
     private static class TextContentTypeHandler implements ContentTypeHandler {
         @Override
-        public <T> T deserialize(String responseBody, Class<T> responseType) {
+        public <T> T deserialize(String responseBody, Type responseType) {
             // 如果是String类型，直接返回
             if (responseType == String.class) {
-                return responseType.cast(responseBody);
+                return (T) responseBody;
             }
             
             // 对于其他类型，尝试使用JSON反序列化（很多文本API实际上返回JSON）
@@ -139,15 +142,15 @@ public class ResponseDeserializer {
             } catch (Exception e) {
                 // 如果JSON反序列化失败，尝试其他方式
                 if (responseType == Integer.class || responseType == int.class) {
-                    return responseType.cast(Integer.parseInt(responseBody.trim()));
+                    return (T) Integer.valueOf(Integer.parseInt(responseBody.trim()));
                 } else if (responseType == Long.class || responseType == long.class) {
-                    return responseType.cast(Long.parseLong(responseBody.trim()));
+                    return (T) Long.valueOf(Long.parseLong(responseBody.trim()));
                 } else if (responseType == Double.class || responseType == double.class) {
-                    return responseType.cast(Double.parseDouble(responseBody.trim()));
+                    return (T) Double.valueOf(Double.parseDouble(responseBody.trim()));
                 } else if (responseType == Boolean.class || responseType == boolean.class) {
-                    return responseType.cast(Boolean.parseBoolean(responseBody.trim()));
+                    return (T) Boolean.valueOf(Boolean.parseBoolean(responseBody.trim()));
                 } else {
-                    throw new RuntimeException("文本反序列化失败，无法将文本转换为类型: " + responseType.getName());
+                    throw new RuntimeException("文本反序列化失败，无法将文本转换为类型: " + responseType.getTypeName());
                 }
             }
         }
@@ -156,18 +159,19 @@ public class ResponseDeserializer {
     /**
      * 二进制Content-Type处理器
      */
+    @SuppressWarnings("unchecked")
     private static class BinaryContentTypeHandler implements ContentTypeHandler {
         @Override
-        public <T> T deserialize(String responseBody, Class<T> responseType) {
+        public <T> T deserialize(String responseBody, Type responseType) {
             // 二进制数据通常不适合直接反序列化为对象
             // 这里返回Base64编码的字符串或原始字节数组
             if (responseType == String.class) {
                 // 返回Base64编码的字符串
-                return responseType.cast(java.util.Base64.getEncoder().encodeToString(responseBody.getBytes()));
+                return (T) java.util.Base64.getEncoder().encodeToString(responseBody.getBytes());
             } else if (responseType == byte[].class) {
-                return responseType.cast(responseBody.getBytes());
+                return (T) responseBody.getBytes();
             } else {
-                throw new RuntimeException("二进制数据无法反序列化为类型: " + responseType.getName());
+                throw new RuntimeException("二进制数据无法反序列化为类型: " + responseType.getTypeName());
             }
         }
     }

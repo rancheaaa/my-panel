@@ -29,14 +29,23 @@ class LoadBalancerExampleTest {
         Server server2 = new Server("server2", "192.168.1.102", 8080, "http", "zone1");
         Server server3 = new Server("server3", "192.168.1.103", 8080, "http", "zone2");
         
+        // 设置服务器为alive状态
+        server1.setAlive(true);
+        server2.setAlive(true);
+        server3.setAlive(true);
+        
         servers = Arrays.asList(server1, server2, server3);
         
         // 创建静态服务器列表
         serverList = new StaticServerList();
         serverList.addServers("user-service", servers);
         
-        // 创建负载均衡管理器
-        manager = LoadBalancerManager.createDefault();
+        // 创建负载均衡管理器（禁用健康检查以避免影响测试）
+        LoadBalancerConfig testConfig = LoadBalancerConfig.builder()
+                .enableHealthCheck(false)
+                .healthCheckEnabled(false)
+                .build();
+        manager = new LoadBalancerManager(testConfig);
     }
     
     @Test
@@ -96,6 +105,13 @@ class LoadBalancerExampleTest {
         assertEquals("roundRobin", loadBalancer.getName());
         
         // 测试轮询选择
+        // 先检查服务器列表状态
+        assertNotNull(servers, "服务器列表不能为null");
+        assertFalse(servers.isEmpty(), "服务器列表不能为空");
+        for (Server server : servers) {
+            assertTrue(server.isAlive(), "服务器 " + server.getId() + " 应该是alive状态");
+        }
+        
         Server first = loadBalancer.choose(servers);
         Server second = loadBalancer.choose(servers);
         Server third = loadBalancer.choose(servers);

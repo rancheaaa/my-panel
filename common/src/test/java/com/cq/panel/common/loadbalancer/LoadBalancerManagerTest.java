@@ -183,27 +183,6 @@ class LoadBalancerManagerTest {
             assertEquals(LoadBalancerAlgorithm.ROUND_ROBIN, 
                 defaultManager.getDefaultConfig().getAlgorithm());
         }
-        
-        @Test
-        @DisplayName("创建快速管理器")
-        void testCreateFast() {
-            LoadBalancerManager fastManager = LoadBalancerManager.createFast();
-            
-            assertNotNull(fastManager);
-            assertEquals(2000, fastManager.getDefaultConfig().getConnectTimeout());
-            assertEquals(5000, fastManager.getDefaultConfig().getReadTimeout());
-        }
-        
-        @Test
-        @DisplayName("创建高可用管理器")
-        void testCreateHighAvailability() {
-            LoadBalancerManager haManager = LoadBalancerManager.createHighAvailability();
-            
-            assertNotNull(haManager);
-            // 高可用配置主要关注重试次数，超时时间可能保持默认值
-            assertEquals(5, haManager.getDefaultConfig().getMaxRetries());
-            assertEquals(5, haManager.getDefaultConfig().getHealthCheckRetryCount());
-        }
     }
     
     @Nested

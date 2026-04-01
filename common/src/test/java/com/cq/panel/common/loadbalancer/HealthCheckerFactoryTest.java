@@ -52,8 +52,8 @@ class HealthCheckerFactoryTest {
     @Test
     @DisplayName("根据配置创建健康检查器")
     void testCreateWithConfig() {
-        HealthCheckConfig config = HealthCheckConfig.builder()
-                .timeoutMs(4000)
+        LoadBalancerConfig config = LoadBalancerConfig.builder()
+                .healthCheckTimeout(4000)
                 .healthCheckPath("/api/health")
                 .build();
         
@@ -68,7 +68,7 @@ class HealthCheckerFactoryTest {
         assertInstanceOf(HttpHealthChecker.class, httpChecker);
         
         // 测试默认类型
-        HealthChecker defaultChecker = HealthCheckerFactory.create(config);
+        HealthChecker defaultChecker = HealthCheckerFactory.create((LoadBalancerConfig) config);
         assertNotNull(defaultChecker);
         assertInstanceOf(TcpHealthChecker.class, defaultChecker);
     }
@@ -76,7 +76,7 @@ class HealthCheckerFactoryTest {
     @Test
     @DisplayName("使用空配置创建健康检查器")
     void testCreateWithNullConfig() {
-        HealthChecker checker = HealthCheckerFactory.create(null);
+        HealthChecker checker = HealthCheckerFactory.create(null, HealthCheckerFactory.HealthCheckerType.TCP);
         
         assertNotNull(checker);
         assertInstanceOf(TcpHealthChecker.class, checker);

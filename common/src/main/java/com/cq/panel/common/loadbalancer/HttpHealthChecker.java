@@ -25,7 +25,7 @@ public class HttpHealthChecker implements HealthChecker {
      */
     public HttpHealthChecker(HttpClient httpClient, String healthCheckPath, int timeoutMs) {
         this.httpClient = httpClient != null ? httpClient : new SimpleHttpClient();
-        this.healthCheckPath = healthCheckPath != null ? healthCheckPath : "/health";
+        this.healthCheckPath = healthCheckPath != null ? healthCheckPath : "/api/health";
         this.timeoutMs = timeoutMs > 0 ? timeoutMs : 5000;
     }
     
@@ -43,12 +43,16 @@ public class HttpHealthChecker implements HealthChecker {
      * 默认构造函数
      */
     public HttpHealthChecker() {
-        this(null, "/health", 5000);
+        this(null, "/api/health", 5000);
     }
     
     @Override
     public boolean isHealthy(Server server) {
-        if (server == null || !server.isAlive()) {
+        if (server == null) {
+            return false;
+        }
+        if (!"http".equals(server.getScheme())
+                && !"https".equals(server.getScheme())) {
             return false;
         }
         
@@ -61,13 +65,12 @@ public class HttpHealthChecker implements HealthChecker {
             
             // 检查响应状态码
             if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
-                logger.debug("健康检查通过: {} - {}", server.getId(), url);
+                logger.debug("http心跳检查完成: {} - {}:{} -{} -{}", server.getId(), server.getHost(), server.getPort(), url, "健康");
                 return true;
             } else {
-                logger.warn("健康检查失败: {} - {} (状态码: {})", server.getId(), url, response.getStatusCode());
+                logger.warn("http心跳检查失败: {} - {}:{} -{} -{} -statusCode:{}", server.getId(), server.getHost(), server.getPort(), url, "不健康", response.getStatusCode());
                 return false;
             }
-            
         } catch (Exception e) {
             logger.warn("健康检查异常: {} - {}", server.getId(), e.getMessage());
             return false;

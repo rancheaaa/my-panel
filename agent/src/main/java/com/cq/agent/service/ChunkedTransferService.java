@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -75,7 +76,7 @@ public class ChunkedTransferService {
         logger.info("Persistent upload sessions initialized at: {}", config.getUploadSessionsDbPath());
         this.uploadSessions.getValues(1, 10).forEach(session -> logger.info("Loaded Session: {}", session));
 
-        cleanupExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+        cleanupExecutor = new ScheduledThreadPoolExecutor(1, r -> {
             Thread t = new Thread(r, "chunk-cleanup");
             t.setDaemon(true);
             return t;

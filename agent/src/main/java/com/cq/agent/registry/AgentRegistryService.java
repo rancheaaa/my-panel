@@ -8,7 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,7 +35,8 @@ public class AgentRegistryService {
     public AgentRegistryService(AgentConfig config) {
         this.config = config;
         this.registryClient = new AgentRegistryClient(config);
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        // 手动创建单线程调度器
+        this.scheduler = new ScheduledThreadPoolExecutor(1, r -> {
             Thread thread = new Thread(r, "agent-registry-scheduler");
             thread.setDaemon(true);
             return thread;
@@ -108,7 +109,6 @@ public class AgentRegistryService {
             if (response != null && response.isSuccess() && response.getData() != null) {
                 this.registryInfo = response.getData();
                 this.registered.set(true);
-                logger.info("Agent registered successfully: {}", registryInfo);
             } else {
                 this.registered.set(false);
                 String errorMsg = response != null ? response.getMsg() : "Unknown error";
@@ -140,17 +140,9 @@ public class AgentRegistryService {
                 logger.debug("Heartbeat sent successfully");
             } else {
                 logger.warn("Heartbeat failed, will try to re-register");
-                // 心跳失败，尝试重新注册
-                if (config.isAutoRegister()) {
-                    register();
-                }
             }
         } catch (Exception e) {
             logger.error("Heartbeat failed with exception", e);
-            // 心跳失败，尝试重新注册
-            if (config.isAutoRegister()) {
-                register();
-            }
         }
     }
 

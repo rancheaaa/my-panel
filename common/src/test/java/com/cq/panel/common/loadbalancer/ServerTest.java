@@ -5,10 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Timeout;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -370,7 +368,15 @@ class ServerTest {
         int threadCount = 10;
         int incrementsPerThread = 100;
         
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        ExecutorService executor = new ThreadPoolExecutor(
+                threadCount, threadCount,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                r -> {
+                    Thread t = new Thread(r, "test-concurrent-increment");
+                    t.setDaemon(true);
+                    return t;
+                });
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch finishLatch = new CountDownLatch(threadCount);
         
@@ -415,7 +421,15 @@ class ServerTest {
         // 设置初始并发请求数
         defaultServer.setConcurrentRequests(initialRequests);
         
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        ExecutorService executor = new ThreadPoolExecutor(
+                threadCount, threadCount,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                r -> {
+                    Thread t = new Thread(r, "test-concurrent-decrement");
+                    t.setDaemon(true);
+                    return t;
+                });
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch finishLatch = new CountDownLatch(threadCount);
         
@@ -457,7 +471,15 @@ class ServerTest {
         int threadCount = 5;
         int operationsPerThread = 100;
         
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        ExecutorService executor = new ThreadPoolExecutor(
+                threadCount, threadCount,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                r -> {
+                    Thread t = new Thread(r, "test-concurrent-health-check");
+                    t.setDaemon(true);
+                    return t;
+                });
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch finishLatch = new CountDownLatch(threadCount);
         

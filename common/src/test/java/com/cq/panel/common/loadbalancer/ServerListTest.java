@@ -9,10 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -568,7 +565,15 @@ class ServerListTest {
         int threadCount = 10;
         int serversPerThread = 5;
         
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        ExecutorService executor = new ThreadPoolExecutor(
+                threadCount, threadCount,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                r -> {
+                    Thread t = new Thread(r, "test-concurrent-server-addition");
+                    t.setDaemon(true);
+                    return t;
+                });
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch finishLatch = new CountDownLatch(threadCount);
         
@@ -626,7 +631,15 @@ class ServerListTest {
         int threadCount = 8;
         int operationsPerThread = 50;
         
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        ExecutorService executor = new ThreadPoolExecutor(
+                threadCount, threadCount,
+                0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                r -> {
+                    Thread t = new Thread(r, "test-concurrent-server-retrieval");
+                    t.setDaemon(true);
+                    return t;
+                });
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch finishLatch = new CountDownLatch(threadCount);
         

@@ -11,6 +11,7 @@ public class RcNode {
   private String nodeIp;
   private Integer nodePort;
   private String status;
+  private String zone;
   private LocalDateTime lastRefreshTime;
   private String createBy;
   private LocalDateTime createTime;
@@ -63,6 +64,14 @@ public class RcNode {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getZone() {
+    return zone;
+  }
+
+  public void setZone(String zone) {
+    this.zone = zone;
   }
 
   public LocalDateTime getLastRefreshTime() {

@@ -78,6 +78,9 @@ public class RegistryService {
       node.setNodeIp(request.host());
       node.setNodePort(request.port());
       node.setStatus("0");
+      // 设置zone字段，从请求中获取或使用默认值
+      String zone = request.zone() != null && !request.zone().isBlank() ? request.zone() : "default";
+      node.setZone(zone);
       node.setLastRefreshTime(now);
       node.setCreateTime(now);
       node.setUpdateTime(now);
@@ -86,6 +89,10 @@ public class RegistryService {
       for (RcNode existingNode : existingNodes) {
         if (!Objects.equals(existingNode.getStatus(), "0")) {
           existingNode.setStatus("0");
+          // 更新zone字段，如果请求中有zone值则更新
+          if (request.zone() != null && !request.zone().isBlank()) {
+            existingNode.setZone(request.zone());
+          }
           existingNode.setLastRefreshTime(now);
           existingNode.setUpdateTime(now);
           nodeMapper.updateById(existingNode);
@@ -126,7 +133,8 @@ public class RegistryService {
           node.getNodeIp(),
           node.getNodePort() == null ? 0 : node.getNodePort(),
           available,
-          node.getLastRefreshTime() == null ? null : dateTimeFormatter.format(node.getLastRefreshTime())));
+          node.getLastRefreshTime() == null ? null : dateTimeFormatter.format(node.getLastRefreshTime()),
+          node.getZone()));
     }
 
     discoverCache.put(key, instances);

@@ -9,7 +9,7 @@ public record ServiceInstance(
     @Schema(description = "实例IP") String host,
     @Schema(description = "实例端口") int port,
     @Schema(description = "是否可用") boolean available,
-    @Schema(description = "最后心跳时间") String lastHeartbeat
+    @Schema(description = "最后心跳时间") String lastHeartbeat,
+    @Schema(description = "服务所在区域") String zone
 ) {
 }
-

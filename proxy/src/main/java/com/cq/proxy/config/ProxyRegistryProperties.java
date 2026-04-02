@@ -5,7 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "proxy.registry")
 public record ProxyRegistryProperties(
     long heartbeatTimeoutSeconds,
-    long offlineScanIntervalSeconds
+    long offlineScanIntervalSeconds,
+    String zone,
+    int portRangeMin,
+    int portRangeMax
 ) {
 }
-

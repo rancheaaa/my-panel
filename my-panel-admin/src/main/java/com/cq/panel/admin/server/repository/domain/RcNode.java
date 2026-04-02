@@ -41,6 +41,10 @@ public class RcNode extends BaseEntity
     @Excel(name = "状态", readConverterExp = "0=在线,1=离线")
     private String status;
 
+    /** 服务所在区域 */
+    @Excel(name = "服务区域")
+    private String zone;
+
     /** 最后刷新时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Excel(name = "最后刷新时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
@@ -106,6 +110,15 @@ public class RcNode extends BaseEntity
     {
         return status;
     }
+    public void setZone(String zone) 
+    {
+        this.zone = zone;
+    }
+
+    public String getZone() 
+    {
+        return zone;
+    }
     public void setLastRefreshTime(Date lastRefreshTime) 
     {
         this.lastRefreshTime = lastRefreshTime;
@@ -141,6 +154,7 @@ public class RcNode extends BaseEntity
             .append("nodeIp", getNodeIp())
             .append("nodePort", getNodePort())
             .append("status", getStatus())
+            .append("zone", getZone())
             .append("lastRefreshTime", getLastRefreshTime())
             .append("createTime", getCreateTime())
             .toString();

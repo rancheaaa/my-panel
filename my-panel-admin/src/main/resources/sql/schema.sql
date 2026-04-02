@@ -395,6 +395,7 @@ CREATE TABLE IF NOT EXISTS `rc_node` (
   `node_ip` varchar(50) NOT NULL COMMENT '节点IP',
   `node_port` int(11) NOT NULL COMMENT '节点端口',
   `status` char(1) DEFAULT '0' COMMENT '状态（0在线 1离线）',
+  `zone` varchar(50) DEFAULT 'default' COMMENT '服务所在区域',
   `last_refresh_time` datetime DEFAULT NULL COMMENT '最后刷新时间',
   `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
@@ -425,4 +426,3 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
     KEY `idx_app_id` (`app_id`),
     KEY `idx_node_status` (`node_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent客户端注册表';
-

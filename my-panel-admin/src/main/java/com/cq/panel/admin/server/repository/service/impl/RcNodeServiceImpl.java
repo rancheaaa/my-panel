@@ -55,6 +55,10 @@ public class RcNodeServiceImpl implements IRcNodeService
     {
         rcNode.setCreateTime(DateUtils.getNowDate());
         rcNode.setStatus("0"); // 默认在线
+        // 设置zone默认值
+        if (rcNode.getZone() == null || rcNode.getZone().isEmpty()) {
+            rcNode.setZone("default");
+        }
         rcNode.setLastRefreshTime(DateUtils.getNowDate());
         return rcNodeMapper.insertRcNode(rcNode);
     }

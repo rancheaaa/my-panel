@@ -19,7 +19,8 @@ const RegistryCenter = () => {
     envId: undefined,
     projectId: undefined,
     nodeIp: undefined,
-    status: undefined
+    status: undefined,
+    zone: undefined
   });
 
   const [envs, setEnvs] = useState([]);
@@ -96,7 +97,8 @@ const RegistryCenter = () => {
       envId: undefined,
       projectId: undefined,
       nodeIp: undefined,
-      status: undefined
+      status: undefined,
+      zone: undefined
     });
   };
 
@@ -189,6 +191,7 @@ const RegistryCenter = () => {
         </Tag>
       )
     },
+    { title: '服务区域', dataIndex: 'zone', key: 'zone', align: 'center', width: 120 },
     { title: '最后刷新时间', dataIndex: 'lastRefreshTime', key: 'lastRefreshTime', align: 'center', width: 180 },
     { title: '更新人', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
     { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
@@ -259,14 +262,21 @@ const RegistryCenter = () => {
                </Form.Item>
              </Col>
              {expand && (
-               <Col span={6}>
-                 <Form.Item name="status" label="状态">
-                   <Select placeholder="请选择状态" allowClear>
-                     <Select.Option value="0">在线</Select.Option>
-                     <Select.Option value="1">离线</Select.Option>
-                   </Select>
-                 </Form.Item>
-               </Col>
+               <>
+                 <Col span={6}>
+                   <Form.Item name="status" label="状态">
+                     <Select placeholder="请选择状态" allowClear>
+                       <Select.Option value="0">在线</Select.Option>
+                       <Select.Option value="1">离线</Select.Option>
+                     </Select>
+                   </Form.Item>
+                 </Col>
+                 <Col span={6}>
+                   <Form.Item name="zone" label="服务区域">
+                     <Input placeholder="请输入服务区域" allowClear />
+                   </Form.Item>
+                 </Col>
+               </>
              )}
              <Col span={expand ? 18 : 6} style={{ textAlign: 'right' }}>
                <Space>
@@ -398,6 +408,15 @@ const RegistryCenter = () => {
             ]}
           >
             <InputNumber placeholder="请输入节点端口" min={1} max={65535} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="zone"
+            label="服务区域"
+            rules={[
+              { required: false, message: '请输入服务区域' }
+            ]}
+          >
+            <Input placeholder="请输入服务区域，默认为default" />
           </Form.Item>
         </Form>
       </Modal>

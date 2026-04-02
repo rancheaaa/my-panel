@@ -16,10 +16,10 @@ public interface RcNodeMapper {
   @Select("SELECT * FROM rc_node WHERE status = #{status}")
   List<RcNode> selectByStatus(@Param("status") String status);
 
-  @Insert("INSERT INTO rc_node (env_id, project_id, node_ip, node_port, status, last_refresh_time, create_time, update_time) VALUES (#{envId}, #{projectId}, #{nodeIp}, #{nodePort}, #{status}, #{lastRefreshTime}, #{createTime}, #{updateTime})")
+  @Insert("INSERT INTO rc_node (env_id, project_id, node_ip, node_port, status, zone, last_refresh_time, create_time, update_time) VALUES (#{envId}, #{projectId}, #{nodeIp}, #{nodePort}, #{status}, #{zone}, #{lastRefreshTime}, #{createTime}, #{updateTime})")
   @Options(useGeneratedKeys = true, keyProperty = "id")
   int insert(RcNode node);
 
-  @Update("UPDATE rc_node SET status = #{status}, last_refresh_time = #{lastRefreshTime}, update_time = #{updateTime} WHERE id = #{id}")
+  @Update("UPDATE rc_node SET status = #{status}, zone = #{zone}, last_refresh_time = #{lastRefreshTime}, update_time = #{updateTime} WHERE id = #{id}")
   int updateById(RcNode node);
 }

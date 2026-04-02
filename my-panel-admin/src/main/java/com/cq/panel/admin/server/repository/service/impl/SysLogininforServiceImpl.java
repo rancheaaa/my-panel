@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
-import com.cq.panel.admin.server.repository.domain.SysLogininfor;
+import com.cq.panel.admin.server.repository.domain.SysLoginInfo;
 import com.cq.panel.admin.server.repository.mapper.SysLogininforMapper;
 import com.cq.panel.admin.server.repository.service.ISysLogininforService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ public class SysLogininforServiceImpl implements ISysLogininforService
      * @param logininfor 访问日志对象
      */
     @Override
-    public void insertLogininfor(SysLogininfor logininfor)
+    public void insertLogininfor(SysLoginInfo logininfor)
     {
         logininforMapper.insertLogininfor(logininfor);
     }
@@ -37,7 +37,7 @@ public class SysLogininforServiceImpl implements ISysLogininforService
      * @return 登录记录集合
      */
     @Override
-    public List<SysLogininfor> selectLogininforList(SysLogininfor logininfor)
+    public List<SysLoginInfo> selectLogininforList(SysLoginInfo logininfor)
     {
         return logininforMapper.selectLogininforList(logininfor);
     }

@@ -8,6 +8,8 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
+import lombok.Data;
+
 import java.lang.reflect.Type;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -19,12 +21,13 @@ import java.time.format.DateTimeFormatter;
  * 
  * @author cq
  */
-public record ServiceInstance(
-    String serviceName,
-    String environment,
-    String host,
-    int port,
-    boolean available,
-    String lastHeartbeat
-) {
+
+@Data
+public class ServiceInstance {
+    private String serviceName;
+    private String environment;
+    private String host;
+    private int port;
+    private boolean available;
+    private String lastHeartbeat;
 }

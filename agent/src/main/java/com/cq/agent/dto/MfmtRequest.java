@@ -1,26 +1,15 @@
 package com.cq.agent.dto;
 
+import lombok.Data;
+
 /**
  * Request body for set modification time.
  */
+
+@Data
 public class MfmtRequest {
 
     private String path;
     private long timestamp;
 
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
-    }
-
-    public long getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(long timestamp) {
-        this.timestamp = timestamp;
-    }
 }

@@ -17,7 +17,7 @@ public class AgentRegisterRequest {
     @Schema(description = "节点ID")
     private String id;
 
-    @Schema(description = "节点名称", required = true)
+    @Schema(description = "节点名称", requiredMode = Schema.RequiredMode.AUTO)
     @NotBlank(message = "节点名称不能为空")
     private String nodeName;
 
@@ -27,11 +27,11 @@ public class AgentRegisterRequest {
     @Schema(description = "应用ID")
     private String appId;
 
-    @Schema(description = "Agent IP", required = true)
+    @Schema(description = "Agent IP", requiredMode = Schema.RequiredMode.AUTO)
     @NotBlank(message = "Agent IP不能为空")
     private String agentIp;
 
-    @Schema(description = "Agent端口", required = true)
+    @Schema(description = "Agent端口", requiredMode = Schema.RequiredMode.AUTO)
     @NotNull(message = "Agent端口不能为空")
     private Integer agentPort;
 

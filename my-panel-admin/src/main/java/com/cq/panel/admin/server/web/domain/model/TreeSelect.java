@@ -3,17 +3,22 @@ package com.cq.panel.admin.server.web.domain.model;
 import com.cq.panel.admin.server.repository.domain.SysDept;
 import com.cq.panel.admin.server.repository.domain.SysMenu;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Data;
+
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Treeselect树结构实体类
+ * Tree select树结构实体类
  * 
  * @author cq
  */
+@Data
 public class TreeSelect implements Serializable
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** 节点ID */
@@ -26,52 +31,33 @@ public class TreeSelect implements Serializable
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private List<TreeSelect> children;
 
-    public TreeSelect()
-    {
-
+    /**
+     * 默认构造器
+     */
+    public TreeSelect() {
     }
 
-    public TreeSelect(SysDept dept)
-    {
+    /**
+     * 从SysDept构造TreeSelect
+     * @param dept 部门对象
+     */
+    public TreeSelect(SysDept dept) {
         this.id = dept.getDeptId();
         this.label = dept.getDeptName();
-        this.children = dept.getChildren().stream().map(TreeSelect::new).collect(Collectors.toList());
+        this.children = dept.getChildren().stream()
+                .map(TreeSelect::new)
+                .collect(Collectors.toList());
     }
 
-    public TreeSelect(SysMenu menu)
-    {
+    /**
+     * 从SysMenu构造TreeSelect
+     * @param menu 菜单对象
+     */
+    public TreeSelect(SysMenu menu) {
         this.id = menu.getMenuId();
         this.label = menu.getMenuName();
-        this.children = menu.getChildren().stream().map(TreeSelect::new).collect(Collectors.toList());
-    }
-
-    public Long getId()
-    {
-        return id;
-    }
-
-    public void setId(Long id)
-    {
-        this.id = id;
-    }
-
-    public String getLabel()
-    {
-        return label;
-    }
-
-    public void setLabel(String label)
-    {
-        this.label = label;
-    }
-
-    public List<TreeSelect> getChildren()
-    {
-        return children;
-    }
-
-    public void setChildren(List<TreeSelect> children)
-    {
-        this.children = children;
+        this.children = menu.getChildren().stream()
+                .map(TreeSelect::new)
+                .collect(Collectors.toList());
     }
 }

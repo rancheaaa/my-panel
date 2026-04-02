@@ -1,5 +1,7 @@
 package com.cq.agent.dto;
 
+import lombok.Data;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -7,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author cq 2026/3/18 14:21
  * @since 1.0.0
  */
+@Data
 public class ChunkUploadResponse {
 
     private String transferId;
@@ -14,45 +17,19 @@ public class ChunkUploadResponse {
     private final AtomicInteger missingChunksCount =  new AtomicInteger(0);
     private int chunkIndex;
 
-    public String getTransferId() {
-        return transferId;
+    /**
+     * 设置缺失分片数量
+     * @param count 缺失分片数量
+     */
+    public void setMissingChunksCount(int count) {
+        this.missingChunksCount.set(count);
     }
 
-    public void setTransferId(String transferId) {
-        this.transferId = transferId;
-    }
-
-    public Boolean getCompleted() {
-        return completed;
-    }
-
-    public void setCompleted(Boolean completed) {
-        this.completed = completed;
-    }
-
-    public Integer getMissingChunksCount() {
-        return missingChunksCount.get();
-    }
-
-    public void setMissingChunksCount(Integer missingChunksCount) {
-        this.missingChunksCount.set(missingChunksCount);
-    }
-
-    public int getChunkIndex() {
-        return chunkIndex;
-    }
-
-    public void setChunkIndex(int chunkIndex) {
-        this.chunkIndex = chunkIndex;
-    }
-
-    @Override
-    public String toString() {
-        return "ChunkUploadResponse{" +
-                "transferId='" + transferId + '\'' +
-                ", completed=" + completed +
-                ", missingChunksCount=" + missingChunksCount +
-                ", chunkIndex=" + chunkIndex +
-                '}';
+    /**
+     * 获取缺失分片数量
+     * @return 缺失分片数量
+     */
+    public int getMissingChunksCount() {
+        return this.missingChunksCount.get();
     }
 }

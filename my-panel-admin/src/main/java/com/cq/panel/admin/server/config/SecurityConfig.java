@@ -44,8 +44,20 @@ public class SecurityConfig
                     }
                 }
             }
+            
+            // 确保超级管理员拥有admin角色
+            if (loginUser.getUser() != null && loginUser.getUser().isAdmin()) {
+                roles.add("admin");
+            }
+            
             Set<String> permissions = loginUser.getPermissions() == null ? Set.of() : loginUser.getPermissions();
-            return new User(loginUser.getUsername(), roles, permissions);
+            
+            // 使用用户ID作为username，确保不为null
+            String username = loginUser.getUser() != null && loginUser.getUser().getUserName() != null 
+                ? loginUser.getUser().getUserName() 
+                : "user_" + loginUser.getUserId();
+            
+            return new User(username, roles, permissions);
         };
     }
 

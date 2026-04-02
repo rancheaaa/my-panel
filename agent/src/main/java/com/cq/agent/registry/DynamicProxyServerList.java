@@ -237,7 +237,7 @@ public class DynamicProxyServerList implements ServerList {
      * @return Server对象
      */
     private Server convertToServer(ServiceInstance instance) {
-        return new Server(instance.serviceName(), instance.host(), instance.port(), "http", DEFAULT_ZONE);
+        return new Server(instance.getServiceName(), instance.getHost(), instance.getPort(), "http", DEFAULT_ZONE);
     }
 
     /**

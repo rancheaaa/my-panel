@@ -2,9 +2,8 @@ package com.cq.panel.admin.server.repository.domain;
 
 import com.cq.panel.admin.server.common.annotation.Excel;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import java.io.Serial;
 import java.util.Date;
 
@@ -13,6 +12,9 @@ import java.util.Date;
  * 
  * @author cq
  */
+
+@EqualsAndHashCode(callSuper = true)
+@Data
 public class RcNode extends BaseEntity
 {
     @Serial
@@ -55,108 +57,4 @@ public class RcNode extends BaseEntity
 
     /** 项目名称 */
     private String projectName;
-
-    public void setId(Long id) 
-    {
-        this.id = id;
-    }
-
-    public Long getId() 
-    {
-        return id;
-    }
-    public void setEnvId(Long envId) 
-    {
-        this.envId = envId;
-    }
-
-    public Long getEnvId() 
-    {
-        return envId;
-    }
-    public void setProjectId(Long projectId) 
-    {
-        this.projectId = projectId;
-    }
-
-    public Long getProjectId() 
-    {
-        return projectId;
-    }
-    public void setNodeIp(String nodeIp) 
-    {
-        this.nodeIp = nodeIp;
-    }
-
-    public String getNodeIp() 
-    {
-        return nodeIp;
-    }
-    public void setNodePort(Integer nodePort) 
-    {
-        this.nodePort = nodePort;
-    }
-
-    public Integer getNodePort() 
-    {
-        return nodePort;
-    }
-    public void setStatus(String status) 
-    {
-        this.status = status;
-    }
-
-    public String getStatus() 
-    {
-        return status;
-    }
-    public void setZone(String zone) 
-    {
-        this.zone = zone;
-    }
-
-    public String getZone() 
-    {
-        return zone;
-    }
-    public void setLastRefreshTime(Date lastRefreshTime) 
-    {
-        this.lastRefreshTime = lastRefreshTime;
-    }
-
-    public Date getLastRefreshTime() 
-    {
-        return lastRefreshTime;
-    }
-
-    public String getEnvName() {
-        return envName;
-    }
-
-    public void setEnvName(String envName) {
-        this.envName = envName;
-    }
-
-    public String getProjectName() {
-        return projectName;
-    }
-
-    public void setProjectName(String projectName) {
-        this.projectName = projectName;
-    }
-
-    @Override
-    public String toString() {
-        return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
-            .append("id", getId())
-            .append("envId", getEnvId())
-            .append("projectId", getProjectId())
-            .append("nodeIp", getNodeIp())
-            .append("nodePort", getNodePort())
-            .append("status", getStatus())
-            .append("zone", getZone())
-            .append("lastRefreshTime", getLastRefreshTime())
-            .append("createTime", getCreateTime())
-            .toString();
-    }
 }

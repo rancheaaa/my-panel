@@ -1,8 +1,12 @@
 package com.cq.agent.dto;
 
+import lombok.Data;
+
 /**
  * Request body for store unique file.
  */
+
+@Data
 public class StouRequest {
 
     private String directory;
@@ -10,35 +14,4 @@ public class StouRequest {
     private String content;
     private String encoding;
 
-    public String getDirectory() {
-        return directory;
-    }
-
-    public void setDirectory(String directory) {
-        this.directory = directory;
-    }
-
-    public String getPrefix() {
-        return prefix;
-    }
-
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getEncoding() {
-        return encoding;
-    }
-
-    public void setEncoding(String encoding) {
-        this.encoding = encoding;
-    }
 }

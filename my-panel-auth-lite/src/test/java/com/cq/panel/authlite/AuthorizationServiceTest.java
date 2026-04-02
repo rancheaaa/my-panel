@@ -105,7 +105,7 @@ class AuthorizationServiceTest {
         try {
             List<String> permissions = Arrays.asList("user:add:query", "role:delete:query");
             assertTrue(service.hasAnyPermission(permissions));
-            
+
             List<String> noMatchPermissions = Arrays.asList("role:delete:query", "system:config:update");
             assertFalse(service.hasAnyPermission(noMatchPermissions));
         } finally {
@@ -120,7 +120,7 @@ class AuthorizationServiceTest {
         try {
             List<String> permissions = Arrays.asList("user:add:query", "role:delete:query");
             assertTrue(service.hasAllPermissions(permissions));
-            
+
             List<String> mixedPermissions = Arrays.asList("user:add:query", "user:add:update");
             assertFalse(service.hasAllPermissions(mixedPermissions));
         } finally {

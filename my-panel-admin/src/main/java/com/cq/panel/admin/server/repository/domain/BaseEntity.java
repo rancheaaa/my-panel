@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.repository.domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Data;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Date;
@@ -13,6 +14,7 @@ import java.util.Map;
  * 
  * @author cq
  */
+@Data
 public class BaseEntity implements Serializable
 {
     @Serial
@@ -39,56 +41,6 @@ public class BaseEntity implements Serializable
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, Object> params;
 
-    public String getCreateBy()
-    {
-        return createBy;
-    }
-
-    public void setCreateBy(String createBy)
-    {
-        this.createBy = createBy;
-    }
-
-    public Date getCreateTime()
-    {
-        return createTime;
-    }
-
-    public void setCreateTime(Date createTime)
-    {
-        this.createTime = createTime;
-    }
-
-    public String getUpdateBy()
-    {
-        return updateBy;
-    }
-
-    public void setUpdateBy(String updateBy)
-    {
-        this.updateBy = updateBy;
-    }
-
-    public Date getUpdateTime()
-    {
-        return updateTime;
-    }
-
-    public void setUpdateTime(Date updateTime)
-    {
-        this.updateTime = updateTime;
-    }
-
-    public String getRemark()
-    {
-        return remark;
-    }
-
-    public void setRemark(String remark)
-    {
-        this.remark = remark;
-    }
-
     public Map<String, Object> getParams()
     {
         if (params == null)
@@ -96,10 +48,5 @@ public class BaseEntity implements Serializable
             params = new HashMap<>();
         }
         return params;
-    }
-
-    public void setParams(Map<String, Object> params)
-    {
-        this.params = params;
     }
 }

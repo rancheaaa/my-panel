@@ -1,6 +1,7 @@
 package com.cq.panel.admin.server.repository.mapper;
 
-import com.cq.panel.admin.server.repository.domain.SysLogininfor;
+import com.cq.panel.admin.server.repository.domain.SysLoginInfo;
+
 import java.util.List;
 
 /**
@@ -15,7 +16,7 @@ public interface SysLogininforMapper
      * 
      * @param logininfor 访问日志对象
      */
-    public void insertLogininfor(SysLogininfor logininfor);
+    public void insertLogininfor(SysLoginInfo logininfor);
 
     /**
      * 查询系统登录日志集合
@@ -23,7 +24,7 @@ public interface SysLogininforMapper
      * @param logininfor 访问日志对象
      * @return 登录记录集合
      */
-    public List<SysLogininfor> selectLogininforList(SysLogininfor logininfor);
+    public List<SysLoginInfo> selectLogininforList(SysLoginInfo logininfor);
 
     /**
      * 批量删除系统登录日志

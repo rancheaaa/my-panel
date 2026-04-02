@@ -1,13 +1,6 @@
 package com.cq.agent.dto;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
+import lombok.Data;
 
 /**
  * Proxy服务端返回的API响应格式
@@ -15,35 +8,14 @@ import java.lang.reflect.Type;
  * 
  * @author cq
  */
+
+@Data
 public class ProxyApiResponse<T> {
     
     private int code;
     private String message;
     private T data;
 
-    public int getCode() {
-        return code;
-    }
-
-    public void setCode(int code) {
-        this.code = code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public T getData() {
-        return data;
-    }
-
-    public void setData(T data) {
-        this.data = data;
-    }
 
     /**
      * 判断是否成功

@@ -42,6 +42,7 @@
         <commons.lang3.version>3.20.0</commons.lang3.version>
         <guava.version>31.1-jre</guava.version>
         <rocksdb.version>6.10.2</rocksdb.version>
+        <lombok.version>1.18.36</lombok.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -180,6 +181,14 @@
                 <version>${rocksdb.version}</version>
             </dependency>
 
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
             <!-- Testing -->
             <dependency>
                 <groupId>org.mockito</groupId>
@@ -218,6 +227,13 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
 

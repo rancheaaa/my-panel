@@ -24,7 +24,7 @@ public class RandomPortConfig implements WebServerFactoryCustomizer<Configurable
 
     private int findAvailablePort() {
 
-        for (int port = registryProperties.portRangeMin(); port <= registryProperties.portRangeMax(); port++) {
+        for (int port = registryProperties.getPortRangeMin(); port <= registryProperties.getPortRangeMax(); port++) {
             if (PortUtils.isPortAvailable(port)) {
                 return port;
             }

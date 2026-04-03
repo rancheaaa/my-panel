@@ -1,15 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Tooltip, Switch, Modal, Radio, InputNumber, Row, Col, Descriptions, Dropdown } from 'antd';
-import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, ColumnHeightOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Tooltip, Switch, Modal, Radio, InputNumber, Row, Col, Descriptions, Dropdown, Popover } from 'antd';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, ColumnHeightOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, DownOutlined, UpOutlined, CalendarOutlined, ExportOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
-import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob } from '../../../api/monitor/job';
+import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob } from '../../../api/monitor/job';
 import JobLog from './JobLog';
+import QnnCron from 'qnn-react-cron';
 import { getDicts } from '../../../api/dict/data';
-import dayjs from 'dayjs';
 import './index.scss';
 
 const { Option } = Select;
-const { TextArea } = Input;
+
+const CrontabInput = ({ value, onChange }) => {
+    const [open, setOpen] = useState(false);
+
+    const handleConfirm = (cronValue) => {
+        onChange(cronValue);
+        setOpen(false);
+    };
+
+    return (
+        <Popover
+            open={open}
+            onOpenChange={setOpen}
+            content={
+                <div style={{ width: 600 }} className="qnn-cron-popover-content">
+                    <QnnCron 
+                        value={value || '0 0 12 * * ?'} 
+                        onOk={handleConfirm}
+                    />
+                </div>
+            }
+            title="生成 Cron 表达式"
+            trigger="click"
+            placement="bottomLeft"
+            overlayStyle={{ zIndex: 2000 }}
+        >
+            <Input 
+                value={value}
+                placeholder="请输入Cron执行表达式" 
+                suffix={<CalendarOutlined style={{ color: 'rgba(0,0,0,.45)', cursor: 'pointer' }} />}
+                readOnly
+                style={{ cursor: 'pointer' }}
+            />
+        </Popover>
+    );
+};
 
 const Job = () => {
   const [data, setData] = useState([]);
@@ -168,6 +203,44 @@ const Job = () => {
     });
   };
 
+  // 导出定时任务数据
+  const handleExport = () => {
+    searchForm.validateFields().then(values => {
+      const exportParams = {
+        ...queryParams,
+        ...values
+      };
+      
+      // 移除分页参数
+      delete exportParams.pageNum;
+      delete exportParams.pageSize;
+      
+      exportJob(exportParams).then(response => {
+        // 创建Blob对象
+        const blob = new Blob([response], { type: 'application/vnd.ms-excel' });
+        
+        // 创建下载链接
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `定时任务数据_${new Date().getTime()}.xlsx`;
+        
+        // 触发下载
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 释放URL对象
+        window.URL.revokeObjectURL(url);
+        
+        message.success('导出成功');
+      }).catch(error => {
+        console.error('导出失败:', error);
+        message.error('导出失败');
+      });
+    });
+  };
+
   const handleAdd = () => {
     form.resetFields();
     setTitle('添加任务');
@@ -310,6 +383,7 @@ const Job = () => {
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
             <Button type="primary" danger icon={<DeleteOutlined />} disabled={selectedRowKeys.length === 0} onClick={handleBatchDelete}>删除</Button>
             <Button icon={<FileTextOutlined />} onClick={() => handleJobLog()}>调度日志</Button>
+            <Button type="primary" icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
             <Tooltip title="刷新">
                <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
@@ -366,18 +440,39 @@ const Job = () => {
           onOk={submitForm}
           onCancel={() => setOpen(false)}
           width={700}
+          style={{ top: 40 }}
+          bodyStyle={{ maxHeight: '70vh', overflowY: 'auto', padding: '20px 24px' }}
       >
-          <Form form={form} labelCol={{ span: 6 }} wrapperCol={{ span: 16 }}>
+          <Form 
+              form={form} 
+              labelCol={{ span: 6 }} 
+              wrapperCol={{ span: 18 }}
+              layout="horizontal"
+              size="middle"
+          >
               <Form.Item name="jobId" hidden><Input /></Form.Item>
-              <Row>
+              
+              <Row gutter={16}>
                   <Col span={12}>
-                      <Form.Item name="jobName" label="任务名称" rules={[{ required: true, message: '请输入任务名称' }]}>
-                          <Input placeholder="请输入任务名称" />
+                      <Form.Item 
+                          name="jobName" 
+                          label="任务名称" 
+                          rules={[{ required: true, message: '请输入任务名称' }]}
+                          labelCol={{ span: 8 }}
+                          wrapperCol={{ span: 16 }}
+                      >
+                          <Input placeholder="请输入任务名称" style={{ width: '100%' }} />
                       </Form.Item>
                   </Col>
                   <Col span={12}>
-                      <Form.Item name="jobGroup" label="任务分组" rules={[{ required: true, message: '请选择任务分组' }]}>
-                         <Select placeholder="请选择">
+                      <Form.Item 
+                          name="jobGroup" 
+                          label="任务分组" 
+                          rules={[{ required: true, message: '请选择任务分组' }]}
+                          labelCol={{ span: 8 }}
+                          wrapperCol={{ span: 16 }}
+                      >
+                         <Select placeholder="请选择任务分组" style={{ width: '100%' }}>
                             {sysJobGroup.map(dict => (
                                 <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
                             ))}
@@ -385,22 +480,54 @@ const Job = () => {
                       </Form.Item>
                   </Col>
               </Row>
-              <Form.Item name="invokeTarget" label="调用方法" rules={[{ required: true, message: '请输入调用目标字符串' }]}>
-                  <Input placeholder="请输入调用目标字符串" />
+              
+              <Form.Item 
+                  name="invokeTarget" 
+                  label="调用方法" 
+                  rules={[{ required: true, message: '请输入调用目标字符串' }]}
+                  labelCol={{ span: 4 }}
+                  wrapperCol={{ span: 20 }}
+              >
+                  <Input.TextArea 
+                      placeholder="请输入调用目标字符串" 
+                      rows={3}
+                      style={{ resize: 'vertical' }}
+                  />
               </Form.Item>
-              <Form.Item name="cronExpression" label="Cron表达式" rules={[{ required: true, message: '请输入Cron执行表达式' }]}>
-                  <Input placeholder="请输入Cron执行表达式" />
+              
+              <Form.Item 
+                  name="cronExpression" 
+                  label="Cron表达式" 
+                  rules={[{ required: true, message: '请输入Cron执行表达式' }]}
+                  labelCol={{ span: 4 }}
+                  wrapperCol={{ span: 20 }}
+              >
+                  <CrontabInput />
               </Form.Item>
-              <Form.Item name="misfirePolicy" label="执行策略">
-                  <Radio.Group>
-                      <Radio.Button value="1">立即执行</Radio.Button>
-                      <Radio.Button value="2">执行一次</Radio.Button>
-                      <Radio.Button value="3">放弃执行</Radio.Button>
+              
+              <Form.Item 
+                  name="misfirePolicy" 
+                  label="MISFIRE策略"
+                  labelCol={{ span: 4 }}
+                  wrapperCol={{ span: 20 }}
+              >
+                  <Radio.Group style={{ width: '100%' }}>
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                          <Radio value="1">MISFIRE_IGNORE_MISFIRES - 忽略所有超时，继续执行</Radio>
+                          <Radio value="2">MISFIRE_FIRE_AND_PROCEED - 立即执行一次，然后按原计划执行</Radio>
+                          <Radio value="3">MISFIRE_DO_NOTHING - 不执行超时任务，等待下次触发</Radio>
+                      </Space>
                   </Radio.Group>
               </Form.Item>
-              <Row>
+              
+              <Row gutter={16}>
                   <Col span={12}>
-                      <Form.Item name="concurrent" label="是否并发">
+                      <Form.Item 
+                          name="concurrent" 
+                          label="是否并发"
+                          labelCol={{ span: 8 }}
+                          wrapperCol={{ span: 16 }}
+                      >
                           <Radio.Group>
                               <Radio value="0">允许</Radio>
                               <Radio value="1">禁止</Radio>
@@ -408,7 +535,12 @@ const Job = () => {
                       </Form.Item>
                   </Col>
                   <Col span={12}>
-                      <Form.Item name="status" label="状态">
+                      <Form.Item 
+                          name="status" 
+                          label="状态"
+                          labelCol={{ span: 8 }}
+                          wrapperCol={{ span: 16 }}
+                      >
                           <Radio.Group>
                               {sysJobStatus.map(dict => (
                                   <Radio key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Radio>
@@ -445,10 +577,10 @@ const Job = () => {
                       {currentJob.concurrent === '0' ? '允许' : '禁止'}
                   </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="执行策略">
-                   {currentJob.misfirePolicy === '1' && <Tag>立即执行</Tag>}
-                   {currentJob.misfirePolicy === '2' && <Tag>执行一次</Tag>}
-                   {currentJob.misfirePolicy === '3' && <Tag>放弃执行</Tag>}
+              <Descriptions.Item label="MISFIRE策略">
+                   {currentJob.misfirePolicy === '1' && <Tag>忽略</Tag>}
+                   {currentJob.misfirePolicy === '2' && <Tag>立即执行</Tag>}
+                   {currentJob.misfirePolicy === '3' && <Tag>auto</Tag>}
               </Descriptions.Item>
               <Descriptions.Item label="状态">
                   <Tag color={currentJob.status === '0' ? 'success' : 'error'}>

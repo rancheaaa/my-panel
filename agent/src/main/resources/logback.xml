@@ -101,6 +101,7 @@
 	</root>
 
     <logger name="io.netty" level="info" />
+    <logger name="org.apache.hc" level="info"/>
 	
 	<!--系统用户操作日志-->
     <logger name="sys-user" level="info" additivity="false">

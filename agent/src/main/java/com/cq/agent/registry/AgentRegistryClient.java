@@ -117,7 +117,7 @@ public class AgentRegistryClient {
      * @throws IOException IO异常
      * @throws InterruptedException 中断异常
      */
-    public boolean heartbeat(String agentIp, Integer agentPort) throws IOException, InterruptedException {
+    public boolean heartbeat(String agentIp, int agentPort) throws IOException, InterruptedException {
         if (loadBalancerClient == null) {
             logger.debug("Registry server URL is not configured, skipping heartbeat");
             return false;

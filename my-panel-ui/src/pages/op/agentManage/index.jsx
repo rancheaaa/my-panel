@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber, Dropdown, Row, Col } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, PlayCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { 
   listAgentRegistry, 
@@ -9,7 +9,8 @@ import {
   updateAgentRegistry, 
   delAgentRegistry, 
   exportAgentRegistry,
-  offlineTimeoutNodes
+  offlineTimeoutNodes,
+  executeAgentCommand
 } from '../../../api/agent';
 import { getDicts } from '../../../api/dict/data';
 import { listType } from '../../../api/dict/type';
@@ -53,6 +54,14 @@ const AgentManage = () => {
   // Offline Modal State
   const [isOfflineModalOpen, setIsOfflineModalOpen] = useState(false);
   const [offlineForm] = Form.useForm();
+
+  // Execute Command Modal State
+  const [isExecuteModalOpen, setIsExecuteModalOpen] = useState(false);
+  const [executeForm] = Form.useForm();
+  const [currentAgent, setCurrentAgent] = useState(null);
+  const [executing, setExecuting] = useState(false);
+  const [commandResult, setCommandResult] = useState('');
+  const [commandHistory, setCommandHistory] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -243,6 +252,104 @@ const AgentManage = () => {
     }
   };
 
+  // 执行命令相关函数
+  const handleExecute = (record) => {
+    setCurrentAgent(record);
+    setCommandResult('');
+    setCommandHistory([]);
+    executeForm.resetFields();
+    executeForm.setFieldsValue({
+      timeout: 30
+    });
+    setIsExecuteModalOpen(true);
+  };
+
+  const handleExecuteOk = async () => {
+    if (!currentAgent) return;
+    
+    try {
+      const values = await executeForm.validateFields();
+      const { command, timeout } = values;
+      
+      if (!command || command.trim() === '') {
+        message.warning('请输入要执行的命令');
+        return;
+      }
+
+      setExecuting(true);
+      setCommandResult('执行中...\n');
+      
+      // 添加到命令历史
+      const newCommand = {
+        command: command,
+        timestamp: new Date().toLocaleString(),
+        agent: `${currentAgent.nodeName} (${currentAgent.agentIp}:${currentAgent.agentPort})`
+      };
+      setCommandHistory(prev => [newCommand, ...prev.slice(0, 9)]); // 保留最近10条历史
+
+      // 调试信息
+      console.log('执行命令调试信息:');
+      console.log('- Agent信息:', currentAgent);
+      console.log('- Agent ID:', currentAgent.id);
+      console.log('- 命令:', command);
+      console.log('- 超时时间:', timeout);
+
+      // 调用后端接口执行命令
+      const res = await executeAgentCommand(currentAgent.id, command, timeout);
+      
+      if (res.code === 200) {
+        const { success, exitCode, output, error } = res.data;
+        
+        let resultText = `[${currentAgent.nodeName}] ${currentAgent.agentIp}:${currentAgent.agentPort}\n`;
+        resultText += `执行命令: ${command}\n`;
+        resultText += `执行结果: ${success ? '成功' : '失败'} (退出码: ${exitCode})\n`;
+        resultText += '='.repeat(50) + '\n';
+        
+        if (output && output.trim()) {
+          resultText += '标准输出:\n';
+          resultText += output + '\n';
+        }
+        
+        if (error && error.trim()) {
+          resultText += '错误输出:\n';
+          resultText += error + '\n';
+        }
+        
+        if (!output && !error) {
+          resultText += '命令执行完成，无输出内容\n';
+        }
+        
+        setCommandResult(resultText);
+      } else {
+        setCommandResult(`执行失败: ${res.msg || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('执行命令失败:', error);
+      let errorMsg = '执行命令失败: ';
+      if (error.response) {
+        errorMsg += `HTTP ${error.response.status} - ${error.response.data?.msg || '服务器错误'}`;
+      } else if (error.request) {
+        errorMsg += '网络连接失败，请检查Agent服务是否正常运行';
+      } else {
+        errorMsg += error.message;
+      }
+      setCommandResult(errorMsg);
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const handleExecuteCancel = () => {
+    setIsExecuteModalOpen(false);
+    setCurrentAgent(null);
+    setCommandResult('');
+    setExecuting(false);
+  };
+
+  const clearResult = () => {
+    setCommandResult('');
+  };
+
   const [columns, setColumns] = useState([
     { title: '节点ID', dataIndex: 'id', key: 'id', align: 'center', width: 200, ellipsis: true },
     { title: '节点名称', dataIndex: 'nodeName', key: 'nodeName', align: 'center', width: 150, ellipsis: true },
@@ -306,10 +413,21 @@ const AgentManage = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 180,
+      width: 300,
       fixed: 'right',
       render: (_, record) => (
         <Space size="middle">
+          <Tooltip title="执行命令">
+            <Button 
+              type="text" 
+              icon={<ConsoleSqlOutlined />} 
+              onClick={() => handleExecute(record)} 
+              style={{ color: '#52c41a' }}
+              disabled={record.nodeStatus !== 1}
+            >
+              执行
+            </Button>
+          </Tooltip>
           <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
           <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id)}>
             <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
@@ -488,6 +606,76 @@ const AgentManage = () => {
           }}
         />
       </Card>
+
+      <Modal
+        title="执行命令"
+        open={isExecuteModalOpen}
+        onOk={handleExecuteOk}
+        onCancel={handleExecuteCancel}
+        width={800}
+        maskClosable={false}
+        confirmLoading={executing}
+        footer={[
+          <Button key="clear" onClick={clearResult} disabled={executing}>
+            清空结果
+          </Button>,
+          <Button key="cancel" onClick={handleExecuteCancel} disabled={executing}>
+            取消
+          </Button>,
+          <Button key="execute" type="primary" onClick={handleExecuteOk} loading={executing}>
+            执行
+          </Button>
+        ]}
+      >
+        <Form
+          form={executeForm}
+          layout="vertical"
+        >
+          <Form.Item
+            name="command"
+            label="命令"
+            rules={[{ required: true, message: '请输入要执行的命令' }]}
+          >
+            <Input.TextArea 
+              placeholder="请输入要执行的命令（如：ls -la, ipconfig, ping 127.0.0.1等）" 
+              rows={3}
+              disabled={executing}
+            />
+          </Form.Item>
+          <Form.Item
+            name="timeout"
+            label="超时时间（秒）"
+            rules={[
+              { required: true, message: '请输入超时时间' },
+              { type: 'number', min: 1, max: 300, message: '超时时间范围为1-300秒' }
+            ]}
+            extra="命令执行的最大等待时间，超过此时间将自动终止"
+          >
+            <InputNumber placeholder="请输入超时时间" min={1} max={300} style={{ width: '100%' }} disabled={executing} />
+          </Form.Item>
+          <Form.Item label="执行结果">
+            <Input.TextArea 
+              value={commandResult} 
+              readOnly 
+              rows={10}
+              placeholder="执行结果将显示在这里..."
+              style={{ fontFamily: 'monospace', fontSize: '12px' }}
+            />
+          </Form.Item>
+          {commandHistory.length > 0 && (
+            <Form.Item label="最近执行的命令">
+              <div style={{ maxHeight: '150px', overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: '6px', padding: '8px' }}>
+                {commandHistory.map((item, index) => (
+                  <div key={index} style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                    <div><strong>{item.timestamp}</strong> - {item.agent}</div>
+                    <div style={{ fontFamily: 'monospace' }}>{item.command}</div>
+                  </div>
+                ))}
+              </div>
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
 
       <Modal
         title={modalTitle}

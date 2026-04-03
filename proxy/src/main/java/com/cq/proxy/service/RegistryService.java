@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -68,6 +67,9 @@ public class RegistryService {
         }
         if (request.port() <= 0 || request.port() > 65535) {
             throw new BusinessException(400, "port is invalid");
+        }
+        if ("localhost".equals(request.host())  || "127.0.0.1".equals(request.host())) {
+            throw new BusinessException(400, "host is required");
         }
 
         long envId = dictionaryService.getOrCreateEnvId(request.environment());
@@ -196,8 +198,7 @@ public class RegistryService {
             existing.setNodeName(request.getNodeName());
             existing.setOsType(request.getOsType());
             existing.setAppId(request.getAppId());
-            existing.setRemark(request.getRemark());
-            existing.setNodeStatus(1);
+            existing.setNodeStatus(request.getNodeStatus());
             existing.setUpdateTime(now);
             agentRegistryMapper.updateById(existing);
             result = existing;
@@ -209,9 +210,8 @@ public class RegistryService {
             agentRegistry.setAppId(request.getAppId());
             agentRegistry.setAgentIp(request.getAgentIp());
             agentRegistry.setAgentPort(request.getAgentPort());
+            agentRegistry.setNodeStatus(request.getNodeStatus());
             agentRegistry.setNodeEnabled(0);
-            agentRegistry.setNodeStatus(1);
-            agentRegistry.setRemark(request.getRemark());
             agentRegistry.setCreateTime(now);
             agentRegistry.setUpdateTime(now);
             agentRegistryMapper.insert(agentRegistry);

@@ -124,7 +124,10 @@ public class SysJobController extends BaseController
             throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串不在白名单内");
         }
         job.setCreateBy(getUsername());
-        jobService.insertJob(job);
+        final int insertRows = jobService.insertJob(job);
+        if (insertRows <= 0) {
+            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，插入数据库失败");
+        }
         return Result.success();
     }
 
@@ -163,8 +166,11 @@ public class SysJobController extends BaseController
             throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串不在白名单内");
         }
         job.setUpdateBy(getUsername());
-        jobService.updateJob(job);
-        return Result.success();
+        final int updateRows = jobService.updateJob(job);
+        if (updateRows <= 0) {
+            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，更新数据库失败");
+        }
+        else return Result.success();
     }
 
     /**
@@ -179,7 +185,10 @@ public class SysJobController extends BaseController
         SysJob job = jobConverter.toEntity(dto);
         SysJob newJob = jobService.selectJobById(job.getJobId());
         newJob.setStatus(job.getStatus());
-        jobService.changeStatus(newJob);
+        final int changeRows = jobService.changeStatus(newJob);
+        if (changeRows <= 0) {
+            throw new ServiceException("任务状态修改失败");
+        }
         return Result.success();
     }
 
@@ -193,6 +202,9 @@ public class SysJobController extends BaseController
     public Result<Void> run(@RequestBody SysJobDTO dto) throws SchedulerException
     {
         SysJob job = jobConverter.toEntity(dto);
+        if (!jobService.checkCronExpressionIsValid(dto.getCronExpression())) {
+            throw new ServiceException("任务'" + job.getJobName() + "'失败，Cron表达式不正确");
+        }
         boolean result = jobService.run(job);
         if (!result)
         {

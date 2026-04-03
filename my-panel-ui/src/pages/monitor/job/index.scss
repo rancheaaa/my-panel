@@ -99,6 +99,18 @@
     .ant-table-tbody > tr > td {
       padding: 10px 12px;
     }
+  }
+}
+
+.qnn-cron-popover-content {
+  .ant-btn {
+    // 隐藏“解析到 UI”按钮 (通常是第一个按钮或带有特定文本的按钮)
+    // qnn-react-cron 的按钮通常没有非常独特的 class，我们通过排除法或位置来尝试
+    &:first-child {
+      display: none !important;
+    }
+  }
+}
 
     .ant-table-cell {
       font-size: 12.5px;
@@ -108,7 +120,7 @@
       flex-wrap: wrap;
       gap: 8px;
     }
-  }
+  
 
   @media (prefers-reduced-motion: reduce) {
     .ant-table-tbody > tr > td,
@@ -116,5 +128,5 @@
       transition: none;
     }
   }
-}
+
 

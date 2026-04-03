@@ -4,9 +4,14 @@ import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.AgentRegistryRequest;
 import com.cq.agent.dto.AgentRegistryResponse;
 import com.cq.agent.dto.ApiResponse;
+import com.cq.panel.common.constant.AgentNodeStatusConstant;
+import com.cq.panel.common.utils.IpUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -90,7 +95,14 @@ public class AgentRegistryService {
                 scheduler.shutdownNow();
                 Thread.currentThread().interrupt();
             }
-            
+            try {
+                AgentRegistryRequest request = buildDownRegistryRequest();
+                logger.info("DeRegistering agent: {}", request);
+
+                registryClient.register(request);
+            } catch (IOException | InterruptedException e) {
+                //
+            }
             registryClient.close();
             logger.info("Agent registry service stopped");
         }
@@ -101,7 +113,7 @@ public class AgentRegistryService {
      */
     public void register() {
         try {
-            AgentRegistryRequest request = buildRegistryRequest();
+            AgentRegistryRequest request = buildUpRegistryRequest();
             logger.info("Registering agent: {}", request);
             
             ApiResponse<AgentRegistryResponse> response = registryClient.register(request);
@@ -131,8 +143,7 @@ public class AgentRegistryService {
         
         try {
             String agentIp = config.getAgentIp();
-            int port = actualPort > 0 ? actualPort : config.getServerPort();
-            Integer agentPort = port;
+            int agentPort = actualPort > 0 ? actualPort : config.getServerPort();
             
             boolean success = registryClient.heartbeat(agentIp, agentPort);
             
@@ -146,12 +157,20 @@ public class AgentRegistryService {
         }
     }
 
+    private AgentRegistryRequest buildUpRegistryRequest() {
+        return buildUpRegistryRequest(AgentNodeStatusConstant.UP);
+    }
+
+    private AgentRegistryRequest buildDownRegistryRequest() {
+        return buildUpRegistryRequest(AgentNodeStatusConstant.DOWN);
+    }
+
     /**
      * 构建注册请求
      * 
      * @return 注册请求
      */
-    private AgentRegistryRequest buildRegistryRequest() {
+    private AgentRegistryRequest buildUpRegistryRequest(Integer nodeStatus) {
         AgentRegistryRequest request = new AgentRegistryRequest();
 
         // 节点名称
@@ -181,8 +200,8 @@ public class AgentRegistryService {
         String agentIp = config.getAgentIp();
         if (agentIp == null || agentIp.isEmpty()) {
             try {
-                agentIp = InetAddress.getLocalHost().getHostAddress();
-            } catch (UnknownHostException e) {
+                agentIp = IpUtils.getLocalHost();
+            } catch (UnknownHostException | SocketException e) {
                 agentIp = "127.0.0.1";
             }
         }
@@ -192,8 +211,8 @@ public class AgentRegistryService {
         int port = actualPort > 0 ? actualPort : config.getServerPort();
         request.setAgentPort(port);
         
-        // 备注
-        request.setRemark(config.getRemark());
+        // 节点状态
+        request.setNodeStatus(nodeStatus);
         
         return request;
     }

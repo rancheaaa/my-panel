@@ -82,4 +82,14 @@ public interface IAgentRegistryService
      * @return 结果
      */
     int offlineTimeoutNodes(Integer timeoutSeconds);
+
+    /**
+     * 执行Agent命令
+     * 
+     * @param agentId Agent节点ID
+     * @param command 要执行的命令
+     * @param timeout 超时时间（秒）
+     * @return 执行结果
+     */
+    Object executeCommand(String agentId, String command, Integer timeout);
 }

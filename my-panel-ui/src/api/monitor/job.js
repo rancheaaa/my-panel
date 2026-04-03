@@ -56,15 +56,24 @@ export function changeJobStatus(jobId, status) {
   });
 }
 
-// 定时任务立即执行一次
-export function runJob(jobId, jobGroup) {
+// 执行一次任务
+export function runJob(jobId) {
   const data = {
-    jobId,
-    jobGroup
+    jobId
   };
   return request({
     url: '/monitor/job/run',
     method: 'put',
     data: data
+  });
+}
+
+// 导出定时任务
+export function exportJob(query) {
+  return request({
+    url: '/monitor/job/export',
+    method: 'post',
+    params: query,
+    responseType: 'blob'
   });
 }

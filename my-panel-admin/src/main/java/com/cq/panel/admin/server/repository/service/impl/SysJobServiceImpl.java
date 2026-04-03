@@ -8,11 +8,11 @@ import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.admin.server.repository.mapper.SysJobMapper;
 import com.cq.panel.admin.server.repository.service.ISysJobService;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobDataMap;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -22,14 +22,18 @@ import java.util.List;
  * 
  * @author cq
  */
+@Slf4j
 @Service
 public class SysJobServiceImpl implements ISysJobService
 {
-    @Autowired
-    private Scheduler scheduler;
+    private final Scheduler scheduler;
 
-    @Autowired
-    private SysJobMapper jobMapper;
+    private final SysJobMapper jobMapper;
+
+    public SysJobServiceImpl(Scheduler scheduler, SysJobMapper jobMapper) {
+        this.scheduler = scheduler;
+        this.jobMapper = jobMapper;
+    }
 
     /**
      * 项目启动时，初始化定时器 主要是防止手动修改数据库导致未同步到定时任务处理（注：不能手动修改数据库ID和任务组名，否则会导致脏数据）
@@ -49,7 +53,7 @@ public class SysJobServiceImpl implements ISysJobService
      * 获取quartz调度器的计划任务列表
      * 
      * @param job 调度信息
-     * @return
+     * @return 调度任务集合
      */
     @Override
     public List<SysJob> selectJobList(SysJob job)
@@ -132,7 +136,6 @@ public class SysJobServiceImpl implements ISysJobService
      * 批量删除调度信息
      * 
      * @param jobIds 需要删除的任务ID
-     * @return 结果
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -141,7 +144,8 @@ public class SysJobServiceImpl implements ISysJobService
         for (Long jobId : jobIds)
         {
             SysJob job = jobMapper.selectJobById(jobId);
-            deleteJob(job);
+            final int deleteRows = deleteJob(job);
+            log.info("删除任务ID：{}，任务组名：{}，任务状态：{}，删除结果：{}", jobId, job.getJobGroup(), job.getStatus(), deleteRows);
         }
     }
 

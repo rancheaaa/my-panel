@@ -48,10 +48,24 @@ export function exportAgentRegistry(query) {
   return request({
     url: '/agent/registry/export',
     method: 'post',
-    params: query,
     responseType: 'blob'
   });
 }
+
+// 执行Agent命令
+export function executeAgentCommand(agentId, command, timeout = 30) {
+  return request({
+    url: '/agent/registry/execute',
+    method: 'post',
+    data: {
+      agentId: agentId,
+      command: command,
+      timeout: timeout
+    },
+    timeout: (timeout + 10) * 1000 // 设置请求超时时间，比命令超时多10秒
+  });
+}
+
 
 // Agent注册
 export function registerAgent(data) {

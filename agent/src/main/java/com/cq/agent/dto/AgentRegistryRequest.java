@@ -21,5 +21,5 @@ public class AgentRegistryRequest {
     
     private Integer agentPort;
     
-    private String remark;
+    private Integer nodeStatus;
 }

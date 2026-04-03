@@ -35,12 +35,6 @@ public class AgentRegisterRequest {
     @NotNull(message = "Agent端口不能为空")
     private Integer agentPort;
 
-    @Schema(description = "节点是否启用")
-    private Integer nodeEnabled;
-
     @Schema(description = "节点状态")
     private Integer nodeStatus;
-
-    @Schema(description = "备注")
-    private String remark;
 }

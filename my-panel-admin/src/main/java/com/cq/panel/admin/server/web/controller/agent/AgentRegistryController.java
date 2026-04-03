@@ -22,6 +22,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
+import com.cq.panel.admin.server.web.domain.dto.agent.AgentExecuteCommandDTO;
+
 /**
  * Agent注册信息 Controller
  * 
@@ -158,5 +160,22 @@ public class AgentRegistryController extends BaseController
     {
         int count = agentRegistryService.offlineTimeoutNodes(timeoutSeconds);
         return Result.success(count);
+    }
+
+    /**
+     * 执行Agent命令
+     */
+    @Operation(summary = "执行Agent命令", description = "在指定的Agent节点上执行命令")
+    @RequirePermission("agent:registry:execute")
+    @Log(title = "Agent注册信息", businessType = BusinessType.OTHER)
+    @PostMapping("/execute")
+    public Result<Object> executeCommand(@Validated @RequestBody AgentExecuteCommandDTO dto)
+    {
+        try {
+            Object result = agentRegistryService.executeCommand(dto.getAgentId(), dto.getCommand(), dto.getTimeout());
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("执行命令失败: " + e.getMessage());
+        }
     }
 }

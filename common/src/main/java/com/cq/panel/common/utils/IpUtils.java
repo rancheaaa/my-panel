@@ -80,13 +80,82 @@ public class IpUtils {
      */
     private static boolean shouldIgnoreInterface(java.net.NetworkInterface networkInterface) {
         try {
-            return networkInterface.isLoopback() ||
+            String displayName = networkInterface.getDisplayName().toLowerCase();
+            String name = networkInterface.getName().toLowerCase();
+            
+            // 基础过滤条件
+            if (networkInterface.isLoopback() ||
                     !networkInterface.isUp() ||
-                    networkInterface.isVirtual() ||
-                    networkInterface.isPointToPoint();
+                    networkInterface.isPointToPoint()) {
+                return true;
+            }
+            
+            // 过滤Docker相关网卡
+            if (isDockerInterface(displayName, name)) {
+                log.debug("忽略Docker网卡: {} ({})", displayName, name);
+                return true;
+            }
+            
+            // 过滤其他虚拟网卡
+            if (isVirtualInterface(displayName, name)) {
+                log.debug("忽略虚拟网卡: {} ({})", displayName, name);
+                return true;
+            }
+            
+            return false;
+            
         } catch (SocketException e) {
             return true;
         }
+    }
+    
+    /**
+     * 判断是否为Docker网卡
+     */
+    private static boolean isDockerInterface(String displayName, String name) {
+        // Docker网卡名称模式
+        String[] dockerPatterns = {
+            "docker", "veth", "br-", "cni", "flannel", "calico", 
+            "weave", "kube", "k8s", "container", "podman"
+        };
+        
+        for (String pattern : dockerPatterns) {
+            if (displayName.contains(pattern) || name.contains(pattern)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 判断是否为虚拟网卡
+     */
+    private static boolean isVirtualInterface(String displayName, String name) {
+        // 虚拟网卡名称模式
+        String[] virtualPatterns = {
+            "virtual", "vmware", "virtualbox", "vbox", "hyper-v",
+            "vpn", "tun", "tap", "virbr", "vnet"
+        };
+        
+        for (String pattern : virtualPatterns) {
+            if (displayName.contains(pattern) || name.contains(pattern)) {
+                return true;
+            }
+        }
+        
+        // 检查是否为虚拟接口
+        try {
+            java.lang.reflect.Method isVirtualMethod = java.net.NetworkInterface.class.getMethod("isVirtual");
+            Boolean isVirtual = (Boolean) isVirtualMethod.invoke(java.net.NetworkInterface.getByName(name));
+            if (isVirtual != null && isVirtual) {
+                return true;
+            }
+        } catch (Exception e) {
+            // 忽略反射异常
+        }
+        
+        return false;
     }
 
     /**

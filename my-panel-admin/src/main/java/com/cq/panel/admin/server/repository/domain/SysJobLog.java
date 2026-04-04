@@ -39,6 +39,10 @@ public class SysJobLog extends BaseEntity
     @Excel(name = "日志信息")
     private String jobMessage;
 
+    /** 触发类型（0定时触发 1手动触发） */
+    @Excel(name = "触发类型", readConverterExp = "0=定时触发,1=手动触发")
+    private String triggerType;
+
     /** 执行状态（0正常 1失败） */
     @Excel(name = "执行状态", readConverterExp = "0=正常,1=失败")
     private String status;
@@ -50,6 +54,6 @@ public class SysJobLog extends BaseEntity
     /** 开始时间 */
     private Date startTime;
 
-    /** 停止时间 */
-    private Date stopTime;
+    /** 结束时间 */
+    private Date endTime;
 }

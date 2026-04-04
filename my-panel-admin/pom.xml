@@ -62,6 +62,10 @@
             <artifactId>my-panel-auth-lite</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>my-panel-common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.mindrot</groupId>
             <artifactId>jbcrypt</artifactId>
             <version>0.4</version>

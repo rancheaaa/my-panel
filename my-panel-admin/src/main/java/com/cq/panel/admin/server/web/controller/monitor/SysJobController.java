@@ -1,5 +1,8 @@
 package com.cq.panel.admin.server.web.controller.monitor;
 
+import com.cq.panel.admin.server.common.utils.JobLogUtil;
+import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
+import com.cq.panel.admin.server.task.quartz.JobInvokeUtil;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobDTO;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobQueryDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
@@ -25,8 +28,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import org.quartz.SchedulerException;
 import com.cq.panel.authlite.annotation.RequirePermission;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -43,9 +49,12 @@ public class SysJobController extends BaseController
 
     private final SysJobConverter jobConverter;
 
-    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter) {
+    private final TaskExecutor threadPoolTaskExecutor;
+
+    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter, TaskExecutor threadPoolTaskExecutor) {
         this.jobService = jobService;
         this.jobConverter = jobConverter;
+        this.threadPoolTaskExecutor = threadPoolTaskExecutor;
     }
 
     /**
@@ -108,6 +117,7 @@ public class SysJobController extends BaseController
         // 只有在内置方法或原有逻辑下校验 invokeTarget
         if (job.getJobType() == null || job.getJobType() == 0 || job.getJobType() == 1) {
             String target = job.getJobType() == 1 ? job.getMethodName() : job.getInvokeTarget();
+
             if (StringUtils.isEmpty(target)) {
                 // 如果是 jobType=1, validateJob 已经校验了 methodName 不能为空
                 // 这里只是为了兼容原有逻辑的 invokeTarget 校验
@@ -146,6 +156,9 @@ public class SysJobController extends BaseController
     {
         validateJob(dto);
         SysJob job = jobConverter.toEntity(dto);
+        if (job == null) {
+            throw new ServiceException("修改任务失败，任务信息解析失败");
+        }
         if (!CronUtils.isValid(job.getCronExpression()))
         {
             throw new ServiceException("修改任务'" + job.getJobName() + "'失败，Cron表达式不正确" + job.getCronExpression());
@@ -257,12 +270,22 @@ public class SysJobController extends BaseController
             throw new ServiceException("任务'" + job.getJobName() + "'失败，Cron表达式不正确");
         }
 
-        boolean result = jobService.run(job);
-        if (!result)
-        {
-            throw new ServiceException("任务不存在或已过期！");
-        }
+        threadPoolTaskExecutor.execute(() -> {
+            try {
+                JobInvokeUtil.invokeMethod(job);
+                // 手动触发，传入"1"
+                insertSysJobLog(job, new Date(), null, "1");
+            } catch (Exception e) {
+                logger.error("执行定时任务 {} 失败", job, e);
+                // 手动触发，传入"1"
+                insertSysJobLog(job, new Date(), e, "1");
+            }
+        });
         return Result.success();
+    }
+
+    private void insertSysJobLog(SysJob sysJob, Date startTime, Exception e, String triggerType) {
+        JobLogUtil.createAndSaveJobLog(sysJob, startTime, e, triggerType);
     }
 
     /**
@@ -278,9 +301,3 @@ public class SysJobController extends BaseController
         return Result.success();
     }
 }
-
-
-
-
-
-

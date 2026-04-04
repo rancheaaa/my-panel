@@ -131,6 +131,7 @@ CREATE TABLE IF NOT EXISTS `sys_job`
     `http_method`     varchar(10)           DEFAULT NULL COMMENT 'HTTP请求方式',
     `http_headers`    text                  DEFAULT NULL COMMENT 'HTTP请求头(JSON)',
     `http_body`       text                  DEFAULT NULL COMMENT 'HTTP请求体',
+    `load_balance_strategy` varchar(50)      DEFAULT 'roundRobin' COMMENT '负载均衡策略（roundRobin轮询 random随机 weightedRoundRobin加权轮询 weightedRandom加权随机 leastConnections最少连接 fastestResponse最快响应 consistentHash一致性哈希 zoneAware区域感知）',
     `cron_expression` varchar(255)          DEFAULT '' COMMENT 'cron执行表达式',
     `misfire_policy`  varchar(20)           DEFAULT '3' COMMENT '计划执行错误策略（1立即执行 2执行一次 3放弃执行）',
     `concurrent`      char(1)               DEFAULT '1' COMMENT '是否并发执行（0允许 1禁止）',
@@ -154,9 +155,11 @@ CREATE TABLE IF NOT EXISTS `sys_job_log`
     `job_group`      varchar(64)  NOT NULL COMMENT '任务组名',
     `invoke_target`  varchar(500) DEFAULT '' COMMENT '调用目标字符串',
     `job_message`    varchar(500)  DEFAULT NULL COMMENT '日志信息',
+    `trigger_type`   char(1)       DEFAULT '0' COMMENT '触发类型（0定时触发 1手动触发）',
     `status`         char(1)       DEFAULT '0' COMMENT '执行状态（0正常 1失败）',
     `exception_info` varchar(2000) DEFAULT '' COMMENT '异常信息',
-    `create_time`    datetime      DEFAULT NULL COMMENT '创建时间',
+    `start_time`     datetime      DEFAULT NULL COMMENT '开始时间',
+    `end_time`       datetime      DEFAULT NULL COMMENT '结束时间',
     PRIMARY KEY (`job_log_id`)
 )  AUTO_INCREMENT=1077   COMMENT='定时任务调度日志表';
 

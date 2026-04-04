@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker } from 'antd';
-import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, ExportOutlined, SettingOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker, Divider } from 'antd';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, ExportOutlined, SettingOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, DownloadOutlined, MinusCircleOutlined, PlusCircleOutlined } from '@ant-design/icons';
 import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob } from '../../../api/monitor/job';
 import { listJobLog, delJobLog, cleanJobLog, exportJobLog } from '../../../api/monitor/jobLog';
 import { getDicts } from '../../../api/dict/data';
@@ -197,7 +197,7 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
     const [loading, setLoading] = useState(false);
     const [total, setTotal] = useState(0);
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-    const [tableSize, setTableSize] = useState('small');
+    const [tableSize, setTableSize] = useState('middle');
     const [expand, setExpand] = useState(false);
     const [queryParams, setQueryParams] = useState({
       pageNum: 1,
@@ -374,6 +374,19 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
         ellipsis: true,
       },
       {
+        title: '触发类型',
+        dataIndex: 'triggerType',
+        key: 'triggerType',
+        width: 100,
+        render: (triggerType) => {
+          const typeMap = {
+            '0': <Tag color="blue">定时触发</Tag>,
+            '1': <Tag color="orange">手动触发</Tag>
+          };
+          return typeMap[triggerType] || triggerType;
+        }
+      },
+      {
         title: '执行状态',
         dataIndex: 'status',
         key: 'status',
@@ -386,10 +399,23 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
         }
       },
       {
-        title: '执行时间',
-        dataIndex: 'createTime',
-        key: 'createTime',
+        title: '开始时间',
+        dataIndex: 'startTime',
+        key: 'startTime',
         width: 160,
+      },
+      {
+        title: '结束时间',
+        dataIndex: 'endTime',
+        key: 'endTime',
+        width: 160,
+      },
+      {
+        title: '异常信息',
+        dataIndex: 'exceptionInfo',
+        key: 'exceptionInfo',
+        width: 200,
+        ellipsis: true,
       },
       {
         title: '操作',
@@ -472,7 +498,7 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
         </div>
   
         <div className="table-toolbar">
-          <Space size="middle">
+          <Space size="large">
             <Popconfirm
                title="确定删除选中日志吗？"
                onConfirm={() => handleDelete(selectedRowKeys)}
@@ -488,7 +514,8 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
             </Popconfirm>
             <Button icon={<DownloadOutlined />} onClick={handleExport}>导出</Button>
           </Space>
-          <Space size="middle">
+          <div style={{ flex: 1 }}></div>
+          <Space size="large">
             <Tooltip title="刷新">
                <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
@@ -537,29 +564,36 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
             title="调度日志详情"
             open={detailOpen}
             onCancel={() => setDetailOpen(false)}
-            footer={[
-                <Button key="close" onClick={() => setDetailOpen(false)}>
-                    关闭
-                </Button>
-            ]}
             width={700}
+            centered
+            footer={<Button onClick={() => setDetailOpen(false)}>关闭</Button>}
         >
-            <Form labelCol={{ span: 4 }}>
-                <Form.Item label="日志序号">{currentLog.jobLogId}</Form.Item>
-                <Form.Item label="任务名称">{currentLog.jobName}</Form.Item>
-                <Form.Item label="任务分组">{currentLog.jobGroup}</Form.Item>
-                <Form.Item label="执行时间">{currentLog.createTime}</Form.Item>
-                <Form.Item label="调用方法">{currentLog.invokeTarget}</Form.Item>
-                <Form.Item label="日志信息">{currentLog.jobMessage}</Form.Item>
-                <Form.Item label="执行状态">
-                    {currentLog.status === '0' ? '正常' : '失败'}
-                </Form.Item>
-                {currentLog.status === '1' && (
-                    <Form.Item label="异常信息">
-                        <Input.TextArea value={currentLog.exceptionInfo} readOnly rows={4} />
-                    </Form.Item>
-                )}
-            </Form>
+            <Descriptions column={2} bordered size="small" layout="vertical">
+                <Descriptions.Item label="日志序号">{currentLog.jobLogId}</Descriptions.Item>
+                <Descriptions.Item label="任务名称">{currentLog.jobName}</Descriptions.Item>
+                <Descriptions.Item label="任务分组">{currentLog.jobGroup}</Descriptions.Item>
+                <Descriptions.Item label="开始时间">{currentLog.startTime}</Descriptions.Item>
+                <Descriptions.Item label="结束时间">{currentLog.endTime}</Descriptions.Item>
+                <Descriptions.Item label="调用方法">{currentLog.invokeTarget}</Descriptions.Item>
+                <Descriptions.Item label="日志信息" span={2}>
+                    <div style={{ whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto' }}>
+                        {currentLog.jobMessage}
+                    </div>
+                </Descriptions.Item>
+                <Descriptions.Item label="执行状态">
+                    <Tag color={currentLog.status === '0' ? 'success' : 'error'}>
+                        {currentLog.status === '0' ? '正常' : '失败'}
+                    </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="异常信息" span={2}>
+                    <Input.TextArea 
+                        value={currentLog.exceptionInfo} 
+                        readOnly 
+                        rows={8}
+                        style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}
+                    />
+                </Descriptions.Item>
+            </Descriptions>
         </Modal>
       </Modal>
     );
@@ -584,6 +618,10 @@ const Job = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [tableSize, setTableSize] = useState('large');
   
+  // HTTP接口配置状态
+  const [httpPath, setHttpPath] = useState('');
+  const [httpIps, setHttpIps] = useState(['']);
+  
   // 基础列配置
   const [columnWidths, setColumnWidths] = useState({
     jobId: 100,
@@ -592,6 +630,7 @@ const Job = () => {
     jobGroup: 120,
     invokeTarget: 250,
     cronExpression: 150,
+    loadBalanceStrategy: 120,
     status: 80,
     createBy: 100,
     createTime: 160,
@@ -619,6 +658,26 @@ const Job = () => {
     { title: '任务组名', dataIndex: 'jobGroup', align: 'center', width: columnWidths.jobGroup, render: (v) => sysJobGroup.find(d => d.dictValue === v)?.dictLabel || v },
     { title: '调用目标', dataIndex: 'invokeTarget', align: 'center', width: columnWidths.invokeTarget, ellipsis: true },
     { title: 'Cron表达式', dataIndex: 'cronExpression', align: 'center', width: columnWidths.cronExpression },
+    { 
+      title: '负载均衡策略', 
+      dataIndex: 'loadBalanceStrategy', 
+      align: 'center', 
+      width: 120,
+      render: (v) => {
+        if (!v) return '-';
+        const strategyMap = {
+          'roundRobin': '轮询',
+          'random': '随机',
+          'weightedRoundRobin': '加权轮询',
+          'weightedRandom': '加权随机',
+          'leastConnections': '最少连接',
+          'fastestResponse': '最快响应',
+          'consistentHash': '一致性哈希',
+          'zoneAware': '区域感知'
+        };
+        return strategyMap[v] || v;
+      }
+    },
     { title: '状态', dataIndex: 'status', align: 'center', width: columnWidths.status, render: (v, r) => <Switch checked={v === '0'} onChange={() => handleStatusChange(r)} /> },
     { title: '创建人', dataIndex: 'createBy', align: 'center', width: columnWidths.createBy },
     { title: '创建时间', dataIndex: 'createTime', align: 'center', width: columnWidths.createTime },
@@ -662,6 +721,8 @@ const Job = () => {
 
   const handleAdd = () => {
     form.resetFields();
+    setHttpPath('');
+    setHttpIps(['']);
     form.setFieldsValue({ 
       jobType: 1, 
       jobGroup: 'DEFAULT', 
@@ -677,6 +738,35 @@ const Job = () => {
     form.resetFields();
     const res = await getJob(row.jobId || selectedRowKeys[0]);
     if (res.code === 200) {
+      // 解析httpUrl为path和ips
+      let path = '';
+      let ips = [''];
+      if (res.data?.httpUrl) {
+        try {
+          const urls = res.data.httpUrl.split(',');
+          if (urls.length > 0) {
+            // 从第一个URL中提取路径
+            const firstUrl = urls[0].trim();
+            const urlObj = new URL(firstUrl);
+            path = urlObj.pathname;
+            
+            // 提取所有IP:port
+            ips = urls.map(urlItem => {
+              const url = urlItem.trim();
+              const urlObj = new URL(url);
+              return `${urlObj.hostname}:${urlObj.port}`;
+            });
+          }
+        } catch (error) {
+          console.error('URL解析错误:', error);
+          path = '';
+          ips = [''];
+        }
+      }
+      
+      setHttpPath(path);
+      setHttpIps(ips);
+      
       form.setFieldsValue({
         ...res.data,
         jobType: res.data?.jobType != null ? Number(res.data.jobType) : 1,
@@ -711,6 +801,37 @@ const Job = () => {
 
   const submitForm = async () => {
     const values = await form.validateFields();
+    
+    // 如果是HTTP接口类型，拼接httpUrl
+    if (values.jobType === 2) {
+      const fullUrls = httpIps
+        .filter(ip => ip && ip.trim() !== '')
+        .map(ip => {
+          const trimmedIp = ip.trim();
+          // 判断是否包含协议
+          const hasProtocol = trimmedIp.includes('://');
+          let protocol = 'http';
+          let hostname = trimmedIp;
+          
+          if (hasProtocol) {
+            const urlObj = new URL(trimmedIp);
+            protocol = urlObj.protocol.replace(':', '');
+            hostname = urlObj.hostname;
+            // 如果URL中包含端口，保留端口
+            if (urlObj.port) {
+              hostname = `${urlObj.hostname}:${urlObj.port}`;
+            }
+          } else if (trimmedIp.includes(':')) {
+            hostname = trimmedIp;
+          }
+          
+          return `${protocol}://${hostname}${httpPath}`;
+        })
+        .join(',');
+      
+      values.httpUrl = fullUrls;
+    }
+    
     if (values.jobId) {
       const res = await updateJob(values);
       if (res.code === 200) {
@@ -782,13 +903,14 @@ const Job = () => {
 
       <Card bordered={false}>
         <div className="table-toolbar">
-          <Space>
+          <Space size="large">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
             <Button danger icon={<DeleteOutlined />} disabled={!selectedRowKeys.length} onClick={() => handleDelete(selectedRowKeys.join(','))}>删除</Button>
             <Button icon={<FileTextOutlined />} onClick={() => { setLogParams({}); setLogVisible(true); }}>调度日志</Button>
             <Button icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
           </Space>
-          <Space>
+          <div style={{ flex: 1 }}></div>
+          <Space size="large">
             <Tooltip title="刷新">
               <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
             </Tooltip>
@@ -852,8 +974,8 @@ const Job = () => {
                   <>
                       <Row gutter={16}>
                           <Col span={18}>
-                              <Form.Item name="httpUrl" label="接口 URL" rules={[{ required: true, message: '请输入接口 URL' }]}>
-                                  <Input placeholder="http://localhost:8080/api/test/{jobId}" />
+                              <Form.Item label="接口路径" rules={[{ required: true, message: '请输入接口路径' }]}>
+                                  <Input placeholder="/api/test/{jobId}" value={httpPath} onChange={(e) => setHttpPath(e.target.value)} />
                               </Form.Item>
                           </Col>
                           <Col span={6}>
@@ -863,6 +985,59 @@ const Job = () => {
                                       <Option value="POST">POST</Option>
                                       <Option value="PUT">PUT</Option>
                                       <Option value="DELETE">DELETE</Option>
+                                  </Select>
+                              </Form.Item>
+                          </Col>
+                      </Row>
+                      <Form.Item label="服务器IP">
+                          <div style={{ width: '100%' }}>
+                              {httpIps.map((ip, index) => (
+                                  <div key={index} style={{ display: 'flex', marginBottom: '8px', alignItems: 'center' }}>
+                                      <Input
+                                          style={{ flex: 1, marginRight: '8px' }}
+                                          placeholder="例如：localhost:8080"
+                                          value={ip}
+                                          onChange={(e) => {
+                                              const newIps = [...httpIps];
+                                              newIps[index] = e.target.value;
+                                              setHttpIps(newIps);
+                                          }}
+                                      />
+                                      {httpIps.length > 1 && (
+                                          <Button 
+                                              type="text" 
+                                              danger 
+                                              icon={<MinusCircleOutlined />} 
+                                              onClick={() => {
+                                                  const newIps = httpIps.filter((_, i) => i !== index);
+                                                  setHttpIps(newIps);
+                                              }}
+                                          />
+                                      )}
+                                  </div>
+                              ))}
+                              <Button 
+                                  type="dashed" 
+                                  icon={<PlusCircleOutlined />} 
+                                  onClick={() => setHttpIps([...httpIps, ''])}
+                                  style={{ width: '100%' }}
+                              >
+                                  添加服务器IP
+                              </Button>
+                          </div>
+                      </Form.Item>
+                      <Row gutter={16}>
+                          <Col span={12}>
+                              <Form.Item name="loadBalanceStrategy" label="负载均衡策略" initialValue="roundRobin" rules={[{ required: true, message: '请选择负载均衡策略' }]}>
+                                  <Select>
+                                      <Option value="roundRobin">轮询</Option>
+                                      <Option value="random">随机</Option>
+                                      <Option value="weightedRoundRobin">加权轮询</Option>
+                                      <Option value="weightedRandom">加权随机</Option>
+                                      <Option value="leastConnections">最少连接</Option>
+                                      <Option value="fastestResponse">最快响应</Option>
+                                      <Option value="consistentHash">一致性哈希</Option>
+                                      <Option value="zoneAware">区域感知</Option>
                                   </Select>
                               </Form.Item>
                           </Col>
@@ -940,6 +1115,16 @@ const Job = () => {
                    <>
                        <Descriptions.Item label="接口 URL" span={2}>{currentJob.httpUrl}</Descriptions.Item>
                        <Descriptions.Item label="请求方式">{currentJob.httpMethod}</Descriptions.Item>
+                       <Descriptions.Item label="负载均衡策略">
+                           {currentJob.loadBalanceStrategy === 'roundRobin' ? '轮询' :
+                            currentJob.loadBalanceStrategy === 'random' ? '随机' :
+                            currentJob.loadBalanceStrategy === 'weightedRoundRobin' ? '加权轮询' :
+                            currentJob.loadBalanceStrategy === 'weightedRandom' ? '加权随机' :
+                            currentJob.loadBalanceStrategy === 'leastConnections' ? '最少连接' :
+                            currentJob.loadBalanceStrategy === 'fastestResponse' ? '最快响应' :
+                            currentJob.loadBalanceStrategy === 'consistentHash' ? '一致性哈希' :
+                            currentJob.loadBalanceStrategy === 'zoneAware' ? '区域感知' : currentJob.loadBalanceStrategy}
+                       </Descriptions.Item>
                        <Descriptions.Item label="请求头" span={2}>
                            <pre style={{ margin: 0, fontSize: '12px', background: '#f5f5f5', padding: '8px' }}>
                                {currentJob.httpHeaders}

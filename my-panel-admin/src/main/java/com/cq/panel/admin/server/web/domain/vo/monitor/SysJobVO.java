@@ -50,6 +50,10 @@ public class SysJobVO {
     @Excel(name = "HTTP请求体")
     private String httpBody;
 
+    @Schema(description = "负载均衡策略")
+    @Excel(name = "负载均衡策略")
+    private String loadBalanceStrategy;
+
     @Schema(description = "执行表达式", example = "0/10 * * * * ?")
     @Excel(name = "执行表达式")
     private String cronExpression;
@@ -86,4 +90,3 @@ public class SysJobVO {
     @Schema(description = "备注")
     private String remark;
 }
-

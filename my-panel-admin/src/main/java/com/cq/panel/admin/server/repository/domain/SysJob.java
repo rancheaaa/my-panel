@@ -75,6 +75,10 @@ public class SysJob extends BaseEntity
     @Excel(name = "HTTP请求体")
     private String httpBody;
 
+    /** 负载均衡策略 */
+    @Excel(name = "负载均衡策略")
+    private String loadBalanceStrategy;
+
     /** cron执行表达式 */
     @Excel(name = "执行表达式 ")
     @NotBlank(message = "Cron执行表达式不能为空")

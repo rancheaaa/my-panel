@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -66,6 +67,10 @@ public class LoadBalancerClient {
         }
     }
 
+    public LoadBalancerClient(LoadBalancerAlgorithm algorithm) {
+        this(LoadBalancerFactory.createLoadBalancer(algorithm), new StaticServerList(), new SimpleHttpClient(), new TcpHealthChecker(), LoadBalancerConfig.defaultConfig());
+    }
+
     /**
      * 启动健康检查
      */
@@ -121,6 +126,98 @@ public class LoadBalancerClient {
             }
         } catch (Exception e) {
             logger.error("健康检查异常", e);
+        }
+    }
+
+    /**
+     * 从URL数组中选择一个URL（用于定时任务负载均衡）
+     *
+     * @param request 负载均衡请求
+     * @return 选中的URL
+     */
+    public String choose(LoadBalancerRequest<?> request) {
+        try {
+            // 创建一个临时的服务列表，包含所有URL
+            StaticServerList tempServerList = new StaticServerList();
+            
+            // 执行负载均衡选择
+            Server server = loadBalancer.choose(tempServerList.getServers("temp-service"));
+            
+            if (server != null) {
+                return server.getUrl();
+            }
+            
+            throw new IllegalStateException("No URL available for load balancing");
+        } catch (Exception e) {
+            logger.error("Load balancing failed", e);
+            throw new RuntimeException("Failed to choose URL for load balancing", e);
+        }
+    }
+
+    /**
+     * 从URL数组中选择一个URL（用于定时任务负载均衡）
+     *
+     * @param urls URL数组
+     * @return 选中的URL
+     */
+    public String choose(String[] urls) {
+        try {
+            if (urls == null || urls.length == 0) {
+                throw new IllegalArgumentException("URL array cannot be null or empty");
+            }
+            
+            // 创建临时服务器列表
+            List<Server> servers = new ArrayList<>();
+            for (String url : urls) {
+                if (url != null && !url.trim().isEmpty()) {
+                    String trimmedUrl = url.trim();
+                    // 解析URL并创建Server对象
+                    try {
+                        String scheme = "http";
+                        String host;
+                        int port = 80;
+                        
+                        // 提取协议
+                        if (trimmedUrl.contains("://")) {
+                            scheme = trimmedUrl.substring(0, trimmedUrl.indexOf("://"));
+                            trimmedUrl = trimmedUrl.substring(trimmedUrl.indexOf("://") + 3);
+                        }
+                        
+                        // 提取主机和端口
+                        String[] parts = trimmedUrl.split("/");
+                        String hostPort = parts[0];
+                        
+                        if (hostPort.contains(":")) {
+                            String[] hostPortParts = hostPort.split(":");
+                            host = hostPortParts[0];
+                            port = Integer.parseInt(hostPortParts[1]);
+                        } else {
+                            host = hostPort;
+                            port = "https".equals(scheme) ? 443 : 80;
+                        }
+                        
+                        servers.add(new Server(host, port));
+                    } catch (Exception e) {
+                        logger.warn("Failed to parse URL: {}, skipping", url, e);
+                    }
+                }
+            }
+            
+            if (servers.isEmpty()) {
+                throw new IllegalArgumentException("No valid URLs provided");
+            }
+            
+            // 执行负载均衡选择
+            Server server = loadBalancer.choose(servers);
+            
+            if (server != null) {
+                return server.getUrl();
+            }
+            
+            throw new IllegalStateException("No URL available for load balancing");
+        } catch (Exception e) {
+            logger.error("Load balancing failed", e);
+            throw new RuntimeException("Failed to choose URL for load balancing", e);
         }
     }
 

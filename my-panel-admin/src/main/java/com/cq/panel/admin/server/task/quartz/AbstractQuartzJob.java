@@ -3,7 +3,7 @@ package com.cq.panel.admin.server.task.quartz;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;
 import com.cq.panel.admin.server.common.utils.ExceptionUtil;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.JobLogUtil;
 import com.cq.panel.admin.server.common.utils.bean.BeanUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
@@ -70,27 +70,8 @@ public abstract class AbstractQuartzJob implements Job
         Date startTime = threadLocal.get();
         threadLocal.remove();
 
-        final SysJobLog sysJobLog = new SysJobLog();
-        sysJobLog.setJobName(sysJob.getJobName());
-        sysJobLog.setJobGroup(sysJob.getJobGroup());
-        sysJobLog.setInvokeTarget(sysJob.getInvokeTarget());
-        sysJobLog.setStartTime(startTime);
-        sysJobLog.setStopTime(new Date());
-        long runMs = sysJobLog.getStopTime().getTime() - sysJobLog.getStartTime().getTime();
-        sysJobLog.setJobMessage(sysJobLog.getJobName() + " 总共耗时：" + runMs + "毫秒");
-        if (e != null)
-        {
-            sysJobLog.setStatus(Constants.FAIL);
-            String errorMsg = StringUtils.substring(ExceptionUtil.getExceptionMessage(e), 0, 2000);
-            sysJobLog.setExceptionInfo(errorMsg);
-        }
-        else
-        {
-            sysJobLog.setStatus(Constants.SUCCESS);
-        }
-
-        // 写入数据库当中
-        SpringUtils.getBean(ISysJobLogService.class).addJobLog(sysJobLog);
+        // 定时触发，传入"0"
+        JobLogUtil.createAndSaveJobLog(sysJob, startTime, e, "0");
     }
 
     /**

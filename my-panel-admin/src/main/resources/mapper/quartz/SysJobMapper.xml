@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="httpMethod"     column="http_method"     />
 		<result property="httpHeaders"    column="http_headers"    />
 		<result property="httpBody"       column="http_body"       />
+		<result property="loadBalanceStrategy" column="load_balance_strategy" />
 		<result property="cronExpression" column="cron_expression" />
 		<result property="misfirePolicy"  column="misfire_policy"  />
 		<result property="concurrent"     column="concurrent"      />
@@ -27,7 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</resultMap>
 	
 	<sql id="selectJobVo">
-		select job_id, job_name, job_group, invoke_target, job_type, method_name, http_url, http_method, http_headers, http_body,
+		select job_id, job_name, job_group, invoke_target, job_type, method_name, http_url, http_method, http_headers, http_body, load_balance_strategy,
 		       cron_expression, misfire_policy, concurrent, status, create_by, create_time, update_by, update_time, remark 
 		from sys_job
     </sql>
@@ -85,6 +86,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="httpMethod != null">http_method = #{httpMethod},</if>
 			<if test="httpHeaders != null">http_headers = #{httpHeaders},</if>
 			<if test="httpBody != null">http_body = #{httpBody},</if>
+			<if test="loadBalanceStrategy != null">load_balance_strategy = #{loadBalanceStrategy},</if>
  			<if test="cronExpression != null and cronExpression != ''">cron_expression = #{cronExpression},</if>
  			<if test="misfirePolicy != null and misfirePolicy != ''">misfire_policy = #{misfirePolicy},</if>
  			<if test="concurrent != null and concurrent != ''">concurrent = #{concurrent},</if>
@@ -108,6 +110,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="httpMethod != null">http_method,</if>
 			<if test="httpHeaders != null">http_headers,</if>
 			<if test="httpBody != null">http_body,</if>
+			<if test="loadBalanceStrategy != null">load_balance_strategy,</if>
  			<if test="cronExpression != null and cronExpression != ''">cron_expression,</if>
  			<if test="misfirePolicy != null and misfirePolicy != ''">misfire_policy,</if>
  			<if test="concurrent != null and concurrent != ''">concurrent,</if>
@@ -126,6 +129,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="httpMethod != null">#{httpMethod},</if>
 			<if test="httpHeaders != null">#{httpHeaders},</if>
 			<if test="httpBody != null">#{httpBody},</if>
+			<if test="loadBalanceStrategy != null">#{loadBalanceStrategy},</if>
  			<if test="cronExpression != null and cronExpression != ''">#{cronExpression},</if>
  			<if test="misfirePolicy != null and misfirePolicy != ''">#{misfirePolicy},</if>
  			<if test="concurrent != null and concurrent != ''">#{concurrent},</if>
@@ -136,4 +140,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  		)
 	</insert>
 
-</mapper> 
+</mapper>

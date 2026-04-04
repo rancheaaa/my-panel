@@ -3,6 +3,8 @@ package com.cq.panel.admin.server.task.quartz;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
+import com.cq.panel.common.loadbalancer.LoadBalancerAlgorithm;
+import com.cq.panel.common.loadbalancer.LoadBalancerClient;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
@@ -118,10 +120,11 @@ public class JobInvokeUtil
     private static void invokeHttpInterface(SysJob sysJob) throws Exception
     {
         RestTemplate restTemplate = SpringUtils.getBean(RestTemplate.class);
-        String url = replacePlaceholders(sysJob.getHttpUrl(), sysJob);
+        String httpUrl = sysJob.getHttpUrl();
         String methodStr = sysJob.getHttpMethod();
         String headersJson = sysJob.getHttpHeaders();
         String body = replacePlaceholders(sysJob.getHttpBody(), sysJob);
+        String loadBalanceStrategy = sysJob.getLoadBalanceStrategy();
 
         HttpMethod httpMethod = HttpMethod.valueOf(methodStr.toUpperCase());
         HttpHeaders headers = new HttpHeaders();
@@ -137,11 +140,24 @@ public class JobInvokeUtil
         }
 
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.exchange(url, httpMethod, entity, String.class);
-        log.info("HTTP接口调用完成，状态码：{}，响应内容：{}", response.getStatusCode().value(), response.getBody());
+        
+        String selectedUrl;
+        if (StringUtils.isNotEmpty(httpUrl) && httpUrl.contains(",")) {
+            String[] urls = httpUrl.split(",");
+            LoadBalancerAlgorithm algorithm = LoadBalancerAlgorithm.fromName(loadBalanceStrategy);
+            LoadBalancerClient loadBalancerClient = new LoadBalancerClient(algorithm);
+            
+            selectedUrl = loadBalancerClient.choose(urls);
+            log.info("使用负载均衡策略：{}，从{}个URL中选择：{}", algorithm.getName(), urls.length, selectedUrl);
+        } else {
+            selectedUrl = replacePlaceholders(httpUrl, sysJob);
+        }
+
+        ResponseEntity<String> response = restTemplate.exchange(selectedUrl, httpMethod, entity, String.class);
+        log.info("HTTP接口调用完成，sysJobId：{}，jobName：{}，jobGroup：{}，invokeTarget：{}，URL：{}，状态码：{}，响应内容：{}", sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), sysJob.getInvokeTarget(), selectedUrl, response.getStatusCode().value(), response.getBody());
         if (response.getStatusCode().isError()) {
-            log.error("HTTP接口调用失败，状态码：{}，响应内容：{}", response.getStatusCode().value(), response.getBody());
-            throw new Exception("HTTP 接口调用失败，状态码：" + response.getStatusCode().value() + "，响应内容：" + response.getBody());
+            log.error("HTTP接口调用失败，sysJobId：{}，jobName：{}，jobGroup：{}，invokeTarget：{}，URL：{}，状态码：{}，响应内容：{}", sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), sysJob.getInvokeTarget(), selectedUrl, response.getStatusCode().value(), response.getBody());
+            throw new Exception("HTTP 接口调用失败，sysJobId：{}，jobName：{}，jobGroup：{}，invokeTarget：{}，URL：{}，状态码：" + response.getStatusCode().value() + "，响应内容：" + response.getBody());
         }
     }
 

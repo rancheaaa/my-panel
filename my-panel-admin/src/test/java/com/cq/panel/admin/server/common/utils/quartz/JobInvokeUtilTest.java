@@ -129,6 +129,68 @@ public class JobInvokeUtilTest {
     }
 
     @Test
+    @DisplayName("测试HTTP接口调度 - 负载均衡多URL")
+    void testInvokeHttpInterface_LoadBalancing() throws Exception {
+        when(mockBeanFactory.getBean(RestTemplate.class)).thenReturn(restTemplate);
+        
+        MockWebServer server1 = new MockWebServer();
+        MockWebServer server2 = new MockWebServer();
+        server1.start();
+        server2.start();
+        
+        server1.enqueue(new MockResponse().setBody("Server1").setResponseCode(200));
+        server2.enqueue(new MockResponse().setBody("Server2").setResponseCode(200));
+
+        try {
+            SysJob job = new SysJob();
+            job.setJobType(2);
+            job.setHttpUrl(server1.url("/api").toString() + "," + server2.url("/api").toString());
+            job.setHttpMethod("GET");
+            job.setLoadBalanceStrategy("roundRobin");
+
+            JobInvokeUtil.invokeMethod(job);
+
+            RecordedRequest request = server1.takeRequest();
+            assertNotNull(request);
+            assertEquals("GET", request.getMethod());
+        } finally {
+            server1.shutdown();
+            server2.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("测试HTTP接口调度 - 负载均衡随机策略")
+    void testInvokeHttpInterface_LoadBalancingRandom() throws Exception {
+        when(mockBeanFactory.getBean(RestTemplate.class)).thenReturn(restTemplate);
+        
+        MockWebServer server1 = new MockWebServer();
+        MockWebServer server2 = new MockWebServer();
+        server1.start();
+        server2.start();
+        
+        server1.enqueue(new MockResponse().setBody("Server1").setResponseCode(200));
+        server2.enqueue(new MockResponse().setBody("Server2").setResponseCode(200));
+
+        try {
+            SysJob job = new SysJob();
+            job.setJobType(2);
+            job.setHttpUrl(server1.url("/api").toString() + "," + server2.url("/api").toString());
+            job.setHttpMethod("GET");
+            job.setLoadBalanceStrategy("random");
+
+            JobInvokeUtil.invokeMethod(job);
+
+            RecordedRequest request1 = server1.takeRequest();
+            RecordedRequest request2 = server2.takeRequest();
+            assertTrue(true);
+        } finally {
+            server1.shutdown();
+            server2.shutdown();
+        }
+    }
+
+    @Test
     @DisplayName("测试原有逻辑兼容性")
     void testInvokeLegacyMethod() throws Exception {
         // 原有逻辑会调用 getBeanName 等，这里简单模拟

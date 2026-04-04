@@ -15,8 +15,8 @@ import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.web.exception.job.TaskException;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
-import com.cq.panel.admin.server.common.utils.quartz.CronUtils;
-import com.cq.panel.admin.server.common.utils.quartz.ScheduleUtils;
+import com.cq.panel.admin.server.task.quartz.CronUtils;
+import com.cq.panel.admin.server.task.quartz.ScheduleUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.admin.server.repository.service.ISysJobService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -98,31 +98,35 @@ public class SysJobController extends BaseController
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysJobDTO dto) throws SchedulerException, TaskException
     {
+        validateJob(dto);
         SysJob job = jobConverter.toEntity(dto);
         if (!CronUtils.isValid(job.getCronExpression()))
         {
             throw new ServiceException("新增任务'" + job.getJobName() + "'失败，Cron表达式不正确");
         }
-        else if (StringUtils.contains(job.getInvokeTarget(), Constants.LOOKUP_RMI))
-        {
-            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串不允许'rmi'调用");
+        
+        // 只有在内置方法或原有逻辑下校验 invokeTarget
+        if (job.getJobType() == null || job.getJobType() == 0 || job.getJobType() == 1) {
+            String target = job.getJobType() == 1 ? job.getMethodName() : job.getInvokeTarget();
+            if (StringUtils.isEmpty(target)) {
+                // 如果是 jobType=1, validateJob 已经校验了 methodName 不能为空
+                // 这里只是为了兼容原有逻辑的 invokeTarget 校验
+                if (job.getJobType() == null || job.getJobType() == 0) {
+                     throw new ServiceException("调用目标不能为空");
+                }
+            } else {
+                validateInvokeTarget(job.getJobName(), target);
+            }
+            
+            // 如果是 jobType=1, invokeTarget 应该存入一个占位符或 methodName，因为数据库该字段 NOT NULL
+            if (job.getJobType() == 1) {
+                job.setInvokeTarget(job.getMethodName());
+            }
+        } else if (job.getJobType() == 2) {
+            // HTTP 模式，invokeTarget 设为 URL
+            job.setInvokeTarget(job.getHttpUrl());
         }
-        else if (StringUtils.containsAnyIgnoreCase(job.getInvokeTarget(), new String[] { Constants.LOOKUP_LDAP, Constants.LOOKUP_LDAPS }))
-        {
-            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串不允许'ldap(s)'调用");
-        }
-        else if (StringUtils.containsAnyIgnoreCase(job.getInvokeTarget(), new String[] { Constants.HTTP, Constants.HTTPS }))
-        {
-            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串不允许'http(s)'调用");
-        }
-        else if (StringUtils.containsAnyIgnoreCase(job.getInvokeTarget(), Constants.JOB_ERROR_STR))
-        {
-            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串存在违规");
-        }
-        else if (!ScheduleUtils.whiteList(job.getInvokeTarget()))
-        {
-            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，目标字符串不在白名单内");
-        }
+
         job.setCreateBy(getUsername());
         final int insertRows = jobService.insertJob(job);
         if (insertRows <= 0) {
@@ -140,37 +144,73 @@ public class SysJobController extends BaseController
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysJobDTO dto) throws SchedulerException, TaskException
     {
+        validateJob(dto);
         SysJob job = jobConverter.toEntity(dto);
         if (!CronUtils.isValid(job.getCronExpression()))
         {
-            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，Cron表达式不正确");
+            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，Cron表达式不正确" + job.getCronExpression());
         }
-        else if (StringUtils.contains(job.getInvokeTarget(), Constants.LOOKUP_RMI))
-        {
-            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串不允许'rmi'调用");
+
+        if (job.getJobType() == null || job.getJobType() == 0 || job.getJobType() == 1) {
+            String target = job.getJobType() == 1 ? job.getMethodName() : job.getInvokeTarget();
+            if (StringUtils.isNotEmpty(target)) {
+                validateInvokeTarget(job.getJobName(), target);
+            }
+            if (job.getJobType() == 1) {
+                job.setInvokeTarget(job.getMethodName());
+            }
+        } else if (job.getJobType() == 2) {
+            job.setInvokeTarget(job.getHttpUrl());
         }
-        else if (StringUtils.containsAnyIgnoreCase(job.getInvokeTarget(), new String[] { Constants.LOOKUP_LDAP, Constants.LOOKUP_LDAPS }))
-        {
-            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串不允许'ldap(s)'调用");
-        }
-        else if (StringUtils.containsAnyIgnoreCase(job.getInvokeTarget(), new String[] { Constants.HTTP, Constants.HTTPS }))
-        {
-            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串不允许'http(s)'调用");
-        }
-        else if (StringUtils.containsAnyIgnoreCase(job.getInvokeTarget(), Constants.JOB_ERROR_STR))
-        {
-            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串存在违规");
-        }
-        else if (!ScheduleUtils.whiteList(job.getInvokeTarget()))
-        {
-            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，目标字符串不在白名单内");
-        }
+
         job.setUpdateBy(getUsername());
         final int updateRows = jobService.updateJob(job);
         if (updateRows <= 0) {
             throw new ServiceException("修改任务'" + job.getJobName() + "'失败，更新数据库失败");
         }
         else return Result.success();
+    }
+
+    private void validateJob(SysJobDTO dto) {
+        if (dto.getJobType() == 1) {
+            if (StringUtils.isEmpty(dto.getMethodName())) {
+                throw new ServiceException("内置方法不能为空");
+            }
+            if (StringUtils.isNotEmpty(dto.getHttpUrl())) {
+                throw new ServiceException("内置方法模式下，HTTP接口URL必须为空");
+            }
+        } else if (dto.getJobType() == 2) {
+            if (StringUtils.isEmpty(dto.getHttpUrl())) {
+                throw new ServiceException("HTTP接口URL不能为空");
+            }
+            if (StringUtils.isNotEmpty(dto.getMethodName())) {
+                throw new ServiceException("HTTP接口模式下，内置方法必须为空");
+            }
+        }
+    }
+
+    private void validateInvokeTarget(String jobName, String invokeTarget) {
+        if (StringUtils.contains(invokeTarget, Constants.LOOKUP_RMI))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'rmi'调用");
+        }
+        else if (StringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.LOOKUP_LDAP, Constants.LOOKUP_LDAPS }))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'ldap(s)'调用");
+        }
+        else if (StringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.HTTP, Constants.HTTPS }))
+        {
+            // 如果是 jobType=1, 这里不允许输入 http，因为它是反射调用
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'http(s)'调用");
+        }
+        else if (StringUtils.containsAnyIgnoreCase(invokeTarget, Constants.JOB_ERROR_STR))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串存在违规");
+        }
+        else if (!ScheduleUtils.whiteList(invokeTarget))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不在白名单内");
+        }
     }
 
     /**
@@ -201,10 +241,22 @@ public class SysJobController extends BaseController
     @PutMapping("/run")
     public Result<Void> run(@RequestBody SysJobDTO dto) throws SchedulerException
     {
-        SysJob job = jobConverter.toEntity(dto);
-        if (!jobService.checkCronExpressionIsValid(dto.getCronExpression())) {
+        if (dto.getJobId() == null)
+        {
+            throw new ServiceException("任务ID不能为空");
+        }
+
+        SysJob job = jobService.selectJobById(dto.getJobId());
+        if (job == null)
+        {
+            throw new ServiceException("任务不存在或已过期！");
+        }
+
+        if (!jobService.checkCronExpressionIsValid(job.getCronExpression()))
+        {
             throw new ServiceException("任务'" + job.getJobName() + "'失败，Cron表达式不正确");
         }
+
         boolean result = jobService.run(job);
         if (!result)
         {

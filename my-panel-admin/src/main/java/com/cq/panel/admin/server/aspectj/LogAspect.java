@@ -2,7 +2,6 @@ package com.cq.panel.admin.server.aspectj;
 
 import java.util.Collection;
 import java.util.Map;
-
 import com.cq.panel.admin.server.common.annotation.Log;
 import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
@@ -95,14 +94,11 @@ public class LogAspect
             String ip = IpUtils.getIpAddr();
             operLog.setOperIp(ip);
             operLog.setOperUrl(StringUtils.substring(ServletUtils.getRequest().getRequestURI(), 0, 255));
-            if (loginUser != null)
+            operLog.setOperName(loginUser.getUsername());
+            SysUser currentUser = loginUser.getUser();
+            if (StringUtils.isNotNull(currentUser) && StringUtils.isNotNull(currentUser.getDept()))
             {
-                operLog.setOperName(loginUser.getUsername());
-                SysUser currentUser = loginUser.getUser();
-                if (StringUtils.isNotNull(currentUser) && StringUtils.isNotNull(currentUser.getDept()))
-                {
-                    operLog.setDeptName(currentUser.getDept().getDeptName());
-                }
+                operLog.setDeptName(currentUser.getDept().getDeptName());
             }
 
             if (e != null)
@@ -127,7 +123,6 @@ public class LogAspect
         {
             // 记录本地异常日志
             log.error("异常信息:{}", exp.getMessage());
-            exp.printStackTrace();
         }
         finally
         {
@@ -140,7 +135,7 @@ public class LogAspect
      * 
      * @param log 日志
      * @param operLog 操作日志
-     * @throws Exception
+     * @throws Exception 异常
      */
     public void getControllerMethodDescription(JoinPoint joinPoint, Log log, SysOperLog operLog, Object jsonResult) throws Exception
     {
@@ -190,8 +185,8 @@ public class LogAspect
      */
     private String argsArrayToString(Object[] paramsArray, String[] excludeParamNames)
     {
-        String params = "";
-        if (paramsArray != null && paramsArray.length > 0)
+        StringBuilder params = new StringBuilder();
+        if (paramsArray != null)
         {
             for (Object o : paramsArray)
             {
@@ -200,15 +195,15 @@ public class LogAspect
                     try
                     {
                         String jsonObj = JSON.toJSONString(o, excludePropertyPreFilter(excludeParamNames));
-                        params += jsonObj.toString() + " ";
+                        params.append(jsonObj).append(" ");
                     }
-                    catch (Exception e)
+                    catch (Exception ignored)
                     {
                     }
                 }
             }
         }
-        return params.trim();
+        return params.toString().trim();
     }
 
     /**

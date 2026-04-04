@@ -2,8 +2,8 @@ package com.cq.panel.admin.server.repository.service.impl;
 
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;
 import com.cq.panel.admin.server.web.exception.job.TaskException;
-import com.cq.panel.admin.server.common.utils.quartz.CronUtils;
-import com.cq.panel.admin.server.common.utils.quartz.ScheduleUtils;
+import com.cq.panel.admin.server.task.quartz.CronUtils;
+import com.cq.panel.admin.server.task.quartz.ScheduleUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.admin.server.repository.mapper.SysJobMapper;
 import com.cq.panel.admin.server.repository.service.ISysJobService;

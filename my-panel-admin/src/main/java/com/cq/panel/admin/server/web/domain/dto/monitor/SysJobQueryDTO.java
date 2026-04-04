@@ -15,5 +15,9 @@ public class SysJobQueryDTO {
 
     @Schema(description = "任务状态", example = "0")
     private String status;
+
+    // 1-内置方法 2-HTTP接口
+    @Schema(description = "任务类型", example = "1")
+    private Integer jobType;
 }
 

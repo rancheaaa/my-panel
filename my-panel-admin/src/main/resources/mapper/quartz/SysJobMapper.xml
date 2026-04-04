@@ -9,6 +9,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="jobName"        column="job_name"        />
 		<result property="jobGroup"       column="job_group"       />
 		<result property="invokeTarget"   column="invoke_target"   />
+		<result property="jobType"        column="job_type"        />
+		<result property="methodName"     column="method_name"     />
+		<result property="httpUrl"        column="http_url"        />
+		<result property="httpMethod"     column="http_method"     />
+		<result property="httpHeaders"    column="http_headers"    />
+		<result property="httpBody"       column="http_body"       />
 		<result property="cronExpression" column="cron_expression" />
 		<result property="misfirePolicy"  column="misfire_policy"  />
 		<result property="concurrent"     column="concurrent"      />
@@ -21,7 +27,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</resultMap>
 	
 	<sql id="selectJobVo">
-        select job_id, job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, remark 
+		select job_id, job_name, job_group, invoke_target, job_type, method_name, http_url, http_method, http_headers, http_body,
+		       cron_expression, misfire_policy, concurrent, status, create_by, create_time, update_by, update_time, remark 
 		from sys_job
     </sql>
 	
@@ -33,6 +40,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			</if>
 			<if test="jobGroup != null and jobGroup != ''">
 				AND job_group = #{jobGroup}
+			</if>
+			<if test="jobType != null">
+				AND job_type = #{jobType}
 			</if>
 			<if test="status != null and status != ''">
 				AND status = #{status}
@@ -69,6 +79,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="jobName != null and jobName != ''">job_name = #{jobName},</if>
  			<if test="jobGroup != null and jobGroup != ''">job_group = #{jobGroup},</if>
  			<if test="invokeTarget != null and invokeTarget != ''">invoke_target = #{invokeTarget},</if>
+			<if test="jobType != null">job_type = #{jobType},</if>
+			<if test="methodName != null">method_name = #{methodName},</if>
+			<if test="httpUrl != null">http_url = #{httpUrl},</if>
+			<if test="httpMethod != null">http_method = #{httpMethod},</if>
+			<if test="httpHeaders != null">http_headers = #{httpHeaders},</if>
+			<if test="httpBody != null">http_body = #{httpBody},</if>
  			<if test="cronExpression != null and cronExpression != ''">cron_expression = #{cronExpression},</if>
  			<if test="misfirePolicy != null and misfirePolicy != ''">misfire_policy = #{misfirePolicy},</if>
  			<if test="concurrent != null and concurrent != ''">concurrent = #{concurrent},</if>
@@ -86,6 +102,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="jobName != null and jobName != ''">job_name,</if>
  			<if test="jobGroup != null and jobGroup != ''">job_group,</if>
  			<if test="invokeTarget != null and invokeTarget != ''">invoke_target,</if>
+			<if test="jobType != null">job_type,</if>
+			<if test="methodName != null">method_name,</if>
+			<if test="httpUrl != null">http_url,</if>
+			<if test="httpMethod != null">http_method,</if>
+			<if test="httpHeaders != null">http_headers,</if>
+			<if test="httpBody != null">http_body,</if>
  			<if test="cronExpression != null and cronExpression != ''">cron_expression,</if>
  			<if test="misfirePolicy != null and misfirePolicy != ''">misfire_policy,</if>
  			<if test="concurrent != null and concurrent != ''">concurrent,</if>
@@ -98,6 +120,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="jobName != null and jobName != ''">#{jobName},</if>
  			<if test="jobGroup != null and jobGroup != ''">#{jobGroup},</if>
  			<if test="invokeTarget != null and invokeTarget != ''">#{invokeTarget},</if>
+			<if test="jobType != null">#{jobType},</if>
+			<if test="methodName != null">#{methodName},</if>
+			<if test="httpUrl != null">#{httpUrl},</if>
+			<if test="httpMethod != null">#{httpMethod},</if>
+			<if test="httpHeaders != null">#{httpHeaders},</if>
+			<if test="httpBody != null">#{httpBody},</if>
  			<if test="cronExpression != null and cronExpression != ''">#{cronExpression},</if>
  			<if test="misfirePolicy != null and misfirePolicy != ''">#{misfirePolicy},</if>
  			<if test="concurrent != null and concurrent != ''">#{concurrent},</if>

@@ -77,6 +77,7 @@ public class SecurityConfig
         ignore.add("/admin/server/**");
         ignore.add("/agent/registry/register");
         ignore.add("/agent/registry/heartbeat");
+        ignore.add("/test/user/**");
         ignore.add("/");
         ignore.add("/*.html");
         ignore.add("/**/*.html");

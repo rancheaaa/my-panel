@@ -12,14 +12,10 @@ import com.cq.proxy.repository.mapper.AgentRegistryMapper;
 import com.cq.proxy.repository.mapper.RcNodeMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +32,6 @@ public class RegistryService {
     private final RcNodeMapper nodeMapper;
     private final AgentRegistryMapper agentRegistryMapper;
     private final ProxyRegistryProperties registryProperties;
-    private final Clock clock;
     private final Cache<String, List<ServiceInstance>> discoverCache;
     private final DateTimeFormatter dateTimeFormatter;
 
@@ -45,16 +40,45 @@ public class RegistryService {
             RcNodeMapper nodeMapper,
             AgentRegistryMapper agentRegistryMapper,
             ProxyRegistryProperties registryProperties,
-            Clock clock,
             Caffeine<Object, Object> caffeine
     ) {
         this.dictionaryService = dictionaryService;
         this.nodeMapper = nodeMapper;
         this.agentRegistryMapper = agentRegistryMapper;
         this.registryProperties = registryProperties;
-        this.clock = clock;
         this.discoverCache = caffeine.build();
         this.dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    }
+
+
+    @Transactional
+    public void heartbeat(ServiceRegisterRequest request) {
+        if (request == null) {
+            throw new BusinessException(400, "request body is required");
+        }
+        if (request.host() == null || request.host().isBlank()) {
+            throw new BusinessException(400, "host is required");
+        }
+        if (request.port() <= 0 || request.port() > 65535) {
+            throw new BusinessException(400, "port is invalid");
+        }
+        if ("localhost".equals(request.host())  || "127.0.0.1".equals(request.host())) {
+            throw new BusinessException(400, "host is required");
+        }
+
+        long envId = dictionaryService.getOrCreateEnvId(request.environment());
+        long projectId = dictionaryService.getOrCreateProjectId(request.serviceName());
+
+        List<RcNode> existingNodes = nodeMapper.selectByEnvProjectIpPort(envId, projectId, request.host(), request.port());
+
+        LocalDateTime now = LocalDateTime.now();
+        if (!existingNodes.isEmpty()) {
+            for (RcNode existingNode : existingNodes) {
+                existingNode.setLastRefreshTime(now);
+                existingNode.setUpdateTime(now);
+                nodeMapper.updateById(existingNode);
+            }
+        }
     }
 
     @Transactional
@@ -77,7 +101,7 @@ public class RegistryService {
 
         List<RcNode> existingNodes = nodeMapper.selectByEnvProjectIpPort(envId, projectId, request.host(), request.port());
 
-        LocalDateTime now = LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC);
+        LocalDateTime now = LocalDateTime.now();
         if (existingNodes.isEmpty()) {
             RcNode node = new RcNode();
             node.setEnvId(envId);
@@ -94,16 +118,14 @@ public class RegistryService {
             nodeMapper.insert(node);
         } else {
             for (RcNode existingNode : existingNodes) {
-                if (!Objects.equals(existingNode.getStatus(), "0")) {
-                    existingNode.setStatus("0");
-                    // 更新zone字段，如果请求中有zone值则更新
-                    if (request.zone() != null && !request.zone().isBlank()) {
-                        existingNode.setZone(request.zone());
-                    }
-                    existingNode.setLastRefreshTime(now);
-                    existingNode.setUpdateTime(now);
-                    nodeMapper.updateById(existingNode);
+                existingNode.setStatus("0");
+                // 更新zone字段，如果请求中有zone值则更新
+                if (request.zone() != null && !request.zone().isBlank()) {
+                    existingNode.setZone(request.zone());
                 }
+                existingNode.setLastRefreshTime(now);
+                existingNode.setUpdateTime(now);
+                nodeMapper.updateById(existingNode);
             }
         }
 
@@ -125,9 +147,7 @@ public class RegistryService {
 
         long envId = dictionaryService.getOrCreateEnvId(environment);
         long projectId = dictionaryService.getOrCreateProjectId(serviceName);
-        LocalDateTime aliveThreshold = LocalDateTime.ofInstant(
-                Instant.now(clock).minusSeconds(registryProperties.getHeartbeatTimeoutSeconds()),
-                ZoneOffset.UTC);
+        LocalDateTime aliveThreshold = LocalDateTime.now().minusSeconds(registryProperties.getHeartbeatTimeoutSeconds());
 
         List<RcNode> nodes = nodeMapper.selectByEnvProjectStatus(envId, projectId, "0");
 
@@ -151,9 +171,7 @@ public class RegistryService {
     @Scheduled(fixedDelayString = "${proxy.registry.offline-scan-interval-seconds:10}000")
     @Transactional
     public void scanAndMarkOffline() {
-        LocalDateTime timeoutAt = LocalDateTime.ofInstant(
-                Instant.now(clock).minusSeconds(registryProperties.getHeartbeatTimeoutSeconds()),
-                ZoneOffset.UTC);
+        LocalDateTime timeoutAt = LocalDateTime.now().minusSeconds(registryProperties.getHeartbeatTimeoutSeconds());
 
         List<RcNode> onlineNodes = nodeMapper.selectByStatus("0");
 
@@ -164,7 +182,7 @@ public class RegistryService {
         for (RcNode node : onlineNodes) {
             if (node.getLastRefreshTime() != null && node.getLastRefreshTime().isBefore(timeoutAt)) {
                 node.setStatus("1");
-                node.setUpdateTime(LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC));
+                node.setUpdateTime(LocalDateTime.now());
                 nodeMapper.updateById(node);
                 logger.debug("Mark {} as offline", node);
             }
@@ -191,7 +209,7 @@ public class RegistryService {
 
         AgentRegistry existing = agentRegistryMapper.selectByIpPort(request.getAgentIp(), request.getAgentPort());
 
-        LocalDateTime now = LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC);
+        LocalDateTime now = LocalDateTime.now();
 
         AgentRegistry result;
         if (existing != null) {
@@ -246,7 +264,7 @@ public class RegistryService {
 
         if (existing != null) {
             existing.setNodeStatus(1);
-            existing.setUpdateTime(LocalDateTime.ofInstant(Instant.now(clock), ZoneOffset.UTC));
+            existing.setUpdateTime(LocalDateTime.now());
             agentRegistryMapper.updateById(existing);
             return true;
         }

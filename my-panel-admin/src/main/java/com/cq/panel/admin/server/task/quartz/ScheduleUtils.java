@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.common.utils.quartz;
+package com.cq.panel.admin.server.task.quartz;
 
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;

@@ -69,11 +69,38 @@ INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0
        (100, 'Agent所在操作系统', 'agent_os_type', '0', 'admin', '2026-03-27 16:07:18.471015', '', NULL, NULL),
        (132, 'Agent节点开关', 'agent_node_switch', '0', 'admin', '2026-03-27 16:34:36.442403', '', NULL, NULL);
 
-INSERT IGNORE INTO `sys_job` VALUES (1, '备份系统初始化数据表', 'DEFAULT', 'appTask.backupSystemAllTable', '0/10 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-13 10:13:34.873309', ''),
-       (2, '系统默认（有参）', 'DEFAULT', 'appTask.ryParams(''ry'')', '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', ''),
-       (3, '系统默认（多参）', 'DEFAULT', 'appTask.ryMultipleParams(''ry'', true, 2000L, 316.50D, 100)', '0/20 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:14.0', ''),
-       (4, '扫描并下线超时节点', 'DEFAULT', 'rcNodeTask.scanOfflineNodes(60)', '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-13 11:00:00.0', 'admin', '2026-02-13 11:00:00.0', '扫描注册中心表中超时未刷新的节点并设为下线状态'),
-       (5, '扫描并下线Agent超时节点', 'DEFAULT', 'agentTask.scanOfflineAgents(60)', '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-03-30 00:00:00.0', 'admin', '2026-03-30 00:00:00.0', '扫描Agent注册表中超时未更新的节点并设为下线状态');
+INSERT IGNORE INTO `sys_job` (
+    `job_id`,
+    `job_name`,
+    `job_group`,
+    `invoke_target`,
+    `job_type`,
+    `method_name`,
+    `http_url`,
+    `http_method`,
+    `http_headers`,
+    `http_body`,
+    `cron_expression`,
+    `misfire_policy`,
+    `concurrent`,
+    `status`,
+    `create_by`,
+    `create_time`,
+    `update_by`,
+    `update_time`,
+    `remark`
+) VALUES
+       (1, '备份系统初始化数据表', 'DEFAULT', 'appTask.backupSystemAllTable', 1, 'appTask.backupSystemAllTable', NULL, NULL, NULL, NULL, '0/10 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-13 10:13:34.873309', ''),
+       (2, '系统默认（有参）', 'DEFAULT', 'appTask.ryParams(''ry'')', 1, 'appTask.ryParams(''ry'')', NULL, NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', ''),
+       (3, '系统默认（多参）', 'DEFAULT', 'appTask.ryMultipleParams(''ry'', true, 2000L, 316.50D, 100)', 1, 'appTask.ryMultipleParams(''ry'', true, 2000L, 316.50D, 100)', NULL, NULL, NULL, NULL, '0/20 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:14.0', ''),
+       (4, '扫描并下线超时节点', 'DEFAULT', 'rcNodeTask.scanOfflineNodes(60)', 1, 'rcNodeTask.scanOfflineNodes(60)', NULL, NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-13 11:00:00.0', 'admin', '2026-02-13 11:00:00.0', '扫描注册中心表中超时未刷新的节点并设为下线状态'),
+       (5, '扫描并下线Agent超时节点', 'DEFAULT', 'agentTask.scanOfflineAgents(60)', 1, 'agentTask.scanOfflineAgents(60)', NULL, NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-03-30 00:00:00.0', 'admin', '2026-03-30 00:00:00.0', '扫描Agent注册表中超时未更新的节点并设为下线状态'),
+       (6, 'HTTP接口调度示例', 'DEFAULT', 'http://localhost:8888/test/user/1', 2, 'getUser', 'http://localhost:8888/test/user/1', 'GET', '{"Content-Type": "application/json"}', '{"id": "{jobId}", "name": "test"}', '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', '演示HTTP接口调度'),
+       (7, '测试用户列表', 'DEFAULT', 'http://localhost:8888/test/user/list', 2, 'userList', 'http://localhost:8888/test/user/list', 'GET', '{"Content-Type": "application/json"}', NULL, '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-04-04 10:00:00.0', 'admin', '2026-04-04 10:00:00.0', '测试获取用户列表接口'),
+       (8, '测试用户详情', 'DEFAULT', 'http://localhost:8888/test/user/2', 2, 'getUser', 'http://localhost:8888/test/user/2', 'GET', '{"Content-Type": "application/json"}', '{"userId": "{jobId}"}', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-04-04 10:00:00.0', 'admin', '2026-04-04 10:00:00.0', '测试获取用户详情接口'),
+       (9, '测试用户新增', 'DEFAULT', 'http://localhost:8888/test/user/save', 2, 'saveUser', 'http://localhost:8888/test/user/save', 'POST', '{"Content-Type": "application/json"}', '{"userId": "{jobId}", "username": "test", "password": "123456", "mobile": "13800138000"}', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-04-04 10:00:00.0', 'admin', '2026-04-04 10:00:00.0', '测试新增用户接口'),
+       (10, '测试用户更新', 'DEFAULT', 'http://localhost:8888/test/user/update', 2, 'updateUser', 'http://localhost:8888/test/user/update', 'PUT', '{"Content-Type": "application/json"}', '{"userId": "{jobId}", "username": "test", "password": "123456", "mobile": "13800138000"}', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-04-04 10:00:00.0', 'admin', '2026-04-04 10:00:00.0', '测试更新用户接口'),
+       (11, '测试用户删除', 'DEFAULT', 'http://localhost:8888/test/user/3', 2, 'deleteUser', 'http://localhost:8888/test/user/3', 'DELETE', '{"Content-Type": "application/json"}', '{"userId": "{jobId}"}', '0/30 * * * * ?', '3', '1', '1', 'admin', '2026-04-04 10:00:00.0', 'admin', '2026-04-04 10:00:00.0', '测试删除用户接口');
 
 INSERT IGNORE INTO `sys_menu` VALUES (1, '系统管理', 0, 2, 'system', NULL, '', '', 1, 0, 'M', '0', '0', '', 'SettingOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:11:52.0', '系统管理目录'),
        (2, '系统监控', 0, 3, 'monitor', NULL, '', '', 1, 0, 'M', '0', '0', '', 'DashboardOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:12:03.0', '系统监控目录'),

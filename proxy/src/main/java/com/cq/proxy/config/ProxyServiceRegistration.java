@@ -69,7 +69,7 @@ public class ProxyServiceRegistration {
 
             );
 
-            registryService.register(request);
+            registryService.heartbeat(request);
             log.debug("Proxy服务心跳更新: {}:{}", localHost, localPort);
         } catch (Exception e) {
             log.error("Proxy服务心跳更新失败", e);

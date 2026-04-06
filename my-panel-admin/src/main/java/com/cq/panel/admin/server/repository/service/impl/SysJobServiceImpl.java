@@ -262,4 +262,16 @@ public class SysJobServiceImpl implements ISysJobService
     {
         return CronUtils.isValid(cronExpression);
     }
+    
+    /**
+     * 查询任务组名列表（用于自动完成）
+     * 
+     * @param jobGroup 任务组名（支持模糊查询）
+     * @return 任务组名列表
+     */
+    @Override
+    public List<String> selectJobGroupList(String jobGroup)
+    {
+        return jobMapper.selectJobGroupList(jobGroup);
+    }
 }

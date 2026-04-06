@@ -1,4 +1,4 @@
-.post-container {
+.app-container {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -65,46 +65,60 @@
 
   .search-card {
     border-radius: 12px;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     
     :global {
       .ant-card-body {
-        padding: 24px 24px 0 24px;
-      }
-      .ant-form-item {
-        margin-bottom: 24px;
+        padding: 20px;
       }
     }
   }
 
   .table-card {
     border-radius: 12px;
-    min-height: calc(100vh - 300px); 
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    flex: 1;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
     
     :global {
       .ant-card-body {
+        padding: 20px;
         flex: 1;
         display: flex;
         flex-direction: column;
-        padding: 24px 24px 0 24px;
-      }
-      
-      .ant-table-cell {
-        padding: 8px 16px !important;
       }
     }
+  }
 
-    
+  .table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  :global {
     .ant-table-wrapper {
-        :global {
-          .ant-pagination {
-            margin: 16px 0 !important;
-            text-align: right;
-          }
-        }
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ant-table {
+      flex: 1;
+    }
+
+    .ant-table-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .ant-table-body {
+      flex: 1;
     }
   }
 }

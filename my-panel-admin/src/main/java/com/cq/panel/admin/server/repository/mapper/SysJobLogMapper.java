@@ -1,6 +1,7 @@
 package com.cq.panel.admin.server.repository.mapper;
 
 import com.cq.panel.admin.server.repository.domain.SysJobLog;
+import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 /**
@@ -16,7 +17,7 @@ public interface SysJobLogMapper
      * @param jobLog 调度日志信息
      * @return 调度任务日志集合
      */
-    List<SysJobLog> selectJobLogList(SysJobLog jobLog);
+    List<SysJobLog> selectJobLogList(@Param("jobLog") SysJobLog jobLog);
 
     /**
      * 查询所有调度任务日志

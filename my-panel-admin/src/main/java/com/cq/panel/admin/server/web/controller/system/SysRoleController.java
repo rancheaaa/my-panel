@@ -18,6 +18,7 @@ import com.cq.panel.admin.server.web.service.SysPermissionService;
 import com.cq.panel.admin.server.web.service.TokenService;
 import com.cq.panel.admin.server.web.domain.dto.system.SysRoleDTO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysRoleQueryDTO;
+import com.cq.panel.admin.server.web.domain.dto.system.SysRoleSortDTO;
 import com.cq.panel.admin.server.web.domain.vo.system.SysRoleVO;
 import com.cq.panel.admin.server.web.domain.vo.system.RoleDeptTreeSelectVO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysUserRoleDTO;
@@ -196,6 +197,26 @@ public class SysRoleController extends BaseController
         roleService.checkRoleDataScope(role.getRoleId());
         role.setUpdateBy(getUsername());
         roleService.updateRoleStatus(role);
+        return Result.success();
+    }
+
+    /**
+     * 角色排序
+     */
+    @Operation(summary = "角色排序", description = "批量修改角色排序")
+    @RequirePermission("system:role:edit")
+    @Log(title = "角色管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/sort")
+    public Result<Void> sort(@Validated @RequestBody List<SysRoleSortDTO> sortList)
+    {
+        for (SysRoleSortDTO sort : sortList)
+        {
+            SysRole role = new SysRole();
+            role.setRoleId(sort.getRoleId());
+            role.setRoleSort(sort.getRoleSort());
+            role.setUpdateBy(getUsername());
+            roleService.updateRole(role);
+        }
         return Result.success();
     }
 

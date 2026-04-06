@@ -56,4 +56,16 @@ public class SysJobLog extends BaseEntity
 
     /** 结束时间 */
     private Date endTime;
+
+    /** 开始时间起（用于查询） */
+    private transient Date startTimeStart;
+
+    /** 开始时间止（用于查询） */
+    private transient Date startTimeEnd;
+
+    /** 结束时间起（用于查询） */
+    private transient Date endTimeStart;
+
+    /** 结束时间止（用于查询） */
+    private transient Date endTimeEnd;
 }

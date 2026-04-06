@@ -47,8 +47,8 @@ public class SysJob extends BaseEntity
     @Size(max = 1500, message = "调用目标字符串长度不能超过1500个字符")
     private String invokeTarget;
 
-    /** 任务类型（1-内置方法 2-HTTP接口） */
-    @Excel(name = "任务类型", readConverterExp = "1=内置方法,2=HTTP接口")
+    /** 任务类型（1-内置方法 2-HTTP接口 3-脚本） */
+    @Excel(name = "任务类型", readConverterExp = "1=内置方法,2=HTTP接口,3=脚本")
     @NotNull(message = "任务类型不能为空")
     private Integer jobType;
 
@@ -78,6 +78,20 @@ public class SysJob extends BaseEntity
     /** 负载均衡策略 */
     @Excel(name = "负载均衡策略")
     private String loadBalanceStrategy;
+
+    /** 脚本名称 */
+    @Excel(name = "脚本名称")
+    @Size(max = 255, message = "脚本名称长度不能超过255个字符")
+    private String scriptName;
+
+    /** 脚本类型（python shell cmd powershell sql） */
+    @Excel(name = "脚本类型", readConverterExp = "python=Python脚本,shell=Shell脚本,cmd=CMD脚本,powershell=PowerShell脚本,sql=SQL脚本")
+    @Size(max = 20, message = "脚本类型长度不能超过20个字符")
+    private String scriptType;
+
+    /** 脚本内容 */
+    @Excel(name = "脚本内容")
+    private String scriptContent;
 
     /** cron执行表达式 */
     @Excel(name = "执行表达式 ")

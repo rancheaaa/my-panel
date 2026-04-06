@@ -27,7 +27,7 @@ public class JobLogUtil
      * @param triggerType 触发类型（0定时触发 1手动触发）
      * @return 任务日志信息字符串
      */
-    public static String buildJobMessage(SysJob sysJob, Date startTime, Date endTime, Exception e, String triggerType)
+    public static String buildJobMessage(SysJob sysJob, Date startTime, Date endTime, Exception e, String triggerType, String selectedUrl)
     {
         long runMs = endTime.getTime() - startTime.getTime();
         
@@ -44,10 +44,16 @@ public class JobLogUtil
             } else if (sysJob.getJobType() == 2) {
                 jobMessage.append("HTTP接口\n");
                 jobMessage.append("接口URL：").append(sysJob.getHttpUrl() != null ? sysJob.getHttpUrl() : "").append("\n");
+                jobMessage.append("最终请求ip：").append(selectedUrl != null ? selectedUrl : "").append("\n");
                 jobMessage.append("请求方式：").append(sysJob.getHttpMethod() != null ? sysJob.getHttpMethod() : "").append("\n");
                 jobMessage.append("负载均衡策略：").append(sysJob.getLoadBalanceStrategy() != null ? sysJob.getLoadBalanceStrategy() : "roundRobin").append("\n");
                 jobMessage.append("请求头：").append(sysJob.getHttpHeaders() != null ? sysJob.getHttpHeaders() : "").append("\n");
                 jobMessage.append("请求体：").append(sysJob.getHttpBody() != null ? sysJob.getHttpBody() : "").append("\n");
+            } else if (sysJob.getJobType() == 3) {
+                jobMessage.append("脚本\n");
+                jobMessage.append("脚本名称：").append(sysJob.getScriptName() != null ? sysJob.getScriptName() : "").append("\n");
+                jobMessage.append("脚本类型：").append(sysJob.getScriptType() != null ? sysJob.getScriptType() : "").append("\n");
+                jobMessage.append("脚本内容：").append(sysJob.getScriptContent() != null ? sysJob.getScriptContent() : "").append("\n");
             } else {
                 jobMessage.append("未知类型\n");
             }
@@ -72,8 +78,9 @@ public class JobLogUtil
      * @param endTime 结束时间
      * @param e 异常信息
      * @param triggerType 触发类型（0定时触发 1手动触发）
+     * @param selectedUrl 选中的URL（HTTP接口）
      */
-    public static void createAndSaveJobLog(SysJob sysJob, Date startTime, Date endTime, Exception e, String triggerType)
+    public static void createAndSaveJobLog(SysJob sysJob, Date startTime, Date endTime, Exception e, String triggerType, String selectedUrl)
     {
         String triggerTypeName = "0".equals(triggerType) ? "定时触发" : "1".equals(triggerType) ? "手动触发" : "未知触发";
         logger.info("任务日志 - 任务名称: {}, 触发类型: {}, 开始时间: {}", 
@@ -85,7 +92,7 @@ public class JobLogUtil
         sysJobLog.setInvokeTarget(sysJob.getInvokeTarget());
         sysJobLog.setStartTime(startTime);
         sysJobLog.setEndTime(endTime);
-        sysJobLog.setJobMessage(buildJobMessage(sysJob, startTime, endTime, e, triggerType));
+        sysJobLog.setJobMessage(buildJobMessage(sysJob, startTime, endTime, e, triggerType, selectedUrl));
         sysJobLog.setTriggerType(triggerType);
         
         if (e != null)
@@ -114,8 +121,8 @@ public class JobLogUtil
      * @param e 异常信息
      * @param triggerType 触发类型（0定时触发 1手动触发）
      */
-    public static void createAndSaveJobLog(SysJob sysJob, Date startTime, Exception e, String triggerType)
+    public static void createAndSaveJobLog(SysJob sysJob, Date startTime, Exception e, String triggerType, String selectedUrl)
     {
-        createAndSaveJobLog(sysJob, startTime, new Date(), e, triggerType);
+        createAndSaveJobLog(sysJob, startTime, new Date(), e, triggerType, selectedUrl);
     }
 }

@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.web.controller.system;
 
 import com.cq.panel.admin.server.web.domain.dto.system.SysDeptDTO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysDeptQueryDTO;
+import com.cq.panel.admin.server.web.domain.dto.system.SysDeptSortDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.system.SysDeptVO;
 import com.cq.panel.admin.server.web.converter.system.SysDeptConverter;
@@ -123,6 +124,26 @@ public class SysDeptController extends BaseController
         }
         dept.setUpdateBy(getUsername());
         deptService.updateDept(dept);
+        return Result.success();
+    }
+
+    /**
+     * 部门排序
+     */
+    @Operation(summary = "部门排序", description = "批量修改部门排序")
+    @RequirePermission("system:dept:edit")
+    @Log(title = "部门管理", businessType = BusinessType.UPDATE)
+    @PutMapping("/sort")
+    public Result<Void> sort(@Validated @RequestBody List<SysDeptSortDTO> sortList)
+    {
+        for (SysDeptSortDTO sort : sortList)
+        {
+            SysDept dept = new SysDept();
+            dept.setDeptId(sort.getDeptId());
+            dept.setOrderNum(sort.getOrderNum());
+            dept.setUpdateBy(getUsername());
+            deptService.updateDept(dept);
+        }
         return Result.success();
     }
 

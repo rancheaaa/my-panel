@@ -35,6 +35,15 @@ export function updatePost(data) {
   });
 }
 
+// 岗位排序
+export function sortPost(data) {
+  return request({
+    url: '/system/post/sort',
+    method: 'post',
+    data: data
+  });
+}
+
 // 删除岗位
 export function delPost(postId) {
   return request({

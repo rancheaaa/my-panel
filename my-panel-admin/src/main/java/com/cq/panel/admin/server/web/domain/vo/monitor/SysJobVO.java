@@ -54,6 +54,18 @@ public class SysJobVO {
     @Excel(name = "负载均衡策略")
     private String loadBalanceStrategy;
 
+    @Schema(description = "脚本名称")
+    @Excel(name = "脚本名称")
+    private String scriptName;
+
+    @Schema(description = "脚本类型")
+    @Excel(name = "脚本类型", readConverterExp = "python=Python脚本,shell=Shell脚本,cmd=CMD脚本,powershell=PowerShell脚本,sql=SQL脚本")
+    private String scriptType;
+
+    @Schema(description = "脚本内容")
+    @Excel(name = "脚本内容")
+    private String scriptContent;
+
     @Schema(description = "执行表达式", example = "0/10 * * * * ?")
     @Excel(name = "执行表达式")
     private String cronExpression;

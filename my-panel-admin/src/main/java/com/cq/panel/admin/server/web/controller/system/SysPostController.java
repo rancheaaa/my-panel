@@ -8,6 +8,7 @@ import com.cq.panel.admin.server.repository.domain.SysPost;
 import com.cq.panel.admin.server.repository.service.ISysPostService;
 import com.cq.panel.admin.server.web.domain.dto.system.SysPostDTO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysPostQueryDTO;
+import com.cq.panel.admin.server.web.domain.dto.system.SysPostSortDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.system.SysPostVO;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
@@ -122,6 +123,26 @@ public class SysPostController extends BaseController
         }
         post.setUpdateBy(getUsername());
         postService.updatePost(post);
+        return Result.success();
+    }
+
+    /**
+     * 岗位排序
+     */
+    @Operation(summary = "岗位排序", description = "批量修改岗位排序")
+    @RequirePermission("system:post:edit")
+    @Log(title = "岗位管理", businessType = BusinessType.UPDATE)
+    @PostMapping("/sort")
+    public Result<Void> sort(@Validated @RequestBody List<SysPostSortDTO> sortList)
+    {
+        for (SysPostSortDTO sort : sortList)
+        {
+            SysPost post = new SysPost();
+            post.setPostId(sort.getPostId());
+            post.setPostSort(sort.getPostSort());
+            post.setUpdateBy(getUsername());
+            postService.updatePost(post);
+        }
         return Result.success();
     }
 

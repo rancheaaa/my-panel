@@ -2,8 +2,8 @@ package com.cq.panel.admin.server.config;
 
 import java.util.HashMap;
 import java.util.Map;
-import com.cq.panel.admin.server.common.filter.RepeatableFilter;
-import com.cq.panel.admin.server.common.filter.XssFilter;
+import com.cq.panel.admin.server.filter.RepeatableFilter;
+import com.cq.panel.admin.server.filter.XssFilter;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;

@@ -35,6 +35,15 @@ export function updateRole(data) {
   })
 }
 
+// 角色排序
+export function sortRole(data) {
+  return request({
+    url: '/system/role/sort',
+    method: 'post',
+    data: data
+  });
+}
+
 // 角色数据权限
 export function dataScope(data) {
   return request({

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker, Divider } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker, Divider, AutoComplete } from 'antd';
+import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, ExportOutlined, SettingOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, DownloadOutlined, MinusCircleOutlined, PlusCircleOutlined } from '@ant-design/icons';
-import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob } from '../../../api/monitor/job';
+import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob, getJobGroups } from '../../../api/monitor/job';
 import { listJobLog, delJobLog, cleanJobLog, exportJobLog } from '../../../api/monitor/jobLog';
 import { getDicts } from '../../../api/dict/data';
 import { ResizableTitle } from '../../../components/ResizableTable';
@@ -198,17 +199,21 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
     const [total, setTotal] = useState(0);
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
     const [tableSize, setTableSize] = useState('middle');
-    const [expand, setExpand] = useState(false);
+    const [expand, setExpand] = useState(true);
     const [queryParams, setQueryParams] = useState({
       pageNum: 1,
       pageSize: 10,
       jobName: defaultJobName,
       jobGroup: defaultJobGroup,
       status: undefined,
-      createTime: undefined
+      startTimeStart: undefined,
+      startTimeEnd: undefined,
+      endTimeStart: undefined,
+      endTimeEnd: undefined
     });
   
     const [sysJobGroup, setSysJobGroup] = useState([]);
+    const [jobGroupOptions, setJobGroupOptions] = useState([]);
     const [sysCommonStatus, setSysCommonStatus] = useState([]);
     const [form] = Form.useForm();
     
@@ -216,10 +221,39 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
     const [detailOpen, setDetailOpen] = useState(false);
     const [currentLog, setCurrentLog] = useState({});
   
+    const loadJobGroupOptions = async () => {
+      try {
+        const res = await getJobGroups('');
+        if (res.code === 200) {
+          setJobGroupOptions(res.data.map(group => ({
+            value: group,
+            label: group
+          })));
+        }
+      } catch (error) {
+        console.error('加载任务组名失败:', error);
+      }
+    };
+
+    const handleJobGroupSearch = async (value) => {
+      try {
+        const res = await getJobGroups(value);
+        if (res.code === 200) {
+          setJobGroupOptions(res.data.map(group => ({
+            value: group,
+            label: group
+          })));
+        }
+      } catch (error) {
+        console.error('搜索任务组名失败:', error);
+      }
+    };
+  
     useEffect(() => {
       if (visible) {
         getDicts('sys_job_group').then(res => res.code === 200 && setSysJobGroup(res.data));
         getDicts('sys_common_status').then(res => res.code === 200 && setSysCommonStatus(res.data));
+        loadJobGroupOptions();
         
         // Reset form with default values if provided
         form.setFieldsValue({
@@ -264,9 +298,14 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
   
     const handleSearch = () => {
       form.validateFields().then(values => {
+        const { startTimeRange, endTimeRange, ...rest } = values;
         setQueryParams({
           ...queryParams,
-          ...values,
+          ...rest,
+          startTimeStart: startTimeRange ? startTimeRange[0].format('YYYY-MM-DD HH:mm:ss') : undefined,
+          startTimeEnd: startTimeRange ? startTimeRange[1].format('YYYY-MM-DD HH:mm:ss') : undefined,
+          endTimeStart: endTimeRange ? endTimeRange[0].format('YYYY-MM-DD HH:mm:ss') : undefined,
+          endTimeEnd: endTimeRange ? endTimeRange[1].format('YYYY-MM-DD HH:mm:ss') : undefined,
           pageNum: 1
         });
       });
@@ -280,7 +319,10 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
         jobName: undefined,
         jobGroup: undefined,
         status: undefined,
-        createTime: undefined
+        startTimeStart: undefined,
+        startTimeEnd: undefined,
+        endTimeStart: undefined,
+        endTimeEnd: undefined
       });
     };
   
@@ -442,7 +484,7 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
         title="调度日志"
         open={visible}
         onCancel={onCancel}
-        width={1200}
+        width="90%"
         footer={null}
         destroyOnClose
         style={{ top: 20 }}
@@ -457,11 +499,13 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
               </Col>
               <Col span={6}>
                 <Form.Item name="jobGroup" label="任务组名">
-                   <Select placeholder="请选择" allowClear>
-                      {sysJobGroup.map(dict => (
-                          <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
-                      ))}
-                   </Select>
+                   <AutoComplete
+                      placeholder="请选择或输入任务组名"
+                      allowClear
+                      options={jobGroupOptions}
+                      onSearch={handleJobGroupSearch}
+                      filterOption={false}
+                   />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -474,13 +518,32 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
                 </Form.Item>
               </Col>
               {expand && (
-                <Col span={6}>
-                  <Form.Item name="createTime" label="执行时间">
-                     <DatePicker.RangePicker style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
+                <>
+                  <Col span={6}>
+                    <Form.Item name="startTimeRange" label="开始时间">
+                       <DatePicker.RangePicker 
+                         style={{ width: '100%' }} 
+                         showTime 
+                         format="YYYY-MM-DD HH:mm:ss"
+                         locale={zhCN}
+                         placeholder={['开始时间起', '开始时间止']}
+                       />
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item name="endTimeRange" label="结束时间">
+                       <DatePicker.RangePicker 
+                         style={{ width: '100%' }} 
+                         showTime 
+                         format="YYYY-MM-DD HH:mm:ss"
+                         locale={zhCN}
+                         placeholder={['结束时间起', '结束时间止']}
+                       />
+                    </Form.Item>
+                  </Col>
+                </>
               )}
-              <Col span={expand ? 18 : 6} style={{ textAlign: 'right' }}>
+              <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
                 <Space>
                   <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
                   <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
@@ -608,6 +671,7 @@ const Job = () => {
   const [total, setTotal] = useState(0);
   const [queryParams, setQueryParams] = useState({ pageNum: 1, pageSize: 10 });
   const [sysJobGroup, setSysJobGroup] = useState([]);
+  const [jobGroupOptions, setJobGroupOptions] = useState([]);
   const [sysJobStatus, setSysJobStatus] = useState([]);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -621,6 +685,11 @@ const Job = () => {
   // HTTP接口配置状态
   const [httpPath, setHttpPath] = useState('');
   const [httpIps, setHttpIps] = useState(['']);
+  
+  // 脚本配置状态
+  const [scriptName, setScriptName] = useState('');
+  const [scriptType, setScriptType] = useState('');
+  const [scriptContent, setScriptContent] = useState('');
   
   // 基础列配置
   const [columnWidths, setColumnWidths] = useState({
@@ -648,10 +717,18 @@ const Job = () => {
       dataIndex: 'jobType', 
       align: 'center', 
       width: columnWidths.jobType,
-      render: (v) => Number(v) === 2 ? <Tag color="blue">HTTP接口</Tag> : <Tag color="green">内置方法</Tag>,
+      render: (v) => {
+        const typeMap = {
+          1: <Tag color="green">内置方法</Tag>,
+          2: <Tag color="blue">HTTP接口</Tag>,
+          3: <Tag color="orange">脚本</Tag>
+        };
+        return typeMap[v] || v;
+      },
       filters: [
         { text: '内置方法', value: 1 },
         { text: 'HTTP接口', value: 2 },
+        { text: '脚本', value: 3 },
       ],
       onFilter: (value, record) => Number(record.jobType) === Number(value),
     },
@@ -708,7 +785,7 @@ const Job = () => {
         setData(res.data.rows);
         setTotal(res.data.total);
       }
-    } finally {
+     } finally {
       setLoading(false);
     }
   };
@@ -717,12 +794,44 @@ const Job = () => {
     fetchData();
     getDicts('sys_job_group').then(res => res.code === 200 && setSysJobGroup(res.data));
     getDicts('sys_job_status').then(res => res.code === 200 && setSysJobStatus(res.data));
+    loadJobGroupOptions();
   }, [queryParams]);
+
+  const loadJobGroupOptions = async () => {
+    try {
+      const res = await getJobGroups('');
+      if (res.code === 200) {
+        setJobGroupOptions(res.data.map(group => ({
+          value: group,
+          label: group
+        })));
+      }
+    } catch (error) {
+      console.error('加载任务组名失败:', error);
+    }
+  };
+
+  const handleJobGroupSearch = async (value) => {
+    try {
+      const res = await getJobGroups(value);
+      if (res.code === 200) {
+        setJobGroupOptions(res.data.map(group => ({
+          value: group,
+          label: group
+        })));
+      }
+    } catch (error) {
+      console.error('搜索任务组名失败:', error);
+    }
+  };
 
   const handleAdd = () => {
     form.resetFields();
     setHttpPath('');
     setHttpIps(['']);
+    setScriptName('');
+    setScriptType('');
+    setScriptContent('');
     form.setFieldsValue({ 
       jobType: 1, 
       jobGroup: 'DEFAULT', 
@@ -767,10 +876,18 @@ const Job = () => {
       setHttpPath(path);
       setHttpIps(ips);
       
+      // 设置脚本相关状态
+      setScriptName(res.data?.scriptName || '');
+      setScriptType(res.data?.scriptType || '');
+      setScriptContent(res.data?.scriptContent || '');
+      
       form.setFieldsValue({
         ...res.data,
         jobType: res.data?.jobType != null ? Number(res.data.jobType) : 1,
         cronExpression: res.data.cronExpression || '0 0 12 * * ?',
+        scriptName: res.data?.scriptName || '',
+        scriptType: res.data?.scriptType || '',
+        scriptContent: res.data?.scriptContent || '',
       });
       setTitle('修改任务');
       setOpen(true);
@@ -832,6 +949,13 @@ const Job = () => {
       values.httpUrl = fullUrls;
     }
     
+    // 如果是脚本类型，设置脚本相关字段
+    if (values.jobType === 3) {
+      values.scriptName = values.scriptName;
+      values.scriptType = values.scriptType;
+      values.scriptContent = values.scriptContent;
+    }
+    
     if (values.jobId) {
       const res = await updateJob(values);
       if (res.code === 200) {
@@ -880,16 +1004,23 @@ const Job = () => {
     <div className="app-container">
       <Card bordered={false} style={{ marginBottom: 16 }}>
         <Form form={searchForm} layout="inline" onFinish={(v) => setQueryParams({ ...queryParams, ...v, pageNum: 1 })}>
+          <Form.Item name="jobId" label="任务编号"><Input placeholder="请输入任务编号" allowClear /></Form.Item>
           <Form.Item name="jobName" label="任务名称"><Input placeholder="请输入" allowClear /></Form.Item>
           <Form.Item name="jobGroup" label="任务组名">
-            <Select placeholder="请选择" allowClear style={{ width: 150 }}>
-                {sysJobGroup.map(d => <Option key={d.dictValue} value={d.dictValue}>{d.dictLabel}</Option>)}
-            </Select>
+            <AutoComplete
+              placeholder="请选择或输入任务组名"
+              allowClear
+              style={{ width: 150 }}
+              options={jobGroupOptions}
+              onSearch={handleJobGroupSearch}
+              filterOption={false}
+            />
           </Form.Item>
           <Form.Item name="jobType" label="任务类型">
             <Select placeholder="请选择" allowClear style={{ width: 150 }}>
                 <Option value={1}>内置方法</Option>
                 <Option value={2}>HTTP接口</Option>
+                <Option value={3}>脚本</Option>
             </Select>
           </Form.Item>
           <Form.Item name="status" label="任务状态">
@@ -955,12 +1086,13 @@ const Job = () => {
               <Form.Item name="jobId" hidden><Input /></Form.Item>
               <Row gutter={16}>
                   <Col span={12}><Form.Item name="jobName" label="任务名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
-                  <Col span={12}><Form.Item name="jobGroup" label="任务分组" rules={[{ required: true }]}><Select>{sysJobGroup.map(d => <Option key={d.dictValue} value={d.dictValue}>{d.dictLabel}</Option>)}</Select></Form.Item></Col>
+                  <Col span={12}><Form.Item name="jobGroup" label="任务分组" rules={[{ required: true }]}><AutoComplete placeholder="请选择或输入任务分组" allowClear options={jobGroupOptions} onSearch={handleJobGroupSearch} filterOption={false} /></Form.Item></Col>
               </Row>
               <Form.Item name="jobType" label="任务类型" rules={[{ required: true }]}>
                   <Radio.Group>
                       <Radio value={1}>内置方法</Radio>
                       <Radio value={2}>HTTP接口</Radio>
+                      <Radio value={3}>脚本</Radio>
                   </Radio.Group>
               </Form.Item>
               
@@ -1060,6 +1192,32 @@ const Job = () => {
                       </Form.Item>
                   </>
               )}
+              
+              {jobType === 3 && (
+                  <>
+                      <Form.Item name="scriptName" label="脚本名称" rules={[{ required: true, message: '请输入脚本名称' }]}>
+                          <Input placeholder="例如：数据备份脚本" value={scriptName} onChange={(e) => setScriptName(e.target.value)} />
+                      </Form.Item>
+                      <Form.Item name="scriptType" label="脚本类型" rules={[{ required: true, message: '请选择脚本类型' }]}>
+                          <Select placeholder="请选择脚本类型" value={scriptType} onChange={(value) => setScriptType(value)}>
+                              <Option value="python">Python脚本</Option>
+                              <Option value="shell">Shell脚本</Option>
+                              <Option value="cmd">CMD脚本</Option>
+                              <Option value="powershell">PowerShell脚本</Option>
+                              <Option value="sql">SQL脚本</Option>
+                          </Select>
+                      </Form.Item>
+                      <Form.Item name="scriptContent" label="脚本内容" rules={[{ required: true, message: '请输入脚本内容' }]}>
+                          <Input.TextArea 
+                              rows={10} 
+                              placeholder={`请输入${scriptType || '脚本'}内容...`}
+                              value={scriptContent} 
+                              onChange={(e) => setScriptContent(e.target.value)}
+                              style={{ fontFamily: 'monospace' }}
+                          />
+                      </Form.Item>
+                  </>
+              )}
               <Form.Item 
                 name="cronExpression" 
                 label="Cron表达式" 
@@ -1103,7 +1261,9 @@ const Job = () => {
                <Descriptions.Item label="任务名称">{currentJob.jobName}</Descriptions.Item>
                <Descriptions.Item label="任务分组">{sysJobGroup.find(d => d.dictValue === currentJob.jobGroup)?.dictLabel}</Descriptions.Item>
                 <Descriptions.Item label="任务类型">
-                    {Number(currentJob.jobType) === 2 ? <Tag color="blue">HTTP接口</Tag> : <Tag color="green">内置方法</Tag>}
+                    {Number(currentJob.jobType) === 1 ? <Tag color="green">内置方法</Tag> :
+                     Number(currentJob.jobType) === 2 ? <Tag color="blue">HTTP接口</Tag> :
+                     Number(currentJob.jobType) === 3 ? <Tag color="orange">脚本</Tag> : currentJob.jobType}
                 </Descriptions.Item>
                <Descriptions.Item label="Cron表达式">{currentJob.cronExpression}</Descriptions.Item>
                
@@ -1133,6 +1293,24 @@ const Job = () => {
                        <Descriptions.Item label="请求体" span={2}>
                            <pre style={{ margin: 0, fontSize: '12px', background: '#f5f5f5', padding: '8px', maxHeight: '150px', overflow: 'auto' }}>
                                {currentJob.httpBody}
+                           </pre>
+                       </Descriptions.Item>
+                   </>
+               )}
+               
+               {Number(currentJob.jobType) === 3 && (
+                   <>
+                       <Descriptions.Item label="脚本名称" span={2}>{currentJob.scriptName}</Descriptions.Item>
+                       <Descriptions.Item label="脚本类型">
+                           {currentJob.scriptType === 'python' ? 'Python脚本' :
+                            currentJob.scriptType === 'shell' ? 'Shell脚本' :
+                            currentJob.scriptType === 'cmd' ? 'CMD脚本' :
+                            currentJob.scriptType === 'powershell' ? 'PowerShell脚本' :
+                            currentJob.scriptType === 'sql' ? 'SQL脚本' : currentJob.scriptType}
+                       </Descriptions.Item>
+                       <Descriptions.Item label="脚本内容" span={2}>
+                           <pre style={{ margin: 0, fontSize: '12px', background: '#f5f5f5', padding: '8px', maxHeight: '300px', overflow: 'auto', fontFamily: 'monospace' }}>
+                               {currentJob.scriptContent}
                            </pre>
                        </Descriptions.Item>
                    </>

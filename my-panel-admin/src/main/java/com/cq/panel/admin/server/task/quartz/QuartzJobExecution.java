@@ -14,6 +14,7 @@ public class QuartzJobExecution extends AbstractQuartzJob
     @Override
     protected void doExecute(JobExecutionContext context, SysJob sysJob) throws Exception
     {
-        JobInvokeUtil.invokeMethod(sysJob);
+        String result = JobInvokeUtil.invokeMethod(sysJob);
+        context.put("selectedUrl", result);
     }
 }

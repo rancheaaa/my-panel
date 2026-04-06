@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.common.filter;
+package com.cq.panel.admin.server.filter;
 
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import jakarta.servlet.*;

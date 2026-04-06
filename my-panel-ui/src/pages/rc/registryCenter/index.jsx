@@ -12,7 +12,7 @@ const RegistryCenter = () => {
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [tableSize, setTableSize] = useState('large');
-  const [expand, setExpand] = useState(false);
+  const [expand, setExpand] = useState(true);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -278,7 +278,7 @@ const RegistryCenter = () => {
                  </Col>
                </>
              )}
-             <Col span={expand ? 18 : 6} style={{ textAlign: 'right' }}>
+             <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
                <Space>
                  <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
                  <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>

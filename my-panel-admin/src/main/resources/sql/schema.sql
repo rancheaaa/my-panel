@@ -125,13 +125,16 @@ CREATE TABLE IF NOT EXISTS `sys_job`
     `job_name`        varchar(64)  NOT NULL DEFAULT '' COMMENT '任务名称',
     `job_group`       varchar(64)  NOT NULL DEFAULT 'DEFAULT' COMMENT '任务组名',
     `invoke_target`   varchar(500) NOT NULL DEFAULT '' COMMENT '调用目标字符串',
-    `job_type`        tinyint(1)   NOT NULL DEFAULT 1 COMMENT '1-内置方法 2-HTTP接口',
+    `job_type`        tinyint(1)   NOT NULL DEFAULT 1 COMMENT '1-内置方法 2-HTTP接口 3-脚本',
     `method_name`     varchar(255)          DEFAULT NULL COMMENT '内置方法全限定名',
     `http_url`        varchar(500)          DEFAULT NULL COMMENT 'HTTP接口URL',
     `http_method`     varchar(10)           DEFAULT NULL COMMENT 'HTTP请求方式',
     `http_headers`    text                  DEFAULT NULL COMMENT 'HTTP请求头(JSON)',
     `http_body`       text                  DEFAULT NULL COMMENT 'HTTP请求体',
     `load_balance_strategy` varchar(50)      DEFAULT 'roundRobin' COMMENT '负载均衡策略（roundRobin轮询 random随机 weightedRoundRobin加权轮询 weightedRandom加权随机 leastConnections最少连接 fastestResponse最快响应 consistentHash一致性哈希 zoneAware区域感知）',
+    `script_name`     varchar(255)          DEFAULT NULL COMMENT '脚本名称',
+    `script_type`     varchar(20)           DEFAULT NULL COMMENT '脚本类型（python shell cmd powershell sql）',
+    `script_content`   longtext              DEFAULT NULL COMMENT '脚本内容',
     `cron_expression` varchar(255)          DEFAULT '' COMMENT 'cron执行表达式',
     `misfire_policy`  varchar(20)           DEFAULT '3' COMMENT '计划执行错误策略（1立即执行 2执行一次 3放弃执行）',
     `concurrent`      char(1)               DEFAULT '1' COMMENT '是否并发执行（0允许 1禁止）',
@@ -143,8 +146,9 @@ CREATE TABLE IF NOT EXISTS `sys_job`
     `remark`          varchar(500)          DEFAULT '' COMMENT '备注信息',
     PRIMARY KEY (`job_id`, `job_name`, `job_group`),
     CONSTRAINT `check_job_type_fields` CHECK (
-        (job_type = 1 AND method_name IS NOT NULL AND http_url IS NULL) OR
-        (job_type = 2 AND http_url IS NOT NULL AND method_name IS NULL)
+        (job_type = 1 AND method_name IS NOT NULL AND http_url IS NULL AND script_name IS NULL) OR
+        (job_type = 2 AND http_url IS NOT NULL AND method_name IS NULL AND script_name IS NULL) OR
+        (job_type = 3 AND script_name IS NOT NULL AND script_type IS NOT NULL AND script_content IS NOT NULL AND method_name IS NULL AND http_url IS NULL)
     )
 )  AUTO_INCREMENT=100   COMMENT='定时任务调度表';
 

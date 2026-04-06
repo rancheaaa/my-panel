@@ -13,6 +13,7 @@ import { ResizableTitle } from '../../../components/ResizableTable';
 import { listRole, getRole, addRole, updateRole, delRole, changeRoleStatus } from '../../../api/role';
 import { treeselect, roleMenuTreeselect } from '../../../api/menu';
 import { getDicts } from '../../../api/dict/data';
+import './Role.scss';
 
 const { Option } = Select;
 
@@ -176,7 +177,6 @@ const Role = () => {
         setTotal(res.data.total);
       }
     } catch (error) {
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -189,7 +189,6 @@ const Role = () => {
               setMenuOptions(res.data);
           }
       } catch (error) {
-          console.error(error);
       }
   };
 
@@ -308,7 +307,6 @@ const Role = () => {
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      console.error(error);
       message.error('操作失败');
     }
   };

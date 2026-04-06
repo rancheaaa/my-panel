@@ -3,10 +3,11 @@ package com.cq.panel.admin.server.task.quartz;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
-import com.cq.panel.common.loadbalancer.LoadBalancerAlgorithm;
-import com.cq.panel.common.loadbalancer.LoadBalancerClient;
+import com.cq.panel.common.loadbalancer.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -27,12 +28,14 @@ public class JobInvokeUtil
 {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final HealthChecker HEALTH_CHECKER = HealthCheckerFactory.createDefault();
+
     /**
      * 执行方法
      *
      * @param sysJob 系统任务
      */
-    public static void invokeMethod(SysJob sysJob) throws Exception
+    public static String invokeMethod(SysJob sysJob) throws Exception
     {
         Integer jobType = sysJob.getJobType();
         if (jobType == null || jobType == 0) // 兼容原有逻辑
@@ -45,8 +48,13 @@ public class JobInvokeUtil
         }
         else if (jobType == 2)
         {
-            invokeHttpInterface(sysJob);
+            return invokeHttpInterface(sysJob);
         }
+        else if (jobType == 3)
+        {
+            invokeScript(sysJob);
+        }
+        return null;
     }
 
     /**
@@ -117,7 +125,7 @@ public class JobInvokeUtil
     /**
      * 2-HTTP 接口调度
      */
-    private static void invokeHttpInterface(SysJob sysJob) throws Exception
+    private static String invokeHttpInterface(SysJob sysJob) throws Exception
     {
         RestTemplate restTemplate = SpringUtils.getBean(RestTemplate.class);
         String httpUrl = sysJob.getHttpUrl();
@@ -145,9 +153,8 @@ public class JobInvokeUtil
         if (StringUtils.isNotEmpty(httpUrl) && httpUrl.contains(",")) {
             String[] urls = httpUrl.split(",");
             LoadBalancerAlgorithm algorithm = LoadBalancerAlgorithm.fromName(loadBalanceStrategy);
-            LoadBalancerClient loadBalancerClient = new LoadBalancerClient(algorithm);
-            
-            selectedUrl = loadBalancerClient.choose(urls);
+            LoadBalancer loadBalancer = LoadBalancerFactory.createLoadBalancer(algorithm);
+            selectedUrl = choose(urls, loadBalancer);
             log.info("使用负载均衡策略：{}，从{}个URL中选择：{}", algorithm.getName(), urls.length, selectedUrl);
         } else {
             selectedUrl = replacePlaceholders(httpUrl, sysJob);
@@ -159,6 +166,209 @@ public class JobInvokeUtil
             log.error("HTTP接口调用失败，sysJobId：{}，jobName：{}，jobGroup：{}，invokeTarget：{}，URL：{}，状态码：{}，响应内容：{}", sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), sysJob.getInvokeTarget(), selectedUrl, response.getStatusCode().value(), response.getBody());
             throw new Exception("HTTP 接口调用失败，sysJobId：{}，jobName：{}，jobGroup：{}，invokeTarget：{}，URL：{}，状态码：" + response.getStatusCode().value() + "，响应内容：" + response.getBody());
         }
+        return selectedUrl;
+    }
+
+    /**
+     * 从URL数组中选择一个URL（用于定时任务负载均衡）
+     *
+     * @param urls URL数组
+     * @return 选中的URL
+     */
+    private static String choose(String[] urls, LoadBalancer loadBalancer) {
+        try {
+            if (urls == null || urls.length == 0) {
+                throw new IllegalArgumentException("URL array cannot be null or empty");
+            }
+
+            // 创建临时服务器列表
+            List<Server> servers = new ArrayList<>();
+            for (String url : urls) {
+                if (url != null && !url.trim().isEmpty()) {
+                    String trimmedUrl = url.trim();
+                    // 解析URL并创建Server对象
+                    try {
+                        String scheme = "http";
+                        String host;
+                        int port;
+
+                        // 提取协议
+                        if (trimmedUrl.contains("://")) {
+                            scheme = trimmedUrl.substring(0, trimmedUrl.indexOf("://"));
+                            trimmedUrl = trimmedUrl.substring(trimmedUrl.indexOf("://") + 3);
+                        }
+
+                        // 提取主机和端口
+                        String[] parts = trimmedUrl.split("/");
+                        String hostPort = parts[0];
+
+                        if (hostPort.contains(":")) {
+                            String[] hostPortParts = hostPort.split(":");
+                            host = hostPortParts[0];
+                            port = Integer.parseInt(hostPortParts[1]);
+                        } else {
+                            host = hostPort;
+                            port = "https".equals(scheme) ? 443 : 80;
+                        }
+
+                        servers.add(new Server(host, port));
+                    } catch (Exception e) {
+                        log.warn("Failed to parse URL: {}, skipping", url, e);
+                    }
+                }
+            }
+
+            if (servers.isEmpty()) {
+                throw new IllegalArgumentException("No valid URLs provided");
+            }
+
+            for (int i = 0; i < servers.size(); i++) {
+                // 执行负载均衡选择
+                Server server = loadBalancer.choose(servers);
+                if (server != null && JobInvokeUtil.HEALTH_CHECKER.isHealthy(server)) {
+                    return server.getUrl();
+                }
+            }
+            throw new IllegalStateException("No URL available for load balancing");
+        } catch (Exception e) {
+            log.error("Load balancing failed", e);
+            throw new RuntimeException("Failed to choose URL for load balancing", e);
+        }
+    }
+
+    /**
+     * 3-脚本调度
+     */
+    private static void invokeScript(SysJob sysJob) throws Exception
+    {
+        String scriptName = sysJob.getScriptName();
+        String scriptType = sysJob.getScriptType();
+        String scriptContent = sysJob.getScriptContent();
+
+        if (StringUtils.isEmpty(scriptName)) {
+            throw new Exception("脚本名称不能为空");
+        }
+        if (StringUtils.isEmpty(scriptType)) {
+            throw new Exception("脚本类型不能为空");
+        }
+        if (StringUtils.isEmpty(scriptContent)) {
+            throw new Exception("脚本内容不能为空");
+        }
+
+        log.info("开始执行脚本，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}", 
+                 sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType);
+
+        try {
+            String output = executeScriptByType(scriptType, scriptContent);
+            log.info("脚本执行成功，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}，执行输出：{}", 
+                     sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType, output);
+        } catch (Exception e) {
+            log.error("脚本执行失败，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}，错误信息：{}", 
+                      sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType, e.getMessage(), e);
+            throw new Exception("脚本执行失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 根据脚本类型执行脚本
+     */
+    private static String executeScriptByType(String scriptType, String scriptContent) throws Exception
+    {
+        return switch (scriptType.toLowerCase()) {
+            case "python" -> executePythonScript(scriptContent);
+            case "shell" -> executeShellScript(scriptContent);
+            case "cmd" -> executeCmdScript(scriptContent);
+            case "powershell" -> executePowerShellScript(scriptContent);
+            case "sql" -> executeSqlScript(scriptContent);
+            default -> throw new Exception("不支持的脚本类型：" + scriptType);
+        };
+    }
+
+    /**
+     * 执行Python脚本
+     */
+    private static String executePythonScript(String scriptContent) throws Exception
+    {
+        String os = System.getProperty("os.name").toLowerCase();
+        String pythonCommand = os.contains("win") ? "python" : "python3";
+        
+        String tempFile = createTempScriptFile(scriptContent, ".py");
+        ProcessBuilder processBuilder = new ProcessBuilder(pythonCommand, tempFile);
+        return executeProcess(processBuilder);
+    }
+
+    /**
+     * 执行Shell脚本
+     */
+    private static String executeShellScript(String scriptContent) throws Exception
+    {
+        String tempFile = createTempScriptFile(scriptContent, ".sh");
+        ProcessBuilder processBuilder = new ProcessBuilder("sh", tempFile);
+        return executeProcess(processBuilder);
+    }
+
+    /**
+     * 执行CMD脚本
+     */
+    private static String executeCmdScript(String scriptContent) throws Exception
+    {
+        String tempFile = createTempScriptFile(scriptContent, ".bat");
+        ProcessBuilder processBuilder = new ProcessBuilder("cmd", "/c", tempFile);
+        return executeProcess(processBuilder);
+    }
+
+    /**
+     * 执行PowerShell脚本
+     */
+    private static String executePowerShellScript(String scriptContent) throws Exception
+    {
+        String tempFile = createTempScriptFile(scriptContent, ".ps1");
+        ProcessBuilder processBuilder = new ProcessBuilder("powershell", "-File", tempFile);
+        return executeProcess(processBuilder);
+    }
+
+    /**
+     * 创建临时脚本文件
+     */
+    private static String createTempScriptFile(String content, String extension) throws Exception
+    {
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("job_script_", extension);
+        java.nio.file.Files.writeString(tempFile, content, java.nio.charset.StandardCharsets.UTF_8);
+        tempFile.toFile().deleteOnExit();
+        return tempFile.toString();
+    }
+
+    /**
+     * 执行SQL脚本
+     */
+    private static String executeSqlScript(String scriptContent) throws Exception
+    {
+        throw new Exception("SQL脚本执行功能暂未实现，请使用数据库管理工具执行");
+    }
+
+    /**
+     * 执行进程并获取输出
+     */
+    private static String executeProcess(ProcessBuilder processBuilder) throws Exception
+    {
+        processBuilder.redirectErrorStream(true);
+        Process process = processBuilder.start();
+        
+        StringBuilder output = new StringBuilder();
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+        }
+        
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new Exception("进程执行失败，退出码：" + exitCode + "，输出：" + output);
+        }
+        
+        return output.toString().trim();
     }
 
     /**

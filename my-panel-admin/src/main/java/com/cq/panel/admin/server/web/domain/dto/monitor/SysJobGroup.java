@@ -1,18 +1,20 @@
 package com.cq.panel.admin.server.web.domain.dto.monitor;
 
+import jakarta.validation.groups.Default;
+
 /**
- * 定时任务校验分组
+ * 定时任务验证分组
  * 
  * @author cq
  */
 public interface SysJobGroup {
-    /**
-     * 内置方法分组
-     */
-    interface InternalGroup {}
-
-    /**
-     * HTTP接口分组
-     */
-    interface HttpGroup {}
+    
+    interface InternalGroup extends Default {
+    }
+    
+    interface HttpGroup extends Default {
+    }
+    
+    interface ScriptGroup extends Default {
+    }
 }

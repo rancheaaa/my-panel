@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Modal, Popconfirm, Tag, Descriptions, Tooltip, Dropdown } from 'antd';
+import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, EyeOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, delOperlog, cleanOperlog, exportOperlog } from '../../../api/monitor/operlog';
@@ -14,7 +15,7 @@ const Operlog = () => {
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [tableSize, setTableSize] = useState('large');
-  const [expand, setExpand] = useState(false);
+  const [expand, setExpand] = useState(true);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -265,12 +266,15 @@ const Operlog = () => {
                         value={dateRange} 
                         onChange={setDateRange} 
                         style={{ width: '100%' }}
+                        locale={zhCN}
+                        showTime
+                        format="YYYY-MM-DD HH:mm:ss"
                     />
                   </Form.Item>
                 </Col>
               </>
             )}
-            <Col span={expand ? 12 : 6} style={{ textAlign: 'right' }}>
+            <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
               <Space>
                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
                 <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>

@@ -77,3 +77,12 @@ export function exportJob(query) {
     responseType: 'blob'
   });
 }
+
+// 查询任务组名列表
+export function getJobGroups(jobGroup) {
+  return request({
+    url: '/monitor/job/jobGroups',
+    method: 'get',
+    params: { jobGroup }
+  });
+}

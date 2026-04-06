@@ -43,6 +43,15 @@ export function updateDept(data) {
   });
 }
 
+// 部门排序
+export function sortDept(data) {
+  return request({
+    url: '/system/dept/sort',
+    method: 'put',
+    data: data
+  });
+}
+
 // 删除部门
 export function delDept(deptId) {
   return request({

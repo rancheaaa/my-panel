@@ -20,6 +20,11 @@ public interface SysJobLogConverter {
 
     @Mapping(target = "startTime", ignore = true)
     @Mapping(target = "endTime", ignore = true)
+    @Mapping(target = "triggerType", source = "triggerType")
+    @Mapping(target = "startTimeStart", source = "startTimeStart", qualifiedByName = "parseDateTime")
+    @Mapping(target = "startTimeEnd", source = "startTimeEnd", qualifiedByName = "parseDateTime")
+    @Mapping(target = "endTimeStart", source = "endTimeStart", qualifiedByName = "parseDateTime")
+    @Mapping(target = "endTimeEnd", source = "endTimeEnd", qualifiedByName = "parseDateTime")
     SysJobLog toEntity(SysJobLogQueryDTO dto);
 
     List<SysJobLogVO> toVOList(List<SysJobLog> list);
@@ -30,5 +35,23 @@ public interface SysJobLogConverter {
             return null;
         }
         return DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, date);
+    }
+
+    @Named("parseDateTime")
+    static Date parseDateTime(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return null;
+        }
+        try {
+            Date date = DateUtils.parseDate(dateStr);
+            if (date == null) {
+                throw new RuntimeException("日期解析失败: " + dateStr);
+            }
+            return date;
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(SysJobLogConverter.class)
+                .error("日期解析失败 - 值: {}, 支持的格式: yyyy-MM-dd, yyyy-MM-dd HH:mm:ss 等", dateStr, e);
+            return null;
+        }
     }
 }

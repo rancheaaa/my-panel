@@ -1,6 +1,7 @@
 package com.cq.panel.admin.server.config;
 
 import com.cq.panel.admin.server.common.constant.Constants;
+import com.cq.panel.admin.server.interceptor.LogInterceptor;
 import com.cq.panel.admin.server.interceptor.RepeatSubmitInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,9 @@ public class ResourcesConfig implements WebMvcConfigurer
     private RepeatSubmitInterceptor repeatSubmitInterceptor;
 
     @Autowired
+    private LogInterceptor logInterceptor;
+
+    @Autowired
     private AppConfig appConfig;
 
     @Override
@@ -40,6 +44,7 @@ public class ResourcesConfig implements WebMvcConfigurer
     @Override
     public void addInterceptors(InterceptorRegistry registry)
     {
+        registry.addInterceptor(logInterceptor).addPathPatterns("/**");
         registry.addInterceptor(repeatSubmitInterceptor).addPathPatterns("/**");
     }
 

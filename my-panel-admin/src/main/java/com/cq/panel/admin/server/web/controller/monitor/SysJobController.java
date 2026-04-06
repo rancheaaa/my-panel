@@ -73,6 +73,16 @@ public class SysJobController extends BaseController
     }
 
     /**
+     * 查询任务组名列表（用于自动完成）
+     */
+    @Operation(summary = "查询任务组名列表", description = "获取任务组名列表，支持模糊查询")
+    @GetMapping("/jobGroups")
+    public Result<List<String>> getJobGroups(@Parameter(description = "任务组名（支持模糊查询）") @RequestParam(required = false) String jobGroup)
+    {
+        return Result.success(jobService.selectJobGroupList(jobGroup));
+    }
+
+    /**
      * 导出定时任务列表
      */
     @Operation(summary = "导出定时任务列表", description = "导出符合条件的定时任务数据")
@@ -135,6 +145,9 @@ public class SysJobController extends BaseController
         } else if (job.getJobType() == 2) {
             // HTTP 模式，invokeTarget 设为 URL
             job.setInvokeTarget(job.getHttpUrl());
+        } else if (job.getJobType() == 3) {
+            // 脚本模式，invokeTarget 设为脚本名称
+            job.setInvokeTarget(job.getScriptName());
         }
 
         job.setCreateBy(getUsername());
@@ -192,12 +205,34 @@ public class SysJobController extends BaseController
             if (StringUtils.isNotEmpty(dto.getHttpUrl())) {
                 throw new ServiceException("内置方法模式下，HTTP接口URL必须为空");
             }
+            if (StringUtils.isNotEmpty(dto.getScriptName())) {
+                throw new ServiceException("内置方法模式下，脚本名称必须为空");
+            }
         } else if (dto.getJobType() == 2) {
             if (StringUtils.isEmpty(dto.getHttpUrl())) {
                 throw new ServiceException("HTTP接口URL不能为空");
             }
             if (StringUtils.isNotEmpty(dto.getMethodName())) {
                 throw new ServiceException("HTTP接口模式下，内置方法必须为空");
+            }
+            if (StringUtils.isNotEmpty(dto.getScriptName())) {
+                throw new ServiceException("HTTP接口模式下，脚本名称必须为空");
+            }
+        } else if (dto.getJobType() == 3) {
+            if (StringUtils.isEmpty(dto.getScriptName())) {
+                throw new ServiceException("脚本名称不能为空");
+            }
+            if (StringUtils.isEmpty(dto.getScriptType())) {
+                throw new ServiceException("脚本类型不能为空");
+            }
+            if (StringUtils.isEmpty(dto.getScriptContent())) {
+                throw new ServiceException("脚本内容不能为空");
+            }
+            if (StringUtils.isNotEmpty(dto.getMethodName())) {
+                throw new ServiceException("脚本模式下，内置方法必须为空");
+            }
+            if (StringUtils.isNotEmpty(dto.getHttpUrl())) {
+                throw new ServiceException("脚本模式下，HTTP接口URL必须为空");
             }
         }
     }
@@ -272,20 +307,20 @@ public class SysJobController extends BaseController
 
         threadPoolTaskExecutor.execute(() -> {
             try {
-                JobInvokeUtil.invokeMethod(job);
+                String selectedUrl = JobInvokeUtil.invokeMethod(job);
                 // 手动触发，传入"1"
-                insertSysJobLog(job, new Date(), null, "1");
+                insertSysJobLog(job, new Date(), null, "1", selectedUrl);
             } catch (Exception e) {
                 logger.error("执行定时任务 {} 失败", job, e);
                 // 手动触发，传入"1"
-                insertSysJobLog(job, new Date(), e, "1");
+                insertSysJobLog(job, new Date(), e, "1", null);
             }
         });
         return Result.success();
     }
 
-    private void insertSysJobLog(SysJob sysJob, Date startTime, Exception e, String triggerType) {
-        JobLogUtil.createAndSaveJobLog(sysJob, startTime, e, triggerType);
+    private void insertSysJobLog(SysJob sysJob, Date startTime, Exception e, String triggerType, String selectedUrl) {
+        JobLogUtil.createAndSaveJobLog(sysJob, startTime, e, triggerType, selectedUrl);
     }
 
     /**

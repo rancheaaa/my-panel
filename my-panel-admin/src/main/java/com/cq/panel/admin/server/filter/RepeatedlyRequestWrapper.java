@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.common.filter;
+package com.cq.panel.admin.server.filter;
 
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.utils.http.HttpHelper;

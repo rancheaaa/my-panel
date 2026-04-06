@@ -71,7 +71,8 @@ public abstract class AbstractQuartzJob implements Job
         threadLocal.remove();
 
         // 定时触发，传入"0"
-        JobLogUtil.createAndSaveJobLog(sysJob, startTime, e, "0");
+        JobLogUtil.createAndSaveJobLog(sysJob, startTime, e, "0", context.get("selectedUrl").toString());
+
     }
 
     /**

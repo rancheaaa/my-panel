@@ -87,6 +87,7 @@ const Role = () => {
   const [menuHalfCheckedKeys, setMenuHalfCheckedKeys] = useState([]);
   const [menuCheckStrictly, setMenuCheckStrictly] = useState(false);
   const [menuOptions, setMenuOptions] = useState([]);
+  const [menuExpandedKeys, setMenuExpandedKeys] = useState([]);
   const [sysNormalDisable, setSysNormalDisable] = useState([]);
   
   // Resizable Columns State
@@ -240,6 +241,7 @@ const Role = () => {
     setMenuCheckedKeys([]);
     setMenuHalfCheckedKeys([]);
     setMenuCheckStrictly(false);
+    setMenuExpandedKeys(menuOptions.map(item => item.id));
     setIsModalOpen(true);
   };
 
@@ -261,6 +263,7 @@ const Role = () => {
             
             setMenuCheckedKeys(leafKeys);
             setMenuHalfCheckedKeys(parentKeys);
+            setMenuExpandedKeys(menuOptions.map(item => item.id));
             setIsModalOpen(true);
         }
     } catch (error) {
@@ -413,10 +416,13 @@ const Role = () => {
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
             total: total,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total, range) => `共 ${total} 条`,
             onChange: (page, pageSize) => {
                 setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            }
+            },
+            position: ['bottomRight'],
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
         />
       </Card>
@@ -427,32 +433,73 @@ const Role = () => {
         onOk={handleModalOk}
         onCancel={() => setIsModalOpen(false)}
         destroyOnClose
+        width={800}
+        style={{ height: '600px' }}
+        bodyStyle={{ height: 'calc(100% - 110px)', overflow: 'auto' }}
       >
         <Form form={modalForm} layout="vertical">
-          <Form.Item name="roleName" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
-            <Input placeholder="请输入角色名称" />
-          </Form.Item>
-          <Form.Item name="roleKey" label="权限字符" rules={[{ required: true, message: '请输入权限字符' }]}>
-             <Input placeholder="请输入权限字符" />
-          </Form.Item>
-          <Form.Item name="roleSort" label="显示顺序" rules={[{ required: true, message: '请输入显示顺序' }]}>
-             <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="status" label="状态" initialValue="0">
-            <Select>
-                {sysNormalDisable.map(dict => (
-                    <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
-                ))}
-            </Select>
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="roleName" label="角色名称" rules={[{ required: true, message: '请输入角色名称' }]}>
+                <Input placeholder="请输入角色名称" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="roleKey" label="权限字符" rules={[{ required: true, message: '请输入权限字符' }]}>
+                <Input placeholder="请输入权限字符" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="roleSort" label="显示顺序" rules={[{ required: true, message: '请输入显示顺序' }]}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="status" label="状态" initialValue="0">
+                <Select>
+                    {sysNormalDisable.map(dict => (
+                        <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
+                    ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item label="菜单权限">
-              <div style={{ border: '1px solid #d9d9d9', borderRadius: '2px', maxHeight: '200px', overflow: 'auto' }}>
+              <div style={{ 
+                border: '1px solid rgba(0, 0, 0, 0.08)', 
+                borderRadius: '12px', 
+                minHeight: '300px', 
+                maxHeight: '400px', 
+                overflow: 'auto', 
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                padding: '16px'
+              }}>
                 <Tree
                     checkable
                     onCheck={onCheck}
                     checkedKeys={menuCheckedKeys}
                     treeData={menuOptions}
                     fieldNames={{ title: 'label', key: 'id', children: 'children' }}
+                    expandedKeys={menuExpandedKeys}
+                    onExpand={setMenuExpandedKeys}
+                    style={{
+                      fontSize: '14px',
+                      lineHeight: '2.2',
+                      padding: '8px',
+                      background: 'transparent',
+                      color: '#334155'
+                    }}
+                    treeNodeStyle={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      marginBottom: '4px',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                    className="custom-tree"
                 />
               </div>
           </Form.Item>

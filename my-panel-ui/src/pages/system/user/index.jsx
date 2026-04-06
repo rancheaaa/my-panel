@@ -576,10 +576,13 @@ const User = () => {
                     current: queryParams.pageNum,
                     pageSize: queryParams.pageSize,
                     total: total,
-                    showTotal: (total) => `共 ${total} 条`,
+                    showTotal: (total, range) => `共 ${total} 条`,
                     onChange: (page, pageSize) => {
                         setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-                    }
+                    },
+                    position: ['bottomRight'],
+                    showSizeChanger: true,
+                    pageSizeOptions: ['10', '20', '50', '100']
                 }}
                 />
             </Card>

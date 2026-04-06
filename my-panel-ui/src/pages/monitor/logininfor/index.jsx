@@ -138,7 +138,7 @@ const Logininfor = () => {
         width: getWidth('status', 100),
         render: (text) => {
           const dict = sysCommonStatus.find(d => d.dictValue == text);
-          return dict ? <Tag color={String(text) === '0' ? 'success' : 'error'}>{dict.dictLabel}</Tag> : text;
+          return dict ? <Tag color={String(text) === '0' ? '#1890ff' : 'error'}>{dict.dictLabel}</Tag> : text;
         }
       },
       { title: '操作信息', dataIndex: 'msg', key: 'msg', align: 'center', width: getWidth('msg', 150), ellipsis: true },
@@ -324,11 +324,13 @@ const Logininfor = () => {
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
             total: total,
+            showTotal: (total, range) => `共 ${total} 条`,
+            onChange: (page, pageSize) => {
+                setQueryParams({ ...queryParams, pageNum: page, pageSize });
+            },
+            position: ['bottomRight'],
             showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            onChange: (page, size) => {
-                setQueryParams({ ...queryParams, pageNum: page, pageSize: size });
-            }
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
           rowSelection={{
             selectedRowKeys,

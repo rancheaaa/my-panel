@@ -120,5 +120,154 @@
     .ant-table-body {
       flex: 1;
     }
+
+    // 美化菜单权限Tree组件样式
+    .ant-tree {
+      box-shadow: none !important;
+      background: transparent !important;
+
+      .ant-tree-node-content-wrapper {
+        box-shadow: none !important;
+
+        &:hover {
+          background-color: rgba(24, 144, 255, 0.08) !important;
+          border-radius: 8px !important;
+          box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1) !important;
+          transform: translateX(2px) !important;
+        }
+      }
+
+      .ant-tree-checkbox {
+        .ant-tree-checkbox-inner {
+          width: 20px !important;
+          height: 20px !important;
+          border-radius: 5px !important;
+          border: 2px solid #cbd5e1 !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          background: #fff !important;
+
+          &::after {
+            width: 6px !important;
+            height: 10px !important;
+            border: 2px solid #fff !important;
+            border-top: 0 !important;
+            border-left: 0 !important;
+            transform: rotate(45deg) scale(0) !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+          }
+        }
+
+        &.ant-tree-checkbox-checked {
+          .ant-tree-checkbox-inner {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+
+            &::after {
+              transform: rotate(45deg) scale(1) !important;
+              border-color: #fff !important;
+            }
+          }
+        }
+
+        &.ant-tree-checkbox-indeterminate {
+          .ant-tree-checkbox-inner {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+
+            &::after {
+              width: 8px !important;
+              height: 2px !important;
+              border: 0 !important;
+              background-color: #fff !important;
+              transform: translate(-50%, -50%) scale(1) !important;
+              top: 50% !important;
+              left: 50% !important;
+            }
+          }
+        }
+
+        &:hover {
+          .ant-tree-checkbox-inner {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+            transform: scale(1.05) !important;
+          }
+        }
+      }
+
+      .ant-tree-treenode {
+        padding: 3px 0 !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+        &:hover {
+          .ant-tree-node-content-wrapper {
+            background-color: rgba(59, 130, 246, 0.08) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1) !important;
+            transform: translateX(2px) !important;
+          }
+        }
+
+        &.ant-tree-treenode-selected {
+          .ant-tree-node-content-wrapper {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.08) 100%) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15) !important;
+          }
+        }
+      }
+
+      .ant-tree-switcher {
+        width: 24px !important;
+        height: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: none !important;
+        border-radius: 4px !important;
+        transition: all 0.3s ease !important;
+
+        &:hover {
+          background: rgba(59, 130, 246, 0.1) !important;
+          border-radius: 4px !important;
+
+          .ant-tree-switcher-icon {
+            color: #3b82f6 !important;
+            transform: scale(1.1) !important;
+          }
+        }
+
+        .ant-tree-switcher-icon {
+          font-size: 12px !important;
+          color: #64748b !important;
+          transition: all 0.3s ease !important;
+        }
+      }
+
+      .ant-tree-node-content-wrapper {
+        padding: 8px 12px !important;
+        border-radius: 8px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        margin-left: 4px !important;
+        margin-right: 4px !important;
+
+        .ant-tree-title {
+          font-size: 14px !important;
+          color: #334155 !important;
+          font-weight: 500 !important;
+          letter-spacing: 0.01em !important;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+      }
+
+      .ant-tree-child-tree {
+        padding-left: 20px !important;
+        border-left: 1px dashed rgba(148, 163, 184, 0.3) !important;
+        margin-left: 12px !important;
+      }
+    }
   }
 }

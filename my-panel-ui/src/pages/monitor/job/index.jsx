@@ -616,10 +616,13 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
             total: total,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total, range) => `共 ${total} 条`,
             onChange: (page, pageSize) => {
                 setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            }
+            },
+            position: ['bottomRight'],
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
         />
         
@@ -1077,7 +1080,16 @@ const Job = () => {
           size={tableSize} 
           scroll={{ x: 'max-content' }}
           rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }} 
-          pagination={{ current: queryParams.pageNum, pageSize: queryParams.pageSize, total, showTotal: (t) => `共 ${t} 条`, onChange: (pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize }) }} 
+          pagination={{ 
+            current: queryParams.pageNum, 
+            pageSize: queryParams.pageSize, 
+            total, 
+            showTotal: (total, range) => `共 ${total} 条`, 
+            onChange: (pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize }),
+            position: ['bottomRight'],
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100']
+          }} 
         />
       </Card>
 

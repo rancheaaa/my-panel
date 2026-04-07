@@ -16,6 +16,7 @@ public class AgentRegistry {
     private Integer nodeEnabled;
     private Integer nodeStatus;
     private String remark;
+    private LocalDateTime lastRefreshTime;
     private String createBy;
     private LocalDateTime createTime;
     private String updateBy;

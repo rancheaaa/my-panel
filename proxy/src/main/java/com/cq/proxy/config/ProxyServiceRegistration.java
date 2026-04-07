@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,18 +19,17 @@ public class ProxyServiceRegistration {
     private static final Logger log = LoggerFactory.getLogger(ProxyServiceRegistration.class);
 
     private final RegistryService registryService;
-    private final Environment environment;
     private final ProxyRegistryProperties registryProperties;
 
     private String localHost;
     private int localPort;
     private final String serviceName = PROXY_SERVICE_NAME;
     private final String environmentName = EnvNameConstant.DEFAULT_ENV_NAME;
+    private volatile boolean firstRegistrationSuccessFlag = false;
+    private volatile ServiceRegisterRequest serviceRegisterRequest;
 
-
-    public ProxyServiceRegistration(RegistryService registryService, Environment environment, ProxyRegistryProperties registryProperties) {
+    public ProxyServiceRegistration(RegistryService registryService, ProxyRegistryProperties registryProperties) {
     this.registryService = registryService;
-    this.environment = environment;
     this.registryProperties = registryProperties;
   }
 
@@ -49,8 +47,9 @@ public class ProxyServiceRegistration {
                     localPort,
                     registryProperties.getZone()
             );
-
+            serviceRegisterRequest = request;
             registryService.register(request);
+            firstRegistrationSuccessFlag = true;
             log.info("Proxy服务注册成功: {}:{} ({})", localHost, localPort, serviceName);
         } catch (Exception e) {
             log.error("Proxy服务注册失败", e);
@@ -70,6 +69,10 @@ public class ProxyServiceRegistration {
             );
 
             registryService.heartbeat(request);
+            if (!firstRegistrationSuccessFlag && serviceRegisterRequest != null) {
+                registryService.register(serviceRegisterRequest);
+                firstRegistrationSuccessFlag = true;
+            }
             log.debug("Proxy服务心跳更新: {}:{}", localHost, localPort);
         } catch (Exception e) {
             log.error("Proxy服务心跳更新失败", e);

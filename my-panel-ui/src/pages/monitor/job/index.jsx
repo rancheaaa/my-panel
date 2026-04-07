@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker, Divider, AutoComplete } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, ExportOutlined, SettingOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, DownloadOutlined, MinusCircleOutlined, PlusCircleOutlined } from '@ant-design/icons';
-import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob, getJobGroups } from '../../../api/monitor/job';
+import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob, getJobGroups, scanMethods, validateMethod } from '../../../api/monitor/job';
 import { listJobLog, delJobLog, cleanJobLog, exportJobLog } from '../../../api/monitor/jobLog';
 import { getDicts } from '../../../api/dict/data';
 import { ResizableTitle } from '../../../components/ResizableTable';
@@ -694,6 +694,13 @@ const Job = () => {
   const [scriptType, setScriptType] = useState('');
   const [scriptContent, setScriptContent] = useState('');
   
+  // 内置方法配置状态
+  const [availableMethods, setAvailableMethods] = useState([]);
+  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [methodParameters, setMethodParameters] = useState([]);
+  const [parameterValues, setParameterValues] = useState({});
+  const [generatedMethodName, setGeneratedMethodName] = useState('');
+  
   // 基础列配置
   const [columnWidths, setColumnWidths] = useState({
     jobId: 100,
@@ -798,6 +805,7 @@ const Job = () => {
     getDicts('sys_job_group').then(res => res.code === 200 && setSysJobGroup(res.data));
     getDicts('sys_job_status').then(res => res.code === 200 && setSysJobStatus(res.data));
     loadJobGroupOptions();
+    loadAvailableMethods();
   }, [queryParams]);
 
   const loadJobGroupOptions = async () => {
@@ -811,6 +819,126 @@ const Job = () => {
       }
     } catch (error) {
       console.error('加载任务组名失败:', error);
+    }
+  };
+
+  const loadAvailableMethods = async () => {
+    try {
+      const res = await scanMethods();
+      if (res.code === 200) {
+        setAvailableMethods(res.data);
+      }
+    } catch (error) {
+      console.error('加载内置方法列表失败:', error);
+    }
+  };
+
+  const handleMethodChange = (methodValue) => {
+    // methodValue 现在是 "组件名.方法名" 格式
+    const method = availableMethods.find(m => 
+      `${m.componentName}.${m.displayName}` === methodValue
+    );
+    if (method) {
+      setSelectedMethod(method);
+      setMethodParameters(method.parameters || []);
+      setParameterValues({});
+      // 更新生成的方法字符串
+      updateGeneratedMethodName();
+    }
+  };
+
+  const handleParameterValueChange = (paramName, value) => {
+    const newValues = {
+      ...parameterValues,
+      [paramName]: value
+    };
+    setParameterValues(newValues);
+    // 使用最新的参数值实时更新生成的方法字符串，避免React状态更新异步导致的滞后
+    updateGeneratedMethodNameWithValues(newValues);
+  };
+
+  const handleParameterBlur = () => {
+    // 失焦时再次更新生成的方法字符串，确保最新状态
+    updateGeneratedMethodName();
+  };
+
+  const updateGeneratedMethodName = () => {
+    if (!selectedMethod) {
+      setGeneratedMethodName('');
+      return;
+    }
+
+    // 生成完整的方法调用字符串（包含参数）
+    if (selectedMethod.hasParameters) {
+      const paramArray = methodParameters.map(param => {
+        const value = parameterValues[param.name];
+        if (param.type === 'java.lang.String') {
+          return `"${value}"`;
+        } else if (param.type === 'java.lang.Boolean' || param.type === 'boolean') {
+          return value === 'true' || value === true;
+        } else {
+          return value;
+        }
+      });
+      setGeneratedMethodName(`${selectedMethod.componentName}.${selectedMethod.displayName}(${paramArray.join(', ')})`);
+    } else {
+      // 无参数方法
+      setGeneratedMethodName(`${selectedMethod.componentName}.${selectedMethod.displayName}()`);
+    }
+  };
+
+  const updateGeneratedMethodNameWithValues = (currentValues) => {
+    if (!selectedMethod) {
+      setGeneratedMethodName('');
+      return;
+    }
+
+    // 生成完整的方法调用字符串（包含参数）
+    if (selectedMethod.hasParameters) {
+      const paramArray = methodParameters.map(param => {
+        const value = currentValues[param.name];
+        if (param.type === 'java.lang.String') {
+          return `"${value}"`;
+        } else if (param.type === 'java.lang.Boolean' || param.type === 'boolean') {
+          return value === 'true' || value === true;
+        } else {
+          return value;
+        }
+      });
+      setGeneratedMethodName(`${selectedMethod.componentName}.${selectedMethod.displayName}(${paramArray.join(', ')})`);
+    } else {
+      // 无参数方法
+      setGeneratedMethodName(`${selectedMethod.componentName}.${selectedMethod.displayName}()`);
+    }
+  };
+
+  const validateMethodParameters = async () => {
+    if (!selectedMethod) {
+      return true;
+    }
+
+    const paramsArray = methodParameters.map(param => ({
+      name: param.name,
+      type: param.type,
+      value: parameterValues[param.name]
+    }));
+
+    try {
+      const res = await validateMethod({
+        methodName: selectedMethod.methodName,
+        parameterValues: JSON.stringify(paramsArray.map(p => p.value))
+      });
+
+      if (res.code === 200 && res.data.valid) {
+        return true;
+      } else {
+        message.error(res.data?.errorMessage || '参数验证失败');
+        return false;
+      }
+    } catch (error) {
+      console.error('验证方法参数失败:', error);
+      message.error('验证方法参数失败');
+      return false;
     }
   };
 
@@ -835,8 +963,12 @@ const Job = () => {
     setScriptName('');
     setScriptType('');
     setScriptContent('');
+    setSelectedMethod(null);
+    setMethodParameters([]);
+    setParameterValues({});
+    setGeneratedMethodName('');
     form.setFieldsValue({ 
-      jobType: 1, 
+      jobType:1, 
       jobGroup: 'DEFAULT', 
       concurrent: '1', 
       status: '0', 
@@ -884,6 +1016,70 @@ const Job = () => {
       setScriptType(res.data?.scriptType || '');
       setScriptContent(res.data?.scriptContent || '');
       
+      // 处理内置方法
+      if (res.data?.jobType === 1 && res.data?.methodName) {
+        const methodName = res.data.methodName;
+        
+        // 解析方法调用字符串，提取组件名、方法名和参数
+        // 支持两种格式：
+        // 1. appTask.ryParams("hello") - 组件名.方法名(参数)
+        // 2. com.cq.panel.admin.server.task.AppTask.ryParams("hello") - 完整类名.方法名(参数)
+        const match = methodName.match(/(?:([^.]+)\.)?(\w+)\((.*)\)/);
+        if (match) {
+          const componentName = match[1]; // 组件名（可能为空）
+          const pureMethodName = match[2]; // 方法名
+          const paramsStr = match[3]; // 参数字符串
+          
+          // 查找对应的方法
+          let method = null;
+          if (componentName) {
+            // 如果有组件名，按组件名和方法名查找
+            method = availableMethods.find(m => 
+              m.componentName === componentName && m.displayName === pureMethodName
+            );
+          }
+          
+          // 如果没找到，尝试按方法名查找
+          if (!method) {
+            method = availableMethods.find(m => m.displayName === pureMethodName);
+          }
+          
+          if (method) {
+            setSelectedMethod(method);
+            setMethodParameters(method.parameters || []);
+            
+            // 解析参数值
+            if (paramsStr.trim()) {
+              const paramValues = {};
+              const params = paramsStr.split(',').map(p => p.trim());
+              
+              method.parameters.forEach((param, index) => {
+                if (index < params.length) {
+                  let value = params[index];
+                  // 移除字符串引号
+                  if (value.startsWith('"') && value.endsWith('"')) {
+                    value = value.slice(1, -1);
+                  }
+                  paramValues[param.name] = value;
+                }
+              });
+              
+              setParameterValues(paramValues);
+            } else {
+              setParameterValues({});
+            }
+            
+            // 更新生成的方法字符串
+            setGeneratedMethodName(methodName);
+          }
+        }
+      } else {
+        setSelectedMethod(null);
+        setMethodParameters([]);
+        setParameterValues({});
+        setGeneratedMethodName('');
+      }
+      
       form.setFieldsValue({
         ...res.data,
         jobType: res.data?.jobType != null ? Number(res.data.jobType) : 1,
@@ -921,6 +1117,34 @@ const Job = () => {
 
   const submitForm = async () => {
     const values = await form.validateFields();
+    
+    // 如果是内置方法类型，验证方法参数
+    if (values.jobType === 1) {
+      const isValid = await validateMethodParameters();
+      if (!isValid) {
+        return;
+      }
+      
+      // 生成完整的方法调用字符串（包含参数）
+      if (selectedMethod) {
+        if (selectedMethod.hasParameters) {
+          const paramArray = methodParameters.map(param => {
+            const value = parameterValues[param.name];
+            if (param.type === 'java.lang.String') {
+              return `"${value}"`;
+            } else if (param.type === 'java.lang.Boolean' || param.type === 'boolean') {
+              return value === 'true' || value === true;
+            } else {
+              return value;
+            }
+          });
+          values.methodName = `${selectedMethod.componentName}.${selectedMethod.displayName}(${paramArray.join(', ')})`;
+        } else {
+          // 无参数方法
+          values.methodName = `${selectedMethod.componentName}.${selectedMethod.displayName}()`;
+        }
+      }
+    }
     
     // 如果是HTTP接口类型，拼接httpUrl
     if (values.jobType === 2) {
@@ -1109,9 +1333,95 @@ const Job = () => {
               </Form.Item>
               
               {jobType === 1 && (
-                  <Form.Item name="methodName" label="内置方法" rules={[{ required: true, message: '请输入内置方法全限定名' }]}>
-                      <Input placeholder="示例: com.xxx.service.JobService.runTask" />
-                  </Form.Item>
+                  <>
+                      <Form.Item label="内置方法" rules={[{ required: true, message: '请选择内置方法' }]}>
+                          <Select 
+                              placeholder="请选择内置方法" 
+                              showSearch
+                              optionFilterProp="children"
+                              onChange={handleMethodChange}
+                              value={selectedMethod ? `${selectedMethod.componentName}.${selectedMethod.displayName}` : undefined}
+                              optionLabelProp="value"
+                          >
+                              {availableMethods.map(method => (
+                                  <Option key={method.methodName} value={`${method.componentName}.${method.displayName}`}>
+                                      <div style={{ 
+                                          padding: '8px 12px', 
+                                          backgroundColor: '#f5f5f5', 
+                                          borderRadius: '4px',
+                                          border: '1px solid #d9d9d9'
+                                      }}>
+                                          <div style={{ fontWeight: 'bold' }}>{method.displayName}</div>
+                                          <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                                              {method.componentName}.{method.displayName}
+                                              {method.hasParameters && ` (${method.parameters.length}个参数)`}
+                                          </div>
+                                      </div>
+                                  </Option>
+                              ))}
+                          </Select>
+                          {selectedMethod && (
+                              <div style={{ 
+                                  marginTop: '8px',
+                                  padding: '12px', 
+                                  backgroundColor: '#e6f7ff', 
+                                  borderRadius: '4px',
+                                  border: '1px solid #91d5ff'
+                              }}>
+                                  <div style={{ fontWeight: 'bold', color: '#1890ff' }}>{selectedMethod.displayName}</div>
+                                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                      {selectedMethod.componentName}.{selectedMethod.displayName}
+                                      {selectedMethod.hasParameters && ` (${selectedMethod.parameters.length}个参数)`}
+                                  </div>
+                                  {selectedMethod.description && (
+                                      <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                                          {selectedMethod.description}
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                      </Form.Item>
+                      
+                      <Form.Item label="生成的方法调用字符串">
+                          <Input.TextArea 
+                              value={generatedMethodName}
+                              readOnly
+                              placeholder="选择方法并输入参数后，将在此显示生成的方法调用字符串"
+                              autoSize={{ minRows: 2, maxRows: 4 }}
+                              style={{ backgroundColor: '#f5f5f5', color: '#666' }}
+                          />
+                      </Form.Item>
+                      
+                      {selectedMethod && selectedMethod.hasParameters && (
+                          <Form.Item label="方法参数">
+                              <div style={{ width: '100%' }}>
+                                  {methodParameters.map((param, index) => (
+                                      <div key={index} style={{ marginBottom: '12px' }}>
+                                          <div style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                                              <span style={{ fontWeight: 'bold' }}>{param.name}</span>
+                                              <span style={{ marginLeft: '8px' }}>({param.typeDisplayName})</span>
+                                          </div>
+                                          {param.isPrimitive ? (
+                                              <Input 
+                                                  placeholder={`请输入${param.typeDisplayName}`}
+                                                  value={parameterValues[param.name] || ''}
+                                                  onChange={(e) => handleParameterValueChange(param.name, e.target.value)}
+                                                  onBlur={handleParameterBlur}
+                                              />
+                                          ) : (
+                                              <Input 
+                                                  placeholder={`请输入${param.typeDisplayName}`}
+                                                  value={parameterValues[param.name] || ''}
+                                                  onChange={(e) => handleParameterValueChange(param.name, e.target.value)}
+                                                  onBlur={handleParameterBlur}
+                                              />
+                                          )}
+                                      </div>
+                                  ))}
+                              </div>
+                          </Form.Item>
+                      )}
+                  </>
               )}
               
               {jobType === 2 && (

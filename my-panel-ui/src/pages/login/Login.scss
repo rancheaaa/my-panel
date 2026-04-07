@@ -70,8 +70,16 @@
 // Generate 50 particles
 @for $i from 1 through 50 {
   $isStar: math.random(10) > 7; // 30% chance to be a star
-  $color: if($isStar, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, math.random(5) * 0.1 + 0.1));
-  $size: if($isStar, (math.random(3) + 2) * 1px, (math.random(4) + 1) * 1px);
+  
+  // 使用 @if 指令替代已弃用的 if() 函数
+  $color: rgba(255, 255, 255, math.random(5) * 0.1 + 0.1);
+  $size: (math.random(4) + 1) * 1px;
+  
+  @if $isStar {
+    $color: rgba(255, 255, 255, 0.9);
+    $size: (math.random(3) + 2) * 1px;
+  }
+  
   $opacity: math.random(5) * 0.1 + 0.1;
   $left: math.random(100) * 1%;
   $top: math.random(100) * 1%;

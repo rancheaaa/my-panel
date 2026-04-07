@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.task.quartz;
+package com.cq.panel.admin.server.quartz;
 
 import org.quartz.CronExpression;
 

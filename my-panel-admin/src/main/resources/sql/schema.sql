@@ -347,9 +347,9 @@ CREATE TABLE IF NOT EXISTS `rc_env` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '环境ID',
   `env_name` varchar(100) NOT NULL COMMENT '环境名称',
   `env_desc` varchar(200) DEFAULT NULL COMMENT '环境描述',
-  `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_by` varchar(64) DEFAULT 'auto' COMMENT '创建者',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_by` varchar(64) DEFAULT 'auto' COMMENT '更新者',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='环境管理表';
@@ -361,9 +361,9 @@ CREATE TABLE IF NOT EXISTS `rc_project` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '应用ID',
   `project_name` varchar(100) NOT NULL COMMENT '应用名称',
   `project_desc` varchar(200) DEFAULT NULL COMMENT '应用描述',
-  `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_by` varchar(64) DEFAULT 'auto' COMMENT '创建者',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_by` varchar(64) DEFAULT 'auto' COMMENT '更新者',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='应用管理表';
@@ -379,9 +379,9 @@ CREATE TABLE IF NOT EXISTS `rc_config` (
   `config_value` text COMMENT '配置值',
   `config_desc` varchar(200) DEFAULT NULL COMMENT '配置描述',
   `source` char(1) DEFAULT '0' COMMENT '来源（0手工新增 1批量导入）',
-  `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_by` varchar(64) DEFAULT 'auto' COMMENT '创建者',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_by` varchar(64) DEFAULT 'auto' COMMENT '更新者',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_env_project_key` (`env_id`,`project_id`,`config_key`)
@@ -395,9 +395,9 @@ CREATE TABLE IF NOT EXISTS `rc_access_token` (
   `token_value` varchar(200) NOT NULL COMMENT 'Token值',
   `token_desc` varchar(200) DEFAULT NULL COMMENT 'Token描述',
   `status` char(1) DEFAULT '0' COMMENT '状态（0启用 1禁用）',
-  `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_by` varchar(64) DEFAULT 'auto' COMMENT '创建者',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_by` varchar(64) DEFAULT 'auto' COMMENT '更新者',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AccessToken管理表';
@@ -414,9 +414,9 @@ CREATE TABLE IF NOT EXISTS `rc_node` (
   `status` char(1) DEFAULT '0' COMMENT '状态（0在线 1离线）',
   `zone` varchar(50) DEFAULT 'default' COMMENT '服务所在区域',
   `last_refresh_time` datetime DEFAULT NULL COMMENT '最后刷新时间',
-  `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_by` varchar(64) DEFAULT 'auto' COMMENT '创建者',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_by` varchar(64) DEFAULT 'auto' COMMENT '更新者',
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_env_project_ip_port` (`env_id`,`project_id`,`node_ip`,`node_port`)
@@ -433,8 +433,9 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
     `node_enabled` tinyint NOT NULL DEFAULt '0' COMMENT '节点是否启用：0-启用 1-临时关闭 2-永久关闭',
     `node_status` tinyint NOT NULL DEFAULT '0' COMMENT '节点状态：0-离线 1-在线 2-未知',
     `remark` varchar(512) DEFAULT NULL COMMENT '备注信息',
-    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
-    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `last_refresh_time` datetime DEFAULT NULL COMMENT '最后刷新时间',
+    `create_by` varchar(64) DEFAULT 'auto' COMMENT '创建者',
+    `update_by` varchar(64) DEFAULT 'auto' COMMENT '更新者',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),

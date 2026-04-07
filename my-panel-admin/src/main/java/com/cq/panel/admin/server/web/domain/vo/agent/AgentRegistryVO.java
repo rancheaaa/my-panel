@@ -39,6 +39,9 @@ public class AgentRegistryVO {
     @Schema(description = "备注")
     private String remark;
 
+    @Schema(description = "最后刷新时间")
+    private Date lastRefreshTime;
+
     @Schema(description = "创建者")
     private String createBy;
 

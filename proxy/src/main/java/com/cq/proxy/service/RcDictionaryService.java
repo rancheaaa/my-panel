@@ -6,7 +6,7 @@ import com.cq.proxy.repository.entity.RcProject;
 import com.cq.proxy.repository.mapper.RcEnvMapper;
 import com.cq.proxy.repository.mapper.RcProjectMapper;
 import java.time.Clock;
-import java.time.LocalDateTime;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,16 +15,14 @@ public class RcDictionaryService {
 
   private final RcEnvMapper envMapper;
   private final RcProjectMapper projectMapper;
-  private final Clock clock;
 
-  public RcDictionaryService(RcEnvMapper envMapper, RcProjectMapper projectMapper, Clock clock) {
+  public RcDictionaryService(RcEnvMapper envMapper, RcProjectMapper projectMapper) {
     this.envMapper = envMapper;
     this.projectMapper = projectMapper;
-    this.clock = clock;
   }
 
   @Transactional
-  public long getOrCreateEnvId(String envName) {
+  public long getEnvId(String envName) {
     if (envName == null || envName.isBlank()) {
       throw new BusinessException(400, "environment is required");
     }
@@ -32,21 +30,11 @@ public class RcDictionaryService {
     if (existing != null && existing.getId() != null) {
       return existing.getId();
     }
-
-    RcEnv env = new RcEnv();
-    env.setEnvName(envName);
-    LocalDateTime now = LocalDateTime.now(clock);
-    env.setCreateTime(now);
-    env.setUpdateTime(now);
-    envMapper.insert(env);
-    if (env.getId() == null) {
-      throw new BusinessException(500, "failed to create environment");
-    }
-    return env.getId();
+    throw new IllegalStateException("there is no environment with name " + envName);
   }
 
   @Transactional
-  public long getOrCreateProjectId(String projectName) {
+  public long getProjectId(String projectName) {
     if (projectName == null || projectName.isBlank()) {
       throw new BusinessException(400, "serviceName is required");
     }
@@ -54,16 +42,6 @@ public class RcDictionaryService {
     if (existing != null && existing.getId() != null) {
       return existing.getId();
     }
-
-    RcProject project = new RcProject();
-    project.setProjectName(projectName);
-    LocalDateTime now = LocalDateTime.now(clock);
-    project.setCreateTime(now);
-    project.setUpdateTime(now);
-    projectMapper.insert(project);
-    if (project.getId() == null) {
-      throw new BusinessException(500, "failed to create project");
-    }
-    return project.getId();
+    throw new IllegalStateException("there  is no project with name " + projectName);
   }
 }

@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.task.quartz;
+package com.cq.panel.admin.server.quartz;
 
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;

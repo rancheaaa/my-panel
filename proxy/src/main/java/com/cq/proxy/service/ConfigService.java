@@ -51,8 +51,8 @@ public class ConfigService {
       return cached;
     }
 
-    long envId = dictionaryService.getOrCreateEnvId(environment);
-    long projectId = dictionaryService.getOrCreateProjectId(serviceName);
+    long envId = dictionaryService.getEnvId(environment);
+    long projectId = dictionaryService.getProjectId(serviceName);
 
     RcConfig config = configMapper.selectByEnvProjectKey(envId, projectId, configKey);
 
@@ -74,8 +74,8 @@ public class ConfigService {
       throw new BusinessException(400, "request body is required");
     }
 
-    long envId = dictionaryService.getOrCreateEnvId(request.environment());
-    long projectId = dictionaryService.getOrCreateProjectId(request.serviceName());
+    long envId = dictionaryService.getEnvId(request.environment());
+    long projectId = dictionaryService.getProjectId(request.serviceName());
 
     RcConfig existing = configMapper.selectByEnvProjectKey(envId, projectId, configKey);
 

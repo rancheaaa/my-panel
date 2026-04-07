@@ -79,9 +79,9 @@ public class ProxyShutdownManager {
         try {
             // 获取环境ID和项目ID
             String environmentName = EnvNameConstant.DEFAULT_ENV_NAME;
-            long envId = dictionaryService.getOrCreateEnvId(environmentName);
+            long envId = dictionaryService.getEnvId(environmentName);
             String serviceName = PROXY_SERVICE_NAME;
-            long projectId = dictionaryService.getOrCreateProjectId(serviceName);
+            long projectId = dictionaryService.getProjectId(serviceName);
             
             // 查询当前Proxy服务的注册节点
             var nodes = nodeMapper.selectByEnvProjectIpPort(envId, projectId, localHost, localPort);

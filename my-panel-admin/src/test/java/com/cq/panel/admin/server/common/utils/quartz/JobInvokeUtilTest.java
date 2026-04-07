@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.common.utils.quartz;
 
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
-import com.cq.panel.admin.server.task.quartz.JobInvokeUtil;
+import com.cq.panel.admin.server.quartz.JobInvokeUtil;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;

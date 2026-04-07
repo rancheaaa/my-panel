@@ -86,3 +86,20 @@ export function getJobGroups(jobGroup) {
     params: { jobGroup }
   });
 }
+
+// 扫描内置方法列表
+export function scanMethods() {
+  return request({
+    url: '/monitor/job/methods',
+    method: 'get'
+  });
+}
+
+// 验证内置方法
+export function validateMethod(data) {
+  return request({
+    url: '/monitor/job/validateMethod',
+    method: 'post',
+    data: data
+  });
+}

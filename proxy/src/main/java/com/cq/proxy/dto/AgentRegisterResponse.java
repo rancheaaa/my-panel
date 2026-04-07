@@ -45,6 +45,9 @@ public class AgentRegisterResponse {
     @Schema(description = "备注")
     private String remark;
 
+    @Schema(description = "最后刷新时间")
+    private String lastRefreshTime;
+
     @Schema(description = "创建时间")
     private String createTime;
 

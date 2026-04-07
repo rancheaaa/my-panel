@@ -407,6 +407,7 @@ const AgentManage = () => {
       }
     },
     { title: '备注', dataIndex: 'remark', key: 'remark', align: 'center', width: 200, ellipsis: true },
+    { title: '最后刷新时间', dataIndex: 'lastRefreshTime', key: 'lastRefreshTime', align: 'center', width: 180 },
     { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 180 },
     { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
     {

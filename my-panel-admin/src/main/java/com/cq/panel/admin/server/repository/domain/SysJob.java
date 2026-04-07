@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.repository.domain;
 
 import com.cq.panel.admin.server.common.annotation.Excel;
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;
-import com.cq.panel.admin.server.task.quartz.CronUtils;
+import com.cq.panel.admin.server.quartz.CronUtils;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

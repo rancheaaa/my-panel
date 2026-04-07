@@ -1,15 +1,18 @@
 package com.cq.panel.admin.server.web.controller.monitor;
 
 import com.cq.panel.admin.server.common.utils.JobLogUtil;
-import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
-import com.cq.panel.admin.server.task.quartz.JobInvokeUtil;
+import com.cq.panel.admin.server.quartz.JobInvokeUtil;
+import com.cq.panel.admin.server.web.domain.dto.monitor.MethodValidationDTO;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobDTO;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobQueryDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
+import com.cq.panel.admin.server.web.domain.vo.monitor.MethodInfoVO;
+import com.cq.panel.admin.server.web.domain.vo.monitor.MethodValidationVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysJobVO;
 import com.cq.panel.admin.server.web.converter.monitor.SysJobConverter;
 import com.cq.panel.admin.server.web.exception.ServiceException;
+import com.cq.panel.admin.server.service.IMethodScannerService;
 import com.github.pagehelper.PageInfo;
 import com.cq.panel.admin.server.common.annotation.Log;
 import com.cq.panel.admin.server.common.constant.Constants;
@@ -18,8 +21,8 @@ import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.web.exception.job.TaskException;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
-import com.cq.panel.admin.server.task.quartz.CronUtils;
-import com.cq.panel.admin.server.task.quartz.ScheduleUtils;
+import com.cq.panel.admin.server.quartz.CronUtils;
+import com.cq.panel.admin.server.quartz.ScheduleUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.admin.server.repository.service.ISysJobService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,7 +34,6 @@ import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.Date;
 import java.util.List;
 
@@ -51,10 +53,13 @@ public class SysJobController extends BaseController
 
     private final TaskExecutor threadPoolTaskExecutor;
 
-    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter, TaskExecutor threadPoolTaskExecutor) {
+    private final IMethodScannerService methodScannerService;
+
+    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter, TaskExecutor threadPoolTaskExecutor, IMethodScannerService methodScannerService) {
         this.jobService = jobService;
         this.jobConverter = jobConverter;
         this.threadPoolTaskExecutor = threadPoolTaskExecutor;
+        this.methodScannerService = methodScannerService;
     }
 
     /**
@@ -80,6 +85,30 @@ public class SysJobController extends BaseController
     public Result<List<String>> getJobGroups(@Parameter(description = "任务组名（支持模糊查询）") @RequestParam(required = false) String jobGroup)
     {
         return Result.success(jobService.selectJobGroupList(jobGroup));
+    }
+
+    /**
+     * 扫描内置方法列表
+     */
+    @Operation(summary = "扫描内置方法列表", description = "扫描task包下所有组件的public方法，返回可调用的内置方法列表")
+    @GetMapping("/methods")
+    public Result<List<MethodInfoVO>> scanMethods()
+    {
+        return Result.success(methodScannerService.scanTaskMethods());
+    }
+
+    /**
+     * 验证内置方法
+     */
+    @Operation(summary = "验证内置方法", description = "校验内置方法字符串是否正确，包括方法是否存在、入参类型是否正确等")
+    @PostMapping("/validateMethod")
+    public Result<MethodValidationVO> validateMethod(@Validated @RequestBody MethodValidationDTO dto)
+    {
+        if (StringUtils.isEmpty(dto.getParameterValues())) {
+            return Result.success(methodScannerService.validateMethod(dto.getMethodName()));
+        } else {
+            return Result.success(methodScannerService.validateMethodWithParameters(dto.getMethodName(), dto.getParameterValues()));
+        }
     }
 
     /**

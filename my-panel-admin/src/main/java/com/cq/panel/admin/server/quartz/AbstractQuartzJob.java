@@ -1,14 +1,9 @@
-package com.cq.panel.admin.server.task.quartz;
+package com.cq.panel.admin.server.quartz;
 
-import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;
-import com.cq.panel.admin.server.common.utils.ExceptionUtil;
 import com.cq.panel.admin.server.common.utils.JobLogUtil;
 import com.cq.panel.admin.server.common.utils.bean.BeanUtils;
-import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
-import com.cq.panel.admin.server.repository.domain.SysJobLog;
-import com.cq.panel.admin.server.repository.service.ISysJobLogService;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;

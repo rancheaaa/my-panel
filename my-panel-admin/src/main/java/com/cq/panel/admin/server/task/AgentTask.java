@@ -23,7 +23,7 @@ public class AgentTask
     }
 
     /**
-     * 扫描并下线超时节点
+     * 扫描agent节点并下线超时节点
      * 
      * @param timeoutSeconds 超时时间（秒）
      */

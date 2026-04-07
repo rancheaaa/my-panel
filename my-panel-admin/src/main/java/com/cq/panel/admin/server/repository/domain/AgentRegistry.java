@@ -52,4 +52,8 @@ public class AgentRegistry extends BaseEntity
     /** 备注信息 */
     @Excel(name = "备注")
     private String remark;
+
+    /** 最后刷新时间 */
+    @Excel(name = "最后刷新时间")
+    private java.util.Date lastRefreshTime;
 }

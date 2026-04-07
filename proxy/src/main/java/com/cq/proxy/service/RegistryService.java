@@ -66,8 +66,8 @@ public class RegistryService {
             throw new BusinessException(400, "host is required");
         }
 
-        long envId = dictionaryService.getOrCreateEnvId(request.environment());
-        long projectId = dictionaryService.getOrCreateProjectId(request.serviceName());
+        long envId = dictionaryService.getEnvId(request.environment());
+        long projectId = dictionaryService.getProjectId(request.serviceName());
 
         List<RcNode> existingNodes = nodeMapper.selectByEnvProjectIpPort(envId, projectId, request.host(), request.port());
 
@@ -76,6 +76,7 @@ public class RegistryService {
             for (RcNode existingNode : existingNodes) {
                 existingNode.setLastRefreshTime(now);
                 existingNode.setUpdateTime(now);
+                existingNode.setStatus("0");
                 nodeMapper.updateById(existingNode);
             }
         }
@@ -96,8 +97,8 @@ public class RegistryService {
             throw new BusinessException(400, "host is required");
         }
 
-        long envId = dictionaryService.getOrCreateEnvId(request.environment());
-        long projectId = dictionaryService.getOrCreateProjectId(request.serviceName());
+        long envId = dictionaryService.getEnvId(request.environment());
+        long projectId = dictionaryService.getProjectId(request.serviceName());
 
         List<RcNode> existingNodes = nodeMapper.selectByEnvProjectIpPort(envId, projectId, request.host(), request.port());
 
@@ -145,8 +146,8 @@ public class RegistryService {
             return cached;
         }
 
-        long envId = dictionaryService.getOrCreateEnvId(environment);
-        long projectId = dictionaryService.getOrCreateProjectId(serviceName);
+        long envId = dictionaryService.getEnvId(environment);
+        long projectId = dictionaryService.getProjectId(serviceName);
         LocalDateTime aliveThreshold = LocalDateTime.now().minusSeconds(registryProperties.getHeartbeatTimeoutSeconds());
 
         List<RcNode> nodes = nodeMapper.selectByEnvProjectStatus(envId, projectId, "0");
@@ -217,6 +218,7 @@ public class RegistryService {
             existing.setOsType(request.getOsType());
             existing.setAppId(request.getAppId());
             existing.setNodeStatus(request.getNodeStatus());
+            existing.setLastRefreshTime(now);
             existing.setUpdateTime(now);
             agentRegistryMapper.updateById(existing);
             result = existing;
@@ -230,6 +232,7 @@ public class RegistryService {
             agentRegistry.setAgentPort(request.getAgentPort());
             agentRegistry.setNodeStatus(request.getNodeStatus());
             agentRegistry.setNodeEnabled(0);
+            agentRegistry.setLastRefreshTime(now);
             agentRegistry.setCreateTime(now);
             agentRegistry.setUpdateTime(now);
             agentRegistryMapper.insert(agentRegistry);
@@ -246,6 +249,7 @@ public class RegistryService {
                 .nodeEnabled(result.getNodeEnabled())
                 .nodeStatus(result.getNodeStatus())
                 .remark(result.getRemark())
+                .lastRefreshTime(result.getLastRefreshTime() != null ? result.getLastRefreshTime().format(dateTimeFormatter) : null)
                 .createTime(result.getCreateTime() != null ? result.getCreateTime().format(dateTimeFormatter) : null)
                 .updateTime(result.getUpdateTime() != null ? result.getUpdateTime().format(dateTimeFormatter) : null)
                 .build();
@@ -264,6 +268,7 @@ public class RegistryService {
 
         if (existing != null) {
             existing.setNodeStatus(1);
+            existing.setLastRefreshTime(LocalDateTime.now());
             existing.setUpdateTime(LocalDateTime.now());
             agentRegistryMapper.updateById(existing);
             return true;

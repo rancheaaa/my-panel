@@ -41,7 +41,11 @@ public class ArchDiagramHistoryController extends BaseController {
         startPage();
         ArchDiagramHistory history = converter.toEntity(dto);
         List<ArchDiagramHistory> list = historyService.selectArchDiagramHistoryList(history);
-        return Result.success(new PageInfo<>(converter.toHistoryVOList(list)));
+        PageInfo<ArchDiagramHistory> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramHistoryVO> voList = converter.toHistoryVOList(list);
+        PageInfo<ArchDiagramHistoryVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询架构图版本历史", description = "根据架构图ID查询版本历史列表")

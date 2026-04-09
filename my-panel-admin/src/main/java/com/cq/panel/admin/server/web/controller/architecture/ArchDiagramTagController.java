@@ -41,7 +41,11 @@ public class ArchDiagramTagController extends BaseController {
         startPage();
         ArchDiagramTag tag = converter.toEntity(dto);
         List<ArchDiagramTag> list = tagService.selectArchDiagramTagList(tag);
-        return Result.success(new PageInfo<>(converter.toTagVOList(list)));
+        PageInfo<ArchDiagramTag> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramTagVO> voList = converter.toTagVOList(list);
+        PageInfo<ArchDiagramTagVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询所有标签", description = "查询所有启用的标签")

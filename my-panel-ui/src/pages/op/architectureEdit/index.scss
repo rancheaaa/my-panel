@@ -2,7 +2,7 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  backgroundColor: #f5f5f5;
+  background-color: #f5f5f5;
 
   .header-toolbar {
     padding: 16px 24px;
@@ -42,8 +42,17 @@
     flex: 1;
     position: relative;
     overflow: hidden;
+    
+    // 确保 Spin 及其内部容器铺满
+    .ant-spin-nested-loading,
+    .ant-spin-container {
+      height: 100%;
+      width: 100%;
+    }
 
     .react-flow-wrapper {
+      height: 100%;
+      width: 100%;
       background-color: #fafafa;
       background-image: radial-gradient(circle at 1px 1px, #ddd 1px, transparent 0);
       background-size: 20px 20px;
@@ -98,6 +107,15 @@
 
 .react-flow__node {
   pointer-events: all !important;
+  cursor: grab !important;
+}
+
+.react-flow__node:active {
+  cursor: grabbing !important;
+}
+
+.react-flow__pane {
+  cursor: default !important;
 }
 
 .react-flow__connection-line {
@@ -130,6 +148,66 @@
   /* 交互路径：始终保持透明但可交互 */
   path {
     transition: all 0.2s ease;
+  }
+}
+
+/* 可编辑连线标签样式 */
+.editable-edge-label-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid #d9d9d9;
+  font-size: 12px;
+  font-weight: 500;
+  color: #595959;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  border: 2px solid transparent;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    border-color: #40a9ff;
+    color: #1890ff;
+
+    .edge-edit-action {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  &.hovered {
+    border-color: #1890ff;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+  }
+
+  .editable-edge-label {
+    white-space: nowrap;
+  }
+
+  .edge-edit-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: #f0f7ff;
+    color: #1890ff;
+    border-radius: 50%;
+    opacity: 0.6;
+    transform: scale(0.8);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #1890ff;
+      color: white;
+      transform: scale(1.1) !important;
+    }
   }
 }
 
@@ -205,6 +283,20 @@
   }
 }
 
+.hover-edit-hint {
+  position: fixed;
+  z-index: 3000;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.78);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+}
+
 .add-point-button {
   width: 20px;
   height: 20px;
@@ -240,7 +332,7 @@
   max-width: 280px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: default;
+  cursor: inherit;
   position: relative;
 
   &.selected {

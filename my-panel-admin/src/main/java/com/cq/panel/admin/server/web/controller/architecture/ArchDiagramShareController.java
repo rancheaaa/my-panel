@@ -41,7 +41,11 @@ public class ArchDiagramShareController extends BaseController {
         startPage();
         ArchDiagramShare share = converter.toEntity(dto);
         List<ArchDiagramShare> list = shareService.selectArchDiagramShareList(share);
-        return Result.success(new PageInfo<>(converter.toShareVOList(list)));
+        PageInfo<ArchDiagramShare> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramShareVO> voList = converter.toShareVOList(list);
+        PageInfo<ArchDiagramShareVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询架构图分享", description = "根据架构图ID查询分享列表")

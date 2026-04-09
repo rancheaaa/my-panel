@@ -41,7 +41,11 @@ public class ArchNodeGroupController extends BaseController {
         startPage();
         ArchNodeGroup nodeGroup = converter.toEntity(dto);
         List<ArchNodeGroup> list = nodeGroupService.selectArchNodeGroupList(nodeGroup);
-        return Result.success(new PageInfo<>(converter.toNodeGroupVOList(list)));
+        PageInfo<ArchNodeGroup> entityPageInfo = new PageInfo<>(list);
+        List<ArchNodeGroupVO> voList = converter.toNodeGroupVOList(list);
+        PageInfo<ArchNodeGroupVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询架构图分组", description = "根据架构图ID查询分组列表")

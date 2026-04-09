@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Button, 
   Space, 
@@ -11,7 +12,8 @@ import {
   Tag,
   Select,
   InputNumber,
-  Upload
+  Upload,
+  Spin
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -23,7 +25,11 @@ import {
   ApiOutlined,
   DatabaseOutlined,
   CloseOutlined,
-  SyncOutlined
+  SyncOutlined,
+  CloudUploadOutlined,
+  HistoryOutlined,
+  SendOutlined,
+  ArrowLeftOutlined
 } from '@ant-design/icons';
 import { 
   useNodesState, 
@@ -47,6 +53,88 @@ import {
 import 'reactflow/dist/style.css';
 import './index.scss';
 
+const normalizeConfigValue = (value) => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const buildDiagramSignature = (diagramName, nodes, edges) => {
+  const normalizedNodes = (nodes || [])
+    .map((node) => ({
+      id: String(node.id ?? ''),
+      type: String(node.type ?? ''),
+      positionX: Math.round(node.position?.x ?? 0),
+      positionY: Math.round(node.position?.y ?? 0),
+      data: {
+        name: String(node.data?.name ?? ''),
+        type: String(node.data?.type ?? ''),
+        description: String(node.data?.description ?? ''),
+        status: String(node.data?.status ?? ''),
+        ip: String(node.data?.ip ?? ''),
+        port: String(node.data?.port ?? ''),
+        config: normalizeConfigValue(node.data?.config),
+      },
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  const normalizedEdges = (edges || [])
+    .map((edge) => {
+      const style = edge.style || {};
+      const points = Array.isArray(edge.data?.points) ? edge.data.points : [];
+      return {
+        id: String(edge.id ?? ''),
+        source: String(edge.source ?? ''),
+        target: String(edge.target ?? ''),
+        sourceHandle: String(edge.sourceHandle ?? ''),
+        targetHandle: String(edge.targetHandle ?? ''),
+        label: String(edge.label ?? ''),
+        edgeType: String(edge.edgeType ?? edge.data?.edgeType ?? ''),
+        animated: Boolean(edge.animated),
+        style: {
+          stroke: String(style.stroke ?? ''),
+          strokeWidth: Number(style.strokeWidth ?? 0),
+          strokeDasharray: style.strokeDasharray == null ? '' : String(style.strokeDasharray),
+        },
+        markerStart: edge.markerStart
+          ? { type: String(edge.markerStart.type ?? ''), color: String(edge.markerStart.color ?? '') }
+          : null,
+        markerEnd: edge.markerEnd
+          ? { type: String(edge.markerEnd.type ?? ''), color: String(edge.markerEnd.color ?? '') }
+          : null,
+        points: points.map((p) => ({ x: Math.round(p.x ?? 0), y: Math.round(p.y ?? 0) })),
+      };
+    })
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  return JSON.stringify({
+    diagramName: String(diagramName ?? ''),
+    nodes: normalizedNodes,
+    edges: normalizedEdges,
+  });
+};
+
+// 导入架构相关的 API
+import { 
+  getDiagram, 
+  loadDiagramData, 
+  replaceDiagramData,
+  updateDiagram,
+  publishDiagram,
+  addNode,
+  updateNode,
+  delNode,
+  addEdge,
+  updateEdge,
+  delEdge
+} from '@/api/op/architecture';
+import { listAllNodeType } from '@/api/op/archNodeType';
+import { listHistoryByDiagramId, createSnapshot, restoreVersion } from '@/api/op/archHistory';
+
 const { Option } = Select;
 
 // 自定义可编辑连线组件
@@ -62,22 +150,75 @@ const EditableEdge = ({
   markerEnd,
   selected,
   data,
+  label,
 }) => {
   const { setEdges } = useReactFlow();
+  const resolvedEdgeType = data?.edgeType || 'smoothstep';
+  const points = useMemo(() => {
+    if (!data?.points) return [];
+    if (Array.isArray(data.points)) return data.points;
+    if (typeof data.points === 'string') {
+      try {
+        const parsed = JSON.parse(data.points);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [data?.points]);
   
   // 计算基础路径
   const getPath = () => {
     // 如果有自定义点，构造折线路径
-    if (data?.points && data.points.length > 0) {
+    if (points.length > 0) {
       let path = `M ${sourceX},${sourceY}`;
-      data.points.forEach(point => {
+      points.forEach(point => {
         path += ` L ${point.x},${point.y}`;
       });
       path += ` L ${targetX},${targetY}`;
       return path;
     }
     
-    // 默认使用贝塞尔曲线
+    if (resolvedEdgeType === 'straight') {
+      const [path] = getStraightPath({
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+      });
+      return path;
+    }
+
+    if (resolvedEdgeType === 'step') {
+      const [path] = getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 0,
+      });
+      return path;
+    }
+
+    if (resolvedEdgeType === 'smoothstep') {
+      const [path] = getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+      });
+      return path;
+    }
+
+    if (resolvedEdgeType === 'editable') {
+      return `M ${sourceX},${sourceY} L ${targetX},${targetY}`;
+    }
+
     const [path] = getBezierPath({
       sourceX,
       sourceY,
@@ -89,8 +230,57 @@ const EditableEdge = ({
     return path;
   };
 
+  // 计算标签位置
+  const getLabelPosition = () => {
+    if (points.length > 0) {
+      // 如果有折点，取中间折点的位置作为标签位置
+      const midIndex = Math.floor(points.length / 2);
+      return { labelX: points[midIndex].x, labelY: points[midIndex].y };
+    }
+    
+    if (resolvedEdgeType === 'editable' || resolvedEdgeType === 'straight') {
+      return { labelX: (sourceX + targetX) / 2, labelY: (sourceY + targetY) / 2 };
+    }
+
+    if (resolvedEdgeType === 'step') {
+      const [, labelX, labelY] = getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 0,
+      });
+      return { labelX, labelY };
+    }
+
+    if (resolvedEdgeType === 'smoothstep') {
+      const [, labelX, labelY] = getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+      });
+      return { labelX, labelY };
+    }
+
+    const [, labelX, labelY] = getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+    });
+    return { labelX, labelY };
+  };
+
   const [isHovered, setIsHovered] = useState(false);
   const edgePath = getPath();
+  const { labelX, labelY } = getLabelPosition();
 
   // 计算点到线段的距离
   const getDistanceToSegment = (x, y, x1, y1, x2, y2) => {
@@ -148,6 +338,12 @@ const EditableEdge = ({
   // 在连线中间点击并拖拽
   const onEdgeMouseDown = (event) => {
     if (event.button !== 0) return; // 只响应左键
+    
+    // 如果是双击（短时间内两次点击），则不添加点，让 ReactFlow 处理 onEdgeDoubleClick
+    if (event.detail > 1) {
+      return;
+    }
+
     event.stopPropagation();
 
     const pane = document.querySelector('.react-flow__pane');
@@ -224,6 +420,14 @@ const EditableEdge = ({
     );
   };
 
+  const handleEditLabel = (e) => {
+    e.stopPropagation();
+    // 触发自定义事件
+    window.dispatchEvent(new CustomEvent('edit-edge-label', { 
+      detail: { id } 
+    }));
+  };
+
   return (
     <g
       onMouseEnter={() => setIsHovered(true)}
@@ -260,6 +464,34 @@ const EditableEdge = ({
         }}
       />
       
+      {/* 标签渲染 */}
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+            zIndex: 1000,
+          }}
+          className="nodrag nopan"
+        >
+          <div 
+            className={`editable-edge-label-container ${isHovered ? 'hovered' : ''}`}
+            onDoubleClick={handleEditLabel}
+            title="双击编辑标签"
+          >
+            {label && (
+              <div className="editable-edge-label">
+                {label}
+              </div>
+            )}
+            <div className="edge-edit-action" onClick={handleEditLabel} title="修改连线属性">
+              <SettingOutlined />
+            </div>
+          </div>
+        </div>
+      </EdgeLabelRenderer>
+      
       {/* 只有选中或悬浮时才显示控制点 */}
       {(selected || isHovered) && (
         <EdgeLabelRenderer>
@@ -269,7 +501,7 @@ const EditableEdge = ({
             onMouseLeave={() => setIsHovered(false)}
           >
             {/* 控制点 */}
-            {data?.points?.map((point, index) => (
+            {points.map((point, index) => (
               <div
                 key={`${id}-point-${index}`}
                 style={{
@@ -481,7 +713,7 @@ const CustomNode = ({ data, selected, customNodeTypes = [] }) => {
       
       <div className="node-tags">
         <Tag color="blue">
-          {data.type.toUpperCase()}
+          {(data.type || 'unknown').toUpperCase()}
         </Tag>
         <Tag color={data.status === 'running' ? 'green' : 'red'}>
           {data.status === 'running' ? '运行中' : '已停止'}
@@ -519,6 +751,10 @@ const CustomNode = ({ data, selected, customNodeTypes = [] }) => {
 };
 
 const ArchitectureFlow = () => {
+  const { id: routeId } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const diagramId = routeId;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isEdgeModalOpen, setIsEdgeModalOpen] = useState(false);
@@ -530,22 +766,227 @@ const ArchitectureFlow = () => {
   const [currentNode, setCurrentNode] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
-  const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
-  const [architectureName, setArchitectureName] = useState('默认架构');
+  const [architectureName, setArchitectureName] = useState('加载中...');
   const [isConnecting, setIsConnecting] = useState(false);
   const connectSuccessful = React.useRef(false);
+  const connectionActionRef = React.useRef(null);
   const [customNodeTypes, setCustomNodeTypes] = useState([]);
-  const [isCustomNodeModalOpen, setIsCustomNodeModalOpen] = useState(false);
-  const [customNodeForm] = Form.useForm();
+  const [hoverHintTarget, setHoverHintTarget] = useState(null);
+  const [hoverHintPos, setHoverHintPos] = useState({ x: 0, y: 0 });
+  const [isHoverHintVisible, setIsHoverHintVisible] = useState(false);
+  const hoverHintTimerRef = React.useRef(null);
+  
+  // 版本历史相关状态
+  const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
+  const [snapshotForm] = Form.useForm();
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
   const [defaultNodes, setDefaultNodes] = useState([]);
   const [defaultEdges, setDefaultEdges] = useState([]);
+  const savedSignatureRef = React.useRef('');
+  const initializeDefaultArchitectureRef = React.useRef(null);
+
+  const currentSignature = useMemo(
+    () => buildDiagramSignature(architectureName, nodes, edges),
+    [architectureName, nodes, edges]
+  );
+  const isModified = useMemo(() => {
+    if (!savedSignatureRef.current) return false;
+    return currentSignature !== savedSignatureRef.current;
+  }, [currentSignature]);
+
+  useEffect(() => {
+    if (hoverHintTimerRef.current) {
+      clearTimeout(hoverHintTimerRef.current);
+      hoverHintTimerRef.current = null;
+    }
+    setIsHoverHintVisible(false);
+    if (!hoverHintTarget) return;
+
+    hoverHintTimerRef.current = setTimeout(() => {
+      setIsHoverHintVisible(true);
+    }, 1000);
+
+    return () => {
+      if (hoverHintTimerRef.current) {
+        clearTimeout(hoverHintTimerRef.current);
+        hoverHintTimerRef.current = null;
+      }
+    };
+  }, [hoverHintTarget]);
+
+  useEffect(() => {
+    if (!hoverHintTarget) return;
+    const onMouseMove = (event) => {
+      setHoverHintPos({ x: event.clientX, y: event.clientY });
+    };
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+    };
+  }, [hoverHintTarget]);
+
+  // 加载节点类型
+  const loadNodeTypes = useCallback(async () => {
+    try {
+      const response = await listAllNodeType();
+      if (response.code === 200) {
+        const safeJsonParse = (value) => {
+          if (!value) return null;
+          if (typeof value === 'object') return value;
+          try {
+            return JSON.parse(value);
+          } catch {
+            return null;
+          }
+        };
+
+        const extractPrimaryColor = (defaultStyle) => {
+          const styleObj = safeJsonParse(defaultStyle);
+          return styleObj?.borderColor || styleObj?.backgroundColor || styleObj?.color || '#1890ff';
+        };
+
+        // 后端返回的节点类型转换为前端使用的格式
+        const types = response.data.map(item => ({
+          type: item.typeCode,
+          name: item.typeName,
+          description: item.remark,
+          icon: item.icon || 'ApiOutlined',
+          color: extractPrimaryColor(item.defaultStyle),
+          defaultStyle: safeJsonParse(item.defaultStyle)
+        }));
+        setCustomNodeTypes(types);
+      }
+    } catch (error) {
+      console.error('加载节点类型失败:', error);
+      message.error('加载节点类型失败');
+    }
+  }, []);
+
+  // 加载架构图数据
+  const loadData = useCallback(async (id) => {
+    if (!id) {
+      initializeDefaultArchitectureRef.current?.('默认架构');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 1. 获取架构图基本信息
+      let nextDiagramName = architectureName;
+      const diagRes = await getDiagram(id);
+      if (diagRes.code === 200) {
+        nextDiagramName = diagRes.data.diagramName;
+        setArchitectureName(nextDiagramName);
+      }
+
+      // 2. 获取架构图节点和连线数据
+      const dataRes = await loadDiagramData(id);
+      if (dataRes.code === 200 && dataRes.data) {
+        const { nodes: backendNodes = [], edges: backendEdges = [] } = dataRes.data;
+        
+        // 转换节点格式
+        const formattedNodes = (backendNodes || []).map(node => {
+          let properties = {};
+          try {
+            properties = node.nodeProperties ? JSON.parse(node.nodeProperties) : {};
+          } catch (e) {
+            console.error('解析节点属性失败', e);
+          }
+
+          return {
+            id: node.id.toString(),
+            type: node.nodeType || 'unknown',
+            position: { 
+              x: node.positionX ?? node.xPosition ?? 0, 
+              y: node.positionY ?? node.yPosition ?? 0 
+            },
+            data: {
+              name: node.nodeName,
+              type: node.nodeType || 'unknown',
+              description: node.description || node.remark,
+              status: node.status === '0' ? 'running' : 'stopped',
+              ip: properties.ip || node.ip,
+              port: properties.port || node.port,
+              config: properties.config || node.config
+            }
+          };
+        });
+
+        // 转换连线格式
+        const formattedEdges = (backendEdges || []).map(edge => {
+          let style = {};
+          try {
+            style = edge.edgeStyle ? JSON.parse(edge.edgeStyle) : {};
+          } catch (e) {
+            console.error('解析连线样式失败', e);
+          }
+
+          let properties = {};
+          try {
+            properties = edge.edgeProperties ? JSON.parse(edge.edgeProperties) : {};
+          } catch (e) {
+            console.error('解析连线属性失败', e);
+          }
+
+          let points = properties.points || [];
+          if (typeof points === 'string') {
+            try {
+              points = JSON.parse(points);
+            } catch (e) {
+              console.error('加载连线折点失败', e);
+              points = [];
+            }
+          }
+
+          return {
+            id: edge.id.toString(),
+            source: edge.sourceNodeId.toString(),
+            target: edge.targetNodeId.toString(),
+            sourceHandle: edge.sourceHandle || edge.sourceAnchor || 'bottom',
+            targetHandle: edge.targetHandle || edge.targetAnchor || 'top',
+            label: edge.edgeLabel,
+            type: 'editable',
+            edgeType: edge.edgeType || 'smoothstep',
+            data: { points: Array.isArray(points) ? points : [], edgeType: edge.edgeType || 'smoothstep' },
+            style: {
+              stroke: style.stroke || '#1890ff',
+              strokeWidth: style.strokeWidth || edge.weight || 2,
+              strokeDasharray: style.strokeDasharray
+            },
+            animated: edge.animated === '1',
+            markerEnd: {
+              type: 'arrowclosed',
+              color: style.stroke || '#1890ff'
+            }
+          };
+        });
+
+        setNodes(formattedNodes);
+        setEdges(formattedEdges);
+        setDefaultNodes(formattedNodes);
+        setDefaultEdges(formattedEdges);
+        savedSignatureRef.current = buildDiagramSignature(nextDiagramName, formattedNodes, formattedEdges);
+      } else {
+        // 如果数据为空，则初始化默认架构
+        initializeDefaultArchitectureRef.current?.('默认架构');
+      }
+    } catch (error) {
+      console.error('加载架构图数据失败:', error);
+      message.error('加载架构图数据失败，将显示默认架构');
+      initializeDefaultArchitectureRef.current?.('默认架构');
+    } finally {
+      setLoading(false);
+    }
+  }, [architectureName, setEdges, setNodes]);
 
   // 初始化默认架构
-  const initializeDefaultArchitecture = useCallback(() => {
+  const initializeDefaultArchitecture = useCallback((nextName = '默认架构') => {
+      setArchitectureName(nextName);
       const initialNodes = [
       {
         id: 'nginx-1',
@@ -694,7 +1135,7 @@ const ArchitectureFlow = () => {
         label: 'HTTP请求',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#1890ff', 
           strokeWidth: 3,
@@ -715,7 +1156,7 @@ const ArchitectureFlow = () => {
         label: 'HTTP请求',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#1890ff', 
           strokeWidth: 3,
@@ -736,7 +1177,7 @@ const ArchitectureFlow = () => {
         label: '服务调用',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -752,7 +1193,7 @@ const ArchitectureFlow = () => {
         label: '服务调用',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -768,7 +1209,7 @@ const ArchitectureFlow = () => {
         label: '服务调用',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -784,7 +1225,7 @@ const ArchitectureFlow = () => {
         label: '服务调用',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -800,7 +1241,7 @@ const ArchitectureFlow = () => {
         label: '服务调用',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -816,7 +1257,7 @@ const ArchitectureFlow = () => {
         label: '服务调用',
         type: 'editable',
         edgeType: 'editable',
-        data: { points: [] },
+        data: { points: [], edgeType: 'editable' },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -829,11 +1270,17 @@ const ArchitectureFlow = () => {
     setDefaultEdges(initialEdges);
     setNodes(initialNodes);
     setEdges(initialEdges);
+    savedSignatureRef.current = buildDiagramSignature(nextName, initialNodes, initialEdges);
   }, [setNodes, setEdges]);
 
   useEffect(() => {
-    initializeDefaultArchitecture();
+    initializeDefaultArchitectureRef.current = initializeDefaultArchitecture;
   }, [initializeDefaultArchitecture]);
+
+  useEffect(() => {
+    loadNodeTypes();
+    loadData(diagramId);
+  }, [loadNodeTypes, loadData, diagramId]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -889,6 +1336,15 @@ const ArchitectureFlow = () => {
     setSelectedNode(node);
   }, []);
 
+  const onNodeMouseEnter = useCallback((event, node) => {
+    setHoverHintTarget({ kind: 'node', id: node.id });
+    setHoverHintPos({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setHoverHintTarget(null);
+  }, []);
+
   const onNodeDoubleClick = useCallback((event, node) => {
     setSelectedNode(node);
     setIsDrawerOpen(true);
@@ -907,7 +1363,8 @@ const ArchitectureFlow = () => {
   }, []);
 
   const onEdgeMouseEnter = useCallback((event, edge) => {
-    setHoveredEdgeId(edge.id);
+    setHoverHintTarget({ kind: 'edge', id: edge.id });
+    setHoverHintPos({ x: event.clientX, y: event.clientY });
     // 鼠标移入时，将该线段移到数组末尾，使其在 SVG 中渲染在最上层
     setEdges((eds) => {
       const otherEdges = eds.filter((e) => e.id !== edge.id);
@@ -916,8 +1373,25 @@ const ArchitectureFlow = () => {
   }, [setEdges]);
 
   const onEdgeMouseLeave = useCallback(() => {
-    setHoveredEdgeId(null);
+    setHoverHintTarget(null);
   }, []);
+
+  const getEdgeEffectValue = (edge) => {
+    const dash = edge?.style?.strokeDasharray;
+    const normalizedDash = typeof dash === 'string' ? dash.replace(/\s+/g, '') : '';
+    const isDashed = normalizedDash === '8,4';
+    const isDotted = normalizedDash === '2,6';
+
+    if (edge?.animated) {
+      if (isDashed) return 'dashedFlow';
+      if (isDotted) return 'dottedFlow';
+      return 'flow';
+    }
+
+    if (isDashed) return 'dashed';
+    if (isDotted) return 'dotted';
+    return 'none';
+  };
 
   const onEdgeDoubleClick = useCallback((event, edge) => {
     setSelectedEdge(edge);
@@ -927,6 +1401,8 @@ const ArchitectureFlow = () => {
       sourceHandle: edge.sourceHandle || 'bottom',
       targetHandle: edge.targetHandle || 'top',
       edgeType: edge.edgeType || edge.type || 'smoothstep',
+      effect: getEdgeEffectValue(edge),
+      strokeWidth: edge.style?.strokeWidth || 2,
       arrowType: edge.markerEnd?.type || edge.markerStart?.type || 'arrowclosed',
       arrowDirection: edge.markerStart && edge.markerEnd ? 'both' : 
                      edge.markerEnd ? 'target' : 
@@ -934,6 +1410,21 @@ const ArchitectureFlow = () => {
     });
     setIsEdgeModalOpen(true);
   }, [edgeForm]);
+
+  useEffect(() => {
+    const handleEditEdgeLabel = (event) => {
+      const { id } = event.detail;
+      const edge = edges.find(e => e.id === id);
+      if (edge) {
+        onEdgeDoubleClick(null, edge);
+      }
+    };
+
+    window.addEventListener('edit-edge-label', handleEditEdgeLabel);
+    return () => {
+      window.removeEventListener('edit-edge-label', handleEditEdgeLabel);
+    };
+  }, [edges, onEdgeDoubleClick]);
 
   const onConnect = useCallback((connection) => {
     // 如果连接信息不完整，直接返回null来阻止连接
@@ -1037,10 +1528,11 @@ const ArchitectureFlow = () => {
       label: defaultLabel,
       type: 'editable',
       edgeType: defaultEdgeType,
-      data: { points: [] },
+      data: { points: [], edgeType: defaultEdgeType },
       style: {
         stroke: defaultStroke,
-        strokeWidth: defaultStrokeWidth
+        strokeWidth: defaultStrokeWidth,
+        strokeDasharray: '6,4'
       },
       animated: true,
       markerEnd: {
@@ -1049,6 +1541,31 @@ const ArchitectureFlow = () => {
       }
     };
     
+    // 如果有架构图ID，实时持久化连线
+    if (diagramId) {
+      try {
+        addEdge({
+          diagramId: diagramId,
+          sourceNodeId: newEdge.source,
+          targetNodeId: newEdge.target,
+          sourceHandle: newEdge.sourceHandle,
+          targetHandle: newEdge.targetHandle,
+          edgeLabel: newEdge.label,
+          edgeType: newEdge.edgeType,
+          edgeStyle: JSON.stringify(newEdge.style),
+          animated: newEdge.animated ? '1' : '0',
+          color: newEdge.style.stroke,
+          weight: newEdge.style.strokeWidth
+        }).then(res => {
+          if (res.code === 200) {
+            newEdge.id = res.data.id.toString();
+          }
+        });
+      } catch (error) {
+        console.error('实时保存连线失败:', error);
+      }
+    }
+
     setEdges((currentEdges) => {
       const updatedEdges = [...currentEdges, newEdge];
       return updatedEdges;
@@ -1159,8 +1676,9 @@ const ArchitectureFlow = () => {
             target: newConnection.target,
             targetHandle: newConnection.targetHandle,
             label: defaultLabel,
-            type: defaultEdgeType,
+            type: 'editable',
             edgeType: defaultEdgeType,
+            data: { ...(edge.data || {}), edgeType: defaultEdgeType },
             style: {
               ...edge.style,
               stroke: defaultStroke,
@@ -1231,8 +1749,9 @@ const ArchitectureFlow = () => {
             target: newConnection.target,
             targetHandle: newConnection.targetHandle,
             label: defaultLabel,
-            type: defaultEdgeType,
+            type: 'editable',
             edgeType: defaultEdgeType,
+            data: { ...(edge.data || {}), edgeType: defaultEdgeType },
             style: {
               ...edge.style,
               stroke: defaultStroke,
@@ -1248,23 +1767,28 @@ const ArchitectureFlow = () => {
       });
     });
     
+    connectSuccessful.current = true;
     message.success('连接重连成功');
   }, [nodes, edges]);
 
   const onReconnectStart = useCallback(() => {
     connectSuccessful.current = false;
+    connectionActionRef.current = 'reconnect';
   }, []);
 
-  const onReconnectEnd = useCallback((_, edge) => {
+  const onReconnectEnd = useCallback(() => {
     if (!connectSuccessful.current) {
       // 如果重连没有成功且拖拽结束在空白处，可以考虑删除原连线或保持原样
       // 这里我们选择保持原样，不做任何处理
     }
+    connectionActionRef.current = null;
+    connectSuccessful.current = false;
   }, []);
 
-  const onConnectStart = useCallback((event, { nodeId, handleId, handleType }) => {
+  const onConnectStart = useCallback((event, { nodeId }) => {
     setIsConnecting(true);
     connectSuccessful.current = false;
+    connectionActionRef.current = 'connect';
     const node = nodes.find(n => n.id === nodeId);
     if (node) {
       message.info(`开始从 "${node.data.name}" 创建连接，松开鼠标取消`);
@@ -1304,20 +1828,22 @@ const ArchitectureFlow = () => {
     return true;
   }, [nodes, edges]);
 
-  const onConnectEnd = useCallback((event) => {
+  const onConnectEnd = useCallback(() => {
     // 如果没有通过 onConnect 建立连接，则视为取消
-    if (!connectSuccessful.current) {
+    if (connectionActionRef.current === 'connect' && !connectSuccessful.current) {
       setIsConnecting(false);
       message.info('连接已取消');
       
       // 强制刷新 edges 状态，有时能清除 ReactFlow 残留的临时连线
       setEdges((eds) => [...eds]);
     }
+    connectionActionRef.current = null;
+    connectSuccessful.current = false;
   }, [setEdges]);
 
-  const onPaneClick = useCallback((event) => {
+  const onPaneClick = useCallback(() => {
     // 如果正在连接，点击空白区域时取消连接
-    if (isConnecting) {
+    if (isConnecting && connectionActionRef.current === 'connect') {
       setIsConnecting(false);
       message.info('连接已取消');
       
@@ -1329,6 +1855,8 @@ const ArchitectureFlow = () => {
     setSelectedNode(null);
     setSelectedEdge(null);
   }, [isConnecting, setEdges]);
+
+  const onNodeDragStop = useCallback(() => {}, []);
 
   const handleAddNode = () => {
     modalForm.resetFields();
@@ -1376,14 +1904,25 @@ const ArchitectureFlow = () => {
         okText: '确定',
         cancelText: '取消',
         okButtonProps: { danger: true },
-        onOk: () => {
-          setNodes((currentNodes) => currentNodes.filter((node) => node.id !== selectedNode.id));
-          setEdges((currentEdges) => currentEdges.filter((edge) => 
-            edge.source !== selectedNode.id && edge.target !== selectedNode.id
-          ));
-          setIsDrawerOpen(false);
-          setSelectedNode(null);
-          message.success('删除成功');
+        onOk: async () => {
+          setLoading(true);
+          try {
+            if (diagramId) {
+              await delNode(selectedNode.id);
+            }
+            setNodes((currentNodes) => currentNodes.filter((node) => node.id !== selectedNode.id));
+            setEdges((currentEdges) => currentEdges.filter((edge) => 
+              edge.source !== selectedNode.id && edge.target !== selectedNode.id
+            ));
+            setIsDrawerOpen(false);
+            setSelectedNode(null);
+            message.success('删除成功');
+          } catch (error) {
+            console.error(error);
+            message.error('删除节点失败');
+          } finally {
+            setLoading(false);
+          }
         }
       });
     }
@@ -1487,7 +2026,7 @@ const ArchitectureFlow = () => {
         label: values.label || defaultLabel,
         type: 'editable',
         edgeType: values.edgeType || defaultEdgeType,
-        data: { points: [] },
+        data: { points: [], edgeType: values.edgeType || defaultEdgeType },
         style: {
           stroke: defaultStroke,
           strokeWidth: defaultStrokeWidth
@@ -1515,98 +2054,251 @@ const ArchitectureFlow = () => {
   };
 
   const handleModalOk = () => {
-    modalForm.validateFields().then((values) => {
-      const nodeId = currentNode?.id || values.id;
-      const configStr = typeof values.configContent === 'string' ? values.configContent : '';
+    modalForm.validateFields().then(async (values) => {
       const { configContent, ...rest } = values;
+      const configStr = typeof configContent === 'string' ? configContent : '';
       
-      if (currentNode) {
-        setNodes((currentNodes) =>
-          currentNodes.map((node) =>
-            node.id === currentNode.id
-              ? { ...node, data: { ...node.data, ...rest, config: configStr } }
-              : node
-          )
-        );
-        message.success('修改成功');
-      } else {
-        const newNode = {
-          id: nodeId,
-          type: rest.type,
-          position: { x: 400, y: 400 },
-          connectable: true,
-          data: {
-            name: rest.name,
-            type: rest.type,
-            description: rest.description,
-            status: rest.status,
+      setLoading(true);
+      try {
+        if (currentNode) {
+          // 修改节点
+          const nodeData = {
+            id: currentNode.id,
+            diagramId: diagramId,
+            nodeName: rest.name,
+            nodeCode: rest.id,
+            nodeType: rest.type,
             ip: rest.ip,
             port: rest.port,
+            status: rest.status === 'running' ? '0' : '1',
+            remark: rest.description,
             config: configStr
-          },
-        };
-        setNodes((currentNodes) => [...currentNodes, newNode]);
-        message.success('新增成功');
+          };
+          
+          if (diagramId) {
+            await updateNode(nodeData);
+          }
+
+          setNodes((currentNodes) =>
+            currentNodes.map((node) =>
+              node.id === currentNode.id
+                ? { ...node, data: { ...node.data, ...rest, config: configStr } }
+                : node
+            )
+          );
+          message.success('修改成功');
+        } else {
+          // 新增节点
+          const nodeData = {
+            diagramId: diagramId,
+            nodeName: rest.name,
+            nodeCode: rest.id, // 映射前端的“节点ID”到后端的“节点编码”
+            nodeType: rest.type,
+            positionX: 400,
+            positionY: 400,
+            ip: rest.ip,
+            port: rest.port,
+            status: rest.status === 'running' ? '0' : '1',
+            remark: rest.description,
+            config: configStr
+          };
+
+          let newNodeId = values.id || `node-${Date.now()}`;
+          if (diagramId) {
+            const res = await addNode(nodeData);
+            if (res.code === 200) {
+              newNodeId = res.data.id.toString();
+            }
+          }
+
+          const newNode = {
+            id: newNodeId,
+            type: rest.type,
+            position: { x: 400, y: 400 },
+            connectable: true,
+            data: {
+              name: rest.name,
+              type: rest.type,
+              description: rest.description,
+              status: rest.status,
+              ip: rest.ip,
+              port: rest.port,
+              config: configStr
+            },
+          };
+          setNodes((currentNodes) => [...currentNodes, newNode]);
+          message.success('新增成功');
+        }
+        
+        setIsModalOpen(false);
+        modalForm.resetFields();
+        setCurrentNode(null);
+      } catch (error) {
+        console.error(error);
+        message.error('保存节点失败');
+      } finally {
+        setLoading(false);
       }
-      
-      setIsModalOpen(false);
-      modalForm.resetFields();
-      setCurrentNode(null);
     });
   };
 
-  const handleSaveArchitecture = () => {
-    const ARCHITECTURE_DATA = {
-      name: architectureName,
-      nodes: nodes,
-      edges: edges,
-      createdAt: new Date().toISOString()
-    };
-    
-    message.success('架构保存成功');
-  };
+  const handleSaveArchitecture = async () => {
+    if (!diagramId) {
+      message.warning('请先选择或创建一个架构图');
+      return;
+    }
 
-  const handleReset = () => {
-    initializeDefaultArchitecture();
-    message.success('已重置为默认架构');
+    setLoading(true);
+    try {
+      // 1. 更新架构图名称
+      await updateDiagram({ id: diagramId, diagramName: architectureName });
+
+      // 2. 转换节点格式供后端保存
+      const backendNodes = nodes.map(node => ({
+        frontId: node.id, // 保留前端使用的ID（可能是数字字符串或临时字符串）
+        diagramId: diagramId,
+        nodeName: node.data.name,
+        nodeType: node.type,
+        positionX: Math.round(node.position.x),
+        positionY: Math.round(node.position.y),
+        ip: node.data.ip,
+        port: node.data.port,
+        status: node.data.status === 'running' ? '0' : '1',
+        remark: node.data.description,
+        config: node.data.config
+      }));
+
+      // 3. 转换连线格式供后端保存
+      const nodeIdSet = new Set(nodes.map((n) => n.id));
+      const backendEdges = edges
+        .filter((edge) => edge?.source && edge?.target && nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target))
+        .map((edge) => {
+        const style = edge.style || {};
+        const edgeStyle = JSON.stringify({
+          stroke: style.stroke || '#1890ff',
+          strokeWidth: style.strokeWidth || 2,
+          ...(style.strokeDasharray ? { strokeDasharray: style.strokeDasharray } : {})
+        });
+
+        return {
+          diagramId: diagramId,
+          sourceFrontId: edge.source,
+          targetFrontId: edge.target,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          edgeLabel: edge.label,
+          edgeType: edge.edgeType || 'smoothstep',
+          points: edge.data?.points ? JSON.stringify(edge.data.points) : '[]',
+          edgeStyle,
+          animated: edge.animated ? '1' : '0',
+          color: style.stroke || '#1890ff',
+          weight: style.strokeWidth || 2
+        };
+      });
+
+      // 4. 调用全量更新接口
+      const response = await replaceDiagramData(diagramId, {
+        nodes: backendNodes,
+        edges: backendEdges
+      });
+
+      if (response.code === 200) {
+        message.success('架构保存成功');
+        savedSignatureRef.current = currentSignature;
+        loadData(diagramId); // 重新加载数据以获取后端生成的ID
+      }
+    } catch (error) {
+      console.error('保存架构失败:', error);
+      message.error('保存架构失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRefresh = () => {
-    setNodes([...nodes]);
-    setEdges([...edges]);
-    message.success('已刷新架构');
-  };
-
-  const handleAddCustomNodeType = () => {
-    setIsCustomNodeModalOpen(true);
-    customNodeForm.resetFields();
-  };
-
-  const handleCustomNodeModalOk = () => {
-    customNodeForm.validateFields().then((values) => {
-      const newNodeType = {
-        type: values.type,
-        name: values.name,
-        description: values.description,
-        icon: values.icon || 'ApiOutlined',
-        color: values.color || '#1890ff'
-      };
-      
-      const existingType = customNodeTypes.find(t => t.type === values.type);
-      if (existingType) {
-        message.warning('该节点类型已存在');
-        return;
+    Modal.confirm({
+      title: '确认刷新',
+      content: '刷新将放弃当前未保存的所有更改，并从服务器重新加载数据。确定吗？',
+      onOk: () => {
+        loadData(diagramId);
+        message.success('已刷新');
       }
-      
-      setCustomNodeTypes([...customNodeTypes, newNodeType]);
-      message.success('自定义节点类型添加成功');
-      setIsCustomNodeModalOpen(false);
     });
   };
 
-  const handleCustomNodeModalCancel = () => {
-    setIsCustomNodeModalOpen(false);
-    customNodeForm.resetFields();
+  // 版本历史处理函数
+  const handleOpenHistory = async () => {
+    if (!diagramId) return;
+    setLoading(true);
+    try {
+      const res = await listHistoryByDiagramId(diagramId);
+      if (res.code === 200) {
+        setHistoryList(res.data);
+        setIsHistoryDrawerOpen(true);
+      }
+    } catch (error) {
+      console.error(error);
+      message.error('加载历史记录失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSnapshot = () => {
+    snapshotForm.resetFields();
+    // 默认生成一个新的版本号 (简单处理)
+    const nextVersion = `V${new Date().getTime().toString().slice(-6)}`;
+    snapshotForm.setFieldsValue({ version: nextVersion });
+    setIsSnapshotModalOpen(true);
+  };
+
+  const handleSnapshotModalOk = async () => {
+    try {
+      const values = await snapshotForm.validateFields();
+      setLoading(true);
+      const res = await createSnapshot({
+        diagramId: diagramId,
+        version: values.version,
+        versionName: values.versionName,
+        changeSummary: values.changeSummary
+      });
+      if (res.code === 200) {
+        message.success('版本快照创建成功');
+        setIsSnapshotModalOpen(false);
+        // 如果历史侧边栏已打开，刷新它
+        if (isHistoryDrawerOpen) {
+          handleOpenHistory();
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      message.error('创建快照失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreVersion = async (historyId) => {
+    Modal.confirm({
+      title: '确认恢复',
+      content: '确定要将当前架构图恢复到该版本吗？这将覆盖当前所有未保存的内容。',
+      onOk: async () => {
+        setLoading(true);
+        try {
+          const res = await restoreVersion(historyId);
+          if (res.code === 200) {
+            message.success('版本恢复成功');
+            loadData(diagramId);
+            setIsHistoryDrawerOpen(false);
+          }
+        } catch (error) {
+          console.error(error);
+          message.error('恢复版本失败');
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const handleDrawerClose = () => {
@@ -1616,8 +2308,34 @@ const ArchitectureFlow = () => {
   };
 
   const handleEdgeModalOk = () => {
-    edgeForm.validateFields().then((values) => {
+    edgeForm.validateFields().then(async (values) => {
       if (selectedEdge) {
+        const effectToConfig = {
+          none: { animated: false, dash: undefined },
+          flow: { animated: true, dash: '6,4' },
+          dashed: { animated: false, dash: '8,4' },
+          dashedFlow: { animated: true, dash: '8,4' },
+          dotted: { animated: false, dash: '2,6' },
+          dottedFlow: { animated: true, dash: '2,6' },
+        };
+
+        const effectConfig = effectToConfig[values.effect] || effectToConfig.none;
+        const strokeWidth = Number(values.strokeWidth || selectedEdge.style?.strokeWidth || 2);
+        const nextStyle = {
+          ...(selectedEdge.style || {}),
+          strokeWidth,
+          ...(effectConfig.dash ? { strokeDasharray: effectConfig.dash } : {}),
+        };
+        if (!effectConfig.dash && nextStyle.strokeDasharray != null) {
+          delete nextStyle.strokeDasharray;
+        }
+
+        const edgeStyleForBackend = JSON.stringify({
+          stroke: nextStyle.stroke || '#1890ff',
+          strokeWidth,
+          ...(effectConfig.dash ? { strokeDasharray: effectConfig.dash } : {}),
+        });
+
         const markerStart = values.arrowDirection === 'source' || values.arrowDirection === 'both' 
           ? { type: values.arrowType, color: selectedEdge.style?.stroke || '#1890ff' }
           : undefined;
@@ -1626,39 +2344,70 @@ const ArchitectureFlow = () => {
           ? { type: values.arrowType, color: selectedEdge.style?.stroke || '#1890ff' }
           : undefined;
 
-        setEdges((currentEdges) =>
-          currentEdges.map((edge) =>
-            edge.id === selectedEdge.id
-              ? { 
-                  ...edge, 
-                  label: values.label,
-                  sourceHandle: values.sourceHandle,
-                  targetHandle: values.targetHandle,
-                  edgeType: values.edgeType,
-                  type: values.edgeType,
-                  markerStart,
-                  markerEnd
-                }
-              : edge
-          )
-        );
-        setDefaultEdges((defaultEdgesList) =>
-          defaultEdgesList.map((edge) =>
-            edge.id === selectedEdge.id
-              ? { 
-                  ...edge, 
-                  label: values.label,
-                  sourceHandle: values.sourceHandle,
-                  targetHandle: values.targetHandle,
-                  edgeType: values.edgeType,
-                  type: values.edgeType,
-                  markerStart,
-                  markerEnd
-                }
-              : edge
-          )
-        );
-        message.success('边缘修改成功');
+        setLoading(true);
+        try {
+          if (diagramId) {
+            await updateEdge({
+              id: selectedEdge.id,
+              diagramId: diagramId,
+              sourceNodeId: selectedEdge.source,
+              targetNodeId: selectedEdge.target,
+              sourceHandle: values.sourceHandle,
+              targetHandle: values.targetHandle,
+              edgeLabel: values.label,
+              edgeType: values.edgeType,
+              edgeStyle: edgeStyleForBackend,
+              animated: effectConfig.animated ? '1' : '0',
+              color: nextStyle.stroke || '#1890ff',
+              weight: strokeWidth
+            });
+          }
+
+          setEdges((currentEdges) =>
+            currentEdges.map((edge) =>
+              edge.id === selectedEdge.id
+                ? { 
+                    ...edge, 
+                    label: values.label,
+                    sourceHandle: values.sourceHandle,
+                    targetHandle: values.targetHandle,
+                    edgeType: values.edgeType,
+                    type: 'editable',
+                    animated: effectConfig.animated,
+                    style: nextStyle,
+                    markerStart,
+                    markerEnd,
+                    data: { ...(edge.data || {}), edgeType: values.edgeType }
+                  }
+                : edge
+            )
+          );
+          setDefaultEdges((currentEdges) =>
+            currentEdges.map((edge) =>
+              edge.id === selectedEdge.id
+                ? { 
+                    ...edge, 
+                    label: values.label,
+                    sourceHandle: values.sourceHandle,
+                    targetHandle: values.targetHandle,
+                    edgeType: values.edgeType,
+                    type: 'editable',
+                    animated: effectConfig.animated,
+                    style: nextStyle,
+                    markerStart,
+                    markerEnd,
+                    data: { ...(edge.data || {}), edgeType: values.edgeType }
+                  }
+                : edge
+            )
+          );
+          message.success('边缘修改成功');
+        } catch (error) {
+          console.error(error);
+          message.error('修改连线失败');
+        } finally {
+          setLoading(false);
+        }
       }
       
       setIsEdgeModalOpen(false);
@@ -1681,13 +2430,24 @@ const ArchitectureFlow = () => {
         okText: '确定',
         cancelText: '取消',
         okButtonProps: { danger: true },
-        onOk: () => {
-          setEdges((currentEdges) => currentEdges.filter((edge) => edge.id !== selectedEdge.id));
-          setDefaultEdges((defaultEdgesList) => defaultEdgesList.filter((edge) => edge.id !== selectedEdge.id));
-          setIsEdgeModalOpen(false);
-          edgeForm.resetFields();
-          setSelectedEdge(null);
-          message.success('边缘删除成功');
+        onOk: async () => {
+          setLoading(true);
+          try {
+            if (diagramId) {
+              await delEdge(selectedEdge.id);
+            }
+            setEdges((currentEdges) => currentEdges.filter((edge) => edge.id !== selectedEdge.id));
+            setDefaultEdges((defaultEdgesList) => defaultEdgesList.filter((edge) => edge.id !== selectedEdge.id));
+            setIsEdgeModalOpen(false);
+            edgeForm.resetFields();
+            setSelectedEdge(null);
+            message.success('边缘删除成功');
+          } catch (error) {
+            console.error(error);
+            message.error('删除连线失败');
+          } finally {
+            setLoading(false);
+          }
         }
       });
     }
@@ -1728,9 +2488,22 @@ const ArchitectureFlow = () => {
             onChange={(e) => setArchitectureName(e.target.value)}
             size="large"
           />
+          {isModified && (
+            <Tag color="orange" style={{ margin: 0, fontWeight: 600 }}>
+              已修改
+            </Tag>
+          )}
         </div>
         
         <Space size="middle">
+          <Button 
+            icon={<ArrowLeftOutlined />} 
+            onClick={() => navigate('/architecture/arch-diagram')}
+            size="large"
+            className="toolbar-button"
+          >
+            返回列表
+          </Button>
           <Button 
             type="primary" 
             icon={<PlusOutlined />} 
@@ -1745,53 +2518,87 @@ const ArchitectureFlow = () => {
             onClick={handleSaveArchitecture}
             size="large"
             className="toolbar-button"
+            loading={loading}
           >
             保存架构
           </Button>
           <Button 
-            icon={<ReloadOutlined />} 
-            onClick={handleReset}
+            icon={<CloudUploadOutlined />} 
+            onClick={handleCreateSnapshot}
             size="large"
             className="toolbar-button"
+            loading={loading}
           >
-            重置
+            创建快照
           </Button>
           <Button 
-            icon={<SyncOutlined />} 
+            icon={<HistoryOutlined />} 
+            onClick={handleOpenHistory}
+            size="large"
+            className="toolbar-button"
+            loading={loading}
+          >
+            版本历史
+          </Button>
+          <Button 
+            icon={<SendOutlined />} 
+            onClick={async () => {
+              if (diagramId) {
+                setLoading(true);
+                try {
+                  const res = await publishDiagram(diagramId);
+                  if (res.code === 200) {
+                    message.success('架构已发布');
+                    loadData(diagramId);
+                  }
+                } catch (error) {
+                  console.error(error);
+                  message.error('发布失败');
+                } finally {
+                  setLoading(false);
+                }
+              }
+            }}
+            size="large"
+            className="toolbar-button"
+            loading={loading}
+            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
+          >
+            发布架构
+          </Button>
+          <Button 
+            icon={<ReloadOutlined />} 
             onClick={handleRefresh}
             size="large"
             className="toolbar-button"
           >
             刷新
           </Button>
-          <Button 
-            icon={<SettingOutlined />} 
-            onClick={handleAddCustomNodeType}
-            size="large"
-            className="toolbar-button"
-          >
-            新增自定义节点类型
-          </Button>
         </Space>
       </div>
 
       <div className="flow-canvas-container">
-        <ReactFlow
-          key={`${defaultNodes.length}-${defaultEdges.length}`}
+        <Spin spinning={loading} size="large" tip="加载架构中..." style={{ height: '100%' }}>
+          <ReactFlow
+            key={`${defaultNodes.length}-${defaultEdges.length}`}
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
+          onNodeMouseEnter={onNodeMouseEnter}
+          onNodeMouseLeave={onNodeMouseLeave}
           onEdgeClick={onEdgeClick}
           onEdgeMouseEnter={onEdgeMouseEnter}
           onEdgeMouseLeave={onEdgeMouseLeave}
           onNodeDoubleClick={onNodeDoubleClick}
           onEdgeDoubleClick={onEdgeDoubleClick}
+          onNodeDragStop={onNodeDragStop}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
           onConnectStart={onConnectStart}
           onConnectEnd={onConnectEnd}
+          isValidConnection={isValidConnection}
           onReconnect={onReconnect}
           onReconnectStart={onReconnectStart}
           onReconnectEnd={onReconnectEnd}
@@ -1841,6 +2648,18 @@ const ArchitectureFlow = () => {
           <MiniMap />
           <Controls />
         </ReactFlow>
+        </Spin>
+        {isHoverHintVisible && hoverHintTarget && (
+          <div
+            className="hover-edit-hint"
+            style={{
+              left: hoverHintPos.x + 12,
+              top: hoverHintPos.y + 12,
+            }}
+          >
+            {hoverHintTarget.kind === 'node' ? '双击打开节点编辑' : '双击打开连线编辑'}
+          </div>
+        )}
       </div>
 
       <Modal
@@ -1910,12 +2729,12 @@ const ArchitectureFlow = () => {
           
           <Form.Item
             name="id"
-            label="节点ID"
-            rules={[{ required: true, message: '请输入节点ID' }]}
+            label="节点编码"
+            rules={[{ required: true, message: '请输入节点编码' }]}
           >
             <Input 
               size="large" 
-              placeholder="请输入节点ID" 
+              placeholder="请输入节点编码 (例如: nginx-1)" 
               disabled={!!currentNode}
               style={{ backgroundColor: currentNode ? '#f5f5f5' : '#fff', cursor: currentNode ? 'not-allowed' : 'text' }}
             />
@@ -2064,7 +2883,7 @@ const ArchitectureFlow = () => {
               </h3>
               <Space size="middle">
                 <Tag color="blue" style={{ fontSize: '13px', fontWeight: '500' }}>
-                  {selectedNode.data.type.toUpperCase()}
+                  {(selectedNode.data.type || 'unknown').toUpperCase()}
                 </Tag>
                 <Tag 
                   color={selectedNode.data.status === 'running' ? 'green' : 'red'}
@@ -2088,7 +2907,7 @@ const ArchitectureFlow = () => {
             <Divider />
             
             <Form form={drawerForm} layout="vertical" disabled>
-              <Form.Item name="id" label="节点ID">
+              <Form.Item name="id" label="节点编码">
                 <Input disabled style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
               </Form.Item>
               
@@ -2312,6 +3131,38 @@ const ArchitectureFlow = () => {
               </Option>
             </Select>
           </Form.Item>
+
+          <Form.Item
+            name="effect"
+            label="连线特效"
+            rules={[{ required: true, message: '请选择连线特效' }]}
+            initialValue="flow"
+          >
+            <Select size="large" placeholder="请选择连线特效">
+              <Option value="none">无特效（静态实线）</Option>
+              <Option value="flow">流动动画（默认）</Option>
+              <Option value="dashed">虚线（静态）</Option>
+              <Option value="dashedFlow">虚线流动（动画）</Option>
+              <Option value="dotted">点线（静态）</Option>
+              <Option value="dottedFlow">点线流动（动画）</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="strokeWidth"
+            label="线宽"
+            rules={[{ required: true, message: '请选择线宽' }]}
+            initialValue={2}
+          >
+            <Select size="large" placeholder="请选择线宽">
+              <Option value={1}>1 - 细</Option>
+              <Option value={2}>2 - 标准</Option>
+              <Option value={3}>3 - 加粗</Option>
+              <Option value={4}>4</Option>
+              <Option value={5}>5</Option>
+              <Option value={6}>6</Option>
+            </Select>
+          </Form.Item>
           
           <Form.Item
             name="arrowType"
@@ -2486,9 +3337,9 @@ const ArchitectureFlow = () => {
                     {node.data.type === 'my-panel' && <ApiOutlined style={{ color: '#52c41a' }} />}
                     {node.data.type === 'proxy' && <DatabaseOutlined style={{ color: '#fa8c16' }} />}
                     <span>{node.data.name}</span>
-                    <Tag color="blue" style={{ fontSize: '12px', marginLeft: '8px' }}>
-                      {node.data.type.toUpperCase()}
-                    </Tag>
+                      <Tag color="blue" style={{ fontSize: '12px', marginLeft: '8px' }}>
+                        {(node.data.type || 'unknown').toUpperCase()}
+                      </Tag>
                   </div>
                 </Option>
               ))}
@@ -2627,99 +3478,81 @@ const ArchitectureFlow = () => {
       </Modal>
 
       <Modal
-        title="新增自定义节点类型"
-        open={isCustomNodeModalOpen}
-        onOk={handleCustomNodeModalOk}
-        onCancel={handleCustomNodeModalCancel}
-        width={600}
-        okText="确定"
+        title="创建版本快照"
+        open={isSnapshotModalOpen}
+        onOk={handleSnapshotModalOk}
+        onCancel={() => setIsSnapshotModalOpen(false)}
+        okText="创建"
         cancelText="取消"
       >
-        <Form form={customNodeForm} layout="vertical">
+        <Form form={snapshotForm} layout="vertical">
           <Form.Item
-            label="节点类型标识"
-            name="type"
-            rules={[
-              { required: true, message: '请输入节点类型标识' },
-              { pattern: /^[a-zA-Z0-9_-]+$/, message: '只能包含字母、数字、下划线和连字符' }
-            ]}
-            tooltip="节点的唯一标识符，用于区分不同类型的节点"
+            name="version"
+            label="版本号"
+            rules={[{ required: true, message: '请输入版本号' }]}
           >
-            <Input placeholder="例如：custom-service" />
+            <Input placeholder="例如: V1.0.0" />
           </Form.Item>
-
           <Form.Item
-            label="节点类型名称"
-            name="name"
-            rules={[{ required: true, message: '请输入节点类型名称' }]}
-            tooltip="节点类型的显示名称"
+            name="versionName"
+            label="版本名称"
           >
-            <Input placeholder="例如：自定义服务" />
+            <Input placeholder="请输入版本名称" />
           </Form.Item>
-
           <Form.Item
-            label="节点类型描述"
-            name="description"
-            tooltip="节点类型的详细描述"
+            name="changeSummary"
+            label="变更摘要"
           >
-            <Input.TextArea placeholder="请输入节点类型描述" rows={3} />
+            <Input.TextArea placeholder="请输入变更说明" rows={3} />
           </Form.Item>
-
-          <Form.Item
-            label="节点图标"
-            name="icon"
-            initialValue="ApiOutlined"
-            tooltip="选择节点显示的图标"
-          >
-            <Select>
-              <Select.Option value="ApiOutlined">API图标</Select.Option>
-              <Select.Option value="ClusterOutlined">集群图标</Select.Option>
-              <Select.Option value="DatabaseOutlined">数据库图标</Select.Option>
-              <Select.Option value="SettingOutlined">设置图标</Select.Option>
-              <Select.Option value="DeleteOutlined">删除图标</Select.Option>
-              <Select.Option value="SyncOutlined">同步图标</Select.Option>
-              <Select.Option value="PlusOutlined">加号图标</Select.Option>
-              <Select.Option value="SaveOutlined">保存图标</Select.Option>
-              <Select.Option value="ReloadOutlined">刷新图标</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            label="节点颜色"
-            name="color"
-            initialValue="#1890ff"
-            tooltip="选择节点的主题颜色"
-          >
-            <Select>
-              <Select.Option value="#1890ff">蓝色</Select.Option>
-              <Select.Option value="#52c41a">绿色</Select.Option>
-              <Select.Option value="#fa8c16">橙色</Select.Option>
-              <Select.Option value="#722ed1">紫色</Select.Option>
-              <Select.Option value="#eb2f96">粉色</Select.Option>
-              <Select.Option value="#13c2c2">青色</Select.Option>
-              <Select.Option value="#f5222d">红色</Select.Option>
-              <Select.Option value="#faad14">黄色</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '4px',
-            fontSize: '13px',
-            color: '#595959'
-          }}>
-            <div style={{ marginBottom: '8px', fontWeight: '500' }}>
-              <span style={{ color: '#1890ff' }}>自定义节点说明：</span>
-            </div>
-            <div style={{ marginBottom: '4px' }}>• 节点类型标识：唯一标识符，用于区分不同类型</div>
-            <div style={{ marginBottom: '4px' }}>• 节点类型名称：显示在界面上的名称</div>
-            <div style={{ marginBottom: '4px' }}>• 节点类型描述：详细描述节点类型的用途</div>
-            <div style={{ marginBottom: '4px' }}>• 节点图标：选择节点显示的图标样式</div>
-            <div>• 节点颜色：选择节点的主题颜色</div>
-          </div>
         </Form>
       </Modal>
+
+      <Drawer
+        title="版本历史"
+        placement="right"
+        width={400}
+        onClose={() => setIsHistoryDrawerOpen(false)}
+        open={isHistoryDrawerOpen}
+      >
+        {historyList.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+            暂无历史记录
+          </div>
+        ) : (
+          <div className="history-list">
+            {historyList.map((item) => (
+              <Card 
+                key={item.id} 
+                size="small" 
+                style={{ marginBottom: '12px', border: item.isCurrent === '1' ? '1px solid #1890ff' : undefined }}
+                title={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{item.version}</span>
+                    {item.isCurrent === '1' && <Tag color="blue">当前版本</Tag>}
+                  </div>
+                }
+                extra={
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    onClick={() => handleRestoreVersion(item.id)}
+                    disabled={item.isCurrent === '1'}
+                  >
+                    恢复此版本
+                  </Button>
+                }
+              >
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  <p><strong>版本名称:</strong> {item.versionName || '-'}</p>
+                  <p><strong>变更说明:</strong> {item.changeSummary || '-'}</p>
+                  <p><strong>保存时间:</strong> {item.createTime}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 };

@@ -41,7 +41,11 @@ public class ArchDiagramCommentController extends BaseController {
         startPage();
         ArchDiagramComment comment = converter.toEntity(dto);
         List<ArchDiagramComment> list = commentService.selectArchDiagramCommentList(comment);
-        return Result.success(new PageInfo<>(converter.toCommentVOList(list)));
+        PageInfo<ArchDiagramComment> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramCommentVO> voList = converter.toCommentVOList(list);
+        PageInfo<ArchDiagramCommentVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询架构图评论", description = "根据架构图ID查询评论列表")

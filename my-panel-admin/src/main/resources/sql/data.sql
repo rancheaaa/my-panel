@@ -66,8 +66,8 @@ INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0
        (8, '通知状态', 'sys_notice_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '通知状态列表'),
        (9, '操作类型', 'sys_oper_type', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '操作类型列表'),
        (10, '系统状态', 'sys_common_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '登录状态列表'),
-       (100, 'Agent所在操作系统', 'agent_os_type', '0', 'admin', '2026-03-27 16:07:18.471015', '', NULL, NULL),
-       (132, 'Agent节点开关', 'agent_node_switch', '0', 'admin', '2026-03-27 16:34:36.442403', '', NULL, NULL);
+       (100, 'Agent所在操作系统', 'agent_os_type', '0', 'admin', '2026-03-27 16:07:18.471015', '', NULL, 'Agent所在操作系统列表'),
+       (132, 'Agent节点开关', 'agent_node_switch', '0', 'admin', '2026-03-27 16:34:36.442403', '', NULL, 'Agent节点开关列表');
 
 INSERT IGNORE INTO `sys_job` (
     `job_id`,
@@ -191,8 +191,7 @@ INSERT IGNORE INTO `sys_menu` VALUES (1, '系统管理', 0, 2, 'system', NULL, '
        (1500, '运维管理', 0, 5, 'op', '', '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-26 15:32:27.562145', '运维工具目录'),
        (2000, '环境管理', 3, 3, 'env-manage', 'rc/envManage/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:envManage:list', 'EnvironmentTwoTone', 'admin', '2026-02-13 09:56:15.041545', 'admin', '2026-03-27 18:46:31.008615', ''),
        (2001, 'AccessToken', 3, 5, 'access-token', 'rc/accessToken/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:accessToken:list', 'KeyOutlined', 'admin', '2026-02-13 10:12:09.691179', 'admin', '2026-03-27 18:46:31.01306', ''),
-       (2002, 'Agent管理', 1500, 1, 'agentManage', 'op/agentManage/index', NULL, '', 1, 0, 'C', '0', '0', 'op:agentManage:list', 'CreditCardOutlined', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
-       (2003, '架构编排', 1500, 2, 'architectureEdit', 'op/architectureEdit/index', NULL, '', 1, 0, 'C', '0', '0', 'op:architectureEdit:list', 'ApiOutlined', 'admin', '2026-04-08 00:00:00.0', '', NULL, '');
+       (2002, 'Agent管理', 1500, 1, 'agentManage', 'op/agentManage/index', NULL, '', 1, 0, 'C', '0', '0', 'op:agentManage:list', 'CreditCardOutlined', 'admin', '2026-03-26 15:34:13.105463', '', NULL, '');
 
 INSERT IGNORE INTO `sys_menu` VALUES (1500, '运维工具', 0, 5, 'ops', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', '', NULL, '运维工具目录');
 
@@ -338,7 +337,7 @@ INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `ca
 (1, 'server', '服务器', 'ServerOutlined', 'infrastructure', 120, 80, '{"backgroundColor":"#1890ff","borderColor":"#1890ff","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"cpu":"4核","memory":"8GB","disk":"100GB"}', '1', '1', 1, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-服务器'),
 (2, 'vm', '虚拟机', 'CloudServerOutlined', 'infrastructure', 120, 80, '{"backgroundColor":"#52c41a","borderColor":"#52c41a","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"cpu":"2核","memory":"4GB","disk":"50GB"}', '1', '1', 2, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-虚拟机'),
 (3, 'container', '容器', 'AppstoreOutlined', 'infrastructure', 100, 100, '{"backgroundColor":"#13c2c2","borderColor":"#13c2c2","borderWidth":2,"borderRadius":50,"color":"#ffffff"}', '{"image":"nginx:latest","port":80}', '1', '1', 3, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-容器'),
-(4, 'nginx', 'Nginx', 'ApiOutlined', 'middleware', 120, 80, '{"backgroundColor":"#faad14","borderColor":"#faad14","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"1.18","port":80,"workers":4}', '1', '1', 4, 'admin', NOW(), 'admin', NOW(), '0', '中间件-Nginx'),
+(4, 'nginx', 'Nginx', 'ApiOutlined', 'middleware', 120, 80, '{"backgroundColor":"#1890ff","borderColor":"#1890ff","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"1.18","port":80,"workers":4}', '1', '1', 4, 'admin', NOW(), 'admin', NOW(), '0', '中间件-Nginx'),
 (5, 'redis', 'Redis', 'DatabaseOutlined', 'cache', 120, 80, '{"backgroundColor":"#f5222d","borderColor":"#f5222d","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"6.0","port":6379,"maxMemory":"1GB"}', '1', '1', 5, 'admin', NOW(), 'admin', NOW(), '0', '缓存-Redis'),
 (6, 'mysql', 'MySQL', 'DatabaseOutlined', 'database', 120, 80, '{"backgroundColor":"#2f54eb","borderColor":"#2f54eb","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"8.0","port":3306,"charset":"utf8mb4"}', '1', '1', 6, 'admin', NOW(), 'admin', NOW(), '0', '数据库-MySQL'),
 (7, 'mongodb', 'MongoDB', 'DatabaseOutlined', 'database', 120, 80, '{"backgroundColor":"#52c41a","borderColor":"#52c41a","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"4.4","port":27017,"replicas":3}', '1', '1', 7, 'admin', NOW(), 'admin', NOW(), '0', '数据库-MongoDB'),
@@ -379,9 +378,9 @@ INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_color`, `tag_type`
 
 -- 12. 菜单权限数据
 INSERT IGNORE INTO `sys_menu` VALUES (2100, '架构编排', 0, 6, 'architecture', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ApartmentOutlined', 'admin', NOW(), '', NULL, '架构编排目录'),
-(2101, '架构图管理', 2100, 1, 'arch-diagram', 'architecture/diagram/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
-(2102, '节点类型管理', 2100, 2, 'arch-node-type', 'architecture/nodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
-(2103, '模板管理', 2100, 3, 'arch-template', 'architecture/template/index', '', '', 1, 0, 'C', '0', '0', 'arch:template:list', 'template', 'admin', NOW(), '', NULL, '模板管理菜单'),
+(2101, '架构图管理', 2100, 1, 'arch-diagram', 'op/architectureList/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
+(2102, '节点类型管理', 2100, 2, 'arch-node-type', 'op/architectureNodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
+(2103, '模板管理', 2100, 3, 'arch-template', 'op/architectureTemplate/index', '', '', 1, 0, 'C', '0', '0', 'arch:template:list', 'template', 'admin', NOW(), '', NULL, '模板管理菜单'),
 (2104, '架构图查询', 2101, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:query', '#', 'admin', NOW(), '', NULL, ''),
 (2105, '架构图新增', 2101, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:add', '#', 'admin', NOW(), '', NULL, ''),
 (2106, '架构图修改', 2101, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:edit', '#', 'admin', NOW(), '', NULL, ''),
@@ -416,15 +415,15 @@ INSERT IGNORE INTO `arch_diagram` (`id`, `diagram_name`, `diagram_description`, 
 
 -- 14.2 架构图节点
 INSERT IGNORE INTO `arch_node` (`id`, `diagram_id`, `node_type_id`, `node_name`, `node_code`, `x_position`, `y_position`, `node_width`, `node_height`, `node_properties`, `label`, `description`, `status`, `visible`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`) VALUES
-(1, 1, 4, 'Nginx-负载均衡服务器', 'nginx-1', 975.00, 50.00, 120, 80, '{"port":80,"ip":"192.168.1.100","config":"worker_processes 4;\\nworker_connections 1024;\\nkeepalive_timeout 65;"}', 'Nginx', '负载均衡服务器', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(2, 1, 21, 'My-Panel-后端管理服务1', 'mypanel-1', 450.00, 350.00, 120, 80, '{"port":8080,"ip":"192.168.1.101","config":"JAVA_VERSION=17\\nMAX_MEMORY=2G\\nTHREAD_POOL_SIZE=200"}', 'My-Panel-1', '后端管理服务1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(3, 1, 21, 'My-Panel-后端管理服务2', 'mypanel-2', 1500.00, 350.00, 120, 80, '{"port":8081,"ip":"192.168.1.102","config":"JAVA_VERSION=17\\nMAX_MEMORY=2G\\nTHREAD_POOL_SIZE=200"}', 'My-Panel-2', '后端管理服务2', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(4, 1, 22, 'Proxy-代理服务1', 'proxy-1', 100.00, 650.00, 120, 80, '{"port":9001,"ip":"192.168.1.201","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-1', '代理服务实例1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(5, 1, 22, 'Proxy-代理服务2', 'proxy-2', 450.00, 650.00, 120, 80, '{"port":9002,"ip":"192.168.1.202","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-2', '代理服务实例2', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(6, 1, 22, 'Proxy-代理服务3', 'proxy-3', 800.00, 650.00, 120, 80, '{"port":9003,"ip":"192.168.1.203","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-3', '代理服务实例3', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(7, 1, 22, 'Proxy-代理服务4', 'proxy-4', 1150.00, 650.00, 120, 80, '{"port":9004,"ip":"192.168.1.204","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-4', '代理服务实例4', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(8, 1, 22, 'Proxy-代理服务5', 'proxy-5', 1500.00, 650.00, 120, 80, '{"port":9005,"ip":"192.168.1.205","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-5', '代理服务实例5', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
-(9, 1, 22, 'Proxy-代理服务6', 'proxy-6', 1850.00, 650.00, 120, 80, '{"port":9006,"ip":"192.168.1.206","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-6', '代理服务实例6', '0', '1', 'admin', NOW(), 'admin', NOW(), '0');
+(1, 1, 4, 'Nginx-负载均衡服务器', 'nginx-1', 975.00, 50.00, 120, 80, '{"port":80,"ip":"192.168.1.100","config":"worker_processes 4;\nworker_connections 1024;\nkeepalive_timeout 65;"}', 'Nginx', '负载均衡服务器', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(2, 1, 21, 'My-Panel-后端管理服务1', 'mypanel-1', 450.00, 350.00, 120, 80, '{"port":8080,"ip":"192.168.1.101","config":"JAVA_VERSION=17;\nMAX_MEMORY=2G;\nTHREAD_POOL_SIZE=200"}', 'My-Panel-1', '后端管理服务1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(3, 1, 21, 'My-Panel-后端管理服务2', 'mypanel-2', 1500.00, 350.00, 120, 80, '{"port":8081,"ip":"192.168.1.102","config":"JAVA_VERSION=17;\nMAX_MEMORY=2G;\nTHREAD_POOL_SIZE=200"}', 'My-Panel-2', '后端管理服务2', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(4, 1, 22, 'Proxy-代理服务1', 'proxy-1', 100.00, 650.00, 120, 80, '{"port":9001,"ip":"192.168.1.201","config":"REGISTRY_ENABLED=true;\nHEALTH_CHECK_INTERVAL=30;\nMAX_CONNECTIONS=1000"}', 'Proxy-1', '代理服务实例1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(5, 1, 22, 'Proxy-代理服务2', 'proxy-2', 450.00, 650.00, 120, 80, '{"port":9002,"ip":"192.168.1.202","config":"REGISTRY_ENABLED=true;\nHEALTH_CHECK_INTERVAL=30;\nMAX_CONNECTIONS=1000"}', 'Proxy-2', '代理服务实例2', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(6, 1, 22, 'Proxy-代理服务3', 'proxy-3', 800.00, 650.00, 120, 80, '{"port":9003,"ip":"192.168.1.203","config":"REGISTRY_ENABLED=true;\nHEALTH_CHECK_INTERVAL=30;\nMAX_CONNECTIONS=1000"}', 'Proxy-3', '代理服务实例3', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(7, 1, 22, 'Proxy-代理服务4', 'proxy-4', 1150.00, 650.00, 120, 80, '{"port":9004,"ip":"192.168.1.204","config":"REGISTRY_ENABLED=true;\nHEALTH_CHECK_INTERVAL=30;\nMAX_CONNECTIONS=1000"}', 'Proxy-4', '代理服务实例4', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(8, 1, 22, 'Proxy-代理服务5', 'proxy-5', 1500.00, 650.00, 120, 80, '{"port":9005,"ip":"192.168.1.205","config":"REGISTRY_ENABLED=true;\nHEALTH_CHECK_INTERVAL=30;\nMAX_CONNECTIONS=1000"}', 'Proxy-5', '代理服务实例5', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(9, 1, 22, 'Proxy-代理服务6', 'proxy-6', 1850.00, 650.00, 120, 80, '{"port":9006,"ip":"192.168.1.206","config":"REGISTRY_ENABLED=true;\nHEALTH_CHECK_INTERVAL=30;\nMAX_CONNECTIONS=1000"}', 'Proxy-6', '代理服务实例6', '0', '1', 'admin', NOW(), 'admin', NOW(), '0');
 
 -- 14.3 架构图连线
 INSERT IGNORE INTO `arch_edge` (`id`, `diagram_id`, `edge_type`, `source_node_id`, `target_node_id`, `source_anchor`, `target_anchor`, `edge_label`, `edge_style`, `animated`, `status`, `visible`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`) VALUES

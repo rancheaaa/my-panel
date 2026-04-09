@@ -3,10 +3,13 @@ package com.cq.panel.admin.server.web.controller.architecture;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.repository.domain.ArchDiagram;
 import com.cq.panel.admin.server.repository.domain.ArchNode;
+import com.cq.panel.admin.server.repository.domain.ArchNode;
 import com.cq.panel.admin.server.repository.domain.ArchEdge;
+import com.cq.panel.admin.server.repository.domain.ArchNodeType;
 import com.cq.panel.admin.server.repository.service.IArchDiagramService;
 import com.cq.panel.admin.server.repository.service.IArchNodeService;
 import com.cq.panel.admin.server.repository.service.IArchEdgeService;
+import com.cq.panel.admin.server.repository.service.IArchNodeTypeService;
 import com.cq.panel.admin.server.web.converter.architecture.ArchConverter;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramDTO;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchNodeDTO;
@@ -14,6 +17,8 @@ import com.cq.panel.admin.server.web.domain.dto.architecture.ArchEdgeDTO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchNodeVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchEdgeVO;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +29,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 架构编排 Controller - 实时持久化架构图操作
@@ -41,7 +48,9 @@ public class ArchController extends BaseController {
     private final IArchDiagramService diagramService;
     private final IArchNodeService nodeService;
     private final IArchEdgeService edgeService;
+    private final IArchNodeTypeService nodeTypeService;
     private final ArchConverter converter;
+    private final ObjectMapper objectMapper;
 
     /**
      * 查询架构图列表
@@ -53,7 +62,11 @@ public class ArchController extends BaseController {
         startPage();
         ArchDiagram diagram = converter.toEntity(dto);
         List<ArchDiagram> list = diagramService.selectArchDiagramList(diagram);
-        return Result.success(new PageInfo<>(converter.toDiagramVOList(list)));
+        PageInfo<ArchDiagram> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramVO> voList = converter.toDiagramVOList(list);
+        PageInfo<ArchDiagramVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     /**
@@ -147,6 +160,7 @@ public class ArchController extends BaseController {
     @PostMapping("/node")
     @Transactional(rollbackFor = Exception.class)
     public Result<ArchNodeVO> createNode(@Valid @RequestBody ArchNodeDTO dto) {
+        processNodeDTO(dto);
         ArchNode node = converter.toEntity(dto);
         nodeService.insertArchNode(node);
         log.info("节点已创建并持久化: nodeId={}, diagramId={}", node.getId(), node.getDiagramId());
@@ -160,6 +174,7 @@ public class ArchController extends BaseController {
     @PostMapping("/node/batch")
     @Transactional(rollbackFor = Exception.class)
     public Result<List<ArchNodeVO>> batchCreateNode(@RequestBody List<ArchNodeDTO> dtoList) {
+        dtoList.forEach(this::processNodeDTO);
         List<ArchNode> nodes = converter.toNodeEntityList(dtoList);
         nodeService.batchInsertArchNode(nodes);
         log.info("批量节点已创建并持久化: count={}", nodes.size());
@@ -173,6 +188,7 @@ public class ArchController extends BaseController {
     @PutMapping("/node")
     @Transactional(rollbackFor = Exception.class)
     public Result<ArchNodeVO> updateNode(@Valid @RequestBody ArchNodeDTO dto) {
+        processNodeDTO(dto);
         ArchNode node = converter.toEntity(dto);
         nodeService.updateArchNode(node);
         log.info("节点已更新并持久化: nodeId={}", node.getId());
@@ -226,6 +242,7 @@ public class ArchController extends BaseController {
     @PostMapping("/edge")
     @Transactional(rollbackFor = Exception.class)
     public Result<ArchEdgeVO> createEdge(@Valid @RequestBody ArchEdgeDTO dto) {
+        processEdgeDTO(dto);
         ArchEdge edge = converter.toEntity(dto);
         edgeService.insertArchEdge(edge);
         log.info("边缘已创建并持久化: edgeId={}, diagramId={}", edge.getId(), edge.getDiagramId());
@@ -239,6 +256,7 @@ public class ArchController extends BaseController {
     @PostMapping("/edge/batch")
     @Transactional(rollbackFor = Exception.class)
     public Result<List<ArchEdgeVO>> batchCreateEdge(@RequestBody List<ArchEdgeDTO> dtoList) {
+        dtoList.forEach(this::processEdgeDTO);
         List<ArchEdge> edges = converter.toEdgeEntityList(dtoList);
         edgeService.batchInsertArchEdge(edges);
         log.info("批量边缘已创建并持久化: count={}", edges.size());
@@ -252,6 +270,7 @@ public class ArchController extends BaseController {
     @PutMapping("/edge")
     @Transactional(rollbackFor = Exception.class)
     public Result<ArchEdgeVO> updateEdge(@Valid @RequestBody ArchEdgeDTO dto) {
+        processEdgeDTO(dto);
         ArchEdge edge = converter.toEntity(dto);
         edgeService.updateArchEdge(edge);
         log.info("边缘已更新并持久化: edgeId={}", edge.getId());
@@ -311,34 +330,75 @@ public class ArchController extends BaseController {
             @RequestBody Map<String, Object> data) {
         log.info("开始全量更新架构图: diagramId={}", id);
         
-        // 清空现有节点
-        List<ArchNode> existingNodes = nodeService.selectNodesByDiagramId(id);
-        if (!existingNodes.isEmpty()) {
-            Long[] nodeIds = existingNodes.stream().map(ArchNode::getId).toArray(Long[]::new);
-            nodeService.deleteArchNodeByIds(nodeIds);
-        }
-        
-        // 清空现有边缘
+        // 1. 清空现有边缘
         List<ArchEdge> existingEdges = edgeService.selectEdgesByDiagramId(id);
         if (!existingEdges.isEmpty()) {
             Long[] edgeIds = existingEdges.stream().map(ArchEdge::getId).toArray(Long[]::new);
             edgeService.deleteArchEdgeByIds(edgeIds);
         }
         
-        // 插入新节点
-        @SuppressWarnings("unchecked")
-        List<ArchNodeDTO> nodeList = (List<ArchNodeDTO>) data.get("nodes");
-        if (nodeList != null && !nodeList.isEmpty()) {
-            List<ArchNode> nodes = converter.toNodeEntityList(nodeList);
-            nodeService.batchInsertArchNode(nodes);
+        // 2. 清空现有节点
+        List<ArchNode> existingNodes = nodeService.selectNodesByDiagramId(id);
+        if (!existingNodes.isEmpty()) {
+            Long[] nodeIds = existingNodes.stream().map(ArchNode::getId).toArray(Long[]::new);
+            nodeService.deleteArchNodeByIds(nodeIds);
         }
         
-        // 插入新边缘
+        // 3. 插入新节点并建立 ID 映射
+        Map<String, Long> nodeIdMap = new HashMap<>();
         @SuppressWarnings("unchecked")
-        List<ArchEdgeDTO> edgeList = (List<ArchEdgeDTO>) data.get("edges");
-        if (edgeList != null && !edgeList.isEmpty()) {
-            List<ArchEdge> edges = converter.toEdgeEntityList(edgeList);
-            edgeService.batchInsertArchEdge(edges);
+        List<Map<String, Object>> nodeDataList = (List<Map<String, Object>>) data.get("nodes");
+        if (nodeDataList != null && !nodeDataList.isEmpty()) {
+            for (Map<String, Object> nodeMap : nodeDataList) {
+                // 记录前端使用的ID
+                Object frontIdObj = nodeMap.get("frontId");
+                String frontId = frontIdObj != null ? String.valueOf(frontIdObj) : null;
+                
+                ArchNodeDTO nodeDto = objectMapper.convertValue(nodeMap, ArchNodeDTO.class);
+                processNodeDTO(nodeDto);
+                ArchNode node = converter.toEntity(nodeDto);
+                nodeService.insertArchNode(node); // 逐个插入以获取生成的 ID
+                
+                if (frontId != null) {
+                    nodeIdMap.put(frontId, node.getId());
+                }
+            }
+        }
+        
+        // 4. 插入新边缘
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> edgeDataList = (List<Map<String, Object>>) data.get("edges");
+        if (edgeDataList != null && !edgeDataList.isEmpty()) {
+            for (Map<String, Object> edgeMap : edgeDataList) {
+                Object sFrontIdObj = edgeMap.get("sourceFrontId");
+                Object tFrontIdObj = edgeMap.get("targetFrontId");
+                String sourceFrontId = sFrontIdObj != null ? String.valueOf(sFrontIdObj) : null;
+                String targetFrontId = tFrontIdObj != null ? String.valueOf(tFrontIdObj) : null;
+                
+                ArchEdgeDTO edgeDto = objectMapper.convertValue(edgeMap, ArchEdgeDTO.class);
+                
+                // 使用映射后的 ID
+                if (sourceFrontId != null && nodeIdMap.containsKey(sourceFrontId)) {
+                    edgeDto.setSourceNodeId(nodeIdMap.get(sourceFrontId));
+                }
+                if (targetFrontId != null && nodeIdMap.containsKey(targetFrontId)) {
+                    edgeDto.setTargetNodeId(nodeIdMap.get(targetFrontId));
+                }
+                
+                if (edgeDto.getSourceNodeId() == null || edgeDto.getTargetNodeId() == null) {
+                    log.warn("跳过无效边缘：diagramId={}, sourceFrontId={}, targetFrontId={}, sourceNodeId={}, targetNodeId={}",
+                            id,
+                            sourceFrontId,
+                            targetFrontId,
+                            edgeDto.getSourceNodeId(),
+                            edgeDto.getTargetNodeId());
+                    continue;
+                }
+
+                processEdgeDTO(edgeDto);
+                ArchEdge edge = converter.toEntity(edgeDto);
+                edgeService.insertArchEdge(edge);
+            }
         }
         
         // 返回最新数据
@@ -348,5 +408,93 @@ public class ArchController extends BaseController {
         
         log.info("全量更新完成: diagramId={}", id);
         return Result.success(result);
+    }
+
+    /**
+     * 处理节点DTO，将前端传参映射到后端字段
+     */
+    private void processNodeDTO(ArchNodeDTO dto) {
+        // 1. 处理位置别名
+        if (dto.getPositionX() != null) dto.setXPosition(dto.getPositionX());
+        if (dto.getPositionY() != null) dto.setYPosition(dto.getPositionY());
+
+        // 2. 处理节点类型编码 -> ID
+        if (dto.getNodeType() != null) {
+            ArchNodeType type = nodeTypeService.selectArchNodeTypeByCode(dto.getNodeType());
+            if (type != null) {
+                dto.setNodeTypeId(type.getId());
+            }
+        }
+
+        // 3. 处理节点属性 -> JSON
+        if (dto.getIp() != null || dto.getPort() != null || dto.getConfig() != null) {
+            Map<String, Object> props = new LinkedHashMap<>();
+            if (dto.getIp() != null) props.put("ip", dto.getIp());
+            if (dto.getPort() != null) props.put("port", dto.getPort());
+            if (dto.getConfig() != null) props.put("config", dto.getConfig());
+            try {
+                dto.setNodeProperties(objectMapper.writeValueAsString(props));
+            } catch (JsonProcessingException e) {
+                log.error("序列化节点属性失败", e);
+            }
+        }
+    }
+
+    /**
+     * 处理边缘DTO，将前端传参映射到后端字段
+     */
+    private void processEdgeDTO(ArchEdgeDTO dto) {
+        // 1. 处理锚点别名
+        if (dto.getSourceHandle() != null) dto.setSourceAnchor(dto.getSourceHandle());
+        if (dto.getTargetHandle() != null) dto.setTargetAnchor(dto.getTargetHandle());
+
+        // 2. 处理连线样式 -> JSON
+        boolean hasEdgeStyle = dto.getEdgeStyle() != null && !dto.getEdgeStyle().isBlank();
+        boolean hasStyleAlias = dto.getColor() != null || dto.getWeight() != null;
+        if (hasEdgeStyle || hasStyleAlias) {
+            Map<String, Object> style = new LinkedHashMap<>();
+
+            if (hasEdgeStyle) {
+                try {
+                    Object styleObj = objectMapper.readValue(dto.getEdgeStyle(), Object.class);
+                    if (styleObj instanceof Map<?, ?> styleMap) {
+                        for (Map.Entry<?, ?> entry : styleMap.entrySet()) {
+                            if (entry.getKey() != null) {
+                                style.put(String.valueOf(entry.getKey()), entry.getValue());
+                            }
+                        }
+                    }
+                } catch (JsonProcessingException e) {
+                    log.error("解析连线样式失败", e);
+                }
+            }
+
+            if (dto.getColor() != null) style.put("stroke", dto.getColor());
+            if (dto.getWeight() != null) style.put("strokeWidth", dto.getWeight());
+
+            try {
+                dto.setEdgeStyle(objectMapper.writeValueAsString(style));
+            } catch (JsonProcessingException e) {
+                log.error("序列化连线样式失败", e);
+            }
+        }
+
+        // 3. 处理连线属性 -> JSON
+        if (dto.getPoints() != null) {
+            Map<String, Object> props = new LinkedHashMap<>();
+            try {
+                // 如果是有效的 JSON 数组，解析后存入，避免双重序列化
+                Object pointsObj = objectMapper.readValue(dto.getPoints(), Object.class);
+                props.put("points", pointsObj);
+            } catch (JsonProcessingException e) {
+                // 如果解析失败，原样存入字符串
+                props.put("points", dto.getPoints());
+            }
+            try {
+                dto.setEdgeProperties(objectMapper.writeValueAsString(props));
+            } catch (JsonProcessingException e) {
+                log.error("序列化连线属性失败", e);
+            }
+        }
     }
 }

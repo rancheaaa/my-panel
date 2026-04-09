@@ -524,10 +524,11 @@ CREATE TABLE IF NOT EXISTS `arch_node` (
     `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
     KEY `idx_diagram_id` (`diagram_id`),
     KEY `idx_node_type_id` (`node_type_id`),
-    KEY `idx_status` (`status`)
+    KEY `idx_arch_node_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点主表';
 
 -- 6.4 边缘关系表
@@ -552,10 +553,11 @@ CREATE TABLE IF NOT EXISTS `arch_edge` (
     `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_diagram_id` (`diagram_id`),
-    KEY `idx_source_node_id` (`source_node_id`),
-    KEY `idx_target_node_id` (`target_node_id`)
+    KEY `idx_arch_diagram_id` (`diagram_id`),
+    KEY `idx_arch_source_node_id` (`source_node_id`),
+    KEY `idx_arch_target_node_id` (`target_node_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='边缘关系表';
 
 -- 6.5 架构图版本历史表
@@ -575,9 +577,9 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_history` (
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_diagram_id` (`diagram_id`),
-    KEY `idx_version` (`version`),
-    KEY `idx_is_current` (`is_current`)
+    KEY `idx_arch_diagram_id2` (`diagram_id`),
+    KEY `idx_arch_version` (`version`),
+    KEY `idx_arch_is_current` (`is_current`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本历史表';
 
 -- 6.6 架构图模板表
@@ -603,10 +605,10 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_template` (
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_template_category` (`template_category`),
-    KEY `idx_is_system` (`is_system`),
-    KEY `idx_is_public` (`is_public`),
-    KEY `idx_use_count` (`use_count`)
+    KEY `idx_template_category2` (`template_category`),
+    KEY `idx_is_system2` (`is_system`),
+    KEY `idx_is_public2` (`is_public`),
+    KEY `idx_use_count2` (`use_count`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图模板表';
 
 -- 6.7 节点分组表
@@ -629,8 +631,8 @@ CREATE TABLE IF NOT EXISTS `arch_node_group` (
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_diagram_id` (`diagram_id`),
-    KEY `idx_parent_group_id` (`parent_group_id`)
+    KEY `idx_arch_diagram_id3` (`diagram_id`),
+    KEY `idx_arch_parent_group_id` (`parent_group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点分组表';
 
 -- 6.8 节点分组关联表
@@ -664,9 +666,9 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_share` (
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_share_code` (`share_code`),
-    KEY `idx_diagram_id` (`diagram_id`),
-    KEY `idx_status` (`status`),
-    KEY `idx_expire_time` (`expire_time`)
+    KEY `idx_arch_diagram_id4` (`diagram_id`),
+    KEY `idx_arch_status` (`status`),
+    KEY `idx_arch_expire_time` (`expire_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图分享表';
 
 -- 6.10 架构图评论表
@@ -690,12 +692,13 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_comment` (
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_diagram_id` (`diagram_id`),
-    KEY `idx_node_id` (`node_id`),
-    KEY `idx_edge_id` (`edge_id`),
-    KEY `idx_parent_comment_id` (`parent_comment_id`),
-    KEY `idx_create_time` (`create_time`)
+    KEY `idx_arch_diagram_id5` (`diagram_id`),
+    KEY `idx_arch_node_id` (`node_id`),
+    KEY `idx_arch_edge_id` (`edge_id`),
+    KEY `idx_arch_parent_comment_id` (`parent_comment_id`),
+    KEY `idx_arch_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图评论表';
 
 -- 6.11 架构图收藏表
@@ -705,6 +708,7 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_favorite` (
     `user_id` bigint(20) NOT NULL COMMENT '用户ID',
     `folder_name` varchar(100) DEFAULT 'default' COMMENT '收藏夹名称',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_user_diagram` (`user_id`, `diagram_id`),
     KEY `idx_user_id` (`user_id`),
@@ -728,9 +732,9 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_log` (
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_diagram_id` (`diagram_id`),
-    KEY `idx_operation_type` (`operation_type`),
-    KEY `idx_create_time` (`create_time`)
+    KEY `idx_arch_diagram_id6` (`diagram_id`),
+    KEY `idx_arch_operation_type2` (`operation_type`),
+    KEY `idx_arch_create_time2` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图操作日志表';
 
 -- 6.13 架构图标签表
@@ -743,6 +747,7 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_tag` (
     `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tag_name` (`tag_name`),
     KEY `idx_use_count` (`use_count`)

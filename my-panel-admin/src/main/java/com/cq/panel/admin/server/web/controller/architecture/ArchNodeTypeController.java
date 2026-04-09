@@ -41,7 +41,11 @@ public class ArchNodeTypeController extends BaseController {
         startPage();
         ArchNodeType nodeType = converter.toEntity(dto);
         List<ArchNodeType> list = nodeTypeService.selectArchNodeTypeList(nodeType);
-        return Result.success(new PageInfo<>(converter.toNodeTypeVOList(list)));
+        PageInfo<ArchNodeType> entityPageInfo = new PageInfo<>(list);
+        List<ArchNodeTypeVO> voList = converter.toNodeTypeVOList(list);
+        PageInfo<ArchNodeTypeVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询所有节点类型", description = "查询所有启用的节点类型")

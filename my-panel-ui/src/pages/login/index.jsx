@@ -146,6 +146,7 @@ const Login = () => {
           onFinish={onFinish}
           layout="vertical"
           size="large"
+          autoComplete="on"
         >
           <div onClick={() => usernameRef.current && usernameRef.current.focus()}>
             <Form.Item
@@ -156,6 +157,7 @@ const Login = () => {
                 ref={usernameRef}
                 prefix={<UserOutlined />} 
                 placeholder="用户名" 
+                autoComplete="username"
               />
             </Form.Item>
           </div>
@@ -174,6 +176,7 @@ const Login = () => {
                 ref={passwordRef}
                 prefix={<LockOutlined />} 
                 placeholder="密码" 
+                autoComplete="current-password"
               />
             </Form.Item>
           </div>

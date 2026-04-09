@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="diagramId"    column="diagram_id"    />
         <result property="nodeTypeId"    column="node_type_id"    />
         <result property="nodeName"    column="node_name"    />
+        <result property="nodeType"    column="node_type"    />
         <result property="nodeCode"    column="node_code"    />
         <result property="xPosition"    column="x_position"    />
         <result property="yPosition"    column="y_position"    />
@@ -33,31 +34,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectArchNodeVo">
-        select id, diagram_id, node_type_id, node_name, node_code, x_position, y_position, node_width, node_height, z_index, rotation, node_style, node_properties, node_meta, label, description, status, locked, visible, create_by, create_time, update_by, update_time, del_flag, remark from arch_node
+        select n.id, n.diagram_id, n.node_type_id, n.node_name, n.node_code, n.x_position, n.y_position, n.node_width, n.node_height, n.z_index, n.rotation, n.node_style, n.node_properties, n.node_meta, n.label, n.description, n.status, n.locked, n.visible, n.create_by, n.create_time, n.update_by, n.update_time, n.del_flag, n.remark, t.type_code as node_type
+        from arch_node n
+        left join arch_node_type t on n.node_type_id = t.id
     </sql>
 
     <select id="selectArchNodeList" parameterType="ArchNode" resultMap="ArchNodeResult">
         <include refid="selectArchNodeVo"/>
         <where>  
-            del_flag = '0'
-            <if test="diagramId != null"> and diagram_id = #{diagramId}</if>
-            <if test="nodeTypeId != null"> and node_type_id = #{nodeTypeId}</if>
-            <if test="nodeName != null  and nodeName != ''"> and node_name like concat('%', #{nodeName}, '%')</if>
-            <if test="nodeCode != null  and nodeCode != ''"> and node_code = #{nodeCode}</if>
-            <if test="status != null  and status != ''"> and status = #{status}</if>
+            n.del_flag = '0'
+            <if test="diagramId != null"> and n.diagram_id = #{diagramId}</if>
+            <if test="nodeTypeId != null"> and n.node_type_id = #{nodeTypeId}</if>
+            <if test="nodeName != null  and nodeName != ''"> and n.node_name like concat('%', #{nodeName}, '%')</if>
+            <if test="nodeCode != null  and nodeCode != ''"> and n.node_code = #{nodeCode}</if>
+            <if test="status != null  and status != ''"> and n.status = #{status}</if>
         </where>
-        order by create_time desc
+        order by n.create_time desc
     </select>
 
     <select id="selectNodesByDiagramId" parameterType="Long" resultMap="ArchNodeResult">
         <include refid="selectArchNodeVo"/>
-        where diagram_id = #{diagramId} and del_flag = '0'
-        order by z_index asc, create_time asc
+        where n.diagram_id = #{diagramId} and n.del_flag = '0'
+        order by n.z_index asc, n.create_time asc
     </select>
     
     <select id="selectArchNodeById" parameterType="Long" resultMap="ArchNodeResult">
         <include refid="selectArchNodeVo"/>
-        where id = #{id} and del_flag = '0'
+        where n.id = #{id} and n.del_flag = '0'
     </select>
         
     <insert id="insertArchNode" parameterType="ArchNode" useGeneratedKeys="true" keyProperty="id">

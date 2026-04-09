@@ -37,6 +37,7 @@ import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramFavoriteV
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramLogVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramTagVO;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import java.util.List;
 
@@ -47,12 +48,22 @@ public interface ArchConverter {
     List<ArchDiagram> toDiagramEntityList(List<ArchDiagramDTO> dtoList);
     List<ArchDiagramVO> toDiagramVOList(List<ArchDiagram> entityList);
 
+    @Mapping(source = "positionX", target = "XPosition")
+    @Mapping(source = "positionY", target = "YPosition")
     ArchNode toEntity(ArchNodeDTO dto);
+
+    @Mapping(source = "XPosition", target = "positionX")
+    @Mapping(source = "YPosition", target = "positionY")
     ArchNodeVO toVO(ArchNode entity);
     List<ArchNode> toNodeEntityList(List<ArchNodeDTO> dtoList);
     List<ArchNodeVO> toNodeVOList(List<ArchNode> entityList);
 
+    @Mapping(source = "sourceHandle", target = "sourceAnchor")
+    @Mapping(source = "targetHandle", target = "targetAnchor")
     ArchEdge toEntity(ArchEdgeDTO dto);
+
+    @Mapping(source = "sourceAnchor", target = "sourceHandle")
+    @Mapping(source = "targetAnchor", target = "targetHandle")
     ArchEdgeVO toVO(ArchEdge entity);
     List<ArchEdge> toEdgeEntityList(List<ArchEdgeDTO> dtoList);
     List<ArchEdgeVO> toEdgeVOList(List<ArchEdge> entityList);

@@ -37,20 +37,32 @@ public class ArchEdgeDTO {
     @Schema(description = "目标锚点位置（top/bottom/left/right/auto）")
     private String targetAnchor;
 
+    @Schema(description = "源锚点位置 (前端别名)")
+    private String sourceHandle;
+
+    @Schema(description = "目标锚点位置 (前端别名)")
+    private String targetHandle;
+
     @Schema(description = "边缘标签")
     private String edgeLabel;
 
     @Schema(description = "边缘样式（颜色、线宽、箭头等）JSON")
     private String edgeStyle;
 
+    @Schema(description = "连线颜色 (前端传参)")
+    private String color;
+
+    @Schema(description = "连线权重 (前端传参)")
+    private BigDecimal weight;
+
+    @Schema(description = "连线折点JSON (前端传参)")
+    private String points;
+
     @Schema(description = "边缘属性JSON")
     private String edgeProperties;
 
     @Schema(description = "边缘元数据（扩展属性）JSON")
     private String edgeMeta;
-
-    @Schema(description = "权重（用于布局算法）")
-    private BigDecimal weight;
 
     @Schema(description = "是否有动画（0否 1是）")
     private String animated;

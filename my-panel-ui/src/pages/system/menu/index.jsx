@@ -215,7 +215,7 @@ const Menu = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 200,
+      width: 300,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">

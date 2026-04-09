@@ -207,6 +207,38 @@ Mock.mock(/\/api\/getRouters/, 'get', () => {
           ]
         },
         {
+          name: 'Operation',
+          path: '/op',
+          hidden: false,
+          redirect: 'noRedirect',
+          component: 'Layout',
+          alwaysShow: true,
+          meta: { title: '运维管理', icon: 'tool', noCache: false, link: null },
+          children: [
+            {
+              name: 'AgentManage',
+              path: 'agentManage',
+              hidden: false,
+              component: 'op/agentManage/index',
+              meta: { title: 'Agent管理', icon: 'user', noCache: false, link: null }
+            },
+            {
+              name: 'ArchitectureList',
+              path: 'architectureList',
+              hidden: false,
+              component: 'op/architectureList/index',
+              meta: { title: '架构列表', icon: 'tree-table', noCache: false, link: null }
+            },
+            {
+              name: 'ArchitectureEdit',
+              path: 'architectureEdit/:id',
+              hidden: true,
+              component: 'op/architectureEdit/index',
+              meta: { title: '架构编排', icon: 'tree-table', noCache: false, link: null }
+            }
+          ]
+        },
+        {
             name: 'Tool',
             path: '/tool',
             hidden: true, // Assuming no tools for now, or keep it visible if there are pages

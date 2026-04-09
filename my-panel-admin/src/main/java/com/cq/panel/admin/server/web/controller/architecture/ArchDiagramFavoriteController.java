@@ -41,7 +41,11 @@ public class ArchDiagramFavoriteController extends BaseController {
         startPage();
         ArchDiagramFavorite favorite = converter.toEntity(dto);
         List<ArchDiagramFavorite> list = favoriteService.selectArchDiagramFavoriteList(favorite);
-        return Result.success(new PageInfo<>(converter.toFavoriteVOList(list)));
+        PageInfo<ArchDiagramFavorite> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramFavoriteVO> voList = converter.toFavoriteVOList(list);
+        PageInfo<ArchDiagramFavoriteVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询用户收藏", description = "根据用户ID查询收藏列表")

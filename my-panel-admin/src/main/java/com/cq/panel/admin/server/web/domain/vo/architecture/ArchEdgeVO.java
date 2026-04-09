@@ -33,6 +33,12 @@ public class ArchEdgeVO {
     @Schema(description = "目标锚点位置（top/bottom/left/right/auto）")
     private String targetAnchor;
 
+    @Schema(description = "源锚点位置 (前端别名)")
+    private String sourceHandle;
+
+    @Schema(description = "目标锚点位置 (前端别名)")
+    private String targetHandle;
+
     @Schema(description = "边缘标签")
     private String edgeLabel;
 

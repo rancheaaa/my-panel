@@ -29,7 +29,6 @@ public class ArchNode extends BaseEntity
     private Long diagramId;
 
     /** 节点类型ID */
-    @NotNull(message = "节点类型ID不能为空")
     private Long nodeTypeId;
 
     /** 节点名称 */
@@ -37,6 +36,9 @@ public class ArchNode extends BaseEntity
     @NotBlank(message = "节点名称不能为空")
     @Size(max = 200, message = "节点名称不能超过200个字符")
     private String nodeName;
+
+    /** 节点类型编码 (用于展示) */
+    private String nodeType;
 
     /** 节点编码/标识 */
     @Excel(name = "节点编码")

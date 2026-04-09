@@ -41,7 +41,11 @@ public class ArchDiagramLogController extends BaseController {
         startPage();
         ArchDiagramLog log = converter.toEntity(dto);
         List<ArchDiagramLog> list = logService.selectArchDiagramLogList(log);
-        return Result.success(new PageInfo<>(converter.toLogVOList(list)));
+        PageInfo<ArchDiagramLog> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramLogVO> voList = converter.toLogVOList(list);
+        PageInfo<ArchDiagramLogVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询架构图操作日志", description = "根据架构图ID查询操作日志列表")

@@ -41,7 +41,11 @@ public class ArchDiagramTemplateController extends BaseController {
         startPage();
         ArchDiagramTemplate template = converter.toEntity(dto);
         List<ArchDiagramTemplate> list = templateService.selectArchDiagramTemplateList(template);
-        return Result.success(new PageInfo<>(converter.toTemplateVOList(list)));
+        PageInfo<ArchDiagramTemplate> entityPageInfo = new PageInfo<>(list);
+        List<ArchDiagramTemplateVO> voList = converter.toTemplateVOList(list);
+        PageInfo<ArchDiagramTemplateVO> voPageInfo = new PageInfo<>(voList);
+        voPageInfo.setTotal(entityPageInfo.getTotal());
+        return Result.success(voPageInfo);
     }
 
     @Operation(summary = "查询所有模板", description = "查询所有启用的模板")

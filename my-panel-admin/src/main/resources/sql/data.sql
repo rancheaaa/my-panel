@@ -378,23 +378,61 @@ INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_color`, `tag_type`
 (10, 'DevOps', '#a0d911', 'system', 0, 'admin', NOW(), '0', 'DevOps标签');
 
 -- 12. 菜单权限数据
-INSERT IGNORE INTO `sys_menu` VALUES (2000, '架构编排', 0, 6, 'architecture', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ApartmentOutlined', 'admin', NOW(), '', NULL, '架构编排目录'),
-(2001, '架构图管理', 2000, 1, 'arch-diagram', 'architecture/diagram/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
-(2002, '节点类型管理', 2000, 2, 'arch-node-type', 'architecture/nodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
-(2003, '模板管理', 2000, 3, 'arch-template', 'architecture/template/index', '', '', 1, 0, 'C', '0', '0', 'arch:template:list', 'template', 'admin', NOW(), '', NULL, '模板管理菜单'),
-(2004, '架构图查询', 2001, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:query', '#', 'admin', NOW(), '', NULL, ''),
-(2005, '架构图新增', 2001, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:add', '#', 'admin', NOW(), '', NULL, ''),
-(2006, '架构图修改', 2001, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:edit', '#', 'admin', NOW(), '', NULL, ''),
-(2007, '架构图删除', 2001, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:remove', '#', 'admin', NOW(), '', NULL, ''),
-(2008, '架构图发布', 2001, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:publish', '#', 'admin', NOW(), '', NULL, ''),
-(2009, '架构图导出', 2001, 6, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:export', '#', 'admin', NOW(), '', NULL, ''),
-(2010, '架构图导入', 2001, 7, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:import', '#', 'admin', NOW(), '', NULL, ''),
-(2011, '节点类型查询', 2002, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:query', '#', 'admin', NOW(), '', NULL, ''),
-(2012, '节点类型新增', 2002, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:add', '#', 'admin', NOW(), '', NULL, ''),
-(2013, '节点类型修改', 2002, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:edit', '#', 'admin', NOW(), '', NULL, ''),
-(2014, '节点类型删除', 2002, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, ''),
-(2015, '模板查询', 2003, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:query', '#', 'admin', NOW(), '', NULL, ''),
-(2016, '模板新增', 2003, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:add', '#', 'admin', NOW(), '', NULL, ''),
-(2017, '模板修改', 2003, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:edit', '#', 'admin', NOW(), '', NULL, ''),
-(2018, '模板删除', 2003, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:remove', '#', 'admin', NOW(), '', NULL, ''),
-(2019, '模板使用', 2003, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:use', '#', 'admin', NOW(), '', NULL, '');
+INSERT IGNORE INTO `sys_menu` VALUES (2100, '架构编排', 0, 6, 'architecture', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ApartmentOutlined', 'admin', NOW(), '', NULL, '架构编排目录'),
+(2101, '架构图管理', 2100, 1, 'arch-diagram', 'architecture/diagram/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
+(2102, '节点类型管理', 2100, 2, 'arch-node-type', 'architecture/nodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
+(2103, '模板管理', 2100, 3, 'arch-template', 'architecture/template/index', '', '', 1, 0, 'C', '0', '0', 'arch:template:list', 'template', 'admin', NOW(), '', NULL, '模板管理菜单'),
+(2104, '架构图查询', 2101, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:query', '#', 'admin', NOW(), '', NULL, ''),
+(2105, '架构图新增', 2101, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:add', '#', 'admin', NOW(), '', NULL, ''),
+(2106, '架构图修改', 2101, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2107, '架构图删除', 2101, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2108, '架构图发布', 2101, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:publish', '#', 'admin', NOW(), '', NULL, ''),
+(2109, '架构图导出', 2101, 6, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:export', '#', 'admin', NOW(), '', NULL, ''),
+(2110, '架构图导入', 2101, 7, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:import', '#', 'admin', NOW(), '', NULL, ''),
+(2111, '节点类型查询', 2102, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:query', '#', 'admin', NOW(), '', NULL, ''),
+(2112, '节点类型新增', 2102, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:add', '#', 'admin', NOW(), '', NULL, ''),
+(2113, '节点类型修改', 2102, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2114, '节点类型删除', 2102, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2115, '模板查询', 2103, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:query', '#', 'admin', NOW(), '', NULL, ''),
+(2116, '模板新增', 2103, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:add', '#', 'admin', NOW(), '', NULL, ''),
+(2117, '模板修改', 2103, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2118, '模板删除', 2103, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2119, '模板使用', 2103, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:use', '#', 'admin', NOW(), '', NULL, '');
+
+-- ----------------------------
+-- 13. 架构图节点类型扩展
+-- ----------------------------
+INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `category`, `default_width`, `default_height`, `default_style`, `default_properties`, `is_system`, `is_active`, `sort_order`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`, `remark`) VALUES
+(21, 'my-panel', 'My-Panel后端服务', 'ApiOutlined', 'application', 120, 80, '{"backgroundColor":"#52c41a","borderColor":"#52c41a","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"java_version":"17","max_memory":"2G"}', '1', '1', 21, 'admin', NOW(), 'admin', NOW(), '0', '应用服务-MyPanel'),
+(22, 'proxy', 'Proxy代理服务', 'DatabaseOutlined', 'middleware', 120, 80, '{"backgroundColor":"#fa8c16","borderColor":"#fa8c16","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"max_connections":1000}', '1', '1', 22, 'admin', NOW(), 'admin', NOW(), '0', '中间件-Proxy');
+
+-- ----------------------------
+-- 14. 默认架构初始化数据
+-- ----------------------------
+
+-- 14.1 架构图主表
+INSERT IGNORE INTO `arch_diagram` (`id`, `diagram_name`, `diagram_description`, `diagram_version`, `status`, `is_published`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`) VALUES
+(1, '默认架构', '系统初始化的默认架构拓扑图', '1.0', '1', '1', 'admin', NOW(), 'admin', NOW(), '0');
+
+-- 14.2 架构图节点
+INSERT IGNORE INTO `arch_node` (`id`, `diagram_id`, `node_type_id`, `node_name`, `node_code`, `x_position`, `y_position`, `node_width`, `node_height`, `node_properties`, `label`, `description`, `status`, `visible`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`) VALUES
+(1, 1, 4, 'Nginx-负载均衡服务器', 'nginx-1', 975.00, 50.00, 120, 80, '{"port":80,"ip":"192.168.1.100","config":"worker_processes 4;\\nworker_connections 1024;\\nkeepalive_timeout 65;"}', 'Nginx', '负载均衡服务器', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(2, 1, 21, 'My-Panel-后端管理服务1', 'mypanel-1', 450.00, 350.00, 120, 80, '{"port":8080,"ip":"192.168.1.101","config":"JAVA_VERSION=17\\nMAX_MEMORY=2G\\nTHREAD_POOL_SIZE=200"}', 'My-Panel-1', '后端管理服务1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(3, 1, 21, 'My-Panel-后端管理服务2', 'mypanel-2', 1500.00, 350.00, 120, 80, '{"port":8081,"ip":"192.168.1.102","config":"JAVA_VERSION=17\\nMAX_MEMORY=2G\\nTHREAD_POOL_SIZE=200"}', 'My-Panel-2', '后端管理服务2', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(4, 1, 22, 'Proxy-代理服务1', 'proxy-1', 100.00, 650.00, 120, 80, '{"port":9001,"ip":"192.168.1.201","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-1', '代理服务实例1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(5, 1, 22, 'Proxy-代理服务2', 'proxy-2', 450.00, 650.00, 120, 80, '{"port":9002,"ip":"192.168.1.202","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-2', '代理服务实例2', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(6, 1, 22, 'Proxy-代理服务3', 'proxy-3', 800.00, 650.00, 120, 80, '{"port":9003,"ip":"192.168.1.203","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-3', '代理服务实例3', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(7, 1, 22, 'Proxy-代理服务4', 'proxy-4', 1150.00, 650.00, 120, 80, '{"port":9004,"ip":"192.168.1.204","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-4', '代理服务实例4', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(8, 1, 22, 'Proxy-代理服务5', 'proxy-5', 1500.00, 650.00, 120, 80, '{"port":9005,"ip":"192.168.1.205","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-5', '代理服务实例5', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(9, 1, 22, 'Proxy-代理服务6', 'proxy-6', 1850.00, 650.00, 120, 80, '{"port":9006,"ip":"192.168.1.206","config":"REGISTRY_ENABLED=true\\nHEALTH_CHECK_INTERVAL=30\\nMAX_CONNECTIONS=1000"}', 'Proxy-6', '代理服务实例6', '0', '1', 'admin', NOW(), 'admin', NOW(), '0');
+
+-- 14.3 架构图连线
+INSERT IGNORE INTO `arch_edge` (`id`, `diagram_id`, `edge_type`, `source_node_id`, `target_node_id`, `source_anchor`, `target_anchor`, `edge_label`, `edge_style`, `animated`, `status`, `visible`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`) VALUES
+(1, 1, 'editable', 1, 2, 'bottom', 'top', 'HTTP请求', '{"stroke":"#1890ff","strokeWidth":3,"strokeDasharray":"8,4"}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(2, 1, 'editable', 1, 3, 'bottom', 'top', 'HTTP请求', '{"stroke":"#1890ff","strokeWidth":3,"strokeDasharray":"8,4"}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(3, 1, 'editable', 2, 4, 'bottom', 'top', '服务调用', '{"stroke":"#52c41a","strokeWidth":2}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(4, 1, 'editable', 2, 5, 'bottom', 'top', '服务调用', '{"stroke":"#52c41a","strokeWidth":2}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(5, 1, 'editable', 2, 6, 'bottom', 'top', '服务调用', '{"stroke":"#52c41a","strokeWidth":2}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(6, 1, 'editable', 3, 7, 'bottom', 'top', '服务调用', '{"stroke":"#52c41a","strokeWidth":2}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(7, 1, 'editable', 3, 8, 'bottom', 'top', '服务调用', '{"stroke":"#52c41a","strokeWidth":2}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0'),
+(8, 1, 'editable', 3, 9, 'bottom', 'top', '服务调用', '{"stroke":"#52c41a","strokeWidth":2}', '1', '0', '1', 'admin', NOW(), 'admin', NOW(), '0');

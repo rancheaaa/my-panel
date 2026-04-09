@@ -444,3 +444,317 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
     KEY `idx_app_id` (`app_id`),
     KEY `idx_node_status` (`node_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent客户端注册表';
+
+-- ----------------------------
+-- 6. 架构编排页面表结构
+-- ----------------------------
+
+-- 6.1 架构图主表
+CREATE TABLE IF NOT EXISTS `arch_diagram` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '架构图ID',
+    `diagram_name` varchar(200) NOT NULL COMMENT '架构图名称',
+    `diagram_description` varchar(500) DEFAULT '' COMMENT '架构图描述',
+    `diagram_version` varchar(50) DEFAULT '1.0' COMMENT '版本号',
+    `thumbnail` longtext COMMENT '缩略图Base64或URL',
+    `canvas_config` longtext COMMENT '画布配置（缩放比例、背景等）JSON',
+    `status` char(1) DEFAULT '0' COMMENT '状态（0草稿 1已发布 2已归档）',
+    `is_published` char(1) DEFAULT '0' COMMENT '是否已发布（0否 1是）',
+    `published_at` datetime DEFAULT NULL COMMENT '发布时间',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图主表';
+
+-- 6.2 节点类型表
+CREATE TABLE IF NOT EXISTS `arch_node_type` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '类型ID',
+    `type_code` varchar(100) NOT NULL COMMENT '类型编码',
+    `type_name` varchar(200) NOT NULL COMMENT '类型名称',
+    `icon` varchar(100) DEFAULT NULL COMMENT '图标（SVG或图片URL）',
+    `category` varchar(100) DEFAULT NULL COMMENT '分类（如：基础设施、中间件、应用服务等）',
+    `default_width` int(11) DEFAULT 120 COMMENT '默认宽度',
+    `default_height` int(11) DEFAULT 80 COMMENT '默认高度',
+    `default_style` longtext COMMENT '默认样式模板（颜色、边框等）JSON',
+    `default_properties` longtext COMMENT '默认属性模板JSON',
+    `validation_rules` longtext COMMENT '属性校验规则JSON',
+    `is_system` char(1) DEFAULT '0' COMMENT '是否系统内置（0否 1是）',
+    `is_active` char(1) DEFAULT '1' COMMENT '是否启用（0否 1是）',
+    `sort_order` int(11) DEFAULT 0 COMMENT '排序号',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_type_code` (`type_code`),
+    KEY `idx_category` (`category`),
+    KEY `idx_is_system` (`is_system`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点类型表';
+
+-- 6.3 节点主表
+CREATE TABLE IF NOT EXISTS `arch_node` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '节点ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '所属架构图ID',
+    `node_type_id` bigint(20) NOT NULL COMMENT '节点类型ID',
+    `node_name` varchar(200) NOT NULL COMMENT '节点名称',
+    `node_code` varchar(100) DEFAULT NULL COMMENT '节点编码/标识',
+    `x_position` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT 'X坐标位置',
+    `y_position` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT 'Y坐标位置',
+    `node_width` int(11) DEFAULT 120 COMMENT '节点宽度',
+    `node_height` int(11) DEFAULT 80 COMMENT '节点高度',
+    `z_index` int(11) DEFAULT 0 COMMENT 'Z轴层级（用于图层顺序）',
+    `rotation` decimal(5,2) DEFAULT '0.00' COMMENT '旋转角度',
+    `node_style` longtext COMMENT '节点样式（颜色、边框、阴影等）JSON',
+    `node_properties` longtext COMMENT '节点属性（业务属性）JSON',
+    `node_meta` longtext COMMENT '节点元数据（扩展属性）JSON',
+    `label` varchar(200) DEFAULT NULL COMMENT '节点显示标签',
+    `description` varchar(500) DEFAULT NULL COMMENT '节点描述',
+    `status` char(1) DEFAULT '0' COMMENT '状态（0正常 1禁用 2异常）',
+    `locked` char(1) DEFAULT '0' COMMENT '是否锁定（0否 1是）',
+    `visible` char(1) DEFAULT '1' COMMENT '是否可见（0否 1是）',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_node_type_id` (`node_type_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点主表';
+
+-- 6.4 边缘关系表
+CREATE TABLE IF NOT EXISTS `arch_edge` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '边缘ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '所属架构图ID',
+    `edge_type` varchar(100) DEFAULT 'default' COMMENT '边缘类型（如：default、dashed、dotted等）',
+    `source_node_id` bigint(20) NOT NULL COMMENT '源节点ID',
+    `target_node_id` bigint(20) NOT NULL COMMENT '目标节点ID',
+    `source_anchor` varchar(50) DEFAULT 'auto' COMMENT '源锚点位置（top/bottom/left/right/auto）',
+    `target_anchor` varchar(50) DEFAULT 'auto' COMMENT '目标锚点位置（top/bottom/left/right/auto）',
+    `edge_label` varchar(200) DEFAULT NULL COMMENT '边缘标签',
+    `edge_style` longtext COMMENT '边缘样式（颜色、线宽、箭头等）JSON',
+    `edge_properties` longtext COMMENT '边缘属性JSON',
+    `edge_meta` longtext COMMENT '边缘元数据（扩展属性）JSON',
+    `weight` decimal(10,2) DEFAULT '1.00' COMMENT '权重（用于布局算法）',
+    `animated` char(1) DEFAULT '0' COMMENT '是否有动画（0否 1是）',
+    `status` char(1) DEFAULT '0' COMMENT '状态（0正常 1禁用）',
+    `visible` char(1) DEFAULT '1' COMMENT '是否可见（0否 1是）',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_source_node_id` (`source_node_id`),
+    KEY `idx_target_node_id` (`target_node_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='边缘关系表';
+
+-- 6.5 架构图版本历史表
+CREATE TABLE IF NOT EXISTS `arch_diagram_history` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '历史ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `version` varchar(50) NOT NULL COMMENT '版本号',
+    `version_name` varchar(200) DEFAULT NULL COMMENT '版本名称',
+    `version_description` varchar(500) DEFAULT NULL COMMENT '版本描述',
+    `diagram_data` longtext COMMENT '完整架构图数据JSON',
+    `thumbnail` longtext COMMENT '缩略图Base64或URL',
+    `change_summary` varchar(1000) DEFAULT NULL COMMENT '变更摘要',
+    `change_type` varchar(50) DEFAULT 'update' COMMENT '变更类型（create/update/delete/restore）',
+    `is_current` char(1) DEFAULT '0' COMMENT '是否当前版本（0否 1是）',
+    `restore_count` int(11) DEFAULT 0 COMMENT '被恢复次数',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_version` (`version`),
+    KEY `idx_is_current` (`is_current`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本历史表';
+
+-- 6.6 架构图模板表
+CREATE TABLE IF NOT EXISTS `arch_diagram_template` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '模板ID',
+    `template_name` varchar(200) NOT NULL COMMENT '模板名称',
+    `template_description` varchar(500) DEFAULT '' COMMENT '模板描述',
+    `template_category` varchar(100) DEFAULT NULL COMMENT '模板分类（如：微服务、大数据、传统架构等）',
+    `thumbnail` longtext COMMENT '缩略图Base64或URL',
+    `template_data` longtext NOT NULL COMMENT '模板数据JSON（包含节点、边缘等）',
+    `preview_image` longtext COMMENT '预览图Base64或URL',
+    `tags` varchar(500) DEFAULT NULL COMMENT '标签（逗号分隔）',
+    `is_system` char(1) DEFAULT '0' COMMENT '是否系统内置（0否 1是）',
+    `is_public` char(1) DEFAULT '1' COMMENT '是否公开（0否 1是）',
+    `use_count` int(11) DEFAULT 0 COMMENT '使用次数',
+    `rating` decimal(3,2) DEFAULT '0.00' COMMENT '评分（0-5分）',
+    `rating_count` int(11) DEFAULT 0 COMMENT '评分人数',
+    `status` char(1) DEFAULT '0' COMMENT '状态（0正常 1禁用）',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_template_category` (`template_category`),
+    KEY `idx_is_system` (`is_system`),
+    KEY `idx_is_public` (`is_public`),
+    KEY `idx_use_count` (`use_count`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图模板表';
+
+-- 6.7 节点分组表
+CREATE TABLE IF NOT EXISTS `arch_node_group` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '分组ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '所属架构图ID',
+    `group_name` varchar(200) NOT NULL COMMENT '分组名称',
+    `group_code` varchar(100) DEFAULT NULL COMMENT '分组编码',
+    `group_type` varchar(50) DEFAULT 'custom' COMMENT '分组类型（custom自定义/region区域/layer层级）',
+    `group_style` longtext COMMENT '分组样式（背景色、边框等）JSON',
+    `group_properties` longtext COMMENT '分组属性JSON',
+    `parent_group_id` bigint(20) DEFAULT NULL COMMENT '父分组ID（支持嵌套分组）',
+    `description` varchar(500) DEFAULT NULL COMMENT '分组描述',
+    `visible` char(1) DEFAULT '1' COMMENT '是否可见（0否 1是）',
+    `locked` char(1) DEFAULT '0' COMMENT '是否锁定（0否 1是）',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_parent_group_id` (`parent_group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点分组表';
+
+-- 6.8 节点分组关联表
+CREATE TABLE IF NOT EXISTS `arch_node_group_rel` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '关联ID',
+    `group_id` bigint(20) NOT NULL COMMENT '分组ID',
+    `node_id` bigint(20) NOT NULL COMMENT '节点ID',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_group_node` (`group_id`, `node_id`),
+    KEY `idx_node_id` (`node_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点分组关联表';
+
+-- 6.9 架构图分享表
+CREATE TABLE IF NOT EXISTS `arch_diagram_share` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '分享ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `share_code` varchar(100) NOT NULL COMMENT '分享码',
+    `share_type` varchar(50) DEFAULT 'view' COMMENT '分享类型（view查看/edit编辑/comment评论）',
+    `share_password` varchar(100) DEFAULT NULL COMMENT '分享密码（加密存储）',
+    `expire_time` datetime DEFAULT NULL COMMENT '过期时间（NULL表示永不过期）',
+    `max_view_count` int(11) DEFAULT NULL COMMENT '最大查看次数（NULL表示无限制）',
+    `current_view_count` int(11) DEFAULT 0 COMMENT '当前查看次数',
+    `allow_download` char(1) DEFAULT '0' COMMENT '是否允许下载（0否 1是）',
+    `allow_copy` char(1) DEFAULT '0' COMMENT '是否允许复制（0否 1是）',
+    `status` char(1) DEFAULT '0' COMMENT '状态（0有效 1已失效 2已撤销）',
+    `share_by` varchar(64) DEFAULT '' COMMENT '分享人',
+    `share_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '分享时间',
+    `revoke_time` datetime DEFAULT NULL COMMENT '撤销时间',
+    `revoke_by` varchar(64) DEFAULT NULL COMMENT '撤销人',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_share_code` (`share_code`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_expire_time` (`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图分享表';
+
+-- 6.10 架构图评论表
+CREATE TABLE IF NOT EXISTS `arch_diagram_comment` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '评论ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `node_id` bigint(20) DEFAULT NULL COMMENT '关联节点ID（NULL表示评论整个架构图）',
+    `edge_id` bigint(20) DEFAULT NULL COMMENT '关联边缘ID',
+    `parent_comment_id` bigint(20) DEFAULT NULL COMMENT '父评论ID（支持回复）',
+    `comment_content` text NOT NULL COMMENT '评论内容',
+    `comment_position` longtext COMMENT '评论位置坐标JSON（用于在画布上显示评论标记）',
+    `comment_type` varchar(50) DEFAULT 'text' COMMENT '评论类型（text文本/image图片/file文件）',
+    `attachments` longtext COMMENT '附件信息JSON',
+    `is_resolved` char(1) DEFAULT '0' COMMENT '是否已解决（0否 1是）',
+    `resolved_time` datetime DEFAULT NULL COMMENT '解决时间',
+    `resolved_by` varchar(64) DEFAULT NULL COMMENT '解决人',
+    `like_count` int(11) DEFAULT 0 COMMENT '点赞数',
+    `reply_count` int(11) DEFAULT 0 COMMENT '回复数',
+    `status` char(1) DEFAULT '0' COMMENT '状态（0正常 1已删除）',
+    `create_by` varchar(64) DEFAULT '' COMMENT '评论人',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_node_id` (`node_id`),
+    KEY `idx_edge_id` (`edge_id`),
+    KEY `idx_parent_comment_id` (`parent_comment_id`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图评论表';
+
+-- 6.11 架构图收藏表
+CREATE TABLE IF NOT EXISTS `arch_diagram_favorite` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '收藏ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `user_id` bigint(20) NOT NULL COMMENT '用户ID',
+    `folder_name` varchar(100) DEFAULT 'default' COMMENT '收藏夹名称',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '收藏时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_diagram` (`user_id`, `diagram_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_folder_name` (`folder_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图收藏表';
+
+-- 6.12 架构图操作日志表
+CREATE TABLE IF NOT EXISTS `arch_diagram_log` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `operation_type` varchar(50) NOT NULL COMMENT '操作类型（create创建/update修改/delete删除/publish发布/unpublish取消发布/share分享/export导出/import导入）',
+    `operation_detail` longtext COMMENT '操作详情JSON',
+    `node_id` bigint(20) DEFAULT NULL COMMENT '关联节点ID',
+    `edge_id` bigint(20) DEFAULT NULL COMMENT '关联边缘ID',
+    `before_data` longtext COMMENT '操作前数据JSON',
+    `after_data` longtext COMMENT '操作后数据JSON',
+    `ip_address` varchar(128) DEFAULT NULL COMMENT 'IP地址',
+    `browser` varchar(50) DEFAULT NULL COMMENT '浏览器',
+    `os` varchar(50) DEFAULT NULL COMMENT '操作系统',
+    `create_by` varchar(64) DEFAULT '' COMMENT '操作人',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id` (`diagram_id`),
+    KEY `idx_operation_type` (`operation_type`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图操作日志表';
+
+-- 6.13 架构图标签表
+CREATE TABLE IF NOT EXISTS `arch_diagram_tag` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '标签ID',
+    `tag_name` varchar(100) NOT NULL COMMENT '标签名称',
+    `tag_color` varchar(20) DEFAULT '#1890ff' COMMENT '标签颜色',
+    `tag_type` varchar(50) DEFAULT 'custom' COMMENT '标签类型（system系统/custom自定义）',
+    `use_count` int(11) DEFAULT 0 COMMENT '使用次数',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_tag_name` (`tag_name`),
+    KEY `idx_use_count` (`use_count`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图标签表';
+
+-- 6.14 架构图标签关联表
+CREATE TABLE IF NOT EXISTS `arch_diagram_tag_rel` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '关联ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `tag_id` bigint(20) NOT NULL COMMENT '标签ID',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_diagram_tag` (`diagram_id`, `tag_id`),
+    KEY `idx_tag_id` (`tag_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图标签关联表';

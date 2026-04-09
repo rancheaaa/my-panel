@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchNodeGroupRelMapper">
+    
+    <resultMap type="ArchNodeGroupRel" id="ArchNodeGroupRelResult">
+        <result property="id"    column="id"    />
+        <result property="groupId"    column="group_id"    />
+        <result property="nodeId"    column="node_id"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectArchNodeGroupRelVo">
+        select id, group_id, node_id, create_time from arch_node_group_rel
+    </sql>
+
+    <select id="selectArchNodeGroupRelList" parameterType="ArchNodeGroupRel" resultMap="ArchNodeGroupRelResult">
+        <include refid="selectArchNodeGroupRelVo"/>
+        <where>  
+            <if test="groupId != null">group_id = #{groupId}</if>
+            <if test="nodeId != null"> and node_id = #{nodeId}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectNodeIdsByGroupId" parameterType="Long" resultType="Long">
+        select node_id from arch_node_group_rel where group_id = #{groupId}
+    </select>
+
+    <select id="selectGroupIdsByNodeId" parameterType="Long" resultType="Long">
+        select group_id from arch_node_group_rel where node_id = #{nodeId}
+    </select>
+        
+    <insert id="insertArchNodeGroupRel" parameterType="ArchNodeGroupRel" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_node_group_rel (group_id, node_id, create_time)
+        values (#{groupId}, #{nodeId}, now())
+    </insert>
+
+    <insert id="batchInsertArchNodeGroupRel" parameterType="java.util.List">
+        insert into arch_node_group_rel (group_id, node_id, create_time)
+        values 
+        <foreach collection="list" item="item" separator=",">
+            (#{item.groupId}, #{item.nodeId}, now())
+        </foreach>
+    </insert>
+
+    <delete id="deleteArchNodeGroupRelById" parameterType="Long">
+        delete from arch_node_group_rel where id = #{id}
+    </delete>
+
+    <delete id="deleteArchNodeGroupRelByIds" parameterType="String">
+        delete from arch_node_group_rel where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteArchNodeGroupRelByGroupId" parameterType="Long">
+        delete from arch_node_group_rel where group_id = #{groupId}
+    </delete>
+
+    <delete id="deleteArchNodeGroupRelByNodeId" parameterType="Long">
+        delete from arch_node_group_rel where node_id = #{nodeId}
+    </delete>
+</mapper>

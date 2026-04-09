@@ -285,3 +285,116 @@ INSERT IGNORE INTO `rc_project` (`id`, `project_name`, `project_desc`, `create_b
 VALUES
 (1, 'my-panel-agent', '系统内置默认应用，my-panel-agent', 'admin', NOW(), 'admin', NOW()),
 (2, 'proxy-service', '系统内置默认应用，proxy-service', 'admin', NOW(), 'admin', NOW());
+
+-- ----------------------------
+-- 架构编排页面预置数据
+-- ----------------------------
+
+-- 1. 字典类型：架构图状态
+INSERT IGNORE INTO `sys_dict_type` VALUES (200, '架构图状态', 'arch_diagram_status', '0', 'admin', NOW(), '', NULL, '架构图状态列表');
+
+-- 2. 字典数据：架构图状态
+INSERT IGNORE INTO `sys_dict_data` VALUES (200, 1, '草稿', '0', 'arch_diagram_status', '', 'default', 'N', '0', 'admin', NOW(), '', NULL, '草稿状态'),
+       (201, 2, '已发布', '1', 'arch_diagram_status', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '已发布状态'),
+       (202, 3, '已归档', '2', 'arch_diagram_status', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '已归档状态');
+
+-- 3. 字典类型：节点分类
+INSERT IGNORE INTO `sys_dict_type` VALUES (201, '节点分类', 'arch_node_category', '0', 'admin', NOW(), '', NULL, '节点分类列表');
+
+-- 4. 字典数据：节点分类
+INSERT IGNORE INTO `sys_dict_data` VALUES (203, 1, '基础设施', 'infrastructure', 'arch_node_category', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '基础设施分类'),
+       (204, 2, '中间件', 'middleware', 'arch_node_category', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '中间件分类'),
+       (205, 3, '应用服务', 'application', 'arch_node_category', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '应用服务分类'),
+       (206, 4, '数据库', 'database', 'arch_node_category', '', 'danger', 'N', '0', 'admin', NOW(), '', NULL, '数据库分类'),
+       (207, 5, '缓存', 'cache', 'arch_node_category', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '缓存分类'),
+       (208, 6, '消息队列', 'mq', 'arch_node_category', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '消息队列分类'),
+       (209, 7, '存储', 'storage', 'arch_node_category', '', 'cyan', 'N', '0', 'admin', NOW(), '', NULL, '存储分类'),
+       (210, 8, '网络', 'network', 'arch_node_category', '', 'orange', 'N', '0', 'admin', NOW(), '', NULL, '网络分类'),
+       (211, 9, '安全', 'security', 'arch_node_category', '', 'red', 'N', '0', 'admin', NOW(), '', NULL, '安全分类'),
+       (212, 10, '监控', 'monitor', 'arch_node_category', '', 'blue', 'N', '0', 'admin', NOW(), '', NULL, '监控分类');
+
+-- 5. 字典类型：边缘类型
+INSERT IGNORE INTO `sys_dict_type` VALUES (202, '边缘类型', 'arch_edge_type', '0', 'admin', NOW(), '', NULL, '边缘类型列表');
+
+-- 6. 字典数据：边缘类型
+INSERT IGNORE INTO `sys_dict_data` VALUES (213, 1, '默认实线', 'default', 'arch_edge_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '默认实线'),
+       (214, 2, '虚线', 'dashed', 'arch_edge_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '虚线'),
+       (215, 3, '点线', 'dotted', 'arch_edge_type', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '点线'),
+       (216, 4, '双向箭头', 'bidirectional', 'arch_edge_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '双向箭头'),
+       (217, 5, '曲线', 'curved', 'arch_edge_type', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '曲线');
+
+-- 7. 字典类型：模板分类
+INSERT IGNORE INTO `sys_dict_type` VALUES (203, '模板分类', 'arch_template_category', '0', 'admin', NOW(), '', NULL, '模板分类列表');
+
+-- 8. 字典数据：模板分类
+INSERT IGNORE INTO `sys_dict_data` VALUES (218, 1, '微服务架构', 'microservice', 'arch_template_category', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '微服务架构'),
+       (219, 2, '大数据架构', 'bigdata', 'arch_template_category', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '大数据架构'),
+       (220, 3, '传统架构', 'traditional', 'arch_template_category', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '传统架构'),
+       (221, 4, '云原生架构', 'cloudnative', 'arch_template_category', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '云原生架构'),
+       (222, 5, 'DevOps架构', 'devops', 'arch_template_category', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, 'DevOps架构');
+
+-- 9. 节点类型预置数据
+INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `category`, `default_width`, `default_height`, `default_style`, `default_properties`, `is_system`, `is_active`, `sort_order`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`, `remark`) VALUES
+(1, 'server', '服务器', 'ServerOutlined', 'infrastructure', 120, 80, '{"backgroundColor":"#1890ff","borderColor":"#1890ff","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"cpu":"4核","memory":"8GB","disk":"100GB"}', '1', '1', 1, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-服务器'),
+(2, 'vm', '虚拟机', 'CloudServerOutlined', 'infrastructure', 120, 80, '{"backgroundColor":"#52c41a","borderColor":"#52c41a","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"cpu":"2核","memory":"4GB","disk":"50GB"}', '1', '1', 2, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-虚拟机'),
+(3, 'container', '容器', 'AppstoreOutlined', 'infrastructure', 100, 100, '{"backgroundColor":"#13c2c2","borderColor":"#13c2c2","borderWidth":2,"borderRadius":50,"color":"#ffffff"}', '{"image":"nginx:latest","port":80}', '1', '1', 3, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-容器'),
+(4, 'nginx', 'Nginx', 'ApiOutlined', 'middleware', 120, 80, '{"backgroundColor":"#faad14","borderColor":"#faad14","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"1.18","port":80,"workers":4}', '1', '1', 4, 'admin', NOW(), 'admin', NOW(), '0', '中间件-Nginx'),
+(5, 'redis', 'Redis', 'DatabaseOutlined', 'cache', 120, 80, '{"backgroundColor":"#f5222d","borderColor":"#f5222d","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"6.0","port":6379,"maxMemory":"1GB"}', '1', '1', 5, 'admin', NOW(), 'admin', NOW(), '0', '缓存-Redis'),
+(6, 'mysql', 'MySQL', 'DatabaseOutlined', 'database', 120, 80, '{"backgroundColor":"#2f54eb","borderColor":"#2f54eb","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"8.0","port":3306,"charset":"utf8mb4"}', '1', '1', 6, 'admin', NOW(), 'admin', NOW(), '0', '数据库-MySQL'),
+(7, 'mongodb', 'MongoDB', 'DatabaseOutlined', 'database', 120, 80, '{"backgroundColor":"#52c41a","borderColor":"#52c41a","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"4.4","port":27017,"replicas":3}', '1', '1', 7, 'admin', NOW(), 'admin', NOW(), '0', '数据库-MongoDB'),
+(8, 'rabbitmq', 'RabbitMQ', 'MessageOutlined', 'mq', 120, 80, '{"backgroundColor":"#eb2f96","borderColor":"#eb2f96","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"3.8","port":5672,"managementPort":15672}', '1', '1', 8, 'admin', NOW(), 'admin', NOW(), '0', '消息队列-RabbitMQ'),
+(9, 'kafka', 'Kafka', 'MessageOutlined', 'mq', 120, 80, '{"backgroundColor":"#722ed1","borderColor":"#722ed1","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"2.8","port":9092,"partitions":3}', '1', '1', 9, 'admin', NOW(), 'admin', NOW(), '0', '消息队列-Kafka'),
+(10, 'springboot', 'SpringBoot', 'CodeOutlined', 'application', 120, 80, '{"backgroundColor":"#52c41a","borderColor":"#52c41a","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"2.7","port":8080,"jvm":"-Xmx512m"}', '1', '1', 10, 'admin', NOW(), 'admin', NOW(), '0', '应用服务-SpringBoot'),
+(11, 'nodejs', 'Node.js', 'CodeOutlined', 'application', 120, 80, '{"backgroundColor":"#faad14","borderColor":"#faad14","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"16.x","port":3000,"framework":"Express"}', '1', '1', 11, 'admin', NOW(), 'admin', NOW(), '0', '应用服务-Node.js'),
+(12, 'python', 'Python', 'CodeOutlined', 'application', 120, 80, '{"backgroundColor":"#13c2c2","borderColor":"#13c2c2","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"3.9","port":5000,"framework":"Flask"}', '1', '1', 12, 'admin', NOW(), 'admin', NOW(), '0', '应用服务-Python'),
+(13, 'elasticsearch', 'Elasticsearch', 'SearchOutlined', 'middleware', 120, 80, '{"backgroundColor":"#fa541c","borderColor":"#fa541c","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"7.10","port":9200,"nodes":3}', '1', '1', 13, 'admin', NOW(), 'admin', NOW(), '0', '中间件-Elasticsearch'),
+(14, 'prometheus', 'Prometheus', 'LineChartOutlined', 'monitor', 120, 80, '{"backgroundColor":"#1890ff","borderColor":"#1890ff","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"2.30","port":9090,"retention":"15d"}', '1', '1', 14, 'admin', NOW(), 'admin', NOW(), '0', '监控-Prometheus'),
+(15, 'grafana', 'Grafana', 'DashboardOutlined', 'monitor', 120, 80, '{"backgroundColor":"#f5222d","borderColor":"#f5222d","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"8.0","port":3000,"datasources":5}', '1', '1', 15, 'admin', NOW(), 'admin', NOW(), '0', '监控-Grafana'),
+(16, 'kubernetes', 'Kubernetes', 'ClusterOutlined', 'infrastructure', 140, 100, '{"backgroundColor":"#326ce5","borderColor":"#326ce5","borderWidth":2,"borderRadius":8,"color":"#ffffff"}', '{"version":"1.22","nodes":5,"pods":100}', '1', '1', 16, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-Kubernetes'),
+(17, 'docker', 'Docker', 'AppstoreOutlined', 'infrastructure', 120, 80, '{"backgroundColor":"#2496ed","borderColor":"#2496ed","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"version":"20.10","containers":10,"images":20}', '1', '1', 17, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-Docker'),
+(18, 'firewall', '防火墙', 'SafetyCertificateOutlined', 'security', 120, 80, '{"backgroundColor":"#f5222d","borderColor":"#f5222d","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"type":"iptables","rules":50}', '1', '1', 18, 'admin', NOW(), 'admin', NOW(), '0', '安全-防火墙'),
+(19, 'loadbalancer', '负载均衡', 'ControlOutlined', 'network', 120, 80, '{"backgroundColor":"#722ed1","borderColor":"#722ed1","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"algorithm":"roundRobin","backends":3}', '1', '1', 19, 'admin', NOW(), 'admin', NOW(), '0', '网络-负载均衡'),
+(20, 'oss', '对象存储', 'FolderOpenOutlined', 'storage', 120, 80, '{"backgroundColor":"#13c2c2","borderColor":"#13c2c2","borderWidth":2,"borderRadius":4,"color":"#ffffff"}', '{"type":"MinIO","capacity":"1TB","buckets":10}', '1', '1', 20, 'admin', NOW(), 'admin', NOW(), '0', '存储-对象存储');
+
+-- 10. 架构图模板预置数据
+INSERT IGNORE INTO `arch_diagram_template` (`id`, `template_name`, `template_description`, `template_category`, `thumbnail`, `template_data`, `preview_image`, `tags`, `is_system`, `is_public`, `use_count`, `rating`, `rating_count`, `status`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`, `remark`) VALUES
+(1, '微服务基础架构', '包含网关、服务注册中心、配置中心、多个微服务实例的微服务基础架构模板', 'microservice', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '微服务,网关,注册中心,配置中心', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '微服务基础架构模板'),
+(2, '大数据处理架构', '包含数据采集、存储、处理、分析的大数据架构模板', 'bigdata', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '大数据,采集,存储,处理,分析', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '大数据处理架构模板'),
+(3, '传统三层架构', '包含表现层、业务逻辑层、数据访问层的传统三层架构模板', 'traditional', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '传统,三层架构,表现层,业务层,数据层', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '传统三层架构模板'),
+(4, '云原生架构', '基于Kubernetes的云原生架构模板，包含容器编排、服务网格、监控等', 'cloudnative', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '云原生,Kubernetes,容器,服务网格,监控', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '云原生架构模板'),
+(5, 'DevOps流水线', '包含代码仓库、CI/CD流水线、自动化测试、部署的DevOps架构模板', 'devops', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, 'DevOps,CI/CD,自动化测试,部署', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', 'DevOps流水线模板');
+
+-- 11. 架构图标签预置数据
+INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_color`, `tag_type`, `use_count`, `create_by`, `create_time`, `del_flag`, `remark`) VALUES
+(1, '生产环境', '#f5222d', 'system', 0, 'admin', NOW(), '0', '生产环境标签'),
+(2, '测试环境', '#faad14', 'system', 0, 'admin', NOW(), '0', '测试环境标签'),
+(3, '开发环境', '#52c41a', 'system', 0, 'admin', NOW(), '0', '开发环境标签'),
+(4, '高可用', '#1890ff', 'system', 0, 'admin', NOW(), '0', '高可用标签'),
+(5, '高性能', '#722ed1', 'system', 0, 'admin', NOW(), '0', '高性能标签'),
+(6, '安全', '#eb2f96', 'system', 0, 'admin', NOW(), '0', '安全标签'),
+(7, '微服务', '#13c2c2', 'system', 0, 'admin', NOW(), '0', '微服务标签'),
+(8, '大数据', '#fa541c', 'system', 0, 'admin', NOW(), '0', '大数据标签'),
+(9, '云原生', '#2f54eb', 'system', 0, 'admin', NOW(), '0', '云原生标签'),
+(10, 'DevOps', '#a0d911', 'system', 0, 'admin', NOW(), '0', 'DevOps标签');
+
+-- 12. 菜单权限数据
+INSERT IGNORE INTO `sys_menu` VALUES (2000, '架构编排', 0, 6, 'architecture', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ApartmentOutlined', 'admin', NOW(), '', NULL, '架构编排目录'),
+(2001, '架构图管理', 2000, 1, 'arch-diagram', 'architecture/diagram/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
+(2002, '节点类型管理', 2000, 2, 'arch-node-type', 'architecture/nodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
+(2003, '模板管理', 2000, 3, 'arch-template', 'architecture/template/index', '', '', 1, 0, 'C', '0', '0', 'arch:template:list', 'template', 'admin', NOW(), '', NULL, '模板管理菜单'),
+(2004, '架构图查询', 2001, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:query', '#', 'admin', NOW(), '', NULL, ''),
+(2005, '架构图新增', 2001, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:add', '#', 'admin', NOW(), '', NULL, ''),
+(2006, '架构图修改', 2001, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2007, '架构图删除', 2001, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2008, '架构图发布', 2001, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:publish', '#', 'admin', NOW(), '', NULL, ''),
+(2009, '架构图导出', 2001, 6, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:export', '#', 'admin', NOW(), '', NULL, ''),
+(2010, '架构图导入', 2001, 7, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:import', '#', 'admin', NOW(), '', NULL, ''),
+(2011, '节点类型查询', 2002, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:query', '#', 'admin', NOW(), '', NULL, ''),
+(2012, '节点类型新增', 2002, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:add', '#', 'admin', NOW(), '', NULL, ''),
+(2013, '节点类型修改', 2002, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2014, '节点类型删除', 2002, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2015, '模板查询', 2003, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:query', '#', 'admin', NOW(), '', NULL, ''),
+(2016, '模板新增', 2003, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:add', '#', 'admin', NOW(), '', NULL, ''),
+(2017, '模板修改', 2003, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2018, '模板删除', 2003, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2019, '模板使用', 2003, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:use', '#', 'admin', NOW(), '', NULL, '');

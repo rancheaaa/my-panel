@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchDiagramShareMapper">
+    
+    <resultMap type="ArchDiagramShare" id="ArchDiagramShareResult">
+        <result property="id"    column="id"    />
+        <result property="diagramId"    column="diagram_id"    />
+        <result property="shareCode"    column="share_code"    />
+        <result property="shareType"    column="share_type"    />
+        <result property="sharePassword"    column="share_password"    />
+        <result property="expireTime"    column="expire_time"    />
+        <result property="maxViewCount"    column="max_view_count"    />
+        <result property="currentViewCount"    column="current_view_count"    />
+        <result property="allowDownload"    column="allow_download"    />
+        <result property="allowCopy"    column="allow_copy"    />
+        <result property="status"    column="status"    />
+        <result property="shareBy"    column="share_by"    />
+        <result property="shareTime"    column="share_time"    />
+        <result property="revokeTime"    column="revoke_time"    />
+        <result property="revokeBy"    column="revoke_by"    />
+    </resultMap>
+
+    <sql id="selectArchDiagramShareVo">
+        select id, diagram_id, share_code, share_type, share_password, expire_time, max_view_count, current_view_count, allow_download, allow_copy, status, share_by, share_time, revoke_time, revoke_by from arch_diagram_share
+    </sql>
+
+    <select id="selectArchDiagramShareList" parameterType="ArchDiagramShare" resultMap="ArchDiagramShareResult">
+        <include refid="selectArchDiagramShareVo"/>
+        <where>  
+            <if test="diagramId != null">diagram_id = #{diagramId}</if>
+            <if test="shareCode != null and shareCode != ''"> and share_code like concat('%', #{shareCode}, '%')</if>
+            <if test="shareType != null and shareType != ''"> and share_type = #{shareType}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by share_time desc
+    </select>
+    
+    <select id="selectSharesByDiagramId" parameterType="Long" resultMap="ArchDiagramShareResult">
+        <include refid="selectArchDiagramShareVo"/>
+        where diagram_id = #{diagramId}
+        order by share_time desc
+    </select>
+
+    <select id="selectArchDiagramShareByCode" parameterType="String" resultMap="ArchDiagramShareResult">
+        <include refid="selectArchDiagramShareVo"/>
+        where share_code = #{shareCode}
+    </select>
+
+    <select id="selectArchDiagramShareById" parameterType="Long" resultMap="ArchDiagramShareResult">
+        <include refid="selectArchDiagramShareVo"/>
+        where id = #{id}
+    </select>
+        
+    <insert id="insertArchDiagramShare" parameterType="ArchDiagramShare" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_diagram_share
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">diagram_id,</if>
+            <if test="shareCode != null and shareCode != ''">share_code,</if>
+            <if test="shareType != null">share_type,</if>
+            <if test="sharePassword != null">share_password,</if>
+            <if test="expireTime != null">expire_time,</if>
+            <if test="maxViewCount != null">max_view_count,</if>
+            <if test="currentViewCount != null">current_view_count,</if>
+            <if test="allowDownload != null">allow_download,</if>
+            <if test="allowCopy != null">allow_copy,</if>
+            <if test="status != null">status,</if>
+            <if test="shareBy != null">share_by,</if>
+            <if test="shareTime != null">share_time,</if>
+            <if test="revokeTime != null">revoke_time,</if>
+            <if test="revokeBy != null">revoke_by,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">#{diagramId},</if>
+            <if test="shareCode != null and shareCode != ''">#{shareCode},</if>
+            <if test="shareType != null">#{shareType},</if>
+            <if test="sharePassword != null">#{sharePassword},</if>
+            <if test="expireTime != null">#{expireTime},</if>
+            <if test="maxViewCount != null">#{maxViewCount},</if>
+            <if test="currentViewCount != null">#{currentViewCount},</if>
+            <if test="allowDownload != null">#{allowDownload},</if>
+            <if test="allowCopy != null">#{allowCopy},</if>
+            <if test="status != null">#{status},</if>
+            <if test="shareBy != null">#{shareBy},</if>
+            <if test="shareTime != null">#{shareTime},</if>
+            <if test="revokeTime != null">#{revokeTime},</if>
+            <if test="revokeBy != null">#{revokeBy},</if>
+         </trim>
+    </insert>
+
+    <update id="updateArchDiagramShare" parameterType="ArchDiagramShare">
+        update arch_diagram_share
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="shareType != null">share_type = #{shareType},</if>
+            <if test="sharePassword != null">share_password = #{sharePassword},</if>
+            <if test="expireTime != null">expire_time = #{expireTime},</if>
+            <if test="maxViewCount != null">max_view_count = #{maxViewCount},</if>
+            <if test="allowDownload != null">allow_download = #{allowDownload},</if>
+            <if test="allowCopy != null">allow_copy = #{allowCopy},</if>
+            <if test="status != null">status = #{status},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <update id="incrementViewCount" parameterType="Long">
+        update arch_diagram_share set current_view_count = current_view_count + 1 where id = #{id}
+    </update>
+
+    <update id="revokeShare" parameterType="Long">
+        update arch_diagram_share set status = '2', revoke_time = now() where id = #{id}
+    </update>
+
+    <delete id="deleteArchDiagramShareById" parameterType="Long">
+        delete from arch_diagram_share where id = #{id}
+    </delete>
+
+    <delete id="deleteArchDiagramShareByIds" parameterType="String">
+        delete from arch_diagram_share where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

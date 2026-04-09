@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchDiagramTagMapper">
+    
+    <resultMap type="ArchDiagramTag" id="ArchDiagramTagResult">
+        <result property="id"    column="id"    />
+        <result property="tagName"    column="tag_name"    />
+        <result property="tagColor"    column="tag_color"    />
+        <result property="tagType"    column="tag_type"    />
+        <result property="useCount"    column="use_count"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="delFlag"    column="del_flag"    />
+    </resultMap>
+
+    <sql id="selectArchDiagramTagVo">
+        select id, tag_name, tag_color, tag_type, use_count, create_by, create_time, del_flag from arch_diagram_tag
+    </sql>
+
+    <select id="selectArchDiagramTagList" parameterType="ArchDiagramTag" resultMap="ArchDiagramTagResult">
+        <include refid="selectArchDiagramTagVo"/>
+        <where>  
+            del_flag = '0'
+            <if test="tagName != null and tagName != ''"> and tag_name like concat('%', #{tagName}, '%')</if>
+            <if test="tagType != null and tagType != ''"> and tag_type = #{tagType}</if>
+        </where>
+        order by use_count desc, create_time desc
+    </select>
+    
+    <select id="selectArchDiagramTagAll" resultMap="ArchDiagramTagResult">
+        <include refid="selectArchDiagramTagVo"/>
+        where del_flag = '0'
+        order by use_count desc
+    </select>
+
+    <select id="selectArchDiagramTagById" parameterType="Long" resultMap="ArchDiagramTagResult">
+        <include refid="selectArchDiagramTagVo"/>
+        where id = #{id} and del_flag = '0'
+    </select>
+
+    <select id="selectArchDiagramTagByName" parameterType="String" resultMap="ArchDiagramTagResult">
+        <include refid="selectArchDiagramTagVo"/>
+        where tag_name = #{tagName} and del_flag = '0'
+        limit 1
+    </select>
+        
+    <insert id="insertArchDiagramTag" parameterType="ArchDiagramTag" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_diagram_tag
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="tagName != null and tagName != ''">tag_name,</if>
+            <if test="tagColor != null">tag_color,</if>
+            <if test="tagType != null">tag_type,</if>
+            <if test="useCount != null">use_count,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="tagName != null and tagName != ''">#{tagName},</if>
+            <if test="tagColor != null">#{tagColor},</if>
+            <if test="tagType != null">#{tagType},</if>
+            <if test="useCount != null">#{useCount},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+         </trim>
+    </insert>
+
+    <update id="updateArchDiagramTag" parameterType="ArchDiagramTag">
+        update arch_diagram_tag
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="tagColor != null">tag_color = #{tagColor},</if>
+            <if test="tagType != null">tag_type = #{tagType},</if>
+            <if test="useCount != null">use_count = #{useCount},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <update id="incrementUseCount" parameterType="Long">
+        update arch_diagram_tag set use_count = use_count + 1 where id = #{id}
+    </update>
+
+    <delete id="deleteArchDiagramTagById" parameterType="Long">
+        update arch_diagram_tag set del_flag = '1' where id = #{id}
+    </delete>
+
+    <delete id="deleteArchDiagramTagByIds" parameterType="String">
+        update arch_diagram_tag set del_flag = '1' where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="checkTagNameUnique" parameterType="ArchDiagramTag" resultMap="ArchDiagramTagResult">
+        <include refid="selectArchDiagramTagVo"/>
+        where tag_name = #{tagName} and del_flag = '0'
+        <if test="id != null"> and id != #{id}</if>
+        limit 1
+    </select>
+</mapper>

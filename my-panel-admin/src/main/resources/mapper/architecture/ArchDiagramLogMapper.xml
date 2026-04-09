@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchDiagramLogMapper">
+    
+    <resultMap type="ArchDiagramLog" id="ArchDiagramLogResult">
+        <result property="id"    column="id"    />
+        <result property="diagramId"    column="diagram_id"    />
+        <result property="operationType"    column="operation_type"    />
+        <result property="operationDetail"    column="operation_detail"    />
+        <result property="nodeId"    column="node_id"    />
+        <result property="edgeId"    column="edge_id"    />
+        <result property="beforeData"    column="before_data"    />
+        <result property="afterData"    column="after_data"    />
+        <result property="ipAddress"    column="ip_address"    />
+        <result property="browser"    column="browser"    />
+        <result property="os"    column="os"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectArchDiagramLogVo">
+        select id, diagram_id, operation_type, operation_detail, node_id, edge_id, before_data, after_data, ip_address, browser, os, create_by, create_time, remark from arch_diagram_log
+    </sql>
+
+    <select id="selectArchDiagramLogList" parameterType="ArchDiagramLog" resultMap="ArchDiagramLogResult">
+        <include refid="selectArchDiagramLogVo"/>
+        <where>  
+            <if test="diagramId != null">diagram_id = #{diagramId}</if>
+            <if test="operationType != null and operationType != ''"> and operation_type = #{operationType}</if>
+            <if test="nodeId != null"> and node_id = #{nodeId}</if>
+            <if test="edgeId != null"> and edge_id = #{edgeId}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectLogsByDiagramId" parameterType="Long" resultMap="ArchDiagramLogResult">
+        <include refid="selectArchDiagramLogVo"/>
+        where diagram_id = #{diagramId}
+        order by create_time desc
+    </select>
+
+    <select id="selectArchDiagramLogById" parameterType="Long" resultMap="ArchDiagramLogResult">
+        <include refid="selectArchDiagramLogVo"/>
+        where id = #{id}
+    </select>
+        
+    <insert id="insertArchDiagramLog" parameterType="ArchDiagramLog" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_diagram_log
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">diagram_id,</if>
+            <if test="operationType != null and operationType != ''">operation_type,</if>
+            <if test="operationDetail != null">operation_detail,</if>
+            <if test="nodeId != null">node_id,</if>
+            <if test="edgeId != null">edge_id,</if>
+            <if test="beforeData != null">before_data,</if>
+            <if test="afterData != null">after_data,</if>
+            <if test="ipAddress != null">ip_address,</if>
+            <if test="browser != null">browser,</if>
+            <if test="os != null">os,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">#{diagramId},</if>
+            <if test="operationType != null and operationType != ''">#{operationType},</if>
+            <if test="operationDetail != null">#{operationDetail},</if>
+            <if test="nodeId != null">#{nodeId},</if>
+            <if test="edgeId != null">#{edgeId},</if>
+            <if test="beforeData != null">#{beforeData},</if>
+            <if test="afterData != null">#{afterData},</if>
+            <if test="ipAddress != null">#{ipAddress},</if>
+            <if test="browser != null">#{browser},</if>
+            <if test="os != null">#{os},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <insert id="batchInsertArchDiagramLog" parameterType="java.util.List">
+        insert into arch_diagram_log (diagram_id, operation_type, operation_detail, node_id, edge_id, before_data, after_data, ip_address, browser, os, create_by, create_time, remark)
+        values 
+        <foreach collection="list" item="item" separator=",">
+            (#{item.diagramId}, #{item.operationType}, #{item.operationDetail}, #{item.nodeId}, #{item.edgeId}, #{item.beforeData}, #{item.afterData}, #{item.ipAddress}, #{item.browser}, #{item.os}, #{item.createBy}, #{item.createTime}, #{item.remark})
+        </foreach>
+    </insert>
+
+    <delete id="deleteArchDiagramLogById" parameterType="Long">
+        delete from arch_diagram_log where id = #{id}
+    </delete>
+
+    <delete id="deleteArchDiagramLogByIds" parameterType="String">
+        delete from arch_diagram_log where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="clearLogsByDiagramId" parameterType="Long">
+        delete from arch_diagram_log where diagram_id = #{diagramId}
+    </delete>
+</mapper>

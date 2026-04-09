@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchDiagramFavoriteMapper">
+    
+    <resultMap type="ArchDiagramFavorite" id="ArchDiagramFavoriteResult">
+        <result property="id"    column="id"    />
+        <result property="diagramId"    column="diagram_id"    />
+        <result property="userId"    column="user_id"    />
+        <result property="folderName"    column="folder_name"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectArchDiagramFavoriteVo">
+        select id, diagram_id, user_id, folder_name, create_time from arch_diagram_favorite
+    </sql>
+
+    <select id="selectArchDiagramFavoriteList" parameterType="ArchDiagramFavorite" resultMap="ArchDiagramFavoriteResult">
+        <include refid="selectArchDiagramFavoriteVo"/>
+        <where>  
+            <if test="diagramId != null">diagram_id = #{diagramId}</if>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="folderName != null and folderName != ''"> and folder_name = #{folderName}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectFavoritesByUserId" parameterType="Long" resultMap="ArchDiagramFavoriteResult">
+        <include refid="selectArchDiagramFavoriteVo"/>
+        where user_id = #{userId}
+        order by create_time desc
+    </select>
+
+    <select id="selectFavoritesByDiagramId" parameterType="Long" resultMap="ArchDiagramFavoriteResult">
+        <include refid="selectArchDiagramFavoriteVo"/>
+        where diagram_id = #{diagramId}
+        order by create_time desc
+    </select>
+
+    <select id="selectFavoriteByUserAndDiagram" resultMap="ArchDiagramFavoriteResult">
+        <include refid="selectArchDiagramFavoriteVo"/>
+        where user_id = #{userId} and diagram_id = #{diagramId}
+        limit 1
+    </select>
+        
+    <insert id="insertArchDiagramFavorite" parameterType="ArchDiagramFavorite" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_diagram_favorite (diagram_id, user_id, folder_name, create_time)
+        values (#{diagramId}, #{userId}, #{folderName}, now())
+    </insert>
+
+    <delete id="deleteArchDiagramFavoriteById" parameterType="Long">
+        delete from arch_diagram_favorite where id = #{id}
+    </delete>
+
+    <delete id="deleteArchDiagramFavoriteByIds" parameterType="String">
+        delete from arch_diagram_favorite where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="cancelFavorite">
+        delete from arch_diagram_favorite where user_id = #{userId} and diagram_id = #{diagramId}
+    </delete>
+</mapper>

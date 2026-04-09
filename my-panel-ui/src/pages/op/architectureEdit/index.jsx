@@ -10,7 +10,8 @@ import {
   Divider,
   Tag,
   Select,
-  InputNumber
+  InputNumber,
+  Upload
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -20,65 +21,307 @@ import {
   DeleteOutlined,
   ClusterOutlined,
   ApiOutlined,
-  DatabaseOutlined
+  DatabaseOutlined,
+  CloseOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
 import { 
-  FlowView, 
   useNodesState, 
-  useEdgesState,
-  MiniMap,
-  Background,
-  FlowPanel,
-  Handle,
-  Position
+  useEdgesState
 } from '@ant-design/pro-flow';
-import { Handle as ReactFlowHandle, Position as ReactFlowPosition } from 'reactflow';
+import { 
+  Handle as ReactFlowHandle, 
+  Position as ReactFlowPosition, 
+  ReactFlow, 
+  Background, 
+  MiniMap, 
+  Controls,
+  ReactFlowProvider,
+  useReactFlow,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  getSmoothStepPath,
+  getStraightPath
+} from 'reactflow';
 import 'reactflow/dist/style.css';
+import './index.scss';
 
 const { Option } = Select;
 
-const styles = `
-  .custom-handle {
-    z-index: 1000 !important;
-  }
+// 自定义可编辑连线组件
+const EditableEdge = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+  selected,
+  data,
+}) => {
+  const { setEdges } = useReactFlow();
   
-  .custom-handle:hover {
-    transform: scale(1.3) !important;
-    box-shadow: 0 0 12px rgba(24, 144, 255, 0.6) !important;
-  }
-  
-  .react-flow__handle {
-    transition: all 0.3s ease !important;
-    z-index: 1000 !important;
-  }
-  
-  .react-flow__handle-connecting {
-    background: #1890ff !important;
-    transform: scale(1.2) !important;
-    box-shadow: 0 0 16px rgba(24, 144, 255, 0.8) !important;
-  }
-  
-  .react-flow__handle-valid {
-    background: #52c41a !important;
-  }
-  
-  .react-flow__edge-path {
-    stroke-width: 2 !important;
-  }
-  
-  .react-flow__edge.selected .react-flow__edge-path {
-    stroke: #1890ff !important;
-    stroke-width: 3 !important;
-  }
-  
-  .react-flow__node {
-    pointer-events: all !important;
-  }
-`;
+  // 计算基础路径
+  const getPath = () => {
+    // 如果有自定义点，构造折线路径
+    if (data?.points && data.points.length > 0) {
+      let path = `M ${sourceX},${sourceY}`;
+      data.points.forEach(point => {
+        path += ` L ${point.x},${point.y}`;
+      });
+      path += ` L ${targetX},${targetY}`;
+      return path;
+    }
+    
+    // 默认使用贝塞尔曲线
+    const [path] = getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+    });
+    return path;
+  };
+
+  const [isHovered, setIsHovered] = useState(false);
+  const edgePath = getPath();
+
+  // 计算点到线段的距离
+  const getDistanceToSegment = (x, y, x1, y1, x2, y2) => {
+    const L2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+    if (L2 === 0) return Math.sqrt((x - x1) ** 2 + (y - y1) ** 2);
+    let t = ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / L2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.sqrt((x - (x1 + t * (x2 - x1))) ** 2 + (y - (y1 + t * (y2 - y1))) ** 2);
+  };
+
+  // 处理控制点拖拽
+  const onHandleDrag = (event, index) => {
+    if (event.button !== 0) return; // 只响应左键
+    event.stopPropagation();
+    const pane = document.querySelector('.react-flow__pane');
+    if (!pane) return;
+
+    const rect = pane.getBoundingClientRect();
+    const transform = pane.style.transform.match(/translate\((.+)px, (.+)px\) scale\((.+)\)/);
+    const tx = transform ? parseFloat(transform[1]) : 0;
+    const ty = transform ? parseFloat(transform[2]) : 0;
+    const s = transform ? parseFloat(transform[3]) : 1;
+
+    const handleMouseMove = (e) => {
+      const x = (e.clientX - rect.left - tx) / s;
+      const y = (e.clientY - rect.top - ty) / s;
+
+      setEdges((eds) =>
+        eds.map((edge) => {
+          if (edge.id === id) {
+            const newPoints = [...(edge.data?.points || [])];
+            newPoints[index] = { x, y };
+            return {
+              ...edge,
+              data: {
+                ...edge.data,
+                points: newPoints,
+              },
+            };
+          }
+          return edge;
+        })
+      );
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // 在连线中间点击并拖拽
+  const onEdgeMouseDown = (event) => {
+    if (event.button !== 0) return; // 只响应左键
+    event.stopPropagation();
+
+    const pane = document.querySelector('.react-flow__pane');
+    if (!pane) return;
+
+    const rect = pane.getBoundingClientRect();
+    const transform = pane.style.transform.match(/translate\((.+)px, (.+)px\) scale\((.+)\)/);
+    const tx = transform ? parseFloat(transform[1]) : 0;
+    const ty = transform ? parseFloat(transform[2]) : 0;
+    const s = transform ? parseFloat(transform[3]) : 1;
+
+    const mouseX = (event.clientX - rect.left - tx) / s;
+    const mouseY = (event.clientY - rect.top - ty) / s;
+
+    // 获取所有点（包括起点和终点）
+    const allPoints = [
+      { x: sourceX, y: sourceY },
+      ...(data?.points || []),
+      { x: targetX, y: targetY }
+    ];
+
+    // 寻找最近的线段
+    let minDistance = Infinity;
+    let insertIndex = 0;
+
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      const p1 = allPoints[i];
+      const p2 = allPoints[i + 1];
+      const dist = getDistanceToSegment(mouseX, mouseY, p1.x, p1.y, p2.x, p2.y);
+      if (dist < minDistance) {
+        minDistance = dist;
+        insertIndex = i;
+      }
+    }
+
+    // 插入新点
+    const newPoint = { x: mouseX, y: mouseY };
+    setEdges((eds) =>
+      eds.map((edge) => {
+        if (edge.id === id) {
+          const points = [...(edge.data?.points || [])];
+          points.splice(insertIndex, 0, newPoint);
+          return {
+            ...edge,
+            data: { ...edge.data, points },
+          };
+        }
+        return edge;
+      })
+    );
+
+    // 立即开始拖拽这个新点
+    onHandleDrag(event, insertIndex);
+  };
+
+  // 删除指定的控制点
+  const onRemovePoint = (event, index) => {
+    event.stopPropagation();
+    setEdges((eds) =>
+      eds.map((edge) => {
+        if (edge.id === id) {
+          const newPoints = [...(edge.data?.points || [])];
+          newPoints.splice(index, 1);
+          return {
+            ...edge,
+            data: {
+              ...edge.data,
+              points: newPoints,
+            },
+          };
+        }
+        return edge;
+      })
+    );
+  };
+
+  return (
+    <g
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`editable-edge-group ${selected ? 'selected' : ''} ${isHovered ? 'hovered' : ''}`}
+      style={{ 
+        cursor: 'crosshair',
+        zIndex: (selected || isHovered) ? 10 : 1,
+      }}
+    >
+      {/* 基础连线 */}
+      <BaseEdge 
+        path={edgePath} 
+        markerEnd={markerEnd} 
+        style={{
+          ...style,
+          strokeWidth: (selected || isHovered) ? (style.strokeWidth || 2) + 1 : style.strokeWidth,
+          stroke: (selected || isHovered) ? '#1890ff' : style.stroke,
+          transition: 'all 0.2s ease',
+        }} 
+      />
+
+      {/* 交互层：极大幅度加宽的透明路径，极大提高点击和拖拽的容错率 */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={isHovered || selected ? 80 : 50}
+        onMouseDown={onEdgeMouseDown}
+        style={{ 
+          cursor: 'crosshair', 
+          pointerEvents: 'stroke',
+          transition: 'stroke-width 0.2s ease'
+        }}
+      />
+      
+      {/* 只有选中或悬浮时才显示控制点 */}
+      {(selected || isHovered) && (
+        <EdgeLabelRenderer>
+          <div 
+            style={{ position: 'relative', zIndex: selected ? 1000 : 900 }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            {/* 控制点 */}
+            {data?.points?.map((point, index) => (
+              <div
+                key={`${id}-point-${index}`}
+                style={{
+                  position: 'absolute',
+                  transform: `translate(-50%, -50%) translate(${point.x}px,${point.y}px)`,
+                  pointerEvents: 'all',
+                }}
+                className="nodrag nopan"
+              >
+                <div
+                  onMouseDown={(e) => onHandleDrag(e, index)}
+                  onDoubleClick={(e) => onRemovePoint(e, index)}
+                  className={`editable-edge-handle ${selected ? 'selected' : ''}`}
+                >
+                  <button
+                    className="remove-point-button"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => onRemovePoint(e, index)}
+                    title="删除顶点"
+                  >
+                    <CloseOutlined />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </g>
+  );
+};
 
 // 自定义节点组件
-const CustomNode = ({ data }) => {
+const CustomNode = ({ data, selected, customNodeTypes = [] }) => {
   const getNodeIcon = (type) => {
+    const customType = customNodeTypes.find(t => t.type === type);
+    if (customType) {
+      const iconMap = {
+        'ApiOutlined': ApiOutlined,
+        'ClusterOutlined': ClusterOutlined,
+        'DatabaseOutlined': DatabaseOutlined,
+        'SettingOutlined': SettingOutlined,
+        'DeleteOutlined': DeleteOutlined,
+        'SyncOutlined': SyncOutlined,
+        'PlusOutlined': PlusOutlined,
+        'SaveOutlined': SaveOutlined,
+        'ReloadOutlined': ReloadOutlined
+      };
+      const IconComponent = iconMap[customType.icon] || ApiOutlined;
+      return <IconComponent style={{ fontSize: '32px', color: customType.color }} />;
+    }
+    
     switch (type) {
       case 'nginx':
         return <ClusterOutlined style={{ fontSize: '32px', color: '#1890ff' }} />;
@@ -92,6 +335,13 @@ const CustomNode = ({ data }) => {
   };
 
   const getNodeColor = (type) => {
+    const customType = customNodeTypes.find(t => t.type === type);
+    if (customType) {
+      const color = customType.color;
+      const bgColor = hexToRgba(color, 0.1);
+      return { bg: bgColor, border: color };
+    }
+    
     switch (type) {
       case 'nginx':
         return { bg: '#e6f7ff', border: '#1890ff' };
@@ -104,168 +354,171 @@ const CustomNode = ({ data }) => {
     }
   };
 
+  const getNodeHandleColor = (type) => {
+    const customType = customNodeTypes.find(t => t.type === type);
+    if (customType) {
+      return customType.color;
+    }
+    
+    switch (type) {
+      case 'nginx':
+        return '#1890ff';
+      case 'my-panel':
+        return '#52c41a';
+      case 'proxy':
+        return '#fa8c16';
+      default:
+        return '#1890ff';
+    }
+  };
+
   const colors = getNodeColor(data.type);
+  const handleColor = getNodeHandleColor(data.type);
+
+  // 辅助函数：将hex颜色转换为rgba
+  function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
 
   return (
-    <div style={{
-      padding: '20px',
-      borderRadius: '12px',
-      border: `3px solid ${colors.border}`,
-      backgroundColor: colors.bg,
-      minWidth: '200px',
-      maxWidth: '280px',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-      transition: 'all 0.3s ease',
-      cursor: 'default',
-      position: 'relative'
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = 'translateY(-4px)';
-      e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
-    }}
+    <div 
+      className={`custom-node-wrapper ${selected ? 'selected' : ''}`}
+      style={{
+        border: `3px solid ${colors.border}`,
+        outline: selected ? `3px solid ${colors.border}` : 'none',
+        outlineOffset: selected ? '2px' : '0',
+        backgroundColor: colors.bg,
+        boxShadow: selected 
+          ? `0 0 20px ${colors.border}88, 0 8px 24px rgba(0,0,0,0.18)` 
+          : '0 4px 16px rgba(0,0,0,0.12)',
+      }}
     >
-      {/* 顶部输入连接桩 */}
+      {/* 顶部连接桩 - 支持双向连接 */}
       <ReactFlowHandle
-        type="target"
+        type="source"
         position={ReactFlowPosition.Top}
         id="top"
-        isConnectable={true}
         style={{
-          background: '#1890ff',
+          background: handleColor,
           width: '16px',
           height: '16px',
           border: '3px solid #fff',
-          boxShadow: '0 2px 8px rgba(24, 144, 255, 0.4)',
+          boxShadow: `0 2px 8px ${handleColor}66`,
           transition: 'all 0.3s ease',
-          cursor: 'crosshair'
+          cursor: 'crosshair',
+          zIndex: 1000
         }}
         className="custom-handle"
       />
       
-      {/* 底部输出连接桩 */}
+      {/* 底部连接桩 - 支持双向连接 */}
       <ReactFlowHandle
         type="source"
         position={ReactFlowPosition.Bottom}
         id="bottom"
-        isConnectable={true}
         style={{
-          background: '#52c41a',
+          background: handleColor,
           width: '16px',
           height: '16px',
           border: '3px solid #fff',
-          boxShadow: '0 2px 8px rgba(82, 196, 26, 0.4)',
+          boxShadow: `0 2px 8px ${handleColor}66`,
           transition: 'all 0.3s ease',
-          cursor: 'crosshair'
+          cursor: 'crosshair',
+          zIndex: 1000
         }}
         className="custom-handle"
       />
       
-      {/* 左侧输入连接桩 */}
+      {/* 左侧连接桩 - 支持双向连接 */}
       <ReactFlowHandle
-        type="target"
+        type="source"
         position={ReactFlowPosition.Left}
         id="left"
-        isConnectable={true}
         style={{
-          background: '#1890ff',
+          background: handleColor,
           width: '16px',
           height: '16px',
           border: '3px solid #fff',
-          boxShadow: '0 2px 8px rgba(24, 144, 255, 0.4)',
+          boxShadow: `0 2px 8px ${handleColor}66`,
           transition: 'all 0.3s ease',
-          cursor: 'crosshair'
+          cursor: 'crosshair',
+          zIndex: 1000
         }}
         className="custom-handle"
       />
       
-      {/* 右侧输出连接桩 */}
+      {/* 右侧连接桩 - 支持双向连接 */}
       <ReactFlowHandle
         type="source"
         position={ReactFlowPosition.Right}
         id="right"
-        isConnectable={true}
         style={{
-          background: '#52c41a',
+          background: handleColor,
           width: '16px',
           height: '16px',
           border: '3px solid #fff',
-          boxShadow: '0 2px 8px rgba(82, 196, 26, 0.4)',
+          boxShadow: `0 2px 8px ${handleColor}66`,
           transition: 'all 0.3s ease',
-          cursor: 'crosshair'
+          cursor: 'crosshair',
+          zIndex: 1000
         }}
         className="custom-handle"
       />
       
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px' }}>
+      <div className="node-header">
         {getNodeIcon(data.type)}
-        <span style={{ 
-          marginLeft: '12px', 
-          fontWeight: 'bold', 
-          fontSize: '16px',
-          color: '#262626'
-        }}>
+        <span className="node-title">
           {data.name}
         </span>
       </div>
       
-      <div style={{ 
-        fontSize: '13px', 
-        color: '#8c8c8c', 
-        marginBottom: '10px',
-        lineHeight: '1.5'
-      }}>
+      <div className="node-description">
         {data.description}
       </div>
       
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        <Tag color="blue" style={{ fontSize: '12px', margin: '0', fontWeight: '500' }}>
+      <div className="node-tags">
+        <Tag color="blue">
           {data.type.toUpperCase()}
         </Tag>
-        <Tag 
-          color={data.status === 'running' ? 'green' : 'red'} 
-          style={{ fontSize: '12px', margin: '0', fontWeight: '500' }}
-        >
+        <Tag color={data.status === 'running' ? 'green' : 'red'}>
           {data.status === 'running' ? '运行中' : '已停止'}
         </Tag>
         {data.port && (
-          <Tag color="purple" style={{ fontSize: '12px', margin: '0', fontWeight: '500' }}>
+          <Tag color="purple">
             端口: {data.port}
           </Tag>
         )}
         {data.ip && (
-          <Tag color="cyan" style={{ fontSize: '12px', margin: '0', fontWeight: '500' }}>
+          <Tag color="cyan">
             IP: {data.ip}
           </Tag>
         )}
       </div>
 
-      {data.config && Object.keys(data.config).length > 0 && (
-        <div style={{
-          marginTop: '8px',
-          padding: '8px 12px',
-          backgroundColor: 'rgba(0,0,0,0.04)',
-          borderRadius: '6px',
-          fontSize: '11px',
-          color: '#595959'
-        }}>
-          <div style={{ fontWeight: '500', marginBottom: '4px' }}>配置信息:</div>
-          {Object.entries(data.config).map(([key, value]) => (
-            <div key={key} style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#8c8c8c' }}>{key}:</span>
-              <span style={{ fontWeight: '500' }}>{String(value)}</span>
-            </div>
-          ))}
+      {data.config && (
+        <div className="node-config-info">
+          <div className="config-title">配置信息:</div>
+          <div className="config-item">
+            <span className="config-value">
+              {typeof data.config === 'string'
+                ? (data.config.length > 120 ? data.config.slice(0, 120) + '…' : data.config)
+                : (() => {
+                    const s = JSON.stringify(data.config);
+                    return s.length > 120 ? s.slice(0, 120) + '…' : s;
+                  })()
+              }
+            </span>
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-const ArchitectureEdit = () => {
+const ArchitectureFlow = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isEdgeModalOpen, setIsEdgeModalOpen] = useState(false);
@@ -277,7 +530,13 @@ const ArchitectureEdit = () => {
   const [currentNode, setCurrentNode] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState(null);
   const [architectureName, setArchitectureName] = useState('默认架构');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const connectSuccessful = React.useRef(false);
+  const [customNodeTypes, setCustomNodeTypes] = useState([]);
+  const [isCustomNodeModalOpen, setIsCustomNodeModalOpen] = useState(false);
+  const [customNodeForm] = Form.useForm();
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -287,15 +546,7 @@ const ArchitectureEdit = () => {
 
   // 初始化默认架构
   const initializeDefaultArchitecture = useCallback(() => {
-    const generateNodeLabel = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
-
-    const initialNodes = [
+      const initialNodes = [
       {
         id: 'nginx-1',
         type: 'nginx',
@@ -308,11 +559,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 80,
           ip: '192.168.1.100',
-          config: {
-            worker_processes: 4,
-            worker_connections: 1024,
-            keepalive_timeout: 65
-          }
+          config: 'worker_processes 4;\nworker_connections 1024;\nkeepalive_timeout 65;'
         },
       },
       {
@@ -327,11 +574,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 8080,
           ip: '192.168.1.101',
-          config: {
-            java_version: '17',
-            max_memory: '2G',
-            thread_pool_size: 200
-          }
+          config: 'JAVA_VERSION=17\nMAX_MEMORY=2G\nTHREAD_POOL_SIZE=200'
         },
       },
       {
@@ -346,11 +589,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 8081,
           ip: '192.168.1.102',
-          config: {
-            java_version: '17',
-            max_memory: '2G',
-            thread_pool_size: 200
-          }
+          config: 'JAVA_VERSION=17\nMAX_MEMORY=2G\nTHREAD_POOL_SIZE=200'
         },
       },
       {
@@ -365,11 +604,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 9001,
           ip: '192.168.1.201',
-          config: {
-            registry_enabled: true,
-            health_check_interval: 30,
-            max_connections: 1000
-          }
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
         },
       },
       {
@@ -384,11 +619,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 9002,
           ip: '192.168.1.202',
-          config: {
-            registry_enabled: true,
-            health_check_interval: 30,
-            max_connections: 1000
-          }
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
         },
       },
       {
@@ -403,11 +634,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 9003,
           ip: '192.168.1.203',
-          config: {
-            registry_enabled: true,
-            health_check_interval: 30,
-            max_connections: 1000
-          }
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
         },
       },
       {
@@ -422,11 +649,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 9004,
           ip: '192.168.1.204',
-          config: {
-            registry_enabled: true,
-            health_check_interval: 30,
-            max_connections: 1000
-          }
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
         },
       },
       {
@@ -441,11 +664,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 9005,
           ip: '192.168.1.205',
-          config: {
-            registry_enabled: true,
-            health_check_interval: 30,
-            max_connections: 1000
-          }
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
         },
       },
       {
@@ -460,11 +679,7 @@ const ArchitectureEdit = () => {
           status: 'running',
           port: 9006,
           ip: '192.168.1.206',
-          config: {
-            registry_enabled: true,
-            health_check_interval: 30,
-            max_connections: 1000
-          }
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
         },
       },
     ];
@@ -473,10 +688,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e1',
         source: 'nginx-1',
+        sourceHandle: 'bottom',
         target: 'mypanel-1',
+        targetHandle: 'top',
         label: 'HTTP请求',
-        type: 'smoothstep',
-        edgeType: 'smoothstep',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#1890ff', 
           strokeWidth: 3,
@@ -491,10 +709,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e2',
         source: 'nginx-1',
+        sourceHandle: 'bottom',
         target: 'mypanel-2',
+        targetHandle: 'top',
         label: 'HTTP请求',
-        type: 'smoothstep',
-        edgeType: 'smoothstep',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#1890ff', 
           strokeWidth: 3,
@@ -509,10 +730,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e3',
         source: 'mypanel-1',
+        sourceHandle: 'bottom',
         target: 'proxy-1',
+        targetHandle: 'top',
         label: '服务调用',
-        type: 'default',
-        edgeType: 'default',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -522,10 +746,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e4',
         source: 'mypanel-1',
+        sourceHandle: 'bottom',
         target: 'proxy-2',
+        targetHandle: 'top',
         label: '服务调用',
-        type: 'default',
-        edgeType: 'default',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -535,10 +762,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e5',
         source: 'mypanel-1',
+        sourceHandle: 'bottom',
         target: 'proxy-3',
+        targetHandle: 'top',
         label: '服务调用',
-        type: 'default',
-        edgeType: 'default',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -548,10 +778,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e6',
         source: 'mypanel-2',
+        sourceHandle: 'bottom',
         target: 'proxy-4',
+        targetHandle: 'top',
         label: '服务调用',
-        type: 'default',
-        edgeType: 'default',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -561,10 +794,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e7',
         source: 'mypanel-2',
+        sourceHandle: 'bottom',
         target: 'proxy-5',
+        targetHandle: 'top',
         label: '服务调用',
-        type: 'default',
-        edgeType: 'default',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -574,10 +810,13 @@ const ArchitectureEdit = () => {
       {
         id: 'e8',
         source: 'mypanel-2',
+        sourceHandle: 'bottom',
         target: 'proxy-6',
+        targetHandle: 'top',
         label: '服务调用',
-        type: 'default',
-        edgeType: 'default',
+        type: 'editable',
+        edgeType: 'editable',
+        data: { points: [] },
         style: { 
           stroke: '#52c41a', 
           strokeWidth: 2
@@ -596,7 +835,61 @@ const ArchitectureEdit = () => {
     initializeDefaultArchitecture();
   }, [initializeDefaultArchitecture]);
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // 检查当前焦点是否在输入框或文本域中
+      const isInput = event.target.tagName === 'INPUT' || 
+                      event.target.tagName === 'TEXTAREA' || 
+                      event.target.isContentEditable;
+      
+      if (isInput) return;
+
+      if (event.key === 'Escape' && isConnecting) {
+        setIsConnecting(false);
+        message.info('连接已取消');
+      }
+
+      // 添加删除快捷键支持 (Delete 或 Backspace)
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        const selectedNodes = nodes.filter(n => n.selected);
+        const selectedEdges = edges.filter(e => e.selected);
+        
+        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+          const content = `确定要删除选中的 ${selectedNodes.length > 0 ? `${selectedNodes.length} 个节点` : ''}${selectedNodes.length > 0 && selectedEdges.length > 0 ? '和 ' : ''}${selectedEdges.length > 0 ? `${selectedEdges.length} 条连线` : ''} 吗？`;
+          
+          Modal.confirm({
+            title: '确认删除',
+            content,
+            okText: '确定',
+            cancelText: '取消',
+            okButtonProps: { danger: true },
+            onOk: () => {
+              if (selectedNodes.length > 0) {
+                setNodes((nds) => nds.filter((node) => !node.selected));
+                setSelectedNode(null);
+              }
+              if (selectedEdges.length > 0) {
+                setEdges((eds) => eds.filter((edge) => !edge.selected));
+                setSelectedEdge(null);
+              }
+              message.success('已删除选中元素');
+            }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isConnecting, nodes, edges, setNodes, setEdges]);
+
   const onNodeClick = useCallback((event, node) => {
+    setSelectedNode(node);
+  }, []);
+
+  const onNodeDoubleClick = useCallback((event, node) => {
     setSelectedNode(node);
     setIsDrawerOpen(true);
     drawerForm.setFieldsValue({
@@ -611,9 +904,28 @@ const ArchitectureEdit = () => {
 
   const onEdgeClick = useCallback((event, edge) => {
     setSelectedEdge(edge);
+  }, []);
+
+  const onEdgeMouseEnter = useCallback((event, edge) => {
+    setHoveredEdgeId(edge.id);
+    // 鼠标移入时，将该线段移到数组末尾，使其在 SVG 中渲染在最上层
+    setEdges((eds) => {
+      const otherEdges = eds.filter((e) => e.id !== edge.id);
+      return [...otherEdges, edge];
+    });
+  }, [setEdges]);
+
+  const onEdgeMouseLeave = useCallback(() => {
+    setHoveredEdgeId(null);
+  }, []);
+
+  const onEdgeDoubleClick = useCallback((event, edge) => {
+    setSelectedEdge(edge);
     edgeForm.setFieldsValue({
       label: edge.label || '',
       id: edge.id,
+      sourceHandle: edge.sourceHandle || 'bottom',
+      targetHandle: edge.targetHandle || 'top',
       edgeType: edge.edgeType || edge.type || 'smoothstep',
       arrowType: edge.markerEnd?.type || edge.markerStart?.type || 'arrowclosed',
       arrowDirection: edge.markerStart && edge.markerEnd ? 'both' : 
@@ -624,26 +936,40 @@ const ArchitectureEdit = () => {
   }, [edgeForm]);
 
   const onConnect = useCallback((connection) => {
+    // 如果连接信息不完整，直接返回null来阻止连接
+    if (!connection.source || !connection.target) {
+      setIsConnecting(false);
+      return null;
+    }
+    
     const sourceNode = nodes.find(node => node.id === connection.source);
     const targetNode = nodes.find(node => node.id === connection.target);
     
     if (!sourceNode || !targetNode) {
-      message.warning('找不到源节点或目标节点');
-      return;
-    }
-    
-    const existingEdge = edges.find(edge => 
-      edge.source === connection.source && edge.target === connection.target
-    );
-    
-    if (existingEdge) {
-      message.warning('该连接已存在');
-      return;
+      setIsConnecting(false);
+      return null;
     }
     
     if (connection.source === connection.target) {
-      message.warning('不能连接到自身');
-      return;
+      setIsConnecting(false);
+      return null;
+    }
+    
+    const sourceHandle = connection.sourceHandle || 'bottom';
+    const targetHandle = connection.targetHandle || 'top';
+    
+    const existingEdge = edges.find(edge => 
+      edge.source === connection.source && 
+      edge.target === connection.target &&
+      edge.sourceHandle === sourceHandle &&
+      edge.targetHandle === targetHandle
+    );
+    
+    if (existingEdge) {
+      setIsConnecting(false);
+      connectSuccessful.current = true; // 标记为已处理，避免 onConnectEnd 弹出“连接已取消”
+      message.warning('不可重复连接');
+      return null;
     }
     
     const sourceType = sourceNode.data.type;
@@ -690,14 +1016,28 @@ const ArchitectureEdit = () => {
       defaultStroke = '#13c2c2';
       defaultStrokeWidth = 2;
     }
+    else {
+      const customSourceType = customNodeTypes.find(t => t.type === sourceType);
+      const customTargetType = customNodeTypes.find(t => t.type === targetType);
+      
+      if (customSourceType || customTargetType) {
+        defaultLabel = '自定义连接';
+        defaultEdgeType = 'smoothstep';
+        defaultStroke = customSourceType ? customSourceType.color : '#1890ff';
+        defaultStrokeWidth = 2;
+      }
+    }
     
     const newEdge = {
       id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       source: connection.source,
+      sourceHandle: sourceHandle,
       target: connection.target,
+      targetHandle: targetHandle,
       label: defaultLabel,
-      type: defaultEdgeType,
+      type: 'editable',
       edgeType: defaultEdgeType,
+      data: { points: [] },
       style: {
         stroke: defaultStroke,
         strokeWidth: defaultStrokeWidth
@@ -709,33 +1049,297 @@ const ArchitectureEdit = () => {
       }
     };
     
-    setEdges((currentEdges) => [...currentEdges, newEdge]);
+    setEdges((currentEdges) => {
+      const updatedEdges = [...currentEdges, newEdge];
+      return updatedEdges;
+    });
     setDefaultEdges((defaultEdgesList) => [...defaultEdgesList, newEdge]);
+    setIsConnecting(false);
+    connectSuccessful.current = true;
     message.success('连接创建成功');
+    
+    return newEdge;
+  }, [nodes, edges, isConnecting]);
+
+  const onReconnect = useCallback((oldEdge, newConnection) => {
+    // 检查是否重连到同一个地方
+    if (oldEdge.source === newConnection.source && 
+        oldEdge.target === newConnection.target && 
+        oldEdge.sourceHandle === newConnection.sourceHandle && 
+        oldEdge.targetHandle === newConnection.targetHandle) {
+      return;
+    }
+
+    // 重连逻辑
+    const sourceNode = nodes.find(node => node.id === newConnection.source);
+    const targetNode = nodes.find(node => node.id === newConnection.target);
+    
+    if (!sourceNode || !targetNode || newConnection.source === newConnection.target) {
+      return;
+    }
+
+    // 检查新连接是否已经存在
+    const existingEdge = edges.find(edge => 
+      edge.id !== oldEdge.id &&
+      edge.source === newConnection.source && 
+      edge.target === newConnection.target &&
+      edge.sourceHandle === newConnection.sourceHandle &&
+      edge.targetHandle === newConnection.targetHandle
+    );
+    
+    if (existingEdge) {
+      message.warning('不可重复连接');
+      return;
+    }
+
+    setEdges((els) => {
+      return els.map((edge) => {
+        if (edge.id === oldEdge.id) {
+          // 重新计算样式和标签
+          const sourceType = sourceNode.data.type;
+          const targetType = targetNode.data.type;
+          
+          let defaultLabel = '连接';
+          let defaultEdgeType = 'smoothstep';
+          let defaultStroke = '#1890ff';
+          let defaultStrokeWidth = 2;
+          
+          if (sourceType === 'nginx' && targetType === 'my-panel') {
+            defaultLabel = 'HTTP请求';
+            defaultEdgeType = 'smoothstep';
+            defaultStroke = '#1890ff';
+            defaultStrokeWidth = 3;
+          }
+          else if (sourceType === 'my-panel' && targetType === 'proxy') {
+            defaultLabel = '服务调用';
+            defaultEdgeType = 'default';
+            defaultStroke = '#52c41a';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'nginx' && targetType === 'proxy') {
+            defaultLabel = '直接代理';
+            defaultEdgeType = 'straight';
+            defaultStroke = '#fa8c16';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'proxy' && targetType === 'my-panel') {
+            defaultLabel = '反向调用';
+            defaultEdgeType = 'default';
+            defaultStroke = '#722ed1';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'my-panel' && targetType === 'my-panel') {
+            defaultLabel = '服务间调用';
+            defaultEdgeType = 'step';
+            defaultStroke = '#eb2f96';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'proxy' && targetType === 'proxy') {
+            defaultLabel = '代理间通信';
+            defaultEdgeType = 'smoothstep';
+            defaultStroke = '#13c2c2';
+            defaultStrokeWidth = 2;
+          }
+          else {
+            const customSourceType = customNodeTypes.find(t => t.type === sourceType);
+            const customTargetType = customNodeTypes.find(t => t.type === targetType);
+            
+            if (customSourceType || customTargetType) {
+              defaultLabel = '自定义连接';
+              defaultEdgeType = 'smoothstep';
+              defaultStroke = customSourceType ? customSourceType.color : '#1890ff';
+              defaultStrokeWidth = 2;
+            }
+          }
+
+          return {
+            ...edge,
+            source: newConnection.source,
+            sourceHandle: newConnection.sourceHandle,
+            target: newConnection.target,
+            targetHandle: newConnection.targetHandle,
+            label: defaultLabel,
+            type: defaultEdgeType,
+            edgeType: defaultEdgeType,
+            style: {
+              ...edge.style,
+              stroke: defaultStroke,
+              strokeWidth: defaultStrokeWidth
+            },
+            markerEnd: {
+              ...edge.markerEnd,
+              color: defaultStroke
+            }
+          };
+        }
+        return edge;
+      });
+    });
+
+    setDefaultEdges((els) => {
+      return els.map((edge) => {
+        if (edge.id === oldEdge.id) {
+          const sourceType = sourceNode.data.type;
+          const targetType = targetNode.data.type;
+          
+          let defaultLabel = '连接';
+          let defaultEdgeType = 'smoothstep';
+          let defaultStroke = '#1890ff';
+          let defaultStrokeWidth = 2;
+          
+          if (sourceType === 'nginx' && targetType === 'my-panel') {
+            defaultLabel = 'HTTP请求';
+            defaultEdgeType = 'smoothstep';
+            defaultStroke = '#1890ff';
+            defaultStrokeWidth = 3;
+          }
+          else if (sourceType === 'my-panel' && targetType === 'proxy') {
+            defaultLabel = '服务调用';
+            defaultEdgeType = 'default';
+            defaultStroke = '#52c41a';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'nginx' && targetType === 'proxy') {
+            defaultLabel = '直接代理';
+            defaultEdgeType = 'straight';
+            defaultStroke = '#fa8c16';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'proxy' && targetType === 'my-panel') {
+            defaultLabel = '反向调用';
+            defaultEdgeType = 'default';
+            defaultStroke = '#722ed1';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'my-panel' && targetType === 'my-panel') {
+            defaultLabel = '服务间调用';
+            defaultEdgeType = 'step';
+            defaultStroke = '#eb2f96';
+            defaultStrokeWidth = 2;
+          }
+          else if (sourceType === 'proxy' && targetType === 'proxy') {
+            defaultLabel = '代理间通信';
+            defaultEdgeType = 'smoothstep';
+            defaultStroke = '#13c2c2';
+            defaultStrokeWidth = 2;
+          }
+
+          return {
+            ...edge,
+            source: newConnection.source,
+            sourceHandle: newConnection.sourceHandle,
+            target: newConnection.target,
+            targetHandle: newConnection.targetHandle,
+            label: defaultLabel,
+            type: defaultEdgeType,
+            edgeType: defaultEdgeType,
+            style: {
+              ...edge.style,
+              stroke: defaultStroke,
+              strokeWidth: defaultStrokeWidth
+            },
+            markerEnd: {
+              ...edge.markerEnd,
+              color: defaultStroke
+            }
+          };
+        }
+        return edge;
+      });
+    });
+    
+    message.success('连接重连成功');
   }, [nodes, edges]);
 
+  const onReconnectStart = useCallback(() => {
+    connectSuccessful.current = false;
+  }, []);
+
+  const onReconnectEnd = useCallback((_, edge) => {
+    if (!connectSuccessful.current) {
+      // 如果重连没有成功且拖拽结束在空白处，可以考虑删除原连线或保持原样
+      // 这里我们选择保持原样，不做任何处理
+    }
+  }, []);
+
   const onConnectStart = useCallback((event, { nodeId, handleId, handleType }) => {
+    setIsConnecting(true);
+    connectSuccessful.current = false;
     const node = nodes.find(n => n.id === nodeId);
     if (node) {
-      message.info(`开始从 "${node.data.name}" 创建连接`);
+      message.info(`开始从 "${node.data.name}" 创建连接，松开鼠标取消`);
     }
   }, [nodes]);
 
-  const onConnectEnd = useCallback((event, { nodeId, handleId }) => {
-    if (!nodeId) {
-      message.warning('连接已取消');
+  const isValidConnection = useCallback((connection) => {
+    if (!connection.source || !connection.target) {
+      return false;
     }
-  }, []);
+    
+    const sourceNode = nodes.find(node => node.id === connection.source);
+    const targetNode = nodes.find(node => node.id === connection.target);
+    
+    if (!sourceNode || !targetNode) {
+      return false;
+    }
+    
+    if (connection.source === connection.target) {
+      return false;
+    }
+    
+    const sourceHandle = connection.sourceHandle || 'bottom';
+    const targetHandle = connection.targetHandle || 'top';
+    
+    const existingEdge = edges.find(edge => 
+      edge.source === connection.source && 
+      edge.target === connection.target &&
+      edge.sourceHandle === sourceHandle &&
+      edge.targetHandle === targetHandle
+    );
+    
+    if (existingEdge) {
+      return false;
+    }
+    
+    return true;
+  }, [nodes, edges]);
+
+  const onConnectEnd = useCallback((event) => {
+    // 如果没有通过 onConnect 建立连接，则视为取消
+    if (!connectSuccessful.current) {
+      setIsConnecting(false);
+      message.info('连接已取消');
+      
+      // 强制刷新 edges 状态，有时能清除 ReactFlow 残留的临时连线
+      setEdges((eds) => [...eds]);
+    }
+  }, [setEdges]);
+
+  const onPaneClick = useCallback((event) => {
+    // 如果正在连接，点击空白区域时取消连接
+    if (isConnecting) {
+      setIsConnecting(false);
+      message.info('连接已取消');
+      
+      // 强制刷新 edges 状态
+      setEdges((eds) => [...eds]);
+    }
+    
+    // 点击空白区域时取消选择
+    setSelectedNode(null);
+    setSelectedEdge(null);
+  }, [isConnecting, setEdges]);
 
   const handleAddNode = () => {
     modalForm.resetFields();
     modalForm.setFieldsValue({
-      type: 'proxy',
+      type: customNodeTypes.length > 0 ? customNodeTypes[0].type : 'proxy',
       name: '',
       description: '',
       ip: '',
       port: 80,
-      status: 'running'
+      status: 'running',
+      configContent: ''
     });
     setCurrentNode(null);
     setIsModalOpen(true);
@@ -743,6 +1347,11 @@ const ArchitectureEdit = () => {
 
   const handleEditNode = () => {
     if (selectedNode) {
+      const configContent = typeof selectedNode.data.config === 'string'
+        ? selectedNode.data.config
+        : selectedNode.data.config
+          ? JSON.stringify(selectedNode.data.config, null, 2)
+          : '';
       modalForm.setFieldsValue({
         type: selectedNode.data.type,
         id: selectedNode.id,
@@ -751,7 +1360,7 @@ const ArchitectureEdit = () => {
         ip: selectedNode.data.ip,
         port: selectedNode.data.port,
         status: selectedNode.data.status,
-        config: selectedNode.data.config
+        configContent
       });
       setCurrentNode(selectedNode);
       setIsModalOpen(true);
@@ -761,13 +1370,22 @@ const ArchitectureEdit = () => {
 
   const handleDeleteNode = () => {
     if (selectedNode) {
-      setNodes((currentNodes) => currentNodes.filter((node) => node.id !== selectedNode.id));
-      setEdges((currentEdges) => currentEdges.filter((edge) => 
-        edge.source !== selectedNode.id && edge.target !== selectedNode.id
-      ));
-      setIsDrawerOpen(false);
-      setSelectedNode(null);
-      message.success('删除成功');
+      Modal.confirm({
+        title: '确认删除',
+        content: `确定要删除节点 "${selectedNode.data.name}" 吗？这也会删除所有与之相关的连线。`,
+        okText: '确定',
+        cancelText: '取消',
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setNodes((currentNodes) => currentNodes.filter((node) => node.id !== selectedNode.id));
+          setEdges((currentEdges) => currentEdges.filter((edge) => 
+            edge.source !== selectedNode.id && edge.target !== selectedNode.id
+          ));
+          setIsDrawerOpen(false);
+          setSelectedNode(null);
+          message.success('删除成功');
+        }
+      });
     }
   };
 
@@ -797,7 +1415,7 @@ const ArchitectureEdit = () => {
       );
       
       if (existingEdge) {
-        message.warning('该连接已存在');
+        message.warning('不可重复连接');
         return;
       }
       
@@ -850,14 +1468,26 @@ const ArchitectureEdit = () => {
         defaultStroke = '#13c2c2';
         defaultStrokeWidth = 2;
       }
+      else {
+        const customSourceType = customNodeTypes.find(t => t.type === sourceType);
+        const customTargetType = customNodeTypes.find(t => t.type === targetType);
+        
+        if (customSourceType || customTargetType) {
+          defaultLabel = '自定义连接';
+          defaultEdgeType = 'smoothstep';
+          defaultStroke = customSourceType ? customSourceType.color : '#1890ff';
+          defaultStrokeWidth = 2;
+        }
+      }
       
       const newEdge = {
         id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         source: values.source,
         target: values.target,
         label: values.label || defaultLabel,
-        type: values.edgeType || defaultEdgeType,
+        type: 'editable',
         edgeType: values.edgeType || defaultEdgeType,
+        data: { points: [] },
         style: {
           stroke: defaultStroke,
           strokeWidth: defaultStrokeWidth
@@ -887,12 +1517,14 @@ const ArchitectureEdit = () => {
   const handleModalOk = () => {
     modalForm.validateFields().then((values) => {
       const nodeId = currentNode?.id || values.id;
+      const configStr = typeof values.configContent === 'string' ? values.configContent : '';
+      const { configContent, ...rest } = values;
       
       if (currentNode) {
         setNodes((currentNodes) =>
           currentNodes.map((node) =>
             node.id === currentNode.id
-              ? { ...node, data: { ...node.data, ...values } }
+              ? { ...node, data: { ...node.data, ...rest, config: configStr } }
               : node
           )
         );
@@ -900,17 +1532,17 @@ const ArchitectureEdit = () => {
       } else {
         const newNode = {
           id: nodeId,
-          type: values.type,
+          type: rest.type,
           position: { x: 400, y: 400 },
           connectable: true,
           data: {
-            name: values.name,
-            type: values.type,
-            description: values.description,
-            status: values.status,
-            ip: values.ip,
-            port: values.port,
-            config: values.config || {}
+            name: rest.name,
+            type: rest.type,
+            description: rest.description,
+            status: rest.status,
+            ip: rest.ip,
+            port: rest.port,
+            config: configStr
           },
         };
         setNodes((currentNodes) => [...currentNodes, newNode]);
@@ -924,7 +1556,7 @@ const ArchitectureEdit = () => {
   };
 
   const handleSaveArchitecture = () => {
-    const architectureData = {
+    const ARCHITECTURE_DATA = {
       name: architectureName,
       nodes: nodes,
       edges: edges,
@@ -937,6 +1569,44 @@ const ArchitectureEdit = () => {
   const handleReset = () => {
     initializeDefaultArchitecture();
     message.success('已重置为默认架构');
+  };
+
+  const handleRefresh = () => {
+    setNodes([...nodes]);
+    setEdges([...edges]);
+    message.success('已刷新架构');
+  };
+
+  const handleAddCustomNodeType = () => {
+    setIsCustomNodeModalOpen(true);
+    customNodeForm.resetFields();
+  };
+
+  const handleCustomNodeModalOk = () => {
+    customNodeForm.validateFields().then((values) => {
+      const newNodeType = {
+        type: values.type,
+        name: values.name,
+        description: values.description,
+        icon: values.icon || 'ApiOutlined',
+        color: values.color || '#1890ff'
+      };
+      
+      const existingType = customNodeTypes.find(t => t.type === values.type);
+      if (existingType) {
+        message.warning('该节点类型已存在');
+        return;
+      }
+      
+      setCustomNodeTypes([...customNodeTypes, newNodeType]);
+      message.success('自定义节点类型添加成功');
+      setIsCustomNodeModalOpen(false);
+    });
+  };
+
+  const handleCustomNodeModalCancel = () => {
+    setIsCustomNodeModalOpen(false);
+    customNodeForm.resetFields();
   };
 
   const handleDrawerClose = () => {
@@ -962,6 +1632,8 @@ const ArchitectureEdit = () => {
               ? { 
                   ...edge, 
                   label: values.label,
+                  sourceHandle: values.sourceHandle,
+                  targetHandle: values.targetHandle,
                   edgeType: values.edgeType,
                   type: values.edgeType,
                   markerStart,
@@ -976,6 +1648,8 @@ const ArchitectureEdit = () => {
               ? { 
                   ...edge, 
                   label: values.label,
+                  sourceHandle: values.sourceHandle,
+                  targetHandle: values.targetHandle,
                   edgeType: values.edgeType,
                   type: values.edgeType,
                   markerStart,
@@ -1019,46 +1693,39 @@ const ArchitectureEdit = () => {
     }
   };
 
-  const nodeTypes = useMemo(() => ({
-    nginx: CustomNode,
-    'my-panel': CustomNode,
-    proxy: CustomNode
+  const nodeTypes = useMemo(() => {
+    const NodeRenderer = (props) => (
+      <CustomNode {...props} customNodeTypes={customNodeTypes} />
+    );
+    const types = {
+      nginx: NodeRenderer,
+      'my-panel': NodeRenderer,
+      proxy: NodeRenderer,
+    };
+    customNodeTypes.forEach((customType) => {
+      types[customType.type] = NodeRenderer;
+    });
+    types.custom = NodeRenderer;
+    return types;
+  }, [customNodeTypes]);
+
+  const edgeTypes = useMemo(() => ({
+    editable: EditableEdge
   }), []);
 
   return (
-    <>
-      <style>{styles}</style>
-      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5' }}>
-      <div style={{ 
-        padding: '16px 24px', 
-        backgroundColor: '#fff', 
-        borderBottom: '2px solid #e8e8e8',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-      }}>
+    <div className="architecture-edit-container">
+      <div className="header-toolbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <h2 style={{ 
-            margin: 0, 
-            fontSize: '22px', 
-            fontWeight: 'bold',
-            color: '#262626',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
+          <h2 className="title">
             <ClusterOutlined style={{ color: '#1890ff' }} />
             架构编排
           </h2>
           <Input
             placeholder="请输入架构名称"
+            className="architecture-name-input"
             value={architectureName}
             onChange={(e) => setArchitectureName(e.target.value)}
-            style={{ 
-              width: 320,
-              borderRadius: '6px'
-            }}
             size="large"
           />
         </div>
@@ -1069,11 +1736,7 @@ const ArchitectureEdit = () => {
             icon={<PlusOutlined />} 
             onClick={handleAddNode}
             size="large"
-            style={{ 
-              borderRadius: '6px',
-              fontWeight: '500',
-              boxShadow: '0 2px 4px rgba(24,144,255,0.2)'
-            }}
+            className="toolbar-button primary"
           >
             新增节点
           </Button>
@@ -1081,10 +1744,7 @@ const ArchitectureEdit = () => {
             icon={<SaveOutlined />} 
             onClick={handleSaveArchitecture}
             size="large"
-            style={{ 
-              borderRadius: '6px',
-              fontWeight: '500'
-            }}
+            className="toolbar-button"
           >
             保存架构
           </Button>
@@ -1092,18 +1752,31 @@ const ArchitectureEdit = () => {
             icon={<ReloadOutlined />} 
             onClick={handleReset}
             size="large"
-            style={{ 
-              borderRadius: '6px',
-              fontWeight: '500'
-            }}
+            className="toolbar-button"
           >
             重置
+          </Button>
+          <Button 
+            icon={<SyncOutlined />} 
+            onClick={handleRefresh}
+            size="large"
+            className="toolbar-button"
+          >
+            刷新
+          </Button>
+          <Button 
+            icon={<SettingOutlined />} 
+            onClick={handleAddCustomNodeType}
+            size="large"
+            className="toolbar-button"
+          >
+            新增自定义节点类型
           </Button>
         </Space>
       </div>
 
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <FlowView
+      <div className="flow-canvas-container">
+        <ReactFlow
           key={`${defaultNodes.length}-${defaultEdges.length}`}
           nodes={nodes}
           edges={edges}
@@ -1111,40 +1784,63 @@ const ArchitectureEdit = () => {
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onEdgeMouseEnter={onEdgeMouseEnter}
+          onEdgeMouseLeave={onEdgeMouseLeave}
+          onNodeDoubleClick={onNodeDoubleClick}
+          onEdgeDoubleClick={onEdgeDoubleClick}
+          onPaneClick={onPaneClick}
           onConnect={onConnect}
           onConnectStart={onConnectStart}
           onConnectEnd={onConnectEnd}
+          onReconnect={onReconnect}
+          onReconnectStart={onReconnectStart}
+          onReconnectEnd={onReconnectEnd}
           nodeTypes={nodeTypes}
-          miniMap
-          background
-          flowProps={{
-            fitView: true,
-            nodesDraggable: true,
-            nodesConnectable: true,
-            elementsSelectable: true,
-            panOnDrag: true,
-            zoomOnScroll: true,
-            zoomOnPinch: true,
-            connectOnClick: true,
-            connectionMode: 'loose',
-            connectionLineType: 'smoothstep',
-            defaultEdgeOptions: {
-              animated: true,
-              style: {
-                strokeWidth: 2,
-              },
+          edgeTypes={edgeTypes}
+          fitView
+          nodesDraggable={true}
+          nodesConnectable={true}
+          edgesUpdatable={true}
+          elementsSelectable={true}
+          panOnDrag={true}
+          zoomOnScroll={true}
+          zoomOnPinch={true}
+          connectOnClick={false}
+          connectionMode="loose"
+          connectionLineType="smoothstep"
+          connectionLineStyle={{
+            stroke: '#1890ff',
+            strokeWidth: 2,
+            strokeDasharray: '5,5',
+            opacity: 0.6
+          }}
+          snapToGrid={true}
+          snapGrid={[15, 15]}
+          autoPanOnConnect={true}
+          autoPanSpeed={0.8}
+          preventScrolling={false}
+          defaultEdgeOptions={{
+            animated: true,
+            style: {
+              strokeWidth: 2,
             },
           }}
-          style={{ 
-            backgroundColor: '#fafafa',
-            backgroundImage: `
-              radial-gradient(circle at 1px 1px, #ddd 1px, transparent 0);
-              background-size: 20px 20px
-            `
+          onNodesDelete={() => {
+            // 我们在快捷键处理函数中已经处理了确认逻辑，所以这里不需要重复处理
+            // 或者我们可以移除 deleteKeyCode 让快捷键完全由 useEffect 掌控
           }}
+          onEdgesDelete={() => {
+          }}
+          deleteKeyCode={null} // 禁用 ReactFlow 默认删除快捷键，统一使用我们的全局监听器控制
+          multiSelectionKeyCode="Shift"
+          panActivationKeyCode="Space"
+          zoomActivationKeyCode="Meta"
+          className="react-flow-wrapper"
         >
-          <FlowPanel />
-        </FlowView>
+          <Background />
+          <MiniMap />
+          <Controls />
+        </ReactFlow>
       </div>
 
       <Modal
@@ -1187,6 +1883,28 @@ const ArchitectureEdit = () => {
                   <span>Proxy - 代理服务实例</span>
                 </div>
               </Option>
+              {customNodeTypes.map(customType => {
+                const iconMap = {
+                  'ApiOutlined': ApiOutlined,
+                  'ClusterOutlined': ClusterOutlined,
+                  'DatabaseOutlined': DatabaseOutlined,
+                  'SettingOutlined': SettingOutlined,
+                  'DeleteOutlined': DeleteOutlined,
+                  'SyncOutlined': SyncOutlined,
+                  'PlusOutlined': PlusOutlined,
+                  'SaveOutlined': SaveOutlined,
+                  'ReloadOutlined': ReloadOutlined
+                };
+                const IconComponent = iconMap[customType.icon] || ApiOutlined;
+                return (
+                  <Option key={customType.type} value={customType.type}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <IconComponent style={{ color: customType.color }} />
+                      <span>{customType.name} - {customType.description}</span>
+                    </div>
+                  </Option>
+                );
+              })}
             </Select>
           </Form.Item>
           
@@ -1250,6 +1968,36 @@ const ArchitectureEdit = () => {
                 <Tag color="red">已停止</Tag>
               </Option>
             </Select>
+          </Form.Item>
+
+          <Divider />
+          <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>配置信息</div>
+          <Upload.Dragger
+            name="file"
+            multiple={false}
+            showUploadList={false}
+            beforeUpload={(file) => {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                modalForm.setFieldsValue({ configContent: e.target.result });
+                message.success('配置文件已加载');
+              };
+              reader.onerror = () => {
+                message.error('读取配置文件失败');
+              };
+              reader.readAsText(file);
+              return false;
+            }}
+            style={{ marginBottom: '12px' }}
+          >
+            <p className="ant-upload-drag-icon">
+              <PlusOutlined />
+            </p>
+            <p className="ant-upload-text">点击或拖拽文件到此处上传配置文件</p>
+            <p className="ant-upload-hint">支持通过文件上传或在下方文本框中粘贴配置内容</p>
+          </Upload.Dragger>
+          <Form.Item name="configContent">
+            <Input.TextArea rows={8} placeholder="在此粘贴配置内容，或通过上方上传配置文件自动填充" />
           </Form.Item>
         </Form>
       </Modal>
@@ -1371,7 +2119,7 @@ const ArchitectureEdit = () => {
                 </Select>
               </Form.Item>
               
-              {selectedNode.data.config && Object.keys(selectedNode.data.config).length > 0 && (
+              {selectedNode.data.config && (
                 <div style={{ marginTop: '20px' }}>
                   <h4 style={{ 
                     marginBottom: '12px', 
@@ -1387,33 +2135,13 @@ const ArchitectureEdit = () => {
                     borderRadius: '8px',
                     fontSize: '13px',
                     overflow: 'auto',
-                    border: '1px solid #e8e8e8'
+                    border: '1px solid #e8e8e8',
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.6
                   }}>
-                    {Object.entries(selectedNode.data.config).map(([key, value]) => (
-                      <div key={key} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        marginBottom: '8px',
-                        paddingBottom: '8px',
-                        borderBottom: '1px solid #e8e8e8'
-                      }}>
-                        <span style={{ 
-                          color: '#8c8c8c',
-                          fontWeight: '500',
-                          flex: 1
-                        }}>
-                          {key}:
-                        </span>
-                        <span style={{ 
-                          fontWeight: 'bold',
-                          color: '#262626',
-                          flex: 2,
-                          textAlign: 'right'
-                        }}>
-                          {String(value)}
-                        </span>
-                      </div>
-                    ))}
+                    {typeof selectedNode.data.config === 'string'
+                      ? selectedNode.data.config
+                      : JSON.stringify(selectedNode.data.config, null, 2)}
                   </div>
                 </div>
               )}
@@ -1478,6 +2206,74 @@ const ArchitectureEdit = () => {
           </Form.Item>
           
           <Form.Item
+            name="sourceHandle"
+            label="源节点连接点"
+            rules={[{ required: true, message: '请选择源节点连接点' }]}
+            initialValue="bottom"
+          >
+            <Select size="large" placeholder="请选择源节点连接点">
+              <Option value="top">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⬆️</span>
+                  <span>顶部（Top）</span>
+                </div>
+              </Option>
+              <Option value="bottom">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⬇️</span>
+                  <span>底部（Bottom）</span>
+                </div>
+              </Option>
+              <Option value="left">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⬅️</span>
+                  <span>左侧（Left）</span>
+                </div>
+              </Option>
+              <Option value="right">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>➡️</span>
+                  <span>右侧（Right）</span>
+                </div>
+              </Option>
+            </Select>
+          </Form.Item>
+          
+          <Form.Item
+            name="targetHandle"
+            label="目标节点连接点"
+            rules={[{ required: true, message: '请选择目标节点连接点' }]}
+            initialValue="top"
+          >
+            <Select size="large" placeholder="请选择目标节点连接点">
+              <Option value="top">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⬆️</span>
+                  <span>顶部（Top）</span>
+                </div>
+              </Option>
+              <Option value="bottom">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⬇️</span>
+                  <span>底部（Bottom）</span>
+                </div>
+              </Option>
+              <Option value="left">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>⬅️</span>
+                  <span>左侧（Left）</span>
+                </div>
+              </Option>
+              <Option value="right">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>➡️</span>
+                  <span>右侧（Right）</span>
+                </div>
+              </Option>
+            </Select>
+          </Form.Item>
+          
+          <Form.Item
             name="edgeType"
             label="连线类型"
             rules={[{ required: true, message: '请选择连线类型' }]}
@@ -1506,6 +2302,12 @@ const ArchitectureEdit = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>📊</span>
                   <span>阶梯线 - Step</span>
+                </div>
+              </Option>
+              <Option value="editable">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✍️</span>
+                  <span>可编辑折线 - Editable</span>
                 </div>
               </Option>
             </Select>
@@ -1592,6 +2394,18 @@ const ArchitectureEdit = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span>目标节点：</span>
                 <span style={{ fontWeight: 'bold', color: '#262626' }}>{selectedEdge.target}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>源节点连接点：</span>
+                <span style={{ fontWeight: 'bold', color: '#262626' }}>
+                  {selectedEdge.sourceHandle || 'bottom'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span>目标节点连接点：</span>
+                <span style={{ fontWeight: 'bold', color: '#262626' }}>
+                  {selectedEdge.targetHandle || 'top'}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span>当前箭头类型：</span>
@@ -1720,6 +2534,12 @@ const ArchitectureEdit = () => {
                   <span>阶梯线 - Step</span>
                 </div>
               </Option>
+              <Option value="editable">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✍️</span>
+                  <span>可编辑折线 - Editable</span>
+                </div>
+              </Option>
             </Select>
           </Form.Item>
           
@@ -1805,8 +2625,110 @@ const ArchitectureEdit = () => {
           </div>
         </Form>
       </Modal>
-      </div>
-    </>
+
+      <Modal
+        title="新增自定义节点类型"
+        open={isCustomNodeModalOpen}
+        onOk={handleCustomNodeModalOk}
+        onCancel={handleCustomNodeModalCancel}
+        width={600}
+        okText="确定"
+        cancelText="取消"
+      >
+        <Form form={customNodeForm} layout="vertical">
+          <Form.Item
+            label="节点类型标识"
+            name="type"
+            rules={[
+              { required: true, message: '请输入节点类型标识' },
+              { pattern: /^[a-zA-Z0-9_-]+$/, message: '只能包含字母、数字、下划线和连字符' }
+            ]}
+            tooltip="节点的唯一标识符，用于区分不同类型的节点"
+          >
+            <Input placeholder="例如：custom-service" />
+          </Form.Item>
+
+          <Form.Item
+            label="节点类型名称"
+            name="name"
+            rules={[{ required: true, message: '请输入节点类型名称' }]}
+            tooltip="节点类型的显示名称"
+          >
+            <Input placeholder="例如：自定义服务" />
+          </Form.Item>
+
+          <Form.Item
+            label="节点类型描述"
+            name="description"
+            tooltip="节点类型的详细描述"
+          >
+            <Input.TextArea placeholder="请输入节点类型描述" rows={3} />
+          </Form.Item>
+
+          <Form.Item
+            label="节点图标"
+            name="icon"
+            initialValue="ApiOutlined"
+            tooltip="选择节点显示的图标"
+          >
+            <Select>
+              <Select.Option value="ApiOutlined">API图标</Select.Option>
+              <Select.Option value="ClusterOutlined">集群图标</Select.Option>
+              <Select.Option value="DatabaseOutlined">数据库图标</Select.Option>
+              <Select.Option value="SettingOutlined">设置图标</Select.Option>
+              <Select.Option value="DeleteOutlined">删除图标</Select.Option>
+              <Select.Option value="SyncOutlined">同步图标</Select.Option>
+              <Select.Option value="PlusOutlined">加号图标</Select.Option>
+              <Select.Option value="SaveOutlined">保存图标</Select.Option>
+              <Select.Option value="ReloadOutlined">刷新图标</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="节点颜色"
+            name="color"
+            initialValue="#1890ff"
+            tooltip="选择节点的主题颜色"
+          >
+            <Select>
+              <Select.Option value="#1890ff">蓝色</Select.Option>
+              <Select.Option value="#52c41a">绿色</Select.Option>
+              <Select.Option value="#fa8c16">橙色</Select.Option>
+              <Select.Option value="#722ed1">紫色</Select.Option>
+              <Select.Option value="#eb2f96">粉色</Select.Option>
+              <Select.Option value="#13c2c2">青色</Select.Option>
+              <Select.Option value="#f5222d">红色</Select.Option>
+              <Select.Option value="#faad14">黄色</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <div style={{
+            padding: '12px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+            fontSize: '13px',
+            color: '#595959'
+          }}>
+            <div style={{ marginBottom: '8px', fontWeight: '500' }}>
+              <span style={{ color: '#1890ff' }}>自定义节点说明：</span>
+            </div>
+            <div style={{ marginBottom: '4px' }}>• 节点类型标识：唯一标识符，用于区分不同类型</div>
+            <div style={{ marginBottom: '4px' }}>• 节点类型名称：显示在界面上的名称</div>
+            <div style={{ marginBottom: '4px' }}>• 节点类型描述：详细描述节点类型的用途</div>
+            <div style={{ marginBottom: '4px' }}>• 节点图标：选择节点显示的图标样式</div>
+            <div>• 节点颜色：选择节点的主题颜色</div>
+          </div>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
+const ArchitectureEdit = () => {
+  return (
+    <ReactFlowProvider>
+      <ArchitectureFlow />
+    </ReactFlowProvider>
   );
 };
 

@@ -287,13 +287,6 @@ const AgentManage = () => {
       };
       setCommandHistory(prev => [newCommand, ...prev.slice(0, 9)]); // 保留最近10条历史
 
-      // 调试信息
-      console.log('执行命令调试信息:');
-      console.log('- Agent信息:', currentAgent);
-      console.log('- Agent ID:', currentAgent.id);
-      console.log('- 命令:', command);
-      console.log('- 超时时间:', timeout);
-
       // 调用后端接口执行命令
       const res = await executeAgentCommand(currentAgent.id, command, timeout);
       

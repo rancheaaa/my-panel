@@ -326,19 +326,13 @@ const ConfigCenter = () => {
     setPreviewLoading(true);
     setPreviewContent(''); // 开始请求前清空内容
     try {
-      console.log('Fetching preview with:', { envId, projectId, format });
       const res = await previewConfig({
         envId,
         projectId,
         exportFormat: format
       });
-      console.log('Preview response:', res);
       if (res.code === 200) {
         const content = res.data || '';
-        console.log('Preview content length:', content.length);
-        if (content.length > 0) {
-          console.log('Preview content first 50 chars:', content.substring(0, 50));
-        }
         setPreviewContent(content);
         if (!content) {
           if (res.msg && res.msg !== '操作成功' && res.msg !== '查询成功') {

@@ -58,5 +58,6 @@ console.assert(nextOrderRoot === 9, 'Next order for root should be 9 (8+1)');
 
 const nextOrderChild = calculateNextOrder(childSiblings);
 console.assert(nextOrderChild === 3, 'Next order for child should be 3 (2+1)');
-
-console.log('All menu logic unit tests passed!');
+// All menu logic unit tests passed!
+  });
+});

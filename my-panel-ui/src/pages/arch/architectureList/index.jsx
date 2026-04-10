@@ -25,7 +25,7 @@ import {
   SendOutlined,
   EyeOutlined
 } from '@ant-design/icons';
-import { listDiagram, addDiagram, delDiagram, publishDiagram } from '@/api/op/architecture';
+import { listDiagram, addDiagram, delDiagram, publishDiagram } from '@/api/op/architecture.js';
 
 const ArchitectureList = () => {
   const navigate = useNavigate();
@@ -128,7 +128,7 @@ const ArchitectureList = () => {
 
   const columns = [
     { title: '编号', dataIndex: 'id', key: 'id', width: 80, align: 'center' },
-    { title: '架构图名称', dataIndex: 'diagramName', key: 'diagramName', ellipsis: true },
+    { title: '架构图名称', dataIndex: 'diagramName', width: 200,  key: 'diagramName', ellipsis: true },
     { 
       title: '状态', 
       dataIndex: 'status', 
@@ -146,7 +146,7 @@ const ArchitectureList = () => {
       }
     },
     { title: '版本', dataIndex: 'version', key: 'version', width: 80, align: 'center' },
-    { title: '备注', dataIndex: 'remark', key: 'remark', ellipsis: true },
+    { title: '备注', dataIndex: 'remark', key: 'remark',width: 200,  ellipsis: true },
     { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180, align: 'center' },
     {
       title: '操作',
@@ -159,7 +159,7 @@ const ArchitectureList = () => {
             <Button 
               type="text" 
               icon={<EditOutlined />} 
-              onClick={() => navigate(`/op/architectureEdit/${record.id}`)}
+              onClick={() => navigate(`/arch/architectureEdit/${record.id}`)}
               style={{ color: '#1890ff' }}
             >
               编辑

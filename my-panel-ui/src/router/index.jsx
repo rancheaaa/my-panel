@@ -41,8 +41,8 @@ const mainLayoutChildren = [
       element: loadComponent('system/user/profile')
   },
   {
-      path: '/op/architectureEdit/:id',
-      element: loadComponent('op/architectureEdit/index')
+      path: '/arch/architectureEdit/:id',
+      element: loadComponent('arch/architectureEdit/index')
   },
   {
     path: '*',

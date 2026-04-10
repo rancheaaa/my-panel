@@ -18,7 +18,7 @@ import {
   DeleteOutlined, 
   EditOutlined
 } from '@ant-design/icons';
-import { listTemplate, addTemplate, updateTemplate, delTemplate } from '@/api/op/archTemplate';
+import { listTemplate, addTemplate, updateTemplate, delTemplate } from '@/api/op/archTemplate.js';
 
 const ArchTemplate = () => {
   const [data, setData] = useState([]);

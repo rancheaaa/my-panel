@@ -29,7 +29,8 @@ import {
   CloudUploadOutlined,
   HistoryOutlined,
   SendOutlined,
-  ArrowLeftOutlined
+  ArrowLeftOutlined,
+  ApartmentOutlined
 } from '@ant-design/icons';
 import { 
   useNodesState, 
@@ -131,9 +132,9 @@ import {
   addEdge,
   updateEdge,
   delEdge
-} from '@/api/op/architecture';
-import { listAllNodeType } from '@/api/op/archNodeType';
-import { listHistoryByDiagramId, createSnapshot, restoreVersion } from '@/api/op/archHistory';
+} from '@/api/op/architecture.js';
+import { listAllNodeType } from '@/api/op/archNodeType.js';
+import { listHistoryByDiagramId, createSnapshot, restoreVersion } from '@/api/op/archHistory.js';
 
 const { Option } = Select;
 
@@ -478,7 +479,6 @@ const EditableEdge = ({
           <div 
             className={`editable-edge-label-container ${isHovered ? 'hovered' : ''}`}
             onDoubleClick={handleEditLabel}
-            title="双击编辑标签"
           >
             {label && (
               <div className="editable-edge-label">
@@ -982,7 +982,7 @@ const ArchitectureFlow = () => {
     } finally {
       setLoading(false);
     }
-  }, [architectureName, setEdges, setNodes]);
+  }, [setEdges, setNodes]);
 
   // 初始化默认架构
   const initializeDefaultArchitecture = useCallback((nextName = '默认架构') => {
@@ -2215,6 +2215,99 @@ const ArchitectureFlow = () => {
     }
   };
 
+  const handleAutoLayout = () => {
+    if (nodes.length === 0) {
+      message.warning('没有节点可以布局');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认自动布局',
+      content: '自动布局将重新排列所有节点的位置，确定要继续吗？',
+      onOk: () => {
+        const layoutNodes = (nodes, edges) => {
+          if (nodes.length === 0) return nodes;
+
+          const nodeMap = new Map();
+          nodes.forEach(node => nodeMap.set(node.id, { ...node, children: [], parents: [] }));
+
+          edges.forEach(edge => {
+            const source = nodeMap.get(edge.source);
+            const target = nodeMap.get(edge.target);
+            if (source && target) {
+              source.children.push(target.id);
+              target.parents.push(source.id);
+            }
+          });
+
+          const levels = [];
+          const visited = new Set();
+          const inProgress = new Set();
+
+          const getLevel = (nodeId) => {
+            if (visited.has(nodeId)) return nodeMap.get(nodeId).level;
+            if (inProgress.has(nodeId)) return 0;
+
+            inProgress.add(nodeId);
+            const node = nodeMap.get(nodeId);
+            
+            let maxParentLevel = -1;
+            for (const parentId of node.parents) {
+              maxParentLevel = Math.max(maxParentLevel, getLevel(parentId));
+            }
+
+            node.level = maxParentLevel + 1;
+            inProgress.delete(nodeId);
+            visited.add(nodeId);
+            return node.level;
+          };
+
+          nodes.forEach(node => {
+            if (!visited.has(node.id)) {
+              getLevel(node.id);
+            }
+          });
+
+          nodeMap.forEach(node => {
+            if (!levels[node.level]) {
+              levels[node.level] = [];
+            }
+            levels[node.level].push(node);
+          });
+
+          const NODE_WIDTH = 200;
+          const NODE_HEIGHT = 120;
+          const LEVEL_GAP = 300;
+          const NODE_GAP = 200;
+          const START_X = 100;
+          const START_Y = 50;
+
+          const positionedNodes = [];
+          levels.forEach((levelNodes, levelIndex) => {
+            const levelWidth = levelNodes.length * (NODE_WIDTH + NODE_GAP) - NODE_GAP;
+            const startX = START_X + (2000 - levelWidth) / 2;
+
+            levelNodes.forEach((node, nodeIndex) => {
+              positionedNodes.push({
+                ...node,
+                position: {
+                  x: startX + nodeIndex * (NODE_WIDTH + NODE_GAP),
+                  y: START_Y + levelIndex * (NODE_HEIGHT + LEVEL_GAP)
+                }
+              });
+            });
+          });
+
+          return positionedNodes;
+        };
+
+        const newNodes = layoutNodes(nodes, edges);
+        setNodes(newNodes);
+        message.success('自动布局完成');
+      }
+    });
+  };
+
   const handleRefresh = () => {
     Modal.confirm({
       title: '确认刷新',
@@ -2498,7 +2591,15 @@ const ArchitectureFlow = () => {
         <Space size="middle">
           <Button 
             icon={<ArrowLeftOutlined />} 
-            onClick={() => navigate('/architecture/arch-diagram')}
+            onClick={() => {
+                Modal.confirm({
+                    title: '确认返回',
+                    content: '返回将放弃当前未保存的所有更改，并从服务器重新加载数据。如若已保存，请忽略。',
+                    onOk: () => {
+                        navigate('/architecture/arch-diagram');
+                    }
+                });
+            }}
             size="large"
             className="toolbar-button"
           >
@@ -2512,6 +2613,14 @@ const ArchitectureFlow = () => {
             className="toolbar-button primary"
           >
             新增节点
+          </Button>
+          <Button 
+            icon={<ApartmentOutlined />} 
+            onClick={handleAutoLayout}
+            size="large"
+            className="toolbar-button"
+          >
+            自动布局
           </Button>
           <Button 
             icon={<SaveOutlined />} 

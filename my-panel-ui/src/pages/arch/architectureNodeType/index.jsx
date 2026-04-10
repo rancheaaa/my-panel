@@ -25,7 +25,7 @@ import {
   SyncOutlined,
   SaveOutlined
 } from '@ant-design/icons';
-import { listNodeType, addNodeType, updateNodeType, delNodeType } from '@/api/op/archNodeType';
+import { listNodeType, addNodeType, updateNodeType, delNodeType } from '@/api/op/archNodeType.js';
 
 const { Option } = Select;
 

@@ -535,7 +535,7 @@ CREATE TABLE IF NOT EXISTS `arch_node` (
 CREATE TABLE IF NOT EXISTS `arch_edge` (
     `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '边缘ID',
     `diagram_id` bigint(20) NOT NULL COMMENT '所属架构图ID',
-    `edge_type` varchar(100) DEFAULT 'default' COMMENT '边缘类型（如：default、dashed、dotted等）',
+    `edge_type` varchar(100) DEFAULT 'default' COMMENT '边缘类型（如：default、smoothstep、straight、step、editable等）',
     `source_node_id` bigint(20) NOT NULL COMMENT '源节点ID',
     `target_node_id` bigint(20) NOT NULL COMMENT '目标节点ID',
     `source_anchor` varchar(50) DEFAULT 'auto' COMMENT '源锚点位置（top/bottom/left/right/auto）',

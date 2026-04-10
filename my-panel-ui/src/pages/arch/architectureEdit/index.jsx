@@ -13,7 +13,9 @@ import {
   Select,
   InputNumber,
   Upload,
-  Spin
+  Spin,
+  Row,
+  Col
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -26,12 +28,30 @@ import {
   DatabaseOutlined,
   CloseOutlined,
   SyncOutlined,
-  CloudUploadOutlined,
-  HistoryOutlined,
-  SendOutlined,
-  ArrowLeftOutlined,
-  ApartmentOutlined
+  CloudUploadOutlined, 
+  HistoryOutlined, 
+  SendOutlined, 
+  ArrowLeftOutlined, 
+  ApartmentOutlined,
+  QuestionCircleOutlined,
+  HddOutlined,
+  CloudServerOutlined,
+  AppstoreOutlined,
+  MessageOutlined,
+  CodeOutlined,
+  LineChartOutlined,
+  DashboardOutlined,
+  SafetyCertificateOutlined,
+  ControlOutlined,
+  FolderOpenOutlined,
+  GlobalOutlined,
+  DesktopOutlined,
+  SecurityScanOutlined,
+  NodeIndexOutlined,
+  DeploymentUnitOutlined
 } from '@ant-design/icons';
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
 import { 
   useNodesState, 
   useEdgesState
@@ -49,10 +69,13 @@ import {
   EdgeLabelRenderer,
   getBezierPath,
   getSmoothStepPath,
-  getStraightPath
+  getStraightPath,
+  SelectionMode
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './index.scss';
+import BrandIcon from '@/components/BrandIcon';
+import NodeShape from '@/components/NodeShape';
 
 const normalizeConfigValue = (value) => {
   if (value == null) return '';
@@ -139,7 +162,7 @@ import { listHistoryByDiagramId, createSnapshot, restoreVersion } from '@/api/op
 const { Option } = Select;
 
 // 自定义可编辑连线组件
-const EditableEdge = ({
+const EditableEdge = React.memo(({
   id,
   sourceX,
   sourceY,
@@ -447,7 +470,6 @@ const EditableEdge = ({
           ...style,
           strokeWidth: (selected || isHovered) ? (style.strokeWidth || 2) + 1 : style.strokeWidth,
           stroke: (selected || isHovered) ? '#1890ff' : style.stroke,
-          transition: 'all 0.2s ease',
         }} 
       />
 
@@ -461,7 +483,6 @@ const EditableEdge = ({
         style={{ 
           cursor: 'crosshair', 
           pointerEvents: 'stroke',
-          transition: 'stroke-width 0.2s ease'
         }}
       />
       
@@ -532,10 +553,10 @@ const EditableEdge = ({
       )}
     </g>
   );
-};
+});
 
 // 自定义节点组件
-const CustomNode = ({ data, selected, customNodeTypes = [] }) => {
+const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
   const getNodeIcon = (type) => {
     const customType = customNodeTypes.find(t => t.type === type);
     if (customType) {
@@ -548,21 +569,51 @@ const CustomNode = ({ data, selected, customNodeTypes = [] }) => {
         'SyncOutlined': SyncOutlined,
         'PlusOutlined': PlusOutlined,
         'SaveOutlined': SaveOutlined,
-        'ReloadOutlined': ReloadOutlined
+        'ReloadOutlined': ReloadOutlined,
+        'HddOutlined': HddOutlined,
+        'CloudServerOutlined': CloudServerOutlined,
+        'AppstoreOutlined': AppstoreOutlined,
+        'MessageOutlined': MessageOutlined,
+        'CodeOutlined': CodeOutlined,
+        'LineChartOutlined': LineChartOutlined,
+        'DashboardOutlined': DashboardOutlined,
+        'SafetyCertificateOutlined': SafetyCertificateOutlined,
+        'ControlOutlined': ControlOutlined,
+        'FolderOpenOutlined': FolderOpenOutlined,
+        'ApartmentOutlined': ApartmentOutlined,
+        'GlobalOutlined': GlobalOutlined,
+        'DesktopOutlined': DesktopOutlined,
+        'SecurityScanOutlined': SecurityScanOutlined,
+        'NodeIndexOutlined': NodeIndexOutlined,
+        'DeploymentUnitOutlined': DeploymentUnitOutlined
       };
+      
+      // Prefer BrandIcon if it matches customType.icon or type
+      if (BrandIcon({ type: customType.icon })) {
+        return <BrandIcon type={customType.icon} size="32px" color={customType.color} />;
+      }
+      if (BrandIcon({ type: type })) {
+        return <BrandIcon type={type} size="32px" color={customType.color} />;
+      }
+
       const IconComponent = iconMap[customType.icon] || ApiOutlined;
       return <IconComponent style={{ fontSize: '32px', color: customType.color }} />;
     }
     
+    // Fallback for built-in types
+    if (BrandIcon({ type: type })) {
+      return <BrandIcon type={type} size="32px" />;
+    }
+
     switch (type) {
       case 'nginx':
-        return <ClusterOutlined style={{ fontSize: '32px', color: '#1890ff' }} />;
+        return <DeploymentUnitOutlined style={{ fontSize: '32px', color: '#1890ff' }} />;
       case 'my-panel':
         return <ApiOutlined style={{ fontSize: '32px', color: '#52c41a' }} />;
       case 'proxy':
-        return <DatabaseOutlined style={{ fontSize: '32px', color: '#fa8c16' }} />;
+        return <DeploymentUnitOutlined style={{ fontSize: '32px', color: '#fa8c16' }} />;
       default:
-        return <ApiOutlined />;
+        return <ApiOutlined style={{ fontSize: '32px' }} />;
     }
   };
 
@@ -604,148 +655,312 @@ const CustomNode = ({ data, selected, customNodeTypes = [] }) => {
     }
   };
 
+  const customType = customNodeTypes.find(t => t.type === data.type);
   const colors = getNodeColor(data.type);
   const handleColor = getNodeHandleColor(data.type);
+  const defaultStyle = customType?.defaultStyle || {};
 
   // 辅助函数：将hex颜色转换为rgba
   function hexToRgba(hex, alpha) {
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(0, 0, 0, ${alpha})`;
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
+  // 计算形状样式
+  const getShapeStyle = () => {
+    const shape = defaultStyle.shape || 'rectangle';
+    
+    // 基础样式
+    const style = {
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minWidth: (data?.width ? `${data.width}px` : '180px'),
+      minHeight: (data?.height ? `${data.height}px` : '90px'),
+      position: 'relative',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      backgroundColor: 'transparent',
+      border: 'none',
+      boxShadow: 'none',
+    };
+
+    return style;
+  };
+
+  const wrapperStyle = getShapeStyle();
+  const shape = defaultStyle.shape || 'rectangle';
+  const isDiamond = shape === 'diamond';
+  const isSkewed = shape === 'parallelogram' || shape === 'external-data';
+  const isActor = shape === 'actor';
+  const isCube = shape === 'cube';
+  const isCylinder = shape === 'cylinder';
+  const isLogicAnd = shape === 'logic-and';
+  const isLogicOr = shape === 'logic-or';
+  const isLogicNot = shape === 'logic-not';
+  const isLogicShape = isLogicAnd || isLogicOr || isLogicNot;
+
+  const rotation = data.rotation || 0;
+  const isCurvedOrNarrowShape = isDiamond || isSkewed || shape === 'circle' || shape === 'hexagon' || shape === 'triangle' || shape === 'cloud';
+  const contentWidth = isCurvedOrNarrowShape
+    ? '72%'
+    : (isCylinder ? 'calc(100% - 28px)' : 'calc(100% - 24px)');
+
+  // Apply rotation to the wrapper style
+  if (rotation !== 0) {
+    wrapperStyle.transform = `${wrapperStyle.transform || ''} rotate(${rotation}deg)`.trim();
+  }
+
+  // 渲染内容包装器内部的样式（内容保持正常排版，不再对菱形/平行四边形施加旋转或倾斜）
+  const contentWrapperStyle = {
+    transform: 'none',
+    display: 'flex',
+    flexDirection: 'column',
+    width: contentWidth,
+    maxWidth: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    textAlign: 'center',
+    padding: (isCylinder || isLogicAnd || isLogicOr || isLogicNot) ? '25px 10px 15px' : '10px',
+    boxSizing: 'border-box',
+    gap: '2px'
+  };
+
+  // Apply inverse rotation to content wrapper if the node itself is rotated
+  if (rotation !== 0) {
+    contentWrapperStyle.transform = `${contentWrapperStyle.transform || ''} rotate(-${rotation}deg)`.trim();
+  }
+
   return (
     <div 
-      className={`custom-node-wrapper ${selected ? 'selected' : ''}`}
-      style={{
-        border: `3px solid ${colors.border}`,
-        outline: selected ? `3px solid ${colors.border}` : 'none',
-        outlineOffset: selected ? '2px' : '0',
-        backgroundColor: colors.bg,
-        boxShadow: selected 
-          ? `0 0 20px ${colors.border}88, 0 8px 24px rgba(0,0,0,0.18)` 
-          : '0 4px 16px rgba(0,0,0,0.12)',
-      }}
+      className={`custom-node-wrapper ${selected ? 'selected' : ''} shape-${shape}`}
+      style={wrapperStyle}
     >
-      {/* 顶部连接桩 - 支持双向连接 */}
-      <ReactFlowHandle
-        type="source"
-        position={ReactFlowPosition.Top}
-        id="top"
-        style={{
-          background: handleColor,
-          width: '16px',
-          height: '16px',
-          border: '3px solid #fff',
-          boxShadow: `0 2px 8px ${handleColor}66`,
-          transition: 'all 0.3s ease',
-          cursor: 'crosshair',
-          zIndex: 1000
-        }}
-        className="custom-handle"
-      />
-      
-      {/* 底部连接桩 - 支持双向连接 */}
-      <ReactFlowHandle
-        type="source"
-        position={ReactFlowPosition.Bottom}
-        id="bottom"
-        style={{
-          background: handleColor,
-          width: '16px',
-          height: '16px',
-          border: '3px solid #fff',
-          boxShadow: `0 2px 8px ${handleColor}66`,
-          transition: 'all 0.3s ease',
-          cursor: 'crosshair',
-          zIndex: 1000
-        }}
-        className="custom-handle"
-      />
-      
-      {/* 左侧连接桩 - 支持双向连接 */}
-      <ReactFlowHandle
-        type="source"
-        position={ReactFlowPosition.Left}
-        id="left"
-        style={{
-          background: handleColor,
-          width: '16px',
-          height: '16px',
-          border: '3px solid #fff',
-          boxShadow: `0 2px 8px ${handleColor}66`,
-          transition: 'all 0.3s ease',
-          cursor: 'crosshair',
-          zIndex: 1000
-        }}
-        className="custom-handle"
-      />
-      
-      {/* 右侧连接桩 - 支持双向连接 */}
-      <ReactFlowHandle
-        type="source"
-        position={ReactFlowPosition.Right}
-        id="right"
-        style={{
-          background: handleColor,
-          width: '16px',
-          height: '16px',
-          border: '3px solid #fff',
-          boxShadow: `0 2px 8px ${handleColor}66`,
-          transition: 'all 0.3s ease',
-          cursor: 'crosshair',
-          zIndex: 1000
-        }}
-        className="custom-handle"
-      />
-      
-      <div className="node-header">
-        {getNodeIcon(data.type)}
-        <span className="node-title">
-          {data.name}
-        </span>
-      </div>
-      
-      <div className="node-description">
-        {data.description}
-      </div>
-      
-      <div className="node-tags">
-        <Tag color="blue">
-          {(data.type || 'unknown').toUpperCase()}
-        </Tag>
-        <Tag color={data.status === 'running' ? 'green' : 'red'}>
-          {data.status === 'running' ? '运行中' : '已停止'}
-        </Tag>
-        {data.port && (
-          <Tag color="purple">
-            端口: {data.port}
-          </Tag>
-        )}
-        {data.ip && (
-          <Tag color="cyan">
-            IP: {data.ip}
-          </Tag>
-        )}
+      {/* 统一形状背景组件 */}
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
+        <NodeShape 
+          shape={shape} 
+          color={colors.border} 
+          size="100%" 
+          selected={selected}
+          style={{
+            filter: selected ? `drop-shadow(0 0 12px ${colors.border}66)` : 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
+          }}
+        />
       </div>
 
-      {data.config && (
-        <div className="node-config-info">
-          <div className="config-title">配置信息:</div>
-          <div className="config-item">
-            <span className="config-value">
-              {typeof data.config === 'string'
-                ? (data.config.length > 120 ? data.config.slice(0, 120) + '…' : data.config)
-                : (() => {
-                    const s = JSON.stringify(data.config);
-                    return s.length > 120 ? s.slice(0, 120) + '…' : s;
-                  })()
-              }
-            </span>
-          </div>
+      {/* 内容包装器 */}
+      <div style={contentWrapperStyle} className="node-content-inner">
+        {/* 图标渲染 */}
+        <div style={{ marginBottom: '4px' }}>
+          {getNodeIcon(data.type)}
         </div>
-      )}
+        
+        {/* 节点名称 */}
+        <div style={{ 
+          fontWeight: 'bold', 
+          fontSize: '13px', 
+          color: '#333',
+          marginBottom: '2px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          maxWidth: '100%'
+        }}>
+          {data.name}
+        </div>
+        
+        {/* 节点IP/状态 (仅在非逻辑形状显示) */}
+        {!isLogicShape && (
+          <div style={{ fontSize: '10px', color: '#888', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+            {data.ip || data.type}
+          </div>
+        )}
+
+        {isLogicShape ? (
+          <>
+            {/* 逻辑形状专用连接点：左侧两个（输入），右侧一个（输出） */}
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Left}
+              id="left-1"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                left: '-6px',
+                top: '30%',
+                transform: 'translateY(-50%)'
+              }}
+              className="custom-handle"
+            />
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Left}
+              id="left-2"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                left: '-6px',
+                top: '70%',
+                transform: 'translateY(-50%)'
+              }}
+              className="custom-handle"
+            />
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Right}
+              id="right"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                right: '-6px',
+                top: '50%',
+                transform: 'translateY(-50%)'
+              }}
+              className="custom-handle"
+            />
+          </>
+        ) : (
+          <>
+            {/* 顶部连接桩 - 支持双向连接 */}
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Top}
+              id="top"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                top: '-6px',
+                left: '50%',
+                transform: 'translateX(-50%)'
+              }}
+              className="custom-handle"
+            />
+            
+            {/* 底部连接桩 - 支持双向连接 */}
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Bottom}
+              id="bottom"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                bottom: '-6px',
+                left: '50%',
+                transform: 'translateX(-50%)'
+              }}
+              className="custom-handle"
+            />
+            
+            {/* 左侧连接桩 - 支持双向连接 */}
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Left}
+              id="left"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                left: '-6px',
+                top: '50%',
+                transform: 'translateY(-50%)'
+              }}
+              className="custom-handle"
+            />
+            
+            {/* 右侧连接桩 - 支持双向连接 */}
+            <ReactFlowHandle
+              type="source"
+              position={ReactFlowPosition.Right}
+              id="right"
+              style={{
+                background: handleColor,
+                width: '12px',
+                height: '12px',
+                border: '2px solid #fff',
+                boxShadow: `0 1px 4px ${handleColor}44`,
+                cursor: 'crosshair',
+                zIndex: 1000,
+                right: '-6px',
+                top: '50%',
+                transform: 'translateY(-50%)'
+              }}
+              className="custom-handle"
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// 悬浮提示组件，隔离鼠标移动导致的重渲染
+const HoverEditHint = ({ target, isVisible }) => {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (target) {
+      setPos({ x: target.x || 0, y: target.y || 0 });
+    }
+  }, [target]);
+
+  useEffect(() => {
+    if (!isVisible || !target) return;
+
+    const onMouseMove = (event) => {
+      setPos({ x: event.clientX, y: event.clientY });
+    };
+
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+    };
+  }, [isVisible, target]);
+
+  if (!isVisible || !target) return null;
+
+  return (
+    <div
+      className="hover-edit-hint"
+      style={{
+        left: pos.x + 12,
+        top: pos.y + 12,
+      }}
+    >
+      {target.kind === 'node' ? '双击打开节点编辑' : '双击打开连线编辑'}
     </div>
   );
 };
@@ -772,15 +987,87 @@ const ArchitectureFlow = () => {
   const connectionActionRef = React.useRef(null);
   const [customNodeTypes, setCustomNodeTypes] = useState([]);
   const [hoverHintTarget, setHoverHintTarget] = useState(null);
-  const [hoverHintPos, setHoverHintPos] = useState({ x: 0, y: 0 });
   const [isHoverHintVisible, setIsHoverHintVisible] = useState(false);
   const hoverHintTimerRef = React.useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  // 对齐辅助线相关状态
+  const [alignmentLines, setAlignmentLines] = useState([]);
+
+  const ALIGNMENT_THRESHOLD = 10; // 像素阈值，用于判断是否吸附
+  const ALIGNMENT_LINE_COLOR = '#ff0072'; // 辅助线颜色
   
   // 版本历史相关状态
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
   const [historyList, setHistoryList] = useState([]);
   const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
   const [snapshotForm] = Form.useForm();
+
+  // 教程引导函数
+  const startTutorial = useCallback(() => {
+    const driverObj = driver({
+      showProgress: true,
+      nextBtnText: '下一步',
+      prevBtnText: '上一步',
+      doneBtnText: '完成',
+      steps: [
+        {
+          element: '.react-flow__pane',
+          popover: {
+            title: '拖动画布',
+            description: '在画布空白区域点击并拖拽，可以自由移动整个架构面板，方便查看和编辑。',
+            side: "bottom",
+            align: 'start'
+          }
+        },
+        {
+          element: '.react-flow__node:first-child',
+          popover: {
+            title: '编辑节点',
+            description: '双击任何节点可以打开编辑面板，修改节点详细配置（如 IP、端口、配置内容等）。',
+            side: "top",
+            align: 'center'
+          }
+        },
+        {
+          element: '.react-flow__edge:first-child',
+          popover: {
+            title: '编辑连线',
+            description: '双击连线或点击连线上的设置按钮，可以修改连线的标签、样式以及是否开启动画效果。',
+            side: "bottom",
+            align: 'center'
+          }
+        },
+        {
+          element: '.custom-handle',
+          popover: {
+            title: '创建连线',
+            description: '点击并拖拽节点的蓝色连接点（桩），拉向另一个节点的连接点即可建立连接。',
+            side: "right",
+            align: 'center'
+          }
+        },
+        {
+          element: '.custom-node-wrapper',
+          popover: {
+            title: '切换连接点',
+            description: '每个节点上下左右均有连接点，您可以根据布局需要选择最合适的连接点进行连线。',
+            side: "left",
+            align: 'center'
+          }
+        },
+        {
+          element: '.header-toolbar',
+          popover: {
+            title: '工具栏功能',
+            description: '顶部工具栏提供了保存架构、发布架构、版本历史等核心功能，随时可以点击教程再次查看操作指引。',
+            side: "bottom",
+            align: 'center'
+          }
+        }
+      ]
+    });
+    driverObj.drive();
+  }, []);
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -790,10 +1077,33 @@ const ArchitectureFlow = () => {
   const savedSignatureRef = React.useRef('');
   const initializeDefaultArchitectureRef = React.useRef(null);
 
-  const currentSignature = useMemo(
-    () => buildDiagramSignature(architectureName, nodes, edges),
-    [architectureName, nodes, edges]
-  );
+  // 首次进入自动引导
+  useEffect(() => {
+    const hasSeenTutorial = localStorage.getItem('arch_tutorial_seen');
+    if (!hasSeenTutorial && nodes.length > 0 && edges.length > 0) {
+      // 稍微延迟一下确保渲染完成
+      const timer = setTimeout(() => {
+        startTutorial();
+        localStorage.setItem('arch_tutorial_seen', 'true');
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [nodes.length, edges.length, startTutorial]);
+
+  const [currentSignature, setCurrentSignature] = useState('');
+
+  // 统一更新签名的辅助函数
+  const updateSignature = useCallback(() => {
+    setCurrentSignature(buildDiagramSignature(architectureName, nodes, edges));
+  }, [architectureName, nodes, edges]);
+
+  // 当名称改变或节点/连线数量改变时更新签名（排除拖拽中的坐标变化）
+  useEffect(() => {
+    if (!isDragging) {
+      updateSignature();
+    }
+  }, [isDragging, architectureName, nodes.length, edges.length, updateSignature]);
+
   const isModified = useMemo(() => {
     if (!savedSignatureRef.current) return false;
     return currentSignature !== savedSignatureRef.current;
@@ -805,7 +1115,14 @@ const ArchitectureFlow = () => {
       hoverHintTimerRef.current = null;
     }
     setIsHoverHintVisible(false);
+    
+    // 如果没有目标，或者目标已被选中，则不显示提示
     if (!hoverHintTarget) return;
+
+    const isSelected = (hoverHintTarget.kind === 'node' && selectedNode?.id === hoverHintTarget.id) ||
+                       (hoverHintTarget.kind === 'edge' && selectedEdge?.id === hoverHintTarget.id);
+
+    if (isSelected) return;
 
     hoverHintTimerRef.current = setTimeout(() => {
       setIsHoverHintVisible(true);
@@ -817,18 +1134,7 @@ const ArchitectureFlow = () => {
         hoverHintTimerRef.current = null;
       }
     };
-  }, [hoverHintTarget]);
-
-  useEffect(() => {
-    if (!hoverHintTarget) return;
-    const onMouseMove = (event) => {
-      setHoverHintPos({ x: event.clientX, y: event.clientY });
-    };
-    window.addEventListener('mousemove', onMouseMove, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-    };
-  }, [hoverHintTarget]);
+  }, [hoverHintTarget, selectedNode, selectedEdge]);
 
   // 加载节点类型
   const loadNodeTypes = useCallback(async () => {
@@ -912,7 +1218,15 @@ const ArchitectureFlow = () => {
               status: node.status === '0' ? 'running' : 'stopped',
               ip: properties.ip || node.ip,
               port: properties.port || node.port,
-              config: properties.config || node.config
+              config: properties.config || node.config,
+              nodeProperties: properties, // 新增：存储节点属性
+              rotation: properties.rotation || 0,
+              width: properties.width || (node.nodeWidth ?? node.width ?? node.node_width ?? 120),
+              height: properties.height || (node.nodeHeight ?? node.height ?? node.node_height ?? 80)
+            },
+            style: {
+              width: properties.width || (node.nodeWidth ?? node.width ?? node.node_width ?? 120),
+              height: properties.height || (node.nodeHeight ?? node.height ?? node.node_height ?? 80)
             }
           };
         });
@@ -1337,8 +1651,7 @@ const ArchitectureFlow = () => {
   }, []);
 
   const onNodeMouseEnter = useCallback((event, node) => {
-    setHoverHintTarget({ kind: 'node', id: node.id });
-    setHoverHintPos({ x: event.clientX, y: event.clientY });
+    setHoverHintTarget({ kind: 'node', id: node.id, x: event.clientX, y: event.clientY });
   }, []);
 
   const onNodeMouseLeave = useCallback(() => {
@@ -1363,8 +1676,7 @@ const ArchitectureFlow = () => {
   }, []);
 
   const onEdgeMouseEnter = useCallback((event, edge) => {
-    setHoverHintTarget({ kind: 'edge', id: edge.id });
-    setHoverHintPos({ x: event.clientX, y: event.clientY });
+    setHoverHintTarget({ kind: 'edge', id: edge.id, x: event.clientX, y: event.clientY });
     // 鼠标移入时，将该线段移到数组末尾，使其在 SVG 中渲染在最上层
     setEdges((eds) => {
       const otherEdges = eds.filter((e) => e.id !== edge.id);
@@ -1856,7 +2168,110 @@ const ArchitectureFlow = () => {
     setSelectedEdge(null);
   }, [isConnecting, setEdges]);
 
-  const onNodeDragStop = useCallback(() => {}, []);
+  const onNodeDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const onNodeDragStop = useCallback(() => {
+    setIsDragging(false);
+    setAlignmentLines([]); // 清除辅助线
+    // 拖拽停止后立即更新一次签名，以捕捉位置变化
+    updateSignature();
+  }, [updateSignature]);
+
+  // 获取节点边界信息
+  const getNodeBounds = useCallback((node) => {
+    const width = node.width || 150; // 默认宽度
+    const height = node.height || 100; // 默认高度
+    const x = node.position.x;
+    const y = node.position.y;
+    return {
+      left: x,
+      right: x + width,
+      top: y,
+      bottom: y + height,
+      centerX: x + width / 2,
+      centerY: y + height / 2,
+      width,
+      height,
+    };
+  }, []);
+
+  // 计算辅助线
+  const getHelperLines = useCallback((draggedNode, otherNodes) => {
+    const lines = [];
+    let snappedPosition = { x: draggedNode.position.x, y: draggedNode.position.y };
+    const draggedBounds = getNodeBounds(draggedNode);
+
+    // 遍历所有其他节点，寻找对齐点
+    otherNodes.forEach((otherNode) => {
+      if (draggedNode.id === otherNode.id) return; // 跳过自身
+
+      const otherBounds = getNodeBounds(otherNode);
+
+      // 检查水平对齐
+      const horizontalAlignments = [
+        { dragged: draggedBounds.top, other: otherBounds.top, type: 'top' },
+        { dragged: draggedBounds.centerY, other: otherBounds.centerY, type: 'centerY' },
+        { dragged: draggedBounds.bottom, other: otherBounds.bottom, type: 'bottom' },
+      ];
+
+      horizontalAlignments.forEach(({ dragged, other, type }) => {
+        if (Math.abs(dragged - other) < ALIGNMENT_THRESHOLD) {
+          const y = otherBounds[type === 'top' ? 'top' : type === 'centerY' ? 'centerY' : 'bottom'];
+          lines.push({
+            type: 'horizontal',
+            y,
+            x1: Math.min(draggedBounds.left, otherBounds.left),
+            x2: Math.max(draggedBounds.right, otherBounds.right),
+          });
+          snappedPosition.y = draggedNode.position.y - (dragged - other);
+        }
+      });
+
+      // 检查垂直对齐
+      const verticalAlignments = [
+        { dragged: draggedBounds.left, other: otherBounds.left, type: 'left' },
+        { dragged: draggedBounds.centerX, other: otherBounds.centerX, type: 'centerX' },
+        { dragged: draggedBounds.right, other: otherBounds.right, type: 'right' },
+      ];
+
+      verticalAlignments.forEach(({ dragged, other, type }) => {
+        if (Math.abs(dragged - other) < ALIGNMENT_THRESHOLD) {
+          const x = otherBounds[type === 'left' ? 'left' : type === 'centerX' ? 'centerX' : 'right'];
+          lines.push({
+            type: 'vertical',
+            x,
+            y1: Math.min(draggedBounds.top, otherBounds.top),
+            y2: Math.max(draggedBounds.bottom, otherBounds.bottom),
+          });
+          snappedPosition.x = draggedNode.position.x - (dragged - other);
+        }
+      });
+    });
+
+    return { lines, snappedPosition };
+  }, [ALIGNMENT_THRESHOLD, getNodeBounds]);
+
+  const onNodeDrag = useCallback((event, node) => {
+    const otherNodes = nodes.filter(n => n.id !== node.id);
+    const { lines, snappedPosition } = getHelperLines(node, otherNodes);
+    
+    setAlignmentLines(lines);
+    
+    // 更新节点位置
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === node.id) {
+          return {
+            ...n,
+            position: snappedPosition,
+          };
+        }
+        return n;
+      })
+    );
+  }, [nodes, getHelperLines, setNodes]);
 
   const handleAddNode = () => {
     modalForm.resetFields();
@@ -1888,6 +2303,9 @@ const ArchitectureFlow = () => {
         ip: selectedNode.data.ip,
         port: selectedNode.data.port,
         status: selectedNode.data.status,
+        rotation: selectedNode.data.rotation || 0,
+        width: selectedNode.data.width || 120,
+        height: selectedNode.data.height || 80,
         configContent
       });
       setCurrentNode(selectedNode);
@@ -2055,8 +2473,17 @@ const ArchitectureFlow = () => {
 
   const handleModalOk = () => {
     modalForm.validateFields().then(async (values) => {
-      const { configContent, ...rest } = values;
+      const { configContent, rotation, width, height, ...rest } = values;
       const configStr = typeof configContent === 'string' ? configContent : '';
+      
+      // 构建节点属性对象
+      const nodeProperties = {
+        rotation: rotation || 0,
+        width: width || 120,
+        height: height || 80,
+        // 保留原有的其他属性
+        ...(currentNode?.data?.nodeProperties || {})
+      };
       
       setLoading(true);
       try {
@@ -2072,7 +2499,8 @@ const ArchitectureFlow = () => {
             port: rest.port,
             status: rest.status === 'running' ? '0' : '1',
             remark: rest.description,
-            config: configStr
+            config: configStr,
+            nodeProperties: JSON.stringify(nodeProperties) // 新增：存储节点属性
           };
           
           if (diagramId) {
@@ -2082,7 +2510,23 @@ const ArchitectureFlow = () => {
           setNodes((currentNodes) =>
             currentNodes.map((node) =>
               node.id === currentNode.id
-                ? { ...node, data: { ...node.data, ...rest, config: configStr } }
+                ? { 
+                    ...node, 
+                    data: { 
+                      ...node.data, 
+                      ...rest, 
+                      config: configStr,
+                      nodeProperties: nodeProperties, // 新增：存储到节点数据
+                      rotation: rotation,
+                      width: width,
+                      height: height
+                    },
+                    style: {
+                      ...node.style,
+                      width: width,
+                      height: height
+                    }
+                  }
                 : node
             )
           );
@@ -2100,7 +2544,8 @@ const ArchitectureFlow = () => {
             port: rest.port,
             status: rest.status === 'running' ? '0' : '1',
             remark: rest.description,
-            config: configStr
+            config: configStr,
+            nodeProperties: JSON.stringify(nodeProperties) // 新增
           };
 
           let newNodeId = values.id || `node-${Date.now()}`;
@@ -2123,8 +2568,16 @@ const ArchitectureFlow = () => {
               status: rest.status,
               ip: rest.ip,
               port: rest.port,
-              config: configStr
+              config: configStr,
+              nodeProperties: nodeProperties, // 新增
+              rotation: rotation,
+              width: width,
+              height: height
             },
+            style: {
+              width: width,
+              height: height
+            }
           };
           setNodes((currentNodes) => [...currentNodes, newNode]);
           message.success('新增成功');
@@ -2546,10 +2999,11 @@ const ArchitectureFlow = () => {
     }
   };
 
+  const NodeRenderer = useCallback((props) => (
+    <CustomNode {...props} customNodeTypes={customNodeTypes} />
+  ), [customNodeTypes]);
+
   const nodeTypes = useMemo(() => {
-    const NodeRenderer = (props) => (
-      <CustomNode {...props} customNodeTypes={customNodeTypes} />
-    );
     const types = {
       nginx: NodeRenderer,
       'my-panel': NodeRenderer,
@@ -2560,7 +3014,7 @@ const ArchitectureFlow = () => {
     });
     types.custom = NodeRenderer;
     return types;
-  }, [customNodeTypes]);
+  }, [customNodeTypes, NodeRenderer]);
 
   const edgeTypes = useMemo(() => ({
     editable: EditableEdge
@@ -2683,10 +3137,19 @@ const ArchitectureFlow = () => {
           >
             刷新
           </Button>
+          <Button 
+            icon={<QuestionCircleOutlined />} 
+            onClick={startTutorial}
+            size="large"
+            className="toolbar-button"
+            title="查看操作指引"
+          >
+            教程
+          </Button>
         </Space>
       </div>
 
-      <div className="flow-canvas-container">
+      <div className={`flow-canvas-container ${isDragging ? 'is-dragging' : ''}`}>
         <Spin spinning={loading} size="large" tip="加载架构中..." style={{ height: '100%' }}>
           <ReactFlow
             key={`${defaultNodes.length}-${defaultEdges.length}`}
@@ -2702,6 +3165,7 @@ const ArchitectureFlow = () => {
           onEdgeMouseLeave={onEdgeMouseLeave}
           onNodeDoubleClick={onNodeDoubleClick}
           onEdgeDoubleClick={onEdgeDoubleClick}
+          onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
           onPaneClick={onPaneClick}
           onConnect={onConnect}
@@ -2749,6 +3213,7 @@ const ArchitectureFlow = () => {
           }}
           deleteKeyCode={null} // 禁用 ReactFlow 默认删除快捷键，统一使用我们的全局监听器控制
           multiSelectionKeyCode="Shift"
+          selectionMode={SelectionMode.Box}
           panActivationKeyCode="Space"
           zoomActivationKeyCode="Meta"
           className="react-flow-wrapper"
@@ -2756,19 +3221,39 @@ const ArchitectureFlow = () => {
           <Background />
           <MiniMap />
           <Controls />
+          {/* 渲染对齐辅助线 */}
+          {alignmentLines.length > 0 && (
+            <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 9999 }}>
+              {alignmentLines.map((line, index) => (
+                line.type === 'horizontal' ? (
+                  <line
+                    key={`h-${index}`}
+                    x1={line.x1}
+                    y1={line.y}
+                    x2={line.x2}
+                    y2={line.y}
+                    stroke={ALIGNMENT_LINE_COLOR}
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                  />
+                ) : (
+                  <line
+                    key={`v-${index}`}
+                    x1={line.x}
+                    y1={line.y1}
+                    x2={line.x}
+                    y2={line.y2}
+                    stroke={ALIGNMENT_LINE_COLOR}
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                  />
+                )
+              ))}
+            </svg>
+          )}
         </ReactFlow>
         </Spin>
-        {isHoverHintVisible && hoverHintTarget && (
-          <div
-            className="hover-edit-hint"
-            style={{
-              left: hoverHintPos.x + 12,
-              top: hoverHintPos.y + 12,
-            }}
-          >
-            {hoverHintTarget.kind === 'node' ? '双击打开节点编辑' : '双击打开连线编辑'}
-          </div>
-        )}
+        <HoverEditHint target={hoverHintTarget} isVisible={isHoverHintVisible} />
       </div>
 
       <Modal
@@ -2795,19 +3280,19 @@ const ArchitectureFlow = () => {
             <Select size="large" placeholder="请选择节点类型">
               <Option value="nginx">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ClusterOutlined style={{ color: '#1890ff' }} />
+                  <BrandIcon type="nginx" size="16px" />
                   <span>Nginx - 负载均衡服务器</span>
                 </div>
               </Option>
               <Option value="my-panel">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ApiOutlined style={{ color: '#52c41a' }} />
+                  <BrandIcon type="my-panel" size="16px" />
                   <span>My-Panel - 后端管理服务</span>
                 </div>
               </Option>
               <Option value="proxy">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <DatabaseOutlined style={{ color: '#fa8c16' }} />
+                  <DeploymentUnitOutlined style={{ color: '#fa8c16' }} />
                   <span>Proxy - 代理服务实例</span>
                 </div>
               </Option>
@@ -2821,13 +3306,40 @@ const ArchitectureFlow = () => {
                   'SyncOutlined': SyncOutlined,
                   'PlusOutlined': PlusOutlined,
                   'SaveOutlined': SaveOutlined,
-                  'ReloadOutlined': ReloadOutlined
+                  'ReloadOutlined': ReloadOutlined,
+                  'HddOutlined': HddOutlined,
+                  'CloudServerOutlined': CloudServerOutlined,
+                  'AppstoreOutlined': AppstoreOutlined,
+                  'MessageOutlined': MessageOutlined,
+                  'CodeOutlined': CodeOutlined,
+                  'LineChartOutlined': LineChartOutlined,
+                  'DashboardOutlined': DashboardOutlined,
+                  'SafetyCertificateOutlined': SafetyCertificateOutlined,
+                  'ControlOutlined': ControlOutlined,
+                  'FolderOpenOutlined': FolderOpenOutlined,
+                  'ApartmentOutlined': ApartmentOutlined,
+                  'GlobalOutlined': GlobalOutlined,
+                  'DesktopOutlined': DesktopOutlined,
+                  'SecurityScanOutlined': SecurityScanOutlined,
+                  'NodeIndexOutlined': NodeIndexOutlined,
+                  'DeploymentUnitOutlined': DeploymentUnitOutlined
                 };
-                const IconComponent = iconMap[customType.icon] || ApiOutlined;
+
+                const renderIcon = () => {
+                  if (BrandIcon({ type: customType.icon })) {
+                    return <BrandIcon type={customType.icon} size="16px" color={customType.color} />;
+                  }
+                  if (BrandIcon({ type: customType.type })) {
+                    return <BrandIcon type={customType.type} size="16px" color={customType.color} />;
+                  }
+                  const IconComponent = iconMap[customType.icon] || ApiOutlined;
+                  return <IconComponent style={{ color: customType.color }} />;
+                };
+
                 return (
                   <Option key={customType.type} value={customType.type}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <IconComponent style={{ color: customType.color }} />
+                      {renderIcon()}
                       <span>{customType.name} - {customType.description}</span>
                     </div>
                   </Option>
@@ -2897,6 +3409,68 @@ const ArchitectureFlow = () => {
               </Option>
             </Select>
           </Form.Item>
+
+          <Divider />
+          <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>显示设置</div>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="rotation"
+                label="旋转角度"
+                initialValue={0}
+                tooltip="设置节点的旋转角度（0-360度）"
+              >
+                <InputNumber 
+                  min={0} 
+                  max={360} 
+                  step={1}
+                  formatter={value => `${value}°`}
+                  parser={value => value.replace('°', '')}
+                  style={{ width: '100%' }}
+                  placeholder="旋转角度"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="width"
+                label="节点宽度"
+                initialValue={120}
+                tooltip="设置节点的宽度（像素）"
+              >
+                <InputNumber 
+                  min={60} 
+                  max={500} 
+                  step={10}
+                  formatter={value => `${value}px`}
+                  parser={value => value.replace('px', '')}
+                  style={{ width: '100%' }}
+                  placeholder="节点宽度"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="height"
+                label="节点高度"
+                initialValue={80}
+                tooltip="设置节点的高度（像素）"
+              >
+                <InputNumber 
+                  min={40} 
+                  max={300} 
+                  step={10}
+                  formatter={value => `${value}px`}
+                  parser={value => value.replace('px', '')}
+                  style={{ width: '100%' }}
+                  placeholder="节点高度"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Divider />
           <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>配置信息</div>
@@ -3027,6 +3601,44 @@ const ArchitectureFlow = () => {
               <Form.Item name="description" label="描述">
                 <Input.TextArea rows={3} />
               </Form.Item>
+              
+              <Form.Item name="rotation" label="旋转角度" initialValue={0}>
+                <InputNumber 
+                  min={0} 
+                  max={360} 
+                  step={90} 
+                  formatter={value => `${value}°`}
+                  parser={value => value.replace('°', '')}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+              
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="width" label="节点宽度" initialValue={120}>
+                    <InputNumber 
+                      min={60} 
+                      max={500} 
+                      step={10}
+                      formatter={value => `${value}px`}
+                      parser={value => value.replace('px', '')}
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="height" label="节点高度" initialValue={80}>
+                    <InputNumber 
+                      min={40} 
+                      max={300} 
+                      step={10}
+                      formatter={value => `${value}px`}
+                      parser={value => value.replace('px', '')}
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
               
               <Form.Item name="ip" label="IP地址">
                 <Input />

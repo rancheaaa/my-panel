@@ -94,7 +94,7 @@ const ArchitectureList = () => {
         message.success('创建成功');
         setIsModalOpen(false);
         // 创建成功后直接跳转到编辑页面
-        navigate(`/op/architectureEdit/${res.data.id}`);
+        navigate(`/arch/architectureEdit/${res.data.id}`);
       }
     } catch (error) {
       console.error(error);

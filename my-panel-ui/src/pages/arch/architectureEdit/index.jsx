@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Button, 
@@ -70,7 +70,8 @@ import {
   getBezierPath,
   getSmoothStepPath,
   getStraightPath,
-  SelectionMode
+  SelectionMode,
+  NodeResizer
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import './index.scss';
@@ -101,6 +102,9 @@ const buildDiagramSignature = (diagramName, nodes, edges) => {
         status: String(node.data?.status ?? ''),
         ip: String(node.data?.ip ?? ''),
         port: String(node.data?.port ?? ''),
+        width: Number(node.data?.width ?? 0),
+        height: Number(node.data?.height ?? 0),
+        rotation: Number(node.data?.rotation ?? 0),
         config: normalizeConfigValue(node.data?.config),
       },
     }))
@@ -171,6 +175,7 @@ const EditableEdge = React.memo(({
   sourcePosition,
   targetPosition,
   style = {},
+  markerStart,
   markerEnd,
   selected,
   data,
@@ -465,6 +470,7 @@ const EditableEdge = React.memo(({
       {/* 基础连线 */}
       <BaseEdge 
         path={edgePath} 
+        markerStart={markerStart}
         markerEnd={markerEnd} 
         style={{
           ...style,
@@ -556,9 +562,73 @@ const EditableEdge = React.memo(({
 });
 
 // 自定义节点组件
-const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
+const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNodesProp, customNodeTypes = [] }) => {
+  const nodeRef = useRef(null);
+  const { setNodes: rfSetNodes } = useReactFlow();
+  const setNodes = setNodesProp || rfSetNodes;
+  const [keepAspectRatio, setKeepAspectRatio] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
+
+  const isDragging = dragging;
+
+  // 处理旋转逻辑
+  useEffect(() => {
+    if (!isRotating) return;
+
+    const handleMouseMove = (event) => {
+      if (!nodeRef.current) return;
+      const rect = nodeRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dx = event.clientX - centerX;
+      const dy = event.clientY - centerY;
+      // 计算角度（弧度转角度，+90是因为手柄在上方）
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+      
+      // 增加吸附功能（每 15 度吸附）
+      const snapAngle = 15;
+      angle = Math.round(angle / snapAngle) * snapAngle;
+
+      // 确保角度在 0-360 范围内
+      angle = (angle + 360) % 360;
+
+      setNodes((nds) => nds.map((node) => {
+        if (node.id === id) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              rotation: angle
+            }
+          };
+        }
+        return node;
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setIsRotating(false);
+      // 旋转结束，更新签名
+      setTimeout(() => {
+        // 由于这里拿不到最新的 architectureName, nodes, edges，
+        // 我们可以通过 dispatch 一个自定义事件或让父组件感知。
+        // 在这里我们简单的延迟触发一次
+        const event = new CustomEvent('arch-node-rotated');
+        window.dispatchEvent(event);
+      }, 0);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isRotating, id, setNodes]);
+  
   const getNodeIcon = (type) => {
     const customType = customNodeTypes.find(t => t.type === type);
+    const iconSize = '36px';  // 适配240x160尺寸的图标大小
     if (customType) {
       const iconMap = {
         'ApiOutlined': ApiOutlined,
@@ -590,30 +660,30 @@ const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
       
       // Prefer BrandIcon if it matches customType.icon or type
       if (BrandIcon({ type: customType.icon })) {
-        return <BrandIcon type={customType.icon} size="32px" color={customType.color} />;
+        return <BrandIcon type={customType.icon} size={iconSize} color={customType.color} />;
       }
       if (BrandIcon({ type: type })) {
-        return <BrandIcon type={type} size="32px" color={customType.color} />;
+        return <BrandIcon type={type} size={iconSize} color={customType.color} />;
       }
 
       const IconComponent = iconMap[customType.icon] || ApiOutlined;
-      return <IconComponent style={{ fontSize: '32px', color: customType.color }} />;
+      return <IconComponent style={{ fontSize: iconSize, color: customType.color }} />;
     }
     
     // Fallback for built-in types
     if (BrandIcon({ type: type })) {
-      return <BrandIcon type={type} size="32px" />;
+      return <BrandIcon type={type} size={iconSize} />;
     }
 
     switch (type) {
       case 'nginx':
-        return <DeploymentUnitOutlined style={{ fontSize: '32px', color: '#1890ff' }} />;
+        return <DeploymentUnitOutlined style={{ fontSize: iconSize, color: '#1890ff' }} />;
       case 'my-panel':
-        return <ApiOutlined style={{ fontSize: '32px', color: '#52c41a' }} />;
+        return <ApiOutlined style={{ fontSize: iconSize, color: '#52c41a' }} />;
       case 'proxy':
-        return <DeploymentUnitOutlined style={{ fontSize: '32px', color: '#fa8c16' }} />;
+        return <DeploymentUnitOutlined style={{ fontSize: iconSize, color: '#fa8c16' }} />;
       default:
-        return <ApiOutlined style={{ fontSize: '32px' }} />;
+        return <ApiOutlined style={{ fontSize: iconSize }} />;
     }
   };
 
@@ -656,10 +726,21 @@ const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
   };
 
   const customType = customNodeTypes.find(t => t.type === data.type);
-  const colors = getNodeColor(data.type);
   const handleColor = getNodeHandleColor(data.type);
   const defaultStyle = customType?.defaultStyle || {};
+  
+  // 优先使用后端返回的样式，否则回退到计算样式
+  const colors = {
+    bg: defaultStyle.backgroundColor || getNodeColor(data.type).bg,
+    border: defaultStyle.borderColor || getNodeColor(data.type).border,
+    text: defaultStyle.color || '#333',
+    desc: defaultStyle.color ? hexToRgba(defaultStyle.color, 0.7) : '#888'
+  };
 
+  // 从节点类型获取节点尺寸，优先使用data中的尺寸
+  const nodeWidth = data?.width || customType?.defaultWidth || 180;
+  const nodeHeight = data?.height || customType?.defaultHeight || 180;
+  
   // 辅助函数：将hex颜色转换为rgba
   function hexToRgba(hex, alpha) {
     if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(0, 0, 0, ${alpha})`;
@@ -669,23 +750,41 @@ const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
-  // 计算形状样式
+  // 计算形状样式 - 使用动态节点尺寸
   const getShapeStyle = () => {
     const shape = defaultStyle.shape || 'rectangle';
     
-    // 基础样式
+    // 过滤掉可能干扰 NodeShape 渲染的样式属性
+    // 如果存在形状，容器本身应该是透明的，由 NodeShape 组件负责渲染背景和边框
+    const { 
+      backgroundColor, 
+      borderColor, 
+      border, 
+      borderWidth, 
+      borderStyle, 
+      shape: _shape, 
+      ...containerStyle 
+    } = defaultStyle || {};
+
+    // 基础样式 - 使用动态节点尺寸
     const style = {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-      minWidth: (data?.width ? `${data.width}px` : '180px'),
-      minHeight: (data?.height ? `${data.height}px` : '90px'),
+      width: `${nodeWidth}px`,
+      height: `${nodeHeight}px`,
+      minWidth: `${nodeWidth}px`,
+      minHeight: `${nodeHeight}px`,
+      maxWidth: `${nodeWidth}px`,
+      maxHeight: `${nodeHeight}px`,
       position: 'relative',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: isRotating || isDragging ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       backgroundColor: 'transparent',
       border: 'none',
       boxShadow: 'none',
+      boxSizing: 'border-box',
+      ...containerStyle, // 合并经过过滤的自定义 CSS 样式
     };
 
     return style;
@@ -703,8 +802,33 @@ const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
   const isLogicNot = shape === 'logic-not';
   const isLogicShape = isLogicAnd || isLogicOr || isLogicNot;
 
+  // 计算旋转后的连接桩位置属性，以改善旋转节点的连线效果
+  const getAdjustedPosition = (originalPos, rotation = 0) => {
+    // 确保旋转角度在 0-360 范围内
+    const normalizedRotation = ((rotation % 360) + 360) % 360;
+    
+    // 计算旋转了多少个 90 度 (顺时针旋转)
+    // 0 -> 0, 90 -> 1, 180 -> 2, 270 -> 3
+    const steps = Math.round(normalizedRotation / 90);
+    
+    const positions = [
+      ReactFlowPosition.Top,
+      ReactFlowPosition.Right,
+      ReactFlowPosition.Bottom,
+      ReactFlowPosition.Left
+    ];
+    
+    const currentIndex = positions.indexOf(originalPos);
+    if (currentIndex === -1) return originalPos;
+    
+    // 顺时针旋转，所以索引增加
+    const newIndex = (currentIndex + steps) % 4;
+    return positions[newIndex];
+  };
+
   const rotation = data.rotation || 0;
   const isCurvedOrNarrowShape = isDiamond || isSkewed || shape === 'circle' || shape === 'hexagon' || shape === 'triangle' || shape === 'cloud';
+  // 对于曲线/窄形状，限制内容宽度以避免溢出
   const contentWidth = isCurvedOrNarrowShape
     ? '72%'
     : (isCylinder ? 'calc(100% - 28px)' : 'calc(100% - 24px)');
@@ -714,20 +838,23 @@ const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
     wrapperStyle.transform = `${wrapperStyle.transform || ''} rotate(${rotation}deg)`.trim();
   }
 
-  // 渲染内容包装器内部的样式（内容保持正常排版，不再对菱形/平行四边形施加旋转或倾斜）
+  // 渲染内容包装器内部的样式 - 适配280x160固定尺寸
   const contentWrapperStyle = {
     transform: 'none',
     display: 'flex',
     flexDirection: 'column',
     width: contentWidth,
     maxWidth: '100%',
-    height: '100%',
+    height: 'auto',
+    minHeight: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     textAlign: 'center',
-    padding: (isCylinder || isLogicAnd || isLogicOr || isLogicNot) ? '25px 10px 15px' : '10px',
+    padding: (isCylinder || isLogicAnd || isLogicOr || isLogicNot) ? '28px 12px 18px' : '16px 24px',  // 适配280x160尺寸
     boxSizing: 'border-box',
-    gap: '2px'
+    gap: '0px',
+    overflow: 'hidden',  // 防止内容溢出固定尺寸
+    padding: '8px 12px', // 减小内边距以适应 180x90 尺寸
   };
 
   // Apply inverse rotation to content wrapper if the node itself is rotated
@@ -737,192 +864,332 @@ const CustomNode = React.memo(({ data, selected, customNodeTypes = [] }) => {
 
   return (
     <div 
+      ref={nodeRef}
       className={`custom-node-wrapper ${selected ? 'selected' : ''} shape-${shape}`}
       style={wrapperStyle}
     >
+      {/* PPT 风格的节点尺寸调整器 */}
+      <NodeResizer 
+        color={colors.border} 
+        isVisible={selected} 
+        minWidth={80} 
+        minHeight={50} 
+        keepAspectRatio={keepAspectRatio}
+        handleStyle={{ 
+          width: 8, 
+          height: 8, 
+          borderRadius: '50%',
+          border: `2px solid ${colors.border}`,
+          background: '#fff',
+          zIndex: 10
+        }}
+        lineStyle={{ 
+            border: `1px solid ${colors.border}`,
+            opacity: 0.5
+          }}
+          onResizeStart={(event, params) => {
+            // 如果拖动的是边角（direction 长度为 2），则开启等比例缩放
+            // 例如 ['top', 'left'] 是边角，['left'] 是侧边
+            const isCorner = params.direction && params.direction.length === 2;
+            setKeepAspectRatio(isCorner);
+          }}
+          onResize={(event, params) => {
+            setNodes((nds) => nds.map((node) => {
+              if (node.id === id) {
+                return {
+                  ...node,
+                  width: params.width,
+                  height: params.height,
+                  data: {
+                    ...node.data,
+                    width: params.width,
+                    height: params.height
+                  }
+                };
+              }
+              return node;
+            }));
+          }}
+          onResizeEnd={(event, params) => {
+             setKeepAspectRatio(false); // 重置比例锁定状态
+             setNodes((nds) => nds.map((node) => {
+               if (node.id === id) {
+                 return {
+                   ...node,
+                   width: params.width,
+                   height: params.height,
+                   data: {
+                     ...node.data,
+                     width: params.width,
+                     height: params.height
+                   }
+                 };
+               }
+               return node;
+             }));
+             // 显式触发一次签名更新，以捕捉尺寸变化
+             setTimeout(() => {
+               const customEvent = new CustomEvent('arch-node-resized');
+               window.dispatchEvent(customEvent);
+             }, 0);
+           }}
+        />
+      {/* 旋转手柄 - 模仿 PPT */}
+      {selected && (
+        <div
+          className="node-rotation-handle nodrag"
+          style={{
+            position: 'absolute',
+            top: -30,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            border: `2px solid ${colors.border}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'grab',
+            zIndex: 100,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsRotating(true);
+          }}
+        >
+          <SyncOutlined style={{ fontSize: 12, color: colors.border }} />
+          {/* 连接线 */}
+          <div style={{
+            position: 'absolute',
+            top: 18,
+            left: '50%',
+            width: 2,
+            height: 12,
+            backgroundColor: colors.border,
+            transform: 'translateX(-50%)'
+          }} />
+        </div>
+      )}
       {/* 统一形状背景组件 */}
       <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: -1 }}>
         <NodeShape 
           shape={shape} 
-          color={colors.border} 
+          color={colors.border}
+          backgroundColor={colors.bg}
           size="100%" 
           selected={selected}
           style={{
-            filter: selected ? `drop-shadow(0 0 12px ${colors.border}66)` : 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
+            filter: selected ? `drop-shadow(0 0 12px ${colors.border}66)` : 'drop-shadow(0 4px 8px rgba(0,0,0,0.05))'
           }}
         />
       </div>
 
       {/* 内容包装器 */}
       <div style={contentWrapperStyle} className="node-content-inner">
-        {/* 图标渲染 */}
-        <div style={{ marginBottom: '4px' }}>
+        {/* 第一行：图标 */}
+        <div style={{ 
+          marginBottom: '6px', 
+          flexShrink: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
           {getNodeIcon(data.type)}
         </div>
         
-        {/* 节点名称 */}
+        {/* 第二行：节点名称 */}
         <div style={{ 
-          fontWeight: 'bold', 
-          fontSize: '13px', 
-          color: '#333',
-          marginBottom: '2px',
+          fontWeight: '600', 
+          fontSize: '14px',
+          lineHeight: '1.4',
+          color: colors.text,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          maxWidth: '100%'
+          maxWidth: '100%',
+          flexShrink: 0,
+          marginBottom: '4px',
+          textAlign: 'center',
+          padding: '0 12px'
         }}>
           {data.name}
         </div>
         
-        {/* 节点IP/状态 (仅在非逻辑形状显示) */}
-        {!isLogicShape && (
-          <div style={{ fontSize: '10px', color: '#888', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
-            {data.ip || data.type}
+        {/* 第三行：节点描述 */}
+        {data.description && nodeHeight > 80 && ( // 仅在高度足够时显示描述
+          <div style={{ 
+            fontSize: '11px',  
+            lineHeight: '1.4',
+            color: colors.desc, 
+            whiteSpace: 'normal',
+            wordWrap: 'break-word',
+            wordBreak: 'break-word',
+            maxWidth: '100%',
+            flexShrink: 0,
+            textAlign: 'center',
+            padding: '0 12px',
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical'
+          }}>
+            {data.description}
           </div>
         )}
-
-        {isLogicShape ? (
-          <>
-            {/* 逻辑形状专用连接点：左侧两个（输入），右侧一个（输出） */}
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Left}
-              id="left-1"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                left: '-6px',
-                top: '30%',
-                transform: 'translateY(-50%)'
-              }}
-              className="custom-handle"
-            />
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Left}
-              id="left-2"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                left: '-6px',
-                top: '70%',
-                transform: 'translateY(-50%)'
-              }}
-              className="custom-handle"
-            />
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Right}
-              id="right"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                right: '-6px',
-                top: '50%',
-                transform: 'translateY(-50%)'
-              }}
-              className="custom-handle"
-            />
-          </>
-        ) : (
-          <>
-            {/* 顶部连接桩 - 支持双向连接 */}
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Top}
-              id="top"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                top: '-6px',
-                left: '50%',
-                transform: 'translateX(-50%)'
-              }}
-              className="custom-handle"
-            />
-            
-            {/* 底部连接桩 - 支持双向连接 */}
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Bottom}
-              id="bottom"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                bottom: '-6px',
-                left: '50%',
-                transform: 'translateX(-50%)'
-              }}
-              className="custom-handle"
-            />
-            
-            {/* 左侧连接桩 - 支持双向连接 */}
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Left}
-              id="left"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                left: '-6px',
-                top: '50%',
-                transform: 'translateY(-50%)'
-              }}
-              className="custom-handle"
-            />
-            
-            {/* 右侧连接桩 - 支持双向连接 */}
-            <ReactFlowHandle
-              type="source"
-              position={ReactFlowPosition.Right}
-              id="right"
-              style={{
-                background: handleColor,
-                width: '12px',
-                height: '12px',
-                border: '2px solid #fff',
-                boxShadow: `0 1px 4px ${handleColor}44`,
-                cursor: 'crosshair',
-                zIndex: 1000,
-                right: '-6px',
-                top: '50%',
-                transform: 'translateY(-50%)'
-              }}
-              className="custom-handle"
-            />
-          </>
-        )}
       </div>
+
+      {isLogicShape ? (
+        <>
+          {/* 逻辑形状专用连接点：左侧两个（输入），右侧一个（输出） */}
+          <ReactFlowHandle
+             type="source"
+             position={getAdjustedPosition(ReactFlowPosition.Left, rotation)}
+             id="left-1"
+             style={{
+               background: handleColor,
+               width: '14px',
+               height: '14px',
+               border: '2px solid #fff',
+               boxShadow: `0 1px 4px ${handleColor}66`,
+               cursor: 'crosshair',
+               zIndex: 1000,
+               top: '30%',
+               left: 0,
+               transform: 'translate(-50%, -50%)',
+               margin: 0
+             }}
+             className="custom-handle"
+           />
+           <ReactFlowHandle
+             type="source"
+             position={getAdjustedPosition(ReactFlowPosition.Left, rotation)}
+             id="left-2"
+             style={{
+               background: handleColor,
+               width: '14px',
+               height: '14px',
+               border: '2px solid #fff',
+               boxShadow: `0 1px 4px ${handleColor}66`,
+               cursor: 'crosshair',
+               zIndex: 1000,
+               top: '70%',
+               left: 0,
+               transform: 'translate(-50%, -50%)',
+               margin: 0
+             }}
+             className="custom-handle"
+           />
+           <ReactFlowHandle
+             type="source"
+             position={getAdjustedPosition(ReactFlowPosition.Right, rotation)}
+             id="right"
+             style={{
+               background: handleColor,
+               width: '14px',
+               height: '14px',
+               border: '2px solid #fff',
+               boxShadow: `0 1px 4px ${handleColor}66`,
+               cursor: 'crosshair',
+               zIndex: 1000,
+               top: '50%',
+               right: 0,
+               transform: 'translate(50%, -50%)',
+               margin: 0
+             }}
+             className="custom-handle"
+           />
+        </>
+      ) : (
+        <>
+          {/* 顶部连接桩 - 支持双向连接 */}
+          <ReactFlowHandle
+            type="source"
+            position={getAdjustedPosition(ReactFlowPosition.Top, rotation)}
+            id="top"
+            style={{
+              background: handleColor,
+              width: '14px',
+              height: '14px',
+              border: '2px solid #fff',
+              boxShadow: `0 1px 4px ${handleColor}66`,
+              cursor: 'crosshair',
+              zIndex: 1000,
+              top: 0,
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              margin: 0 // 消除默认 margin
+            }}
+            className="custom-handle"
+          />
+          
+          {/* 底部连接桩 - 支持双向连接 */}
+          <ReactFlowHandle
+            type="source"
+            position={getAdjustedPosition(ReactFlowPosition.Bottom, rotation)}
+            id="bottom"
+            style={{
+              background: handleColor,
+              width: '14px',
+              height: '14px',
+              border: '2px solid #fff',
+              boxShadow: `0 1px 4px ${handleColor}66`,
+              cursor: 'crosshair',
+              zIndex: 1000,
+              bottom: 0,
+              left: '50%',
+              transform: 'translate(-50%, 50%)',
+              margin: 0
+            }}
+            className="custom-handle"
+          />
+          
+          {/* 左侧连接桩 - 支持双向连接 */}
+          <ReactFlowHandle
+            type="source"
+            position={getAdjustedPosition(ReactFlowPosition.Left, rotation)}
+            id="left"
+            style={{
+              background: handleColor,
+              width: '14px',
+              height: '14px',
+              border: '2px solid #fff',
+              boxShadow: `0 1px 4px ${handleColor}66`,
+              cursor: 'crosshair',
+              zIndex: 1000,
+              top: '50%',
+              left: 0,
+              transform: 'translate(-50%, -50%)',
+              margin: 0
+            }}
+            className="custom-handle"
+          />
+          
+          {/* 右侧连接桩 - 支持双向连接 */}
+          <ReactFlowHandle
+            type="source"
+            position={getAdjustedPosition(ReactFlowPosition.Right, rotation)}
+            id="right"
+            style={{
+              background: handleColor,
+              width: '14px',
+              height: '14px',
+              border: '2px solid #fff',
+              boxShadow: `0 1px 4px ${handleColor}66`,
+              cursor: 'crosshair',
+              zIndex: 1000,
+              top: '50%',
+              right: 0,
+              transform: 'translate(50%, -50%)',
+              margin: 0
+            }}
+            className="custom-handle"
+          />
+        </>
+      )}
     </div>
   );
 });
@@ -1104,6 +1371,19 @@ const ArchitectureFlow = () => {
     }
   }, [isDragging, architectureName, nodes.length, edges.length, updateSignature]);
 
+  // 监听节点旋转事件以更新签名
+  useEffect(() => {
+    const handleRotated = () => {
+      updateSignature();
+    };
+    window.addEventListener('arch-node-rotated', handleRotated);
+    window.addEventListener('arch-node-resized', handleRotated);
+    return () => {
+      window.removeEventListener('arch-node-rotated', handleRotated);
+      window.removeEventListener('arch-node-resized', handleRotated);
+    };
+  }, [updateSignature]);
+
   const isModified = useMemo(() => {
     if (!savedSignatureRef.current) return false;
     return currentSignature !== savedSignatureRef.current;
@@ -1157,14 +1437,18 @@ const ArchitectureFlow = () => {
         };
 
         // 后端返回的节点类型转换为前端使用的格式
-        const types = response.data.map(item => ({
-          type: item.typeCode,
-          name: item.typeName,
-          description: item.remark,
-          icon: item.icon || 'ApiOutlined',
-          color: extractPrimaryColor(item.defaultStyle),
-          defaultStyle: safeJsonParse(item.defaultStyle)
-        }));
+        const types = response.data.map(item => {
+          return {
+            type: item.typeCode,
+            name: item.typeName,
+            description: item.remark,
+            icon: item.icon || 'ApiOutlined',
+            color: extractPrimaryColor(item.defaultStyle),
+            defaultStyle: safeJsonParse(item.defaultStyle),
+            defaultWidth: item.defaultWidth || 180,
+            defaultHeight: item.defaultHeight || 180
+          };
+        });
         setCustomNodeTypes(types);
       }
     } catch (error) {
@@ -1204,29 +1488,28 @@ const ArchitectureFlow = () => {
             console.error('解析节点属性失败', e);
           }
 
+          const nodeType = node.nodeType || 'unknown';
+          const customType = customNodeTypes.find(t => t.type === nodeType);
+
           return {
             id: node.id.toString(),
-            type: node.nodeType || 'unknown',
+            type: nodeType,
             position: { 
               x: node.positionX ?? node.xPosition ?? 0, 
               y: node.positionY ?? node.yPosition ?? 0 
             },
             data: {
               name: node.nodeName,
-              type: node.nodeType || 'unknown',
+              type: nodeType,
               description: node.description || node.remark,
               status: node.status === '0' ? 'running' : 'stopped',
               ip: properties.ip || node.ip,
               port: properties.port || node.port,
               config: properties.config || node.config,
-              nodeProperties: properties, // 新增：存储节点属性
-              rotation: properties.rotation || 0,
-              width: properties.width || (node.nodeWidth ?? node.width ?? node.node_width ?? 120),
-              height: properties.height || (node.nodeHeight ?? node.height ?? node.node_height ?? 80)
-            },
-            style: {
-              width: properties.width || (node.nodeWidth ?? node.width ?? node.node_width ?? 120),
-              height: properties.height || (node.nodeHeight ?? node.height ?? node.node_height ?? 80)
+              nodeProperties: properties,
+              rotation: node.rotation || properties.rotation || 0,
+              width: node.nodeWidth || customType?.defaultWidth || 180,
+              height: node.nodeHeight || customType?.defaultHeight || 180
             }
           };
         });
@@ -1266,17 +1549,19 @@ const ArchitectureFlow = () => {
             label: edge.edgeLabel,
             type: 'editable',
             edgeType: edge.edgeType || 'smoothstep',
-            data: { points: Array.isArray(points) ? points : [], edgeType: edge.edgeType || 'smoothstep' },
+            data: { 
+              points: Array.isArray(points) ? points : [], 
+              edgeType: edge.edgeType || 'smoothstep',
+              arrowDirection: style.arrowDirection
+            },
             style: {
               stroke: style.stroke || '#1890ff',
               strokeWidth: style.strokeWidth || edge.weight || 2,
               strokeDasharray: style.strokeDasharray
             },
             animated: edge.animated === '1',
-            markerEnd: {
-              type: 'arrowclosed',
-              color: style.stroke || '#1890ff'
-            }
+            markerStart: style.markerStart,
+            markerEnd: style.markerEnd
           };
         });
 
@@ -1314,7 +1599,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 80,
           ip: '192.168.1.100',
-          config: 'worker_processes 4;\nworker_connections 1024;\nkeepalive_timeout 65;'
+          config: 'worker_processes 4;\nworker_connections 1024;\nkeepalive_timeout 65;',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1329,7 +1617,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 8080,
           ip: '192.168.1.101',
-          config: 'JAVA_VERSION=17\nMAX_MEMORY=2G\nTHREAD_POOL_SIZE=200'
+          config: 'JAVA_VERSION=17\nMAX_MEMORY=2G\nTHREAD_POOL_SIZE=200',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1344,7 +1635,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 8081,
           ip: '192.168.1.102',
-          config: 'JAVA_VERSION=17\nMAX_MEMORY=2G\nTHREAD_POOL_SIZE=200'
+          config: 'JAVA_VERSION=17\nMAX_MEMORY=2G\nTHREAD_POOL_SIZE=200',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1359,7 +1653,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 9001,
           ip: '192.168.1.201',
-          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1374,7 +1671,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 9002,
           ip: '192.168.1.202',
-          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1389,7 +1689,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 9003,
           ip: '192.168.1.203',
-          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1404,7 +1707,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 9004,
           ip: '192.168.1.204',
-          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1419,7 +1725,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 9005,
           ip: '192.168.1.205',
-          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
       {
@@ -1434,7 +1743,10 @@ const ArchitectureFlow = () => {
           status: 'running',
           port: 9006,
           ip: '192.168.1.206',
-          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000'
+          config: 'REGISTRY_ENABLED=true\nHEALTH_CHECK_INTERVAL=30\nMAX_CONNECTIONS=1000',
+          width: 180,
+          height: 180,
+          rotation: 0
         },
       },
     ];
@@ -1667,7 +1979,10 @@ const ArchitectureFlow = () => {
       description: node.data.description,
       ip: node.data.ip,
       port: node.data.port,
-      status: node.data.status
+      status: node.data.status,
+      rotation: node.data.rotation || 0,
+      width: node.data.width || 180,
+      height: node.data.height || 180
     });
   }, [drawerForm]);
 
@@ -1716,9 +2031,10 @@ const ArchitectureFlow = () => {
       effect: getEdgeEffectValue(edge),
       strokeWidth: edge.style?.strokeWidth || 2,
       arrowType: edge.markerEnd?.type || edge.markerStart?.type || 'arrowclosed',
-      arrowDirection: edge.markerStart && edge.markerEnd ? 'both' : 
+      arrowDirection: edge.data?.arrowDirection || (
+                     edge.markerStart && edge.markerEnd ? 'both' : 
                      edge.markerEnd ? 'target' : 
-                     edge.markerStart ? 'source' : 'none'
+                     edge.markerStart ? 'source' : 'none')
     });
     setIsEdgeModalOpen(true);
   }, [edgeForm]);
@@ -1840,13 +2156,18 @@ const ArchitectureFlow = () => {
       label: defaultLabel,
       type: 'editable',
       edgeType: defaultEdgeType,
-      data: { points: [], edgeType: defaultEdgeType },
+      data: { 
+        points: [], 
+        edgeType: defaultEdgeType,
+        arrowDirection: 'target' 
+      },
       style: {
         stroke: defaultStroke,
         strokeWidth: defaultStrokeWidth,
         strokeDasharray: '6,4'
       },
       animated: true,
+      markerStart: undefined,
       markerEnd: {
         type: 'arrowclosed',
         color: defaultStroke
@@ -1864,7 +2185,12 @@ const ArchitectureFlow = () => {
           targetHandle: newEdge.targetHandle,
           edgeLabel: newEdge.label,
           edgeType: newEdge.edgeType,
-          edgeStyle: JSON.stringify(newEdge.style),
+          edgeStyle: JSON.stringify({
+            ...newEdge.style,
+            markerStart: newEdge.markerStart,
+            markerEnd: newEdge.markerEnd,
+            arrowDirection: newEdge.data?.arrowDirection
+          }),
           animated: newEdge.animated ? '1' : '0',
           color: newEdge.style.stroke,
           weight: newEdge.style.strokeWidth
@@ -2275,13 +2601,17 @@ const ArchitectureFlow = () => {
 
   const handleAddNode = () => {
     modalForm.resetFields();
+    const firstType = customNodeTypes.length > 0 ? customNodeTypes[0] : null;
     modalForm.setFieldsValue({
-      type: customNodeTypes.length > 0 ? customNodeTypes[0].type : 'proxy',
+      type: firstType ? firstType.type : '',
       name: '',
       description: '',
       ip: '',
       port: 80,
       status: 'running',
+      rotation: 0,
+      width: firstType?.defaultWidth || 180,
+      height: firstType?.defaultHeight || 180,
       configContent: ''
     });
     setCurrentNode(null);
@@ -2437,6 +2767,25 @@ const ArchitectureFlow = () => {
         }
       }
       
+      let markerStart = undefined;
+      let markerEnd = undefined;
+      const markerColor = defaultStroke;
+      const arrowType = values.arrowType || 'arrowclosed';
+
+      if (values.arrowDirection === 'both') {
+        markerStart = { type: arrowType, color: markerColor };
+        markerEnd = { type: arrowType, color: markerColor };
+      } else if (values.arrowDirection === 'source') {
+        markerStart = { type: arrowType, color: markerColor };
+        markerEnd = undefined;
+      } else if (values.arrowDirection === 'target') {
+        markerStart = undefined;
+        markerEnd = { type: arrowType, color: markerColor };
+      } else if (values.arrowDirection === 'none') {
+        markerStart = undefined;
+        markerEnd = undefined;
+      }
+
       const newEdge = {
         id: `edge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         source: values.source,
@@ -2444,18 +2793,18 @@ const ArchitectureFlow = () => {
         label: values.label || defaultLabel,
         type: 'editable',
         edgeType: values.edgeType || defaultEdgeType,
-        data: { points: [], edgeType: values.edgeType || defaultEdgeType },
+        data: { 
+          points: [], 
+          edgeType: values.edgeType || defaultEdgeType, 
+          arrowDirection: values.arrowDirection || 'target'
+        },
         style: {
           stroke: defaultStroke,
           strokeWidth: defaultStrokeWidth
         },
         animated: true,
-        markerStart: values.arrowDirection === 'source' || values.arrowDirection === 'both'
-          ? { type: values.arrowType || 'arrowclosed', color: defaultStroke }
-          : undefined,
-        markerEnd: values.arrowDirection === 'target' || values.arrowDirection === 'both'
-          ? { type: values.arrowType || 'arrowclosed', color: defaultStroke }
-          : undefined
+        markerStart,
+        markerEnd
       };
       
       setEdges((currentEdges) => [...currentEdges, newEdge]);
@@ -2479,8 +2828,8 @@ const ArchitectureFlow = () => {
       // 构建节点属性对象
       const nodeProperties = {
         rotation: rotation || 0,
-        width: width || 120,
-        height: height || 80,
+        nodeWidth: width || 180,
+        nodeHeight: height || 180,
         // 保留原有的其他属性
         ...(currentNode?.data?.nodeProperties || {})
       };
@@ -2500,7 +2849,10 @@ const ArchitectureFlow = () => {
             status: rest.status === 'running' ? '0' : '1',
             remark: rest.description,
             config: configStr,
-            nodeProperties: JSON.stringify(nodeProperties) // 新增：存储节点属性
+            rotation: rotation || 0,
+            nodeWidth: width || 180,
+            nodeHeight: height || 180,
+            nodeProperties: JSON.stringify(nodeProperties)
           };
           
           if (diagramId) {
@@ -2512,17 +2864,14 @@ const ArchitectureFlow = () => {
               node.id === currentNode.id
                 ? { 
                     ...node, 
+                    width: width,
+                    height: height,
                     data: { 
                       ...node.data, 
                       ...rest, 
                       config: configStr,
-                      nodeProperties: nodeProperties, // 新增：存储到节点数据
+                      nodeProperties: nodeProperties,
                       rotation: rotation,
-                      width: width,
-                      height: height
-                    },
-                    style: {
-                      ...node.style,
                       width: width,
                       height: height
                     }
@@ -2536,7 +2885,7 @@ const ArchitectureFlow = () => {
           const nodeData = {
             diagramId: diagramId,
             nodeName: rest.name,
-            nodeCode: rest.id, // 映射前端的“节点ID”到后端的“节点编码”
+            nodeCode: rest.id,
             nodeType: rest.type,
             positionX: 400,
             positionY: 400,
@@ -2545,7 +2894,10 @@ const ArchitectureFlow = () => {
             status: rest.status === 'running' ? '0' : '1',
             remark: rest.description,
             config: configStr,
-            nodeProperties: JSON.stringify(nodeProperties) // 新增
+            rotation: rotation || 0,
+            nodeWidth: width || 180,
+            nodeHeight: height || 180,
+            nodeProperties: JSON.stringify(nodeProperties)
           };
 
           let newNodeId = values.id || `node-${Date.now()}`;
@@ -2561,6 +2913,8 @@ const ArchitectureFlow = () => {
             type: rest.type,
             position: { x: 400, y: 400 },
             connectable: true,
+            width: width || customNodeTypes.find(t => t.type === rest.type)?.defaultWidth || 180,
+            height: height || customNodeTypes.find(t => t.type === rest.type)?.defaultHeight || 180,
             data: {
               name: rest.name,
               type: rest.type,
@@ -2569,14 +2923,10 @@ const ArchitectureFlow = () => {
               ip: rest.ip,
               port: rest.port,
               config: configStr,
-              nodeProperties: nodeProperties, // 新增
+              nodeProperties: nodeProperties,
               rotation: rotation,
-              width: width,
-              height: height
-            },
-            style: {
-              width: width,
-              height: height
+              width: width || customNodeTypes.find(t => t.type === rest.type)?.defaultWidth || 180,
+              height: height || customNodeTypes.find(t => t.type === rest.type)?.defaultHeight || 180
             }
           };
           setNodes((currentNodes) => [...currentNodes, newNode]);
@@ -2614,6 +2964,9 @@ const ArchitectureFlow = () => {
         nodeType: node.type,
         positionX: Math.round(node.position.x),
         positionY: Math.round(node.position.y),
+        nodeWidth: node.data.width || 180,
+        nodeHeight: node.data.height || 180,
+        rotation: node.data.rotation || 0,
         ip: node.data.ip,
         port: node.data.port,
         status: node.data.status === 'running' ? '0' : '1',
@@ -2630,7 +2983,10 @@ const ArchitectureFlow = () => {
         const edgeStyle = JSON.stringify({
           stroke: style.stroke || '#1890ff',
           strokeWidth: style.strokeWidth || 2,
-          ...(style.strokeDasharray ? { strokeDasharray: style.strokeDasharray } : {})
+          ...(style.strokeDasharray ? { strokeDasharray: style.strokeDasharray } : {}),
+          markerStart: edge.markerStart,
+          markerEnd: edge.markerEnd,
+          arrowDirection: edge.data?.arrowDirection
         });
 
         return {
@@ -2876,19 +3232,32 @@ const ArchitectureFlow = () => {
           delete nextStyle.strokeDasharray;
         }
 
+        const markerColor = selectedEdge.style?.stroke || '#1890ff';
+        let markerStart = undefined;
+        let markerEnd = undefined;
+
+        if (values.arrowDirection === 'both') {
+          markerStart = { type: values.arrowType, color: markerColor };
+          markerEnd = { type: values.arrowType, color: markerColor };
+        } else if (values.arrowDirection === 'source') {
+          markerStart = { type: values.arrowType, color: markerColor };
+          markerEnd = undefined;
+        } else if (values.arrowDirection === 'target') {
+          markerStart = undefined;
+          markerEnd = { type: values.arrowType, color: markerColor };
+        } else if (values.arrowDirection === 'none') {
+          markerStart = undefined;
+          markerEnd = undefined;
+        }
+
         const edgeStyleForBackend = JSON.stringify({
           stroke: nextStyle.stroke || '#1890ff',
           strokeWidth,
           ...(effectConfig.dash ? { strokeDasharray: effectConfig.dash } : {}),
+          markerStart,
+          markerEnd,
+          arrowDirection: values.arrowDirection
         });
-
-        const markerStart = values.arrowDirection === 'source' || values.arrowDirection === 'both' 
-          ? { type: values.arrowType, color: selectedEdge.style?.stroke || '#1890ff' }
-          : undefined;
-        
-        const markerEnd = values.arrowDirection === 'target' || values.arrowDirection === 'both'
-          ? { type: values.arrowType, color: selectedEdge.style?.stroke || '#1890ff' }
-          : undefined;
 
         setLoading(true);
         try {
@@ -2923,7 +3292,7 @@ const ArchitectureFlow = () => {
                     style: nextStyle,
                     markerStart,
                     markerEnd,
-                    data: { ...(edge.data || {}), edgeType: values.edgeType }
+                    data: { ...(edge.data || {}), edgeType: values.edgeType, arrowDirection: values.arrowDirection }
                   }
                 : edge
             )
@@ -2942,7 +3311,7 @@ const ArchitectureFlow = () => {
                     style: nextStyle,
                     markerStart,
                     markerEnd,
-                    data: { ...(edge.data || {}), edgeType: values.edgeType }
+                    data: { ...(edge.data || {}), edgeType: values.edgeType, arrowDirection: values.arrowDirection }
                   }
                 : edge
             )
@@ -3000,8 +3369,8 @@ const ArchitectureFlow = () => {
   };
 
   const NodeRenderer = useCallback((props) => (
-    <CustomNode {...props} customNodeTypes={customNodeTypes} />
-  ), [customNodeTypes]);
+    <CustomNode {...props} customNodeTypes={customNodeTypes} setNodes={setNodes} />
+  ), [customNodeTypes, setNodes]);
 
   const nodeTypes = useMemo(() => {
     const types = {
@@ -3275,27 +3644,21 @@ const ArchitectureFlow = () => {
             name="type"
             label="节点类型"
             rules={[{ required: true, message: '请选择节点类型' }]}
-            initialValue="proxy"
+            initialValue={customNodeTypes.length > 0 ? customNodeTypes[0].type : ''}
           >
-            <Select size="large" placeholder="请选择节点类型">
-              <Option value="nginx">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BrandIcon type="nginx" size="16px" />
-                  <span>Nginx - 负载均衡服务器</span>
-                </div>
-              </Option>
-              <Option value="my-panel">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BrandIcon type="my-panel" size="16px" />
-                  <span>My-Panel - 后端管理服务</span>
-                </div>
-              </Option>
-              <Option value="proxy">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <DeploymentUnitOutlined style={{ color: '#fa8c16' }} />
-                  <span>Proxy - 代理服务实例</span>
-                </div>
-              </Option>
+            <Select 
+              size="large" 
+              placeholder="请选择节点类型"
+              onChange={(value) => {
+                const selectedType = customNodeTypes.find(t => t.type === value);
+                if (selectedType) {
+                  modalForm.setFieldsValue({
+                    width: selectedType.defaultWidth || 180,
+                    height: selectedType.defaultHeight || 180
+                  });
+                }
+              }}
+            >
               {customNodeTypes.map(customType => {
                 const iconMap = {
                   'ApiOutlined': ApiOutlined,
@@ -3415,6 +3778,40 @@ const ArchitectureFlow = () => {
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item
+                name="width"
+                label="宽度"
+                initialValue={180}
+                tooltip="设置节点的宽度"
+              >
+                <InputNumber 
+                  min={50} 
+                  max={2000} 
+                  step={1}
+                  style={{ width: '100%' }}
+                  placeholder="宽度"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="height"
+                label="高度"
+                initialValue={180}
+                tooltip="设置节点的高度"
+              >
+                <InputNumber 
+                  min={50} 
+                  max={2000} 
+                  step={1}
+                  style={{ width: '100%' }}
+                  placeholder="高度"
+                  size="large"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
                 name="rotation"
                 label="旋转角度"
                 initialValue={0}
@@ -3428,44 +3825,6 @@ const ArchitectureFlow = () => {
                   parser={value => value.replace('°', '')}
                   style={{ width: '100%' }}
                   placeholder="旋转角度"
-                  size="large"
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="width"
-                label="节点宽度"
-                initialValue={120}
-                tooltip="设置节点的宽度（像素）"
-              >
-                <InputNumber 
-                  min={60} 
-                  max={500} 
-                  step={10}
-                  formatter={value => `${value}px`}
-                  parser={value => value.replace('px', '')}
-                  style={{ width: '100%' }}
-                  placeholder="节点宽度"
-                  size="large"
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="height"
-                label="节点高度"
-                initialValue={80}
-                tooltip="设置节点的高度（像素）"
-              >
-                <InputNumber 
-                  min={40} 
-                  max={300} 
-                  step={10}
-                  formatter={value => `${value}px`}
-                  parser={value => value.replace('px', '')}
-                  style={{ width: '100%' }}
-                  placeholder="节点高度"
                   size="large"
                 />
               </Form.Item>
@@ -3602,38 +3961,25 @@ const ArchitectureFlow = () => {
                 <Input.TextArea rows={3} />
               </Form.Item>
               
-              <Form.Item name="rotation" label="旋转角度" initialValue={0}>
-                <InputNumber 
-                  min={0} 
-                  max={360} 
-                  step={90} 
-                  formatter={value => `${value}°`}
-                  parser={value => value.replace('°', '')}
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-              
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item name="width" label="节点宽度" initialValue={120}>
-                    <InputNumber 
-                      min={60} 
-                      max={500} 
-                      step={10}
-                      formatter={value => `${value}px`}
-                      parser={value => value.replace('px', '')}
-                      style={{ width: '100%' }}
-                    />
+              <Row gutter={12}>
+                <Col span={8}>
+                  <Form.Item name="width" label="宽度">
+                    <InputNumber style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item name="height" label="节点高度" initialValue={80}>
+                <Col span={8}>
+                  <Form.Item name="height" label="高度">
+                    <InputNumber style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="rotation" label="旋转角度" initialValue={0}>
                     <InputNumber 
-                      min={40} 
-                      max={300} 
-                      step={10}
-                      formatter={value => `${value}px`}
-                      parser={value => value.replace('px', '')}
+                      min={0} 
+                      max={360} 
+                      step={15} 
+                      formatter={value => `${value}°`}
+                      parser={value => value.replace('°', '')}
                       style={{ width: '100%' }}
                     />
                   </Form.Item>
@@ -3923,13 +4269,13 @@ const ArchitectureFlow = () => {
               <Option value="target">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>→</span>
-                  <span>指向目标（右侧）</span>
+                  <span>指向目标</span>
                 </div>
               </Option>
               <Option value="source">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>←</span>
-                  <span>指向源（左侧）</span>
+                  <span>指向源</span>
                 </div>
               </Option>
               <Option value="both">
@@ -4153,13 +4499,13 @@ const ArchitectureFlow = () => {
               <Option value="target">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>→</span>
-                  <span>指向目标（右侧）</span>
+                  <span>指向目标</span>
                 </div>
               </Option>
               <Option value="source">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>←</span>
-                  <span>指向源（左侧）</span>
+                  <span>指向源</span>
                 </div>
               </Option>
               <Option value="both">

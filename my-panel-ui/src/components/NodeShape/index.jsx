@@ -7,6 +7,7 @@ import React from 'react';
 const NodeShape = ({ 
   shape = 'rectangle', 
   color = '#1890ff', 
+  backgroundColor,
   size = 40, 
   strokeWidth = 2,
   style = {},
@@ -14,7 +15,7 @@ const NodeShape = ({
   className = '',
   isPreview = false
 }) => {
-  const bg = `${color}15`; // Light background
+  const bg = backgroundColor || `${color}15`; // Use provided background or fallback to light version of color
   const border = color;
   const viewBox = "0 0 100 100";
   
@@ -32,64 +33,64 @@ const NodeShape = ({
   const renderSvgShape = () => {
     switch (shape) {
       case 'circle':
-        return <circle cx="50" cy="50" r="45" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <circle cx="50" cy="50" r="48" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
       
       case 'diamond':
-        return <path d="M 50 5 L 95 50 L 50 95 L 5 50 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 50 2 L 98 50 L 50 98 L 2 50 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
       
       case 'cylinder':
         return (
           <g>
             <path 
-              d="M 10 20 L 10 80 C 10 95, 90 95, 90 80 L 90 20" 
+              d="M 2 15 L 2 85 C 2 98, 98 98, 98 85 L 98 15" 
               fill={bg} 
               stroke={border} 
               strokeWidth={strokeWidth} 
             />
             <ellipse 
-              cx="50" cy="20" rx="40" ry="15" 
+              cx="50" cy="15" rx="48" ry="12" 
               fill={`${border}33`} 
               stroke={border} 
               strokeWidth={strokeWidth} 
             />
             {/* Minimalist decorative lines */}
-            <path d="M 10 40 C 10 50, 90 50, 90 40" fill="none" stroke={border} strokeWidth={strokeWidth/2} strokeDasharray="4 2" opacity="0.4" />
-            <path d="M 10 60 C 10 70, 90 70, 90 60" fill="none" stroke={border} strokeWidth={strokeWidth/2} strokeDasharray="4 2" opacity="0.4" />
+            <path d="M 2 40 C 2 50, 98 50, 98 40" fill="none" stroke={border} strokeWidth={strokeWidth/2} strokeDasharray="4 2" opacity="0.4" />
+            <path d="M 2 65 C 2 75, 98 75, 98 65" fill="none" stroke={border} strokeWidth={strokeWidth/2} strokeDasharray="4 2" opacity="0.4" />
           </g>
         );
 
       case 'triangle':
-        return <path d="M 50 10 L 90 90 L 10 90 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 50 2 L 98 98 L 2 98 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'hexagon':
-        return <path d="M 25 10 L 75 10 L 95 50 L 75 90 L 25 90 L 5 50 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 25 2 L 75 2 L 98 50 L 75 98 L 25 98 L 2 50 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'parallelogram':
-        return <path d="M 25 20 L 95 20 L 75 80 L 5 80 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 25 2 L 98 2 L 75 98 L 2 98 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'cloud':
-        return <path d="M 25 45 C 5 45, 5 25, 25 25 C 25 10, 55 10, 70 20 C 90 15, 100 35, 90 50 C 100 65, 75 80, 55 75 C 35 85, 10 75, 25 45" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 25 45 C 2 45, 2 25, 25 25 C 25 2, 55 2, 70 20 C 95 10, 98 35, 90 50 C 98 65, 75 98, 55 85 C 35 98, 2 85, 25 45" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'logic-and':
-        return <path d="M 10 10 L 50 10 C 80 10, 95 30, 95 50 C 95 70, 80 90, 50 90 L 10 90 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 2 2 L 50 2 C 80 2, 98 25, 98 50 C 98 75, 80 98, 50 98 L 2 98 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'logic-or':
-        return <path d="M 10 10 C 25 30, 25 70, 10 90 C 50 90, 85 80, 95 50 C 85 20, 50 10, 10 10 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <path d="M 2 2 C 25 30, 25 70, 2 98 C 50 98, 85 90, 98 50 C 85 10, 50 2, 2 2 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'logic-not':
         return (
           <g>
-            <path d="M 10 15 L 75 50 L 10 85 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />
-            <circle cx="85" cy="50" r="8" fill={bg} stroke={border} strokeWidth={strokeWidth} />
+            <path d="M 2 10 L 80 50 L 2 90 Z" fill={bg} stroke={border} strokeWidth={strokeWidth} />
+            <circle cx="88" cy="50" r="10" fill={bg} stroke={border} strokeWidth={strokeWidth} />
           </g>
         );
 
       case 'rounded-rectangle':
-        return <rect x="5" y="20" width="90" height="60" rx="15" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <rect x="2" y="2" width="96" height="96" rx="15" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
 
       case 'rectangle':
       default:
-        return <rect x="5" y="20" width="90" height="60" rx="4" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
+        return <rect x="2" y="2" width="96" height="96" rx="4" fill={bg} stroke={border} strokeWidth={strokeWidth} />;
     }
   };
 
@@ -100,7 +101,7 @@ const NodeShape = ({
         height="100%" 
         viewBox={viewBox} 
         style={{ overflow: 'visible' }}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
       >
         {renderSvgShape()}
       </svg>

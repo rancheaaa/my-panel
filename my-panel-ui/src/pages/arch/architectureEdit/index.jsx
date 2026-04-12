@@ -322,6 +322,7 @@ const EditableEdge = React.memo(({
 
   // 处理控制点拖拽
   const onHandleDrag = (event, index) => {
+    if (resolvedEdgeType !== 'editable') return;
     if (event.button !== 0) return; // 只响应左键
     event.stopPropagation();
     const pane = document.querySelector('.react-flow__pane');
@@ -366,6 +367,7 @@ const EditableEdge = React.memo(({
 
   // 在连线中间点击并拖拽
   const onEdgeMouseDown = (event) => {
+    if (resolvedEdgeType !== 'editable') return;
     if (event.button !== 0) return; // 只响应左键
     
     // 如果是双击（短时间内两次点击），则不添加点，让 ReactFlow 处理 onEdgeDoubleClick
@@ -430,6 +432,7 @@ const EditableEdge = React.memo(({
 
   // 删除指定的控制点
   const onRemovePoint = (event, index) => {
+    if (resolvedEdgeType !== 'editable') return;
     event.stopPropagation();
     setEdges((eds) =>
       eds.map((edge) => {
@@ -519,8 +522,8 @@ const EditableEdge = React.memo(({
         </div>
       </EdgeLabelRenderer>
       
-      {/* 只有选中或悬浮时才显示控制点 */}
-      {(selected || isHovered) && (
+      {/* 只有选中或悬浮时才显示控制点，且只有可编辑折线才显示 */}
+      {(selected || isHovered) && resolvedEdgeType === 'editable' && (
         <EdgeLabelRenderer>
           <div 
             style={{ position: 'relative', zIndex: selected ? 1000 : 900 }}
@@ -564,10 +567,16 @@ const EditableEdge = React.memo(({
 // 自定义节点组件
 const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNodesProp, customNodeTypes = [] }) => {
   const nodeRef = useRef(null);
-  const { setNodes: rfSetNodes } = useReactFlow();
+  const { setNodes: rfSetNodes, getEdges } = useReactFlow();
   const setNodes = setNodesProp || rfSetNodes;
   const [keepAspectRatio, setKeepAspectRatio] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
+
+  // 检查节点是否有连接
+  const hasConnections = () => {
+    const edges = getEdges();
+    return edges.some(edge => edge.source === id || edge.target === id);
+  };
 
   const isDragging = dragging;
 
@@ -826,6 +835,54 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
     return positions[newIndex];
   };
 
+  // 计算锚点的样式，考虑节点旋转
+  const getHandleStyle = (position, handleColor, rotation) => {
+    const baseStyle = {
+      background: handleColor,
+      width: '14px',
+      height: '14px',
+      border: '2px solid #fff',
+      boxShadow: `0 1px 4px ${handleColor}66`,
+      cursor: 'crosshair',
+      zIndex: 1000,
+      margin: 0
+    };
+
+    // 根据位置设置基本定位
+    switch (position) {
+      case ReactFlowPosition.Top:
+        return {
+          ...baseStyle,
+          top: 0,
+          left: '50%',
+          transform: `translate(-50%, -50%)`
+        };
+      case ReactFlowPosition.Bottom:
+        return {
+          ...baseStyle,
+          bottom: 0,
+          left: '50%',
+          transform: `translate(-50%, 50%)`
+        };
+      case ReactFlowPosition.Left:
+        return {
+          ...baseStyle,
+          top: '50%',
+          left: 0,
+          transform: `translate(-50%, -50%)`
+        };
+      case ReactFlowPosition.Right:
+        return {
+          ...baseStyle,
+          top: '50%',
+          right: 0,
+          transform: `translate(50%, -50%)`
+        };
+      default:
+        return baseStyle;
+    }
+  };
+
   const rotation = data.rotation || 0;
   const isCurvedOrNarrowShape = isDiamond || isSkewed || shape === 'circle' || shape === 'hexagon' || shape === 'triangle' || shape === 'cloud';
   // 对于曲线/窄形状，限制内容宽度以避免溢出
@@ -854,7 +911,6 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
     boxSizing: 'border-box',
     gap: '0px',
     overflow: 'hidden',  // 防止内容溢出固定尺寸
-    padding: '8px 12px', // 减小内边距以适应 180x90 尺寸
   };
 
   // Apply inverse rotation to content wrapper if the node itself is rotated
@@ -951,14 +1007,20 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'grab',
+            cursor: hasConnections() ? 'not-allowed' : 'grab',
             zIndex: 100,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            opacity: hasConnections() ? 0.6 : 1
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setIsRotating(true);
+            if (hasConnections()) {
+              // 显示提示信息
+              message.error('有连接线的节点不可以旋转');
+            } else {
+              setIsRotating(true);
+            }
           }}
         >
           <SyncOutlined style={{ fontSize: 12, color: colors.border }} />
@@ -990,29 +1052,38 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
 
       {/* 内容包装器 */}
       <div style={contentWrapperStyle} className="node-content-inner">
-        {/* 第一行：图标 */}
+        {/* 第一行：图标和类型名称 */}
         <div style={{ 
           marginBottom: '6px', 
           flexShrink: 0,
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '8px'
         }}>
           {getNodeIcon(data.type)}
+          <span style={{
+            fontSize: '12px',
+            fontWeight: '500',
+            color: colors.desc,
+            whiteSpace: 'nowrap'
+          }}>
+            {customType?.name || data.type}
+          </span>
         </div>
         
         {/* 第二行：节点名称 */}
         <div style={{ 
-          fontWeight: '600', 
-          fontSize: '14px',
-          lineHeight: '1.4',
+          fontWeight: '700', 
+          fontSize: '20px',
+          lineHeight: '1.3',
           color: colors.text,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           maxWidth: '100%',
           flexShrink: 0,
-          marginBottom: '4px',
+          marginBottom: '6px',
           textAlign: 'center',
           padding: '0 12px'
         }}>
@@ -1059,8 +1130,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
                zIndex: 1000,
                top: '30%',
                left: 0,
-               transform: 'translate(-50%, -50%)',
-               margin: 0
+               transform: 'translate(-50%, -50%)'
              }}
              className="custom-handle"
            />
@@ -1078,8 +1148,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
                zIndex: 1000,
                top: '70%',
                left: 0,
-               transform: 'translate(-50%, -50%)',
-               margin: 0
+               transform: 'translate(-50%, -50%)'
              }}
              className="custom-handle"
            />
@@ -1097,8 +1166,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
                zIndex: 1000,
                top: '50%',
                right: 0,
-               transform: 'translate(50%, -50%)',
-               margin: 0
+               transform: 'translate(50%, -50%)'
              }}
              className="custom-handle"
            />
@@ -1117,11 +1185,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
               border: '2px solid #fff',
               boxShadow: `0 1px 4px ${handleColor}66`,
               cursor: 'crosshair',
-              zIndex: 1000,
-              top: 0,
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              margin: 0 // 消除默认 margin
+              zIndex: 1000
             }}
             className="custom-handle"
           />
@@ -1138,11 +1202,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
               border: '2px solid #fff',
               boxShadow: `0 1px 4px ${handleColor}66`,
               cursor: 'crosshair',
-              zIndex: 1000,
-              bottom: 0,
-              left: '50%',
-              transform: 'translate(-50%, 50%)',
-              margin: 0
+              zIndex: 1000
             }}
             className="custom-handle"
           />
@@ -1159,11 +1219,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
               border: '2px solid #fff',
               boxShadow: `0 1px 4px ${handleColor}66`,
               cursor: 'crosshair',
-              zIndex: 1000,
-              top: '50%',
-              left: 0,
-              transform: 'translate(-50%, -50%)',
-              margin: 0
+              zIndex: 1000
             }}
             className="custom-handle"
           />
@@ -1180,11 +1236,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
               border: '2px solid #fff',
               boxShadow: `0 1px 4px ${handleColor}66`,
               cursor: 'crosshair',
-              zIndex: 1000,
-              top: '50%',
-              right: 0,
-              transform: 'translate(50%, -50%)',
-              margin: 0
+              zIndex: 1000
             }}
             className="custom-handle"
           />
@@ -1193,44 +1245,6 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
     </div>
   );
 });
-
-// 悬浮提示组件，隔离鼠标移动导致的重渲染
-const HoverEditHint = ({ target, isVisible }) => {
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    if (target) {
-      setPos({ x: target.x || 0, y: target.y || 0 });
-    }
-  }, [target]);
-
-  useEffect(() => {
-    if (!isVisible || !target) return;
-
-    const onMouseMove = (event) => {
-      setPos({ x: event.clientX, y: event.clientY });
-    };
-
-    window.addEventListener('mousemove', onMouseMove, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-    };
-  }, [isVisible, target]);
-
-  if (!isVisible || !target) return null;
-
-  return (
-    <div
-      className="hover-edit-hint"
-      style={{
-        left: pos.x + 12,
-        top: pos.y + 12,
-      }}
-    >
-      {target.kind === 'node' ? '双击打开节点编辑' : '双击打开连线编辑'}
-    </div>
-  );
-};
 
 const ArchitectureFlow = () => {
   const { id: routeId } = useParams();
@@ -1253,12 +1267,11 @@ const ArchitectureFlow = () => {
   const connectSuccessful = React.useRef(false);
   const connectionActionRef = React.useRef(null);
   const [customNodeTypes, setCustomNodeTypes] = useState([]);
-  const [hoverHintTarget, setHoverHintTarget] = useState(null);
-  const [isHoverHintVisible, setIsHoverHintVisible] = useState(false);
-  const hoverHintTimerRef = React.useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   // 对齐辅助线相关状态
   const [alignmentLines, setAlignmentLines] = useState([]);
+  // 复制粘贴相关状态
+  const [copiedNode, setCopiedNode] = useState(null);
 
   const ALIGNMENT_THRESHOLD = 10; // 像素阈值，用于判断是否吸附
   const ALIGNMENT_LINE_COLOR = '#ff0072'; // 辅助线颜色
@@ -1316,8 +1329,8 @@ const ArchitectureFlow = () => {
         {
           element: '.custom-node-wrapper',
           popover: {
-            title: '切换连接点',
-            description: '每个节点上下左右均有连接点，您可以根据布局需要选择最合适的连接点进行连线。',
+            title: '复制粘贴节点',
+            description: '选择一个节点后，使用 Ctrl+C 复制，再使用 Ctrl+V 粘贴，可快速创建节点副本。新节点会自动偏移位置并添加"(副本)"后缀。',
             side: "left",
             align: 'center'
           }
@@ -1326,7 +1339,7 @@ const ArchitectureFlow = () => {
           element: '.header-toolbar',
           popover: {
             title: '工具栏功能',
-            description: '顶部工具栏提供了保存架构、发布架构、版本历史等核心功能，随时可以点击教程再次查看操作指引。',
+            description: '顶部工具栏提供了保存架构、发布架构、版本历史等核心功能。您也可以使用 Ctrl+S 快捷键快速保存架构图。随时可以点击教程再次查看操作指引。',
             side: "bottom",
             align: 'center'
           }
@@ -1388,33 +1401,6 @@ const ArchitectureFlow = () => {
     if (!savedSignatureRef.current) return false;
     return currentSignature !== savedSignatureRef.current;
   }, [currentSignature]);
-
-  useEffect(() => {
-    if (hoverHintTimerRef.current) {
-      clearTimeout(hoverHintTimerRef.current);
-      hoverHintTimerRef.current = null;
-    }
-    setIsHoverHintVisible(false);
-    
-    // 如果没有目标，或者目标已被选中，则不显示提示
-    if (!hoverHintTarget) return;
-
-    const isSelected = (hoverHintTarget.kind === 'node' && selectedNode?.id === hoverHintTarget.id) ||
-                       (hoverHintTarget.kind === 'edge' && selectedEdge?.id === hoverHintTarget.id);
-
-    if (isSelected) return;
-
-    hoverHintTimerRef.current = setTimeout(() => {
-      setIsHoverHintVisible(true);
-    }, 1000);
-
-    return () => {
-      if (hoverHintTimerRef.current) {
-        clearTimeout(hoverHintTimerRef.current);
-        hoverHintTimerRef.current = null;
-      }
-    };
-  }, [hoverHintTarget, selectedNode, selectedEdge]);
 
   // 加载节点类型
   const loadNodeTypes = useCallback(async () => {
@@ -1487,6 +1473,15 @@ const ArchitectureFlow = () => {
           } catch (e) {
             console.error('解析节点属性失败', e);
           }
+          
+          let nodeMeta = '';
+          try {
+            if (node.nodeMeta) {
+              nodeMeta = node.nodeMeta;
+            }
+          } catch (e) {
+            console.error('解析节点meta失败', e);
+          }
 
           const nodeType = node.nodeType || 'unknown';
           const customType = customNodeTypes.find(t => t.type === nodeType);
@@ -1509,7 +1504,8 @@ const ArchitectureFlow = () => {
               nodeProperties: properties,
               rotation: node.rotation || properties.rotation || 0,
               width: node.nodeWidth || customType?.defaultWidth || 180,
-              height: node.nodeHeight || customType?.defaultHeight || 180
+              height: node.nodeHeight || customType?.defaultHeight || 180,
+              nodeMeta: nodeMeta
             }
           };
         });
@@ -1950,29 +1946,141 @@ const ArchitectureFlow = () => {
           });
         }
       }
+
+      // 添加复制快捷键支持 (Ctrl+C)
+      if (event.ctrlKey && event.key === 'c') {
+        const selectedNodes = nodes.filter(n => n.selected);
+        if (selectedNodes.length === 1) {
+          setCopiedNode(selectedNodes[0]);
+          message.success('节点已复制');
+        } else if (selectedNodes.length > 1) {
+          message.warning('只能复制单个节点');
+        } else {
+          message.info('请先选择一个节点');
+        }
+      }
+
+      // 添加粘贴快捷键支持 (Ctrl+V)
+      if (event.ctrlKey && event.key === 'v') {
+        if (copiedNode) {
+          // 生成新的节点ID
+          const newNodeId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          // 构建新节点数据
+          const nodeData = {
+            diagramId: diagramId,
+            nodeName: `${copiedNode.data.name} (副本)`,
+            nodeCode: newNodeId,
+            nodeType: copiedNode.data.type,
+            positionX: copiedNode.position.x + 50,
+            positionY: copiedNode.position.y + 50,
+            ip: copiedNode.data.ip,
+            port: copiedNode.data.port,
+            status: copiedNode.data.status === 'running' ? '0' : '1',
+            remark: copiedNode.data.description,
+            config: copiedNode.data.config,
+            rotation: copiedNode.data.rotation || 0,
+            nodeWidth: copiedNode.data.width || 180,
+            nodeHeight: copiedNode.data.height || 180,
+            nodeProperties: JSON.stringify(copiedNode.data.nodeProperties || {}),
+            nodeMeta: copiedNode.data.nodeMeta || ''
+          };
+
+          setLoading(true);
+          try {
+            if (diagramId) {
+              addNode(nodeData).then(res => {
+                if (res.code === 200) {
+                  const serverNodeId = res.data.id.toString();
+                  createNewNode(serverNodeId);
+                } else {
+                  createNewNode(newNodeId);
+                }
+              }).catch(() => {
+                createNewNode(newNodeId);
+              }).finally(() => {
+                setLoading(false);
+              });
+            } else {
+              createNewNode(newNodeId);
+              setLoading(false);
+            }
+          } catch (error) {
+            console.error('粘贴节点失败:', error);
+            createNewNode(newNodeId);
+            setLoading(false);
+          }
+
+          // 创建新节点的辅助函数
+          function createNewNode(id) {
+            const newNode = {
+              id: id,
+              type: copiedNode.data.type,
+              position: {
+                x: copiedNode.position.x + 50,
+                y: copiedNode.position.y + 50
+              },
+              connectable: true,
+              width: copiedNode.data.width || 180,
+              height: copiedNode.data.height || 180,
+              data: {
+                ...copiedNode.data,
+                name: `${copiedNode.data.name} (副本)`,
+                nodeProperties: copiedNode.data.nodeProperties || {},
+                nodeMeta: copiedNode.data.nodeMeta || ''
+              }
+            };
+
+            setNodes((currentNodes) => [...currentNodes, newNode]);
+            message.success('节点已粘贴');
+          }
+        } else {
+          message.info('请先复制一个节点');
+        }
+      }
+
+      // 添加保存快捷键支持 (Ctrl+S)
+      if (event.ctrlKey && event.key === 's') {
+        event.preventDefault(); // 阻止默认的保存行为
+        handleSaveArchitecture();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isConnecting, nodes, edges, setNodes, setEdges]);
+  }, [isConnecting, nodes, edges, setNodes, setEdges, copiedNode, diagramId]);
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
   }, []);
 
-  const onNodeMouseEnter = useCallback((event, node) => {
-    setHoverHintTarget({ kind: 'node', id: node.id, x: event.clientX, y: event.clientY });
-  }, []);
-
-  const onNodeMouseLeave = useCallback(() => {
-    setHoverHintTarget(null);
-  }, []);
-
   const onNodeDoubleClick = useCallback((event, node) => {
     setSelectedNode(node);
     setIsDrawerOpen(true);
+    
+    let nodeMeta = [];
+    try {
+      if (node.data.nodeMeta) {
+        if (typeof node.data.nodeMeta === 'string') {
+          const parsed = JSON.parse(node.data.nodeMeta);
+          if (Array.isArray(parsed)) {
+            nodeMeta = parsed;
+          } else if (typeof parsed === 'object' && parsed !== null) {
+            nodeMeta = Object.entries(parsed).map(([key, value]) => ({ key, value }));
+          }
+        } else if (Array.isArray(node.data.nodeMeta)) {
+          nodeMeta = node.data.nodeMeta;
+        } else if (typeof node.data.nodeMeta === 'object' && node.data.nodeMeta !== null) {
+          nodeMeta = Object.entries(node.data.nodeMeta).map(([key, value]) => ({ key, value }));
+        }
+      }
+    } catch (e) {
+      console.error('解析nodeMeta失败:', e);
+      nodeMeta = [];
+    }
+    
     drawerForm.setFieldsValue({
       id: node.id,
       name: node.data.name,
@@ -1982,25 +2090,13 @@ const ArchitectureFlow = () => {
       status: node.data.status,
       rotation: node.data.rotation || 0,
       width: node.data.width || 180,
-      height: node.data.height || 180
+      height: node.data.height || 180,
+      nodeMeta
     });
   }, [drawerForm]);
 
   const onEdgeClick = useCallback((event, edge) => {
     setSelectedEdge(edge);
-  }, []);
-
-  const onEdgeMouseEnter = useCallback((event, edge) => {
-    setHoverHintTarget({ kind: 'edge', id: edge.id, x: event.clientX, y: event.clientY });
-    // 鼠标移入时，将该线段移到数组末尾，使其在 SVG 中渲染在最上层
-    setEdges((eds) => {
-      const otherEdges = eds.filter((e) => e.id !== edge.id);
-      return [...otherEdges, edge];
-    });
-  }, [setEdges]);
-
-  const onEdgeMouseLeave = useCallback(() => {
-    setHoverHintTarget(null);
   }, []);
 
   const getEdgeEffectValue = (edge) => {
@@ -2095,13 +2191,13 @@ const ArchitectureFlow = () => {
     const targetType = targetNode.data.type;
     
     let defaultLabel = '连接';
-    let defaultEdgeType = 'smoothstep';
+    let defaultEdgeType = 'default';
     let defaultStroke = '#1890ff';
     let defaultStrokeWidth = 2;
     
     if (sourceType === 'nginx' && targetType === 'my-panel') {
       defaultLabel = 'HTTP请求';
-      defaultEdgeType = 'smoothstep';
+      defaultEdgeType = 'default';
       defaultStroke = '#1890ff';
       defaultStrokeWidth = 3;
     }
@@ -2113,7 +2209,7 @@ const ArchitectureFlow = () => {
     }
     else if (sourceType === 'nginx' && targetType === 'proxy') {
       defaultLabel = '直接代理';
-      defaultEdgeType = 'straight';
+      defaultEdgeType = 'default';
       defaultStroke = '#fa8c16';
       defaultStrokeWidth = 2;
     }
@@ -2125,13 +2221,13 @@ const ArchitectureFlow = () => {
     }
     else if (sourceType === 'my-panel' && targetType === 'my-panel') {
       defaultLabel = '服务间调用';
-      defaultEdgeType = 'step';
+      defaultEdgeType = 'default';
       defaultStroke = '#eb2f96';
       defaultStrokeWidth = 2;
     }
     else if (sourceType === 'proxy' && targetType === 'proxy') {
       defaultLabel = '代理间通信';
-      defaultEdgeType = 'smoothstep';
+      defaultEdgeType = 'default';
       defaultStroke = '#13c2c2';
       defaultStrokeWidth = 2;
     }
@@ -2141,7 +2237,7 @@ const ArchitectureFlow = () => {
       
       if (customSourceType || customTargetType) {
         defaultLabel = '自定义连接';
-        defaultEdgeType = 'smoothstep';
+        defaultEdgeType = 'default';
         defaultStroke = customSourceType ? customSourceType.color : '#1890ff';
         defaultStrokeWidth = 2;
       }
@@ -2625,6 +2721,28 @@ const ArchitectureFlow = () => {
         : selectedNode.data.config
           ? JSON.stringify(selectedNode.data.config, null, 2)
           : '';
+      
+      let nodeMeta = [];
+      try {
+        if (selectedNode.data.nodeMeta) {
+          if (typeof selectedNode.data.nodeMeta === 'string') {
+            const parsed = JSON.parse(selectedNode.data.nodeMeta);
+            if (Array.isArray(parsed)) {
+              nodeMeta = parsed;
+            } else if (typeof parsed === 'object' && parsed !== null) {
+              nodeMeta = Object.entries(parsed).map(([key, value]) => ({ key, value }));
+            }
+          } else if (Array.isArray(selectedNode.data.nodeMeta)) {
+            nodeMeta = selectedNode.data.nodeMeta;
+          } else if (typeof selectedNode.data.nodeMeta === 'object' && selectedNode.data.nodeMeta !== null) {
+            nodeMeta = Object.entries(selectedNode.data.nodeMeta).map(([key, value]) => ({ key, value }));
+          }
+        }
+      } catch (e) {
+        console.error('解析nodeMeta失败:', e);
+        nodeMeta = [];
+      }
+      
       modalForm.setFieldsValue({
         type: selectedNode.data.type,
         id: selectedNode.id,
@@ -2636,7 +2754,8 @@ const ArchitectureFlow = () => {
         rotation: selectedNode.data.rotation || 0,
         width: selectedNode.data.width || 120,
         height: selectedNode.data.height || 80,
-        configContent
+        configContent,
+        nodeMeta
       });
       setCurrentNode(selectedNode);
       setIsModalOpen(true);
@@ -2822,8 +2941,20 @@ const ArchitectureFlow = () => {
 
   const handleModalOk = () => {
     modalForm.validateFields().then(async (values) => {
-      const { configContent, rotation, width, height, ...rest } = values;
+      const { configContent, rotation, width, height, nodeMeta, ...rest } = values;
       const configStr = typeof configContent === 'string' ? configContent : '';
+      
+      // 将nodeMeta数组转换为对象
+      let nodeMetaObj = {};
+      if (nodeMeta && Array.isArray(nodeMeta)) {
+        nodeMetaObj = nodeMeta.reduce((acc, item) => {
+          if (item.key && item.value !== undefined && item.value !== null) {
+            acc[item.key] = item.value;
+          }
+          return acc;
+        }, {});
+      }
+      const nodeMetaStr = Object.keys(nodeMetaObj).length > 0 ? JSON.stringify(nodeMetaObj) : '';
       
       // 构建节点属性对象
       const nodeProperties = {
@@ -2852,7 +2983,8 @@ const ArchitectureFlow = () => {
             rotation: rotation || 0,
             nodeWidth: width || 180,
             nodeHeight: height || 180,
-            nodeProperties: JSON.stringify(nodeProperties)
+            nodeProperties: JSON.stringify(nodeProperties),
+            nodeMeta: nodeMetaStr
           };
           
           if (diagramId) {
@@ -2873,7 +3005,8 @@ const ArchitectureFlow = () => {
                       nodeProperties: nodeProperties,
                       rotation: rotation,
                       width: width,
-                      height: height
+                      height: height,
+                      nodeMeta: nodeMetaStr
                     }
                   }
                 : node
@@ -2897,7 +3030,8 @@ const ArchitectureFlow = () => {
             rotation: rotation || 0,
             nodeWidth: width || 180,
             nodeHeight: height || 180,
-            nodeProperties: JSON.stringify(nodeProperties)
+            nodeProperties: JSON.stringify(nodeProperties),
+            nodeMeta: nodeMetaStr
           };
 
           let newNodeId = values.id || `node-${Date.now()}`;
@@ -2926,7 +3060,8 @@ const ArchitectureFlow = () => {
               nodeProperties: nodeProperties,
               rotation: rotation,
               width: width || customNodeTypes.find(t => t.type === rest.type)?.defaultWidth || 180,
-              height: height || customNodeTypes.find(t => t.type === rest.type)?.defaultHeight || 180
+              height: height || customNodeTypes.find(t => t.type === rest.type)?.defaultHeight || 180,
+              nodeMeta: nodeMetaStr
             }
           };
           setNodes((currentNodes) => [...currentNodes, newNode]);
@@ -2971,7 +3106,8 @@ const ArchitectureFlow = () => {
         port: node.data.port,
         status: node.data.status === 'running' ? '0' : '1',
         remark: node.data.description,
-        config: node.data.config
+        config: node.data.config,
+        nodeMeta: node.data.nodeMeta || ''
       }));
 
       // 3. 转换连线格式供后端保存
@@ -3527,11 +3663,7 @@ const ArchitectureFlow = () => {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
-          onNodeMouseEnter={onNodeMouseEnter}
-          onNodeMouseLeave={onNodeMouseLeave}
           onEdgeClick={onEdgeClick}
-          onEdgeMouseEnter={onEdgeMouseEnter}
-          onEdgeMouseLeave={onEdgeMouseLeave}
           onNodeDoubleClick={onNodeDoubleClick}
           onEdgeDoubleClick={onEdgeDoubleClick}
           onNodeDragStart={onNodeDragStart}
@@ -3622,7 +3754,6 @@ const ArchitectureFlow = () => {
           )}
         </ReactFlow>
         </Spin>
-        <HoverEditHint target={hoverHintTarget} isVisible={isHoverHintVisible} />
       </div>
 
       <Modal
@@ -3832,6 +3963,70 @@ const ArchitectureFlow = () => {
           </Row>
 
           <Divider />
+          <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>Meta属性</div>
+          <Form.List name="nodeMeta">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map(({ key, name, ...restField }) => (
+                  <div key={key} style={{ 
+                    display: 'flex', 
+                    gap: '8px', 
+                    marginBottom: '8px',
+                    alignItems: 'center'
+                  }}>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'key']}
+                      rules={[{ required: true, message: '请输入属性名' }]}
+                      style={{ flex: 1, marginBottom: 0 }}
+                    >
+                      <Input placeholder="属性名" size="large" />
+                    </Form.Item>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'value']}
+                      rules={[{ required: true, message: '请输入属性值' }]}
+                      style={{ flex: 1, marginBottom: 0 }}
+                    >
+                      <Input placeholder="属性值" size="large" />
+                    </Form.Item>
+                    <Button 
+                      danger 
+                      size="large"
+                      icon={<DeleteOutlined />}
+                      onClick={() => remove(name)}
+                    >
+                      删除
+                    </Button>
+                  </div>
+                ))}
+                {fields.length === 0 && (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    color: '#999',
+                    border: '1px dashed #d9d9d9',
+                    borderRadius: '4px',
+                    marginBottom: '12px'
+                  }}>
+                    暂无Meta属性，点击下方"添加属性"按钮添加
+                  </div>
+                )}
+                <Button 
+                  type="dashed" 
+                  onClick={() => add({ key: '', value: '' })}
+                  block 
+                  icon={<PlusOutlined />}
+                  size="large"
+                  style={{ marginBottom: '12px' }}
+                >
+                  添加属性
+                </Button>
+              </>
+            )}
+          </Form.List>
+
+          <Divider />
           <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>配置信息</div>
           <Upload.Dragger
             name="file"
@@ -4005,6 +4200,83 @@ const ArchitectureFlow = () => {
                 </Select>
               </Form.Item>
               
+              <div style={{ marginTop: '20px' }}>
+                <h4 style={{ 
+                  marginBottom: '12px', 
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#262626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>Meta属性</span>
+                  <Button 
+                    type="primary" 
+                    size="small" 
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      const currentMeta = drawerForm.getFieldValue('nodeMeta') || [];
+                      drawerForm.setFieldsValue({
+                        nodeMeta: [...currentMeta, { key: '', value: '' }]
+                      });
+                    }}
+                  >
+                    添加属性
+                  </Button>
+                </h4>
+                <Form.List name="nodeMeta">
+                  {(fields, { add, remove }) => (
+                    <>
+                      {fields.map(({ key, name, ...restField }) => (
+                        <div key={key} style={{ 
+                          display: 'flex', 
+                          gap: '8px', 
+                          marginBottom: '8px',
+                          alignItems: 'center'
+                        }}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'key']}
+                            rules={[{ required: true, message: '请输入属性名' }]}
+                            style={{ flex: 1, marginBottom: 0 }}
+                          >
+                            <Input placeholder="属性名" />
+                          </Form.Item>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'value']}
+                            rules={[{ required: true, message: '请输入属性值' }]}
+                            style={{ flex: 1, marginBottom: 0 }}
+                          >
+                            <Input placeholder="属性值" />
+                          </Form.Item>
+                          <Button 
+                            danger 
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            onClick={() => remove(name)}
+                          >
+                            删除
+                          </Button>
+                        </div>
+                      ))}
+                      {fields.length === 0 && (
+                        <div style={{ 
+                          textAlign: 'center', 
+                          padding: '20px', 
+                          color: '#999',
+                          border: '1px dashed #d9d9d9',
+                          borderRadius: '4px'
+                        }}>
+                          暂无Meta属性，点击上方"添加属性"按钮添加
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Form.List>
+              </div>
+              
               {selectedNode.data.config && (
                 <div style={{ marginTop: '20px' }}>
                   <h4 style={{ 
@@ -4098,30 +4370,66 @@ const ArchitectureFlow = () => {
             initialValue="bottom"
           >
             <Select size="large" placeholder="请选择源节点连接点">
-              <Option value="top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⬆️</span>
-                  <span>顶部（Top）</span>
-                </div>
-              </Option>
-              <Option value="bottom">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⬇️</span>
-                  <span>底部（Bottom）</span>
-                </div>
-              </Option>
-              <Option value="left">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⬅️</span>
-                  <span>左侧（Left）</span>
-                </div>
-              </Option>
-              <Option value="right">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>➡️</span>
-                  <span>右侧（Right）</span>
-                </div>
-              </Option>
+              {selectedEdge && (() => {
+                const sourceNode = nodes.find(node => node.id === selectedEdge.source);
+                const isLogicNode = sourceNode && 
+                  (sourceNode.data.type === 'logic-and' || 
+                   sourceNode.data.type === 'logic-or' || 
+                   sourceNode.data.type === 'logic-not');
+                if (isLogicNode) {
+                  return (
+                    <>
+                      <Option value="left-1">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬅️</span>
+                          <span>左侧1（Left-1）</span>
+                        </div>
+                      </Option>
+                      <Option value="left-2">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬅️</span>
+                          <span>左侧2（Left-2）</span>
+                        </div>
+                      </Option>
+                      <Option value="right">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>➡️</span>
+                          <span>右侧（Right）</span>
+                        </div>
+                      </Option>
+                    </>
+                  );
+                } else {
+                  return (
+                    <>
+                      <Option value="top">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬆️</span>
+                          <span>顶部（Top）</span>
+                        </div>
+                      </Option>
+                      <Option value="bottom">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬇️</span>
+                          <span>底部（Bottom）</span>
+                        </div>
+                      </Option>
+                      <Option value="left">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬅️</span>
+                          <span>左侧（Left）</span>
+                        </div>
+                      </Option>
+                      <Option value="right">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>➡️</span>
+                          <span>右侧（Right）</span>
+                        </div>
+                      </Option>
+                    </>
+                  );
+                }
+              })()}
             </Select>
           </Form.Item>
           
@@ -4132,30 +4440,66 @@ const ArchitectureFlow = () => {
             initialValue="top"
           >
             <Select size="large" placeholder="请选择目标节点连接点">
-              <Option value="top">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⬆️</span>
-                  <span>顶部（Top）</span>
-                </div>
-              </Option>
-              <Option value="bottom">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⬇️</span>
-                  <span>底部（Bottom）</span>
-                </div>
-              </Option>
-              <Option value="left">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⬅️</span>
-                  <span>左侧（Left）</span>
-                </div>
-              </Option>
-              <Option value="right">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>➡️</span>
-                  <span>右侧（Right）</span>
-                </div>
-              </Option>
+              {selectedEdge && (() => {
+                const targetNode = nodes.find(node => node.id === selectedEdge.target);
+                const isLogicNode = targetNode && 
+                  (targetNode.data.type === 'logic-and' || 
+                   targetNode.data.type === 'logic-or' || 
+                   targetNode.data.type === 'logic-not');
+                if (isLogicNode) {
+                  return (
+                    <>
+                      <Option value="left-1">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬅️</span>
+                          <span>左侧1（Left-1）</span>
+                        </div>
+                      </Option>
+                      <Option value="left-2">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬅️</span>
+                          <span>左侧2（Left-2）</span>
+                        </div>
+                      </Option>
+                      <Option value="right">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>➡️</span>
+                          <span>右侧（Right）</span>
+                        </div>
+                      </Option>
+                    </>
+                  );
+                } else {
+                  return (
+                    <>
+                      <Option value="top">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬆️</span>
+                          <span>顶部（Top）</span>
+                        </div>
+                      </Option>
+                      <Option value="bottom">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬇️</span>
+                          <span>底部（Bottom）</span>
+                        </div>
+                      </Option>
+                      <Option value="left">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>⬅️</span>
+                          <span>左侧（Left）</span>
+                        </div>
+                      </Option>
+                      <Option value="right">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>➡️</span>
+                          <span>右侧（Right）</span>
+                        </div>
+                      </Option>
+                    </>
+                  );
+                }
+              })()}
             </Select>
           </Form.Item>
           

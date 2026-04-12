@@ -345,20 +345,6 @@
   }
 }
 
-.hover-edit-hint {
-  position: fixed;
-  z-index: 3000;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.78);
-  color: rgba(255, 255, 255, 0.92);
-  font-size: 12px;
-  line-height: 1;
-  border-radius: 6px;
-  pointer-events: none;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-  white-space: nowrap;
-}
-
 .add-point-button {
   width: 20px;
   height: 20px;

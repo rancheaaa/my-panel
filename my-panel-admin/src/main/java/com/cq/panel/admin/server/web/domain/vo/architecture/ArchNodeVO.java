@@ -30,12 +30,6 @@ public class ArchNodeVO {
     @Schema(description = "节点类型 (用于前端展示)")
     private String nodeType;
 
-//    @Schema(description = "X坐标位置")
-//    private BigDecimal xPosition;
-//
-//    @Schema(description = "Y坐标位置")
-//    private BigDecimal yPosition;
-
     @Schema(description = "X坐标位置 (前端别名)")
     private BigDecimal positionX;
 

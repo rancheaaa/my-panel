@@ -1513,6 +1513,8 @@ const ArchitectureFlow = () => {
               x: node.positionX ?? node.xPosition ?? 0, 
               y: node.positionY ?? node.yPosition ?? 0 
             },
+            width: node.nodeWidth || customType?.defaultWidth || 180,
+            height: node.nodeHeight || customType?.defaultHeight || 180,
             data: {
               name: node.nodeName,
               type: nodeType,

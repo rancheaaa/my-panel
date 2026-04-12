@@ -196,7 +196,6 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (2100, '架构编排', 0, 6, 'architecture', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ApartmentOutlined', 'admin', NOW(), '', NULL, '架构编排目录'),
         (2101, '架构图管理', 2100, 1, 'arch-diagram', 'arch/architectureList/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
         (2102, '节点类型管理', 2100, 2, 'arch-node-type', 'arch/architectureNodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
-        (2103, '模板管理', 2100, 3, 'arch-template', 'arch/architectureTemplate/index', '', '', 1, 0, 'C', '0', '0', 'arch:template:list', 'template', 'admin', NOW(), '', NULL, '模板管理菜单'),
         (2104, '架构图查询', 2101, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:query', '#', 'admin', NOW(), '', NULL, ''),
         (2105, '架构图新增', 2101, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:add', '#', 'admin', NOW(), '', NULL, ''),
         (2106, '架构图修改', 2101, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:diagram:edit', '#', 'admin', NOW(), '', NULL, ''),
@@ -207,12 +206,8 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (2111, '节点类型查询', 2102, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:query', '#', 'admin', NOW(), '', NULL, ''),
         (2112, '节点类型新增', 2102, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:add', '#', 'admin', NOW(), '', NULL, ''),
         (2113, '节点类型修改', 2102, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:edit', '#', 'admin', NOW(), '', NULL, ''),
-        (2114, '节点类型删除', 2102, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, ''),
-        (2115, '模板查询', 2103, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:query', '#', 'admin', NOW(), '', NULL, ''),
-        (2116, '模板新增', 2103, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:add', '#', 'admin', NOW(), '', NULL, ''),
-        (2117, '模板修改', 2103, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:edit', '#', 'admin', NOW(), '', NULL, ''),
-        (2118, '模板删除', 2103, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:remove', '#', 'admin', NOW(), '', NULL, ''),
-        (2119, '模板使用', 2103, 5, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:template:use', '#', 'admin', NOW(), '', NULL, '');
+        (2114, '节点类型删除', 2102, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, '');
+
 
 INSERT IGNORE INTO `sys_notice` VALUES (1, '温馨提醒：2018-07-01 若依新版本发布啦', '2', X'e696b0e78988e69cace58685e5aeb9', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '管理员'),
        (2, '维护通知：2018-07-01 若依系统凌晨维护', '1', X'e7bbb4e68aa4e58685e5aeb9', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '管理员');
@@ -343,15 +338,7 @@ INSERT IGNORE INTO `sys_dict_data` VALUES (213, 1, '默认实线', 'default', 'a
        (216, 4, '双向箭头', 'bidirectional', 'arch_edge_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '双向箭头'),
        (217, 5, '曲线', 'curved', 'arch_edge_type', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '曲线');
 
--- 7. 字典类型：模板分类
-INSERT IGNORE INTO `sys_dict_type` VALUES (203, '模板分类', 'arch_template_category', '0', 'admin', NOW(), '', NULL, '模板分类列表');
 
--- 8. 字典数据：模板分类
-INSERT IGNORE INTO `sys_dict_data` VALUES (218, 1, '微服务架构', 'microservice', 'arch_template_category', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '微服务架构'),
-       (219, 2, '大数据架构', 'bigdata', 'arch_template_category', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '大数据架构'),
-       (220, 3, '传统架构', 'traditional', 'arch_template_category', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '传统架构'),
-       (221, 4, '云原生架构', 'cloudnative', 'arch_template_category', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '云原生架构'),
-       (222, 5, 'DevOps架构', 'devops', 'arch_template_category', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, 'DevOps架构');
 
 -- 9. 节点类型预置数据
 INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `category`, `default_width`, `default_height`, `default_style`, `default_properties`, `is_system`, `is_active`, `sort_order`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`, `remark`) VALUES
@@ -376,13 +363,7 @@ INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `ca
 (19, 'loadbalancer', '负载均衡', 'ControlOutlined', 'network', 180, 180, '{"backgroundColor":"#f9f0ff","borderColor":"#722ed1","borderWidth":2,"borderRadius":8,"color":"#262626"}', '{"algorithm":"roundRobin","backends":3,"rotation":0,"width":180,"height":180}', '1', '1', 19, 'admin', NOW(), 'admin', NOW(), '0', '网络-负载均衡'),
 (20, 'oss', '对象存储', 'FolderOpenOutlined', 'storage', 180, 180, '{"backgroundColor":"#e6fffb","borderColor":"#13c2c2","borderWidth":2,"borderRadius":8,"color":"#262626"}', '{"type":"MinIO","capacity":"1TB","buckets":10,"rotation":0,"width":180,"height":180}', '1', '1', 20, 'admin', NOW(), 'admin', NOW(), '0', '存储-对象存储');
 
--- 10. 架构图模板预置数据
-INSERT IGNORE INTO `arch_diagram_template` (`id`, `template_name`, `template_description`, `template_category`, `thumbnail`, `template_data`, `preview_image`, `tags`, `is_system`, `is_public`, `use_count`, `rating`, `rating_count`, `status`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`, `remark`) VALUES
-(1, '微服务基础架构', '包含网关、服务注册中心、配置中心、多个微服务实例的微服务基础架构模板', 'microservice', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '微服务,网关,注册中心,配置中心', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '微服务基础架构模板'),
-(2, '大数据处理架构', '包含数据采集、存储、处理、分析的大数据架构模板', 'bigdata', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '大数据,采集,存储,处理,分析', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '大数据处理架构模板'),
-(3, '传统三层架构', '包含表现层、业务逻辑层、数据访问层的传统三层架构模板', 'traditional', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '传统,三层架构,表现层,业务层,数据层', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '传统三层架构模板'),
-(4, '云原生架构', '基于Kubernetes的云原生架构模板，包含容器编排、服务网格、监控等', 'cloudnative', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, '云原生,Kubernetes,容器,服务网格,监控', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', '云原生架构模板'),
-(5, 'DevOps流水线', '包含代码仓库、CI/CD流水线、自动化测试、部署的DevOps架构模板', 'devops', NULL, '{"nodes":[],"edges":[],"groups":[]}', NULL, 'DevOps,CI/CD,自动化测试,部署', '1', '1', 0, '0.00', 0, '0', 'admin', NOW(), 'admin', NOW(), '0', 'DevOps流水线模板');
+
 
 -- 11. 架构图标签预置数据
 INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_color`, `tag_type`, `use_count`, `create_by`, `create_time`, `del_flag`, `remark`) VALUES

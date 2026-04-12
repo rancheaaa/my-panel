@@ -9,13 +9,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.Map;
 
 /**
  * 架构图版本管理Controller
  *
- * @author
+ * @author cq
  */
 @Slf4j
 @RestController

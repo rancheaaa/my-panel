@@ -155,14 +155,14 @@ const ArchitectureList = () => {
       align: 'center',
       render: (_, record) => (
         <Space size="middle">
-          <Tooltip title="编辑架构图">
+          <Tooltip title="进入架构图创作画布">
             <Button 
               type="text" 
               icon={<EditOutlined />} 
               onClick={() => navigate(`/arch/architectureEdit/${record.id}`)}
               style={{ color: '#1890ff' }}
             >
-              编辑
+              进入
             </Button>
           </Tooltip>
           <Tooltip title="发布架构图">

@@ -217,23 +217,23 @@
 .editable-edge-label-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: white;
-  padding: 4px 10px;
-  border-radius: 20px;
+  padding: 2px 6px;
+  border-radius: 12px;
   border: 1px solid #d9d9d9;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
   color: #595959;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   user-select: none;
   border: 2px solid transparent;
 
   &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
     border-color: #40a9ff;
     color: #1890ff;
 
@@ -256,8 +256,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 16px;
+    height: 16px;
     background: #f0f7ff;
     color: #1890ff;
     border-radius: 50%;

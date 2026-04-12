@@ -561,26 +561,7 @@ CREATE TABLE IF NOT EXISTS `arch_edge` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='边缘关系表';
 
 -- 6.5 架构图版本历史表
-CREATE TABLE IF NOT EXISTS `arch_diagram_history` (
-    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '历史ID',
-    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
-    `version` varchar(50) NOT NULL COMMENT '版本号',
-    `version_name` varchar(200) DEFAULT NULL COMMENT '版本名称',
-    `version_description` varchar(500) DEFAULT NULL COMMENT '版本描述',
-    `diagram_data` longtext COMMENT '完整架构图数据JSON',
-    `thumbnail` longtext COMMENT '缩略图Base64或URL',
-    `change_summary` varchar(1000) DEFAULT NULL COMMENT '变更摘要',
-    `change_type` varchar(50) DEFAULT 'update' COMMENT '变更类型（create/update/delete/restore）',
-    `is_current` char(1) DEFAULT '0' COMMENT '是否当前版本（0否 1是）',
-    `restore_count` int(11) DEFAULT 0 COMMENT '被恢复次数',
-    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
-    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
-    PRIMARY KEY (`id`),
-    KEY `idx_arch_diagram_id2` (`diagram_id`),
-    KEY `idx_arch_version` (`version`),
-    KEY `idx_arch_is_current` (`is_current`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本历史表';
+
 
 -- 6.6 架构图模板表
 CREATE TABLE IF NOT EXISTS `arch_diagram_template` (
@@ -763,3 +744,33 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_tag_rel` (
     UNIQUE KEY `uk_diagram_tag` (`diagram_id`, `tag_id`),
     KEY `idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图标签关联表';
+
+-- 6.15 架构图版本主表
+CREATE TABLE IF NOT EXISTS `arch_diagram_version` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '版本ID',
+    `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `version` varchar(50) NOT NULL COMMENT '版本号',
+    `version_name` varchar(200) DEFAULT NULL COMMENT '版本名称',
+    `version_description` varchar(500) DEFAULT NULL COMMENT '版本描述',
+    `change_summary` varchar(1000) DEFAULT NULL COMMENT '变更摘要',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `restore_count` int(11) DEFAULT 0 COMMENT '被恢复次数',
+    `is_current` char(1) DEFAULT '0' COMMENT '是否当前版本（0否 1是）',
+    PRIMARY KEY (`id`),
+    KEY `idx_diagram_id8` (`diagram_id`),
+    KEY `idx_version8` (`version`),
+    KEY `idx_is_current8` (`is_current`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本主表';
+
+-- 6.16 架构图版本数据表
+CREATE TABLE IF NOT EXISTS `arch_diagram_version_data` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '数据ID',
+    `version_id` bigint(20) NOT NULL COMMENT '版本ID',
+    `data_type` varchar(50) NOT NULL COMMENT '数据类型（nodes/edges）',
+    `data_content` longtext NOT NULL COMMENT '数据内容（JSON格式）',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_version_id9` (`version_id`),
+    KEY `idx_data_type9` (`data_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本数据表';

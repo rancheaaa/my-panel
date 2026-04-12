@@ -4,7 +4,7 @@ import com.cq.panel.admin.server.repository.domain.ArchDiagram;
 import com.cq.panel.admin.server.repository.domain.ArchNode;
 import com.cq.panel.admin.server.repository.domain.ArchEdge;
 import com.cq.panel.admin.server.repository.domain.ArchNodeType;
-import com.cq.panel.admin.server.repository.domain.ArchDiagramHistory;
+
 import com.cq.panel.admin.server.repository.domain.ArchDiagramTemplate;
 import com.cq.panel.admin.server.repository.domain.ArchNodeGroup;
 import com.cq.panel.admin.server.repository.domain.ArchDiagramShare;
@@ -16,7 +16,7 @@ import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramDTO;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchNodeDTO;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchEdgeDTO;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchNodeTypeDTO;
-import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramHistoryDTO;
+
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramTemplateDTO;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchNodeGroupDTO;
 import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramShareDTO;
@@ -28,7 +28,7 @@ import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchNodeVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchEdgeVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchNodeTypeVO;
-import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramHistoryVO;
+
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramTemplateVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchNodeGroupVO;
 import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramShareVO;
@@ -73,10 +73,7 @@ public interface ArchConverter {
     List<ArchNodeType> toNodeTypeEntityList(List<ArchNodeTypeDTO> dtoList);
     List<ArchNodeTypeVO> toNodeTypeVOList(List<ArchNodeType> entityList);
 
-    ArchDiagramHistory toEntity(ArchDiagramHistoryDTO dto);
-    ArchDiagramHistoryVO toHistoryVO(ArchDiagramHistory entity);
-    List<ArchDiagramHistory> toHistoryEntityList(List<ArchDiagramHistoryDTO> dtoList);
-    List<ArchDiagramHistoryVO> toHistoryVOList(List<ArchDiagramHistory> entityList);
+
 
     ArchDiagramTemplate toEntity(ArchDiagramTemplateDTO dto);
     ArchDiagramTemplateVO toTemplateVO(ArchDiagramTemplate entity);

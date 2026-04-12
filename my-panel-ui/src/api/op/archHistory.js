@@ -1,34 +1,17 @@
 import request from '@/utils/request';
 
-// 查询版本历史列表
-export function listHistory(query) {
-  return request({
-    url: '/arch/history/list',
-    method: 'get',
-    params: query
-  });
-}
-
 // 查询架构图版本历史
 export function listHistoryByDiagramId(diagramId) {
   return request({
-    url: '/arch/history/diagram/' + diagramId,
-    method: 'get'
-  });
-}
-
-// 获取当前版本
-export function getCurrentVersion(diagramId) {
-  return request({
-    url: '/arch/history/current/' + diagramId,
+    url: '/api/arch/version/list/' + diagramId,
     method: 'get'
   });
 }
 
 // 获取版本详细信息
-export function getHistory(id) {
+export function getVersionDetail(versionId) {
   return request({
-    url: '/arch/history/' + id,
+    url: '/api/arch/version/detail/' + versionId,
     method: 'get'
   });
 }
@@ -36,24 +19,24 @@ export function getHistory(id) {
 // 创建版本快照
 export function createSnapshot(data) {
   return request({
-    url: '/arch/history/snapshot',
+    url: '/api/arch/version/create',
     method: 'post',
     params: data
   });
 }
 
 // 恢复到指定版本
-export function restoreVersion(historyId) {
+export function restoreVersion(versionId) {
   return request({
-    url: '/arch/history/restore/' + historyId,
+    url: '/api/arch/version/restore/' + versionId,
     method: 'post'
   });
 }
 
-// 删除版本历史
-export function delHistory(ids) {
+// 删除版本
+export function deleteVersion(versionId) {
   return request({
-    url: '/arch/history/' + ids,
+    url: '/api/arch/version/delete/' + versionId,
     method: 'delete'
   });
 }

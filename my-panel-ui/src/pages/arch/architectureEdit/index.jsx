@@ -15,7 +15,9 @@ import {
   Upload,
   Spin,
   Row,
-  Col
+  Col,
+  Card,
+  Switch
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -161,7 +163,7 @@ import {
   delEdge
 } from '@/api/op/architecture.js';
 import { listAllNodeType } from '@/api/op/archNodeType.js';
-import { listHistoryByDiagramId, createSnapshot, restoreVersion } from '@/api/op/archHistory.js';
+import { listHistoryByDiagramId, createSnapshot, restoreVersion, deleteVersion } from '@/api/op/archHistory.js';
 
 const { Option } = Select;
 
@@ -758,6 +760,12 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
+  
+  // 辅助函数：限制字符串长度
+  function truncateString(str, maxLength) {
+    if (!str || str.length <= maxLength) return str;
+    return str.substring(0, maxLength) + '...';
+  }
 
   // 计算形状样式 - 使用动态节点尺寸
   const getShapeStyle = () => {
@@ -1054,7 +1062,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
       <div style={contentWrapperStyle} className="node-content-inner">
         {/* 第一行：图标和类型名称 */}
         <div style={{ 
-          marginBottom: '6px', 
+          marginBottom: '6px',
           flexShrink: 0,
           display: 'flex',
           justifyContent: 'center',
@@ -1087,7 +1095,7 @@ const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNode
           textAlign: 'center',
           padding: '0 12px'
         }}>
-          {data.name}
+          {truncateString(data.name, 8)}
         </div>
         
         {/* 第三行：节点描述 */}
@@ -1256,6 +1264,7 @@ const ArchitectureFlow = () => {
   const [isEdgeModalOpen, setIsEdgeModalOpen] = useState(false);
   const [isConnectionModalOpen, setIsConnectionModalOpen] = useState(false);
   const [modalForm] = Form.useForm();
+  const [showNetworkInfo, setShowNetworkInfo] = useState(false);
   const [drawerForm] = Form.useForm();
   const [edgeForm] = Form.useForm();
   const [connectionForm] = Form.useForm();
@@ -1336,6 +1345,15 @@ const ArchitectureFlow = () => {
           }
         },
         {
+          element: '.react-flow__pane',
+          popover: {
+            title: '框选多个元素',
+            description: '按住 Shift 键并拖动鼠标左键，可以框选多个节点或连线，方便进行批量操作。',
+            side: "bottom",
+            align: 'start'
+          }
+        },
+        {
           element: '.header-toolbar',
           popover: {
             title: '工具栏功能',
@@ -1376,6 +1394,8 @@ const ArchitectureFlow = () => {
   const updateSignature = useCallback(() => {
     setCurrentSignature(buildDiagramSignature(architectureName, nodes, edges));
   }, [architectureName, nodes, edges]);
+  
+
 
   // 当名称改变或节点/连线数量改变时更新签名（排除拖拽中的坐标变化）
   useEffect(() => {
@@ -2697,11 +2717,17 @@ const ArchitectureFlow = () => {
 
   const handleAddNode = () => {
     modalForm.resetFields();
+    setShowNetworkInfo(false);
     const firstType = customNodeTypes.length > 0 ? customNodeTypes[0] : null;
+    const timestamp = Date.now();
+    const defaultType = firstType ? firstType.type : 'general';
+    const defaultTypeName = firstType ? firstType.name : '通用节点';
+    
     modalForm.setFieldsValue({
-      type: firstType ? firstType.type : '',
-      name: '',
-      description: '',
+      type: defaultType,
+      id: `${defaultType.replace('-', '')}-${timestamp}`,
+      name: `${defaultTypeName}-${timestamp}`,
+      description: `这是一个${defaultTypeName}`,
       ip: '',
       port: 80,
       status: 'running',
@@ -2742,6 +2768,10 @@ const ArchitectureFlow = () => {
         console.error('解析nodeMeta失败:', e);
         nodeMeta = [];
       }
+      
+      // 检查节点是否有网络信息
+      const hasNetworkInfo = selectedNode.data.ip || selectedNode.data.port || selectedNode.data.status;
+      setShowNetworkInfo(hasNetworkInfo);
       
       modalForm.setFieldsValue({
         type: selectedNode.data.type,
@@ -2975,9 +3005,6 @@ const ArchitectureFlow = () => {
             nodeName: rest.name,
             nodeCode: rest.id,
             nodeType: rest.type,
-            ip: rest.ip,
-            port: rest.port,
-            status: rest.status === 'running' ? '0' : '1',
             remark: rest.description,
             config: configStr,
             rotation: rotation || 0,
@@ -2986,6 +3013,13 @@ const ArchitectureFlow = () => {
             nodeProperties: JSON.stringify(nodeProperties),
             nodeMeta: nodeMetaStr
           };
+          
+          // 只有当显示网络信息时才包含IP、端口和状态
+          if (rest.showNetworkInfo) {
+            nodeData.ip = rest.ip;
+            nodeData.port = rest.port;
+            nodeData.status = rest.status === 'running' ? '0' : '1';
+          }
           
           if (diagramId) {
             await updateNode(nodeData);
@@ -3022,9 +3056,6 @@ const ArchitectureFlow = () => {
             nodeType: rest.type,
             positionX: 400,
             positionY: 400,
-            ip: rest.ip,
-            port: rest.port,
-            status: rest.status === 'running' ? '0' : '1',
             remark: rest.description,
             config: configStr,
             rotation: rotation || 0,
@@ -3033,6 +3064,13 @@ const ArchitectureFlow = () => {
             nodeProperties: JSON.stringify(nodeProperties),
             nodeMeta: nodeMetaStr
           };
+          
+          // 只有当显示网络信息时才包含IP、端口和状态
+          if (rest.showNetworkInfo) {
+            nodeData.ip = rest.ip;
+            nodeData.port = rest.port;
+            nodeData.status = rest.status === 'running' ? '0' : '1';
+          }
 
           let newNodeId = values.id || `node-${Date.now()}`;
           if (diagramId) {
@@ -3160,98 +3198,7 @@ const ArchitectureFlow = () => {
     }
   };
 
-  const handleAutoLayout = () => {
-    if (nodes.length === 0) {
-      message.warning('没有节点可以布局');
-      return;
-    }
 
-    Modal.confirm({
-      title: '确认自动布局',
-      content: '自动布局将重新排列所有节点的位置，确定要继续吗？',
-      onOk: () => {
-        const layoutNodes = (nodes, edges) => {
-          if (nodes.length === 0) return nodes;
-
-          const nodeMap = new Map();
-          nodes.forEach(node => nodeMap.set(node.id, { ...node, children: [], parents: [] }));
-
-          edges.forEach(edge => {
-            const source = nodeMap.get(edge.source);
-            const target = nodeMap.get(edge.target);
-            if (source && target) {
-              source.children.push(target.id);
-              target.parents.push(source.id);
-            }
-          });
-
-          const levels = [];
-          const visited = new Set();
-          const inProgress = new Set();
-
-          const getLevel = (nodeId) => {
-            if (visited.has(nodeId)) return nodeMap.get(nodeId).level;
-            if (inProgress.has(nodeId)) return 0;
-
-            inProgress.add(nodeId);
-            const node = nodeMap.get(nodeId);
-            
-            let maxParentLevel = -1;
-            for (const parentId of node.parents) {
-              maxParentLevel = Math.max(maxParentLevel, getLevel(parentId));
-            }
-
-            node.level = maxParentLevel + 1;
-            inProgress.delete(nodeId);
-            visited.add(nodeId);
-            return node.level;
-          };
-
-          nodes.forEach(node => {
-            if (!visited.has(node.id)) {
-              getLevel(node.id);
-            }
-          });
-
-          nodeMap.forEach(node => {
-            if (!levels[node.level]) {
-              levels[node.level] = [];
-            }
-            levels[node.level].push(node);
-          });
-
-          const NODE_WIDTH = 200;
-          const NODE_HEIGHT = 120;
-          const LEVEL_GAP = 300;
-          const NODE_GAP = 200;
-          const START_X = 100;
-          const START_Y = 50;
-
-          const positionedNodes = [];
-          levels.forEach((levelNodes, levelIndex) => {
-            const levelWidth = levelNodes.length * (NODE_WIDTH + NODE_GAP) - NODE_GAP;
-            const startX = START_X + (2000 - levelWidth) / 2;
-
-            levelNodes.forEach((node, nodeIndex) => {
-              positionedNodes.push({
-                ...node,
-                position: {
-                  x: startX + nodeIndex * (NODE_WIDTH + NODE_GAP),
-                  y: START_Y + levelIndex * (NODE_HEIGHT + LEVEL_GAP)
-                }
-              });
-            });
-          });
-
-          return positionedNodes;
-        };
-
-        const newNodes = layoutNodes(nodes, edges);
-        setNodes(newNodes);
-        message.success('自动布局完成');
-      }
-    });
-  };
 
   const handleRefresh = () => {
     Modal.confirm({
@@ -3337,7 +3284,33 @@ const ArchitectureFlow = () => {
         }
       }
     });
-  };
+  }; 
+
+  const handleDeleteVersion = async (versionId, version) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除版本 ${version} 吗？此操作不可撤销。`,
+      onOk: async () => {
+        setLoading(true);
+        try {
+          const res = await deleteVersion(versionId);
+          if (res.code === 200) {
+            message.success('版本删除成功');
+            // 立即刷新版本历史列表
+            const historyRes = await listHistoryByDiagramId(diagramId);
+            if (historyRes.code === 200) {
+              setHistoryList(historyRes.data);
+            }
+          }
+        } catch (error) {
+          console.error(error);
+          message.error('删除版本失败');
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  }; 
 
   const handleDrawerClose = () => {
     setIsDrawerOpen(false);
@@ -3572,14 +3545,6 @@ const ArchitectureFlow = () => {
             className="toolbar-button primary"
           >
             新增节点
-          </Button>
-          <Button 
-            icon={<ApartmentOutlined />} 
-            onClick={handleAutoLayout}
-            size="large"
-            className="toolbar-button"
-          >
-            自动布局
           </Button>
           <Button 
             icon={<SaveOutlined />} 
@@ -3873,36 +3838,51 @@ const ArchitectureFlow = () => {
           </Form.Item>
           
           <Form.Item
-            name="ip"
-            label="IP地址"
-            rules={[{ required: true, message: '请输入IP地址' }]}
+            label="网络信息"
           >
-            <Input size="large" placeholder="请输入IP地址" />
+            <Switch 
+              size="large" 
+              checkedChildren="显示" 
+              unCheckedChildren="隐藏" 
+              checked={showNetworkInfo}
+              onChange={(checked) => {
+                setShowNetworkInfo(checked);
+              }}
+            />
           </Form.Item>
           
-          <Form.Item
-            name="port"
-            label="端口"
-            rules={[{ required: true, message: '请输入端口' }]}
-          >
-            <InputNumber size="large" placeholder="请输入端口号" min={1} max={65535} style={{ width: '100%' }} />
-          </Form.Item>
-          
-          <Form.Item
-            name="status"
-            label="状态"
-            rules={[{ required: true, message: '请选择状态' }]}
-            initialValue="running"
-          >
-            <Select size="large">
-              <Option value="running">
-                <Tag color="green">运行中</Tag>
-              </Option>
-              <Option value="stopped">
-                <Tag color="red">已停止</Tag>
-              </Option>
-            </Select>
-          </Form.Item>
+          {showNetworkInfo && (
+            <>
+              <Form.Item
+                name="ip"
+                label="IP地址"
+              >
+                <Input size="large" placeholder="请输入IP地址" />
+              </Form.Item>
+              
+              <Form.Item
+                name="port"
+                label="端口"
+              >
+                <InputNumber size="large" placeholder="请输入端口号" min={1} max={65535} style={{ width: '100%' }} />
+              </Form.Item>
+              
+              <Form.Item
+                name="status"
+                label="状态"
+                initialValue="running"
+              >
+                <Select size="large">
+                  <Option value="running">
+                    <Tag color="green">运行中</Tag>
+                  </Option>
+                  <Option value="stopped">
+                    <Tag color="red">已停止</Tag>
+                  </Option>
+                </Select>
+              </Form.Item>
+            </>
+          )}
 
           <Divider />
           <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>显示设置</div>
@@ -4944,14 +4924,25 @@ const ArchitectureFlow = () => {
                   </div>
                 }
                 extra={
-                  <Button 
-                    type="link" 
-                    size="small" 
-                    onClick={() => handleRestoreVersion(item.id)}
-                    disabled={item.isCurrent === '1'}
-                  >
-                    恢复此版本
-                  </Button>
+                  <Space size="small">
+                    <Button 
+                      type="link" 
+                      size="small" 
+                      onClick={() => handleRestoreVersion(item.id)}
+                      disabled={item.isCurrent === '1'}
+                    >
+                      恢复此版本
+                    </Button>
+                    <Button 
+                      type="link" 
+                      size="small" 
+                      danger
+                      onClick={() => handleDeleteVersion(item.id, item.version)}
+                      disabled={item.isCurrent === '1'}
+                    >
+                      删除
+                    </Button>
+                  </Space>
                 }
               >
                 <div style={{ fontSize: '12px', color: '#666' }}>

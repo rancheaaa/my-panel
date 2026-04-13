@@ -35,6 +35,14 @@ public interface IArchDiagramTagRelService
     List<Long> selectDiagramIdsByTagId(Long tagId);
 
     /**
+     * 通过节点ID查询关联的标签ID列表
+     * 
+     * @param nodeId 节点ID
+     * @return 标签ID列表
+     */
+    List<Long> selectTagIdsByNodeId(Long nodeId);
+
+    /**
      * 新增架构图标签关联信息
      * 
      * @param archDiagramTagRel 架构图标签关联信息
@@ -81,4 +89,12 @@ public interface IArchDiagramTagRelService
      * @return 结果
      */
     int deleteArchDiagramTagRelByTagId(Long tagId);
+
+    /**
+     * 通过节点ID删除所有关联
+     * 
+     * @param nodeId 节点ID
+     * @return 结果
+     */
+    int deleteArchDiagramTagRelByNodeId(Long nodeId);
 }

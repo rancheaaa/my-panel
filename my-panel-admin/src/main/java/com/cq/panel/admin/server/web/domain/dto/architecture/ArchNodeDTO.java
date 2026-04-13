@@ -71,6 +71,9 @@ public class ArchNodeDTO {
     @Schema(description = "配置信息 (前端传参)")
     private String config;
 
+    @Schema(description = "标签信息 (前端传参)")
+    private String tags;
+
     @Schema(description = "节点元数据（扩展属性）JSON")
     private String nodeMeta;
 

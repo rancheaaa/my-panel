@@ -73,13 +73,7 @@ public interface IArchDiagramTagService
      */
     int deleteArchDiagramTagByIds(Long[] ids);
 
-    /**
-     * 增加标签使用次数
-     * 
-     * @param id 标签ID
-     * @return 结果
-     */
-    int incrementUseCount(Long id);
+
 
     /**
      * 校验标签名称是否唯一

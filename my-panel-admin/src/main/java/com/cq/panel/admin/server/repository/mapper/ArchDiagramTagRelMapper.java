@@ -35,6 +35,14 @@ public interface ArchDiagramTagRelMapper
     public List<Long> selectDiagramIdsByTagId(Long tagId);
 
     /**
+     * 通过节点ID查询关联的标签ID列表
+     * 
+     * @param nodeId 节点ID
+     * @return 标签ID列表
+     */
+    public List<Long> selectTagIdsByNodeId(Long nodeId);
+
+    /**
      * 通过关联ID删除架构图标签关联信息
      * 
      * @param id 关联ID
@@ -65,6 +73,14 @@ public interface ArchDiagramTagRelMapper
      * @return 结果
      */
     public int deleteArchDiagramTagRelByTagId(Long tagId);
+
+    /**
+     * 通过节点ID删除所有关联
+     * 
+     * @param nodeId 节点ID
+     * @return 结果
+     */
+    public int deleteArchDiagramTagRelByNodeId(Long nodeId);
 
     /**
      * 新增架构图标签关联信息

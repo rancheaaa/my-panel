@@ -82,6 +82,14 @@ public interface ArchDiagramTagMapper
     public int incrementUseCount(Long id);
 
     /**
+     * 减少标签使用次数
+     * 
+     * @param id 标签ID
+     * @return 结果
+     */
+    public int decrementUseCount(Long id);
+
+    /**
      * 校验标签名称是否唯一
      * 
      * @param archDiagramTag 架构图标签信息

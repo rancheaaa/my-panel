@@ -206,7 +206,12 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (2111, '节点类型查询', 2102, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:query', '#', 'admin', NOW(), '', NULL, ''),
         (2112, '节点类型新增', 2102, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:add', '#', 'admin', NOW(), '', NULL, ''),
         (2113, '节点类型修改', 2102, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:edit', '#', 'admin', NOW(), '', NULL, ''),
-        (2114, '节点类型删除', 2102, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, '');
+        (2114, '节点类型删除', 2102, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:nodeType:remove', '#', 'admin', NOW(), '', NULL, ''),
+        (2103, '节点标签管理', 2100, 3, 'arch-tag', 'arch/architectureTag/index', '', '', 1, 0, 'C', '0', '0', 'arch:tag:list', 'tag', 'admin', NOW(), '', NULL, '节点标签管理菜单'),
+        (2115, '标签查询', 2103, 1, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:tag:query', '#', 'admin', NOW(), '', NULL, ''),
+        (2116, '标签新增', 2103, 2, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:tag:add', '#', 'admin', NOW(), '', NULL, ''),
+        (2117, '标签修改', 2103, 3, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:tag:edit', '#', 'admin', NOW(), '', NULL, ''),
+        (2118, '标签删除', 2103, 4, '', '', '', '', 1, 0, 'F', '0', '0', 'arch:tag:remove', '#', 'admin', NOW(), '', NULL, '');
 
 
 INSERT IGNORE INTO `sys_notice` VALUES (1, '温馨提醒：2018-07-01 若依新版本发布啦', '2', X'e696b0e78988e69cace58685e5aeb9', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '管理员'),
@@ -340,6 +345,11 @@ INSERT IGNORE INTO `sys_dict_data` VALUES (213, 1, '默认实线', 'default', 'a
 
 
 
+-- 8. 架构图标签预置数据
+INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_default_value`, `tag_color`, `tag_type`, `create_by`, `create_time`, `del_flag`, `remark`) VALUES
+(1, '状态', '待运行',  '#1890ff', 'system', 'admin', NOW(), '0', '系统内置状态标签，例如 待运行 初始化 运行中 成功 失败 暂停等'),
+(2, '进度', '0%',  '#52c41a', 'system', 'admin', NOW(), '0', '系统内置进度标签，例如0% 33% 78% 100%等');
+
 -- 9. 节点类型预置数据
 INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `category`, `default_width`, `default_height`, `default_style`, `default_properties`, `is_system`, `is_active`, `sort_order`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`, `remark`) VALUES
 (1, 'server', '服务器', 'server', 'infrastructure', 180, 180, '{"backgroundColor":"#f0f5ff","borderColor":"#2f54eb","borderWidth":2,"borderRadius":8,"color":"#262626"}', '{"cpu":"4核","memory":"8GB","disk":"100GB","rotation":0,"width":180,"height":180}', '1', '1', 1, 'admin', NOW(), 'admin', NOW(), '0', '基础设施-服务器'),
@@ -362,21 +372,6 @@ INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `ca
 (18, 'firewall', '防火墙', 'SafetyCertificateOutlined', 'security', 180, 180, '{"backgroundColor":"#fff1f0","borderColor":"#f5222d","borderWidth":2,"borderRadius":8,"color":"#262626"}', '{"type":"iptables","rules":50,"rotation":0,"width":180,"height":180}', '1', '1', 18, 'admin', NOW(), 'admin', NOW(), '0', '安全-防火墙'),
 (19, 'loadbalancer', '负载均衡', 'ControlOutlined', 'network', 180, 180, '{"backgroundColor":"#f9f0ff","borderColor":"#722ed1","borderWidth":2,"borderRadius":8,"color":"#262626"}', '{"algorithm":"roundRobin","backends":3,"rotation":0,"width":180,"height":180}', '1', '1', 19, 'admin', NOW(), 'admin', NOW(), '0', '网络-负载均衡'),
 (20, 'oss', '对象存储', 'FolderOpenOutlined', 'storage', 180, 180, '{"backgroundColor":"#e6fffb","borderColor":"#13c2c2","borderWidth":2,"borderRadius":8,"color":"#262626"}', '{"type":"MinIO","capacity":"1TB","buckets":10,"rotation":0,"width":180,"height":180}', '1', '1', 20, 'admin', NOW(), 'admin', NOW(), '0', '存储-对象存储');
-
-
-
--- 11. 架构图标签预置数据
-INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_color`, `tag_type`, `use_count`, `create_by`, `create_time`, `del_flag`, `remark`) VALUES
-(1, '生产环境', '#f5222d', 'system', 0, 'admin', NOW(), '0', '生产环境标签'),
-(2, '测试环境', '#faad14', 'system', 0, 'admin', NOW(), '0', '测试环境标签'),
-(3, '开发环境', '#52c41a', 'system', 0, 'admin', NOW(), '0', '开发环境标签'),
-(4, '高可用', '#1890ff', 'system', 0, 'admin', NOW(), '0', '高可用标签'),
-(5, '高性能', '#722ed1', 'system', 0, 'admin', NOW(), '0', '高性能标签'),
-(6, '安全', '#eb2f96', 'system', 0, 'admin', NOW(), '0', '安全标签'),
-(7, '微服务', '#13c2c2', 'system', 0, 'admin', NOW(), '0', '微服务标签'),
-(8, '大数据', '#fa541c', 'system', 0, 'admin', NOW(), '0', '大数据标签'),
-(9, '云原生', '#2f54eb', 'system', 0, 'admin', NOW(), '0', '云原生标签'),
-(10, 'DevOps', '#a0d911', 'system', 0, 'admin', NOW(), '0', 'DevOps标签');
 
 -- ----------------------------
 -- 13. 架构图节点类型扩展

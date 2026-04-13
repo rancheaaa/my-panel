@@ -1,7 +1,6 @@
 package com.cq.panel.admin.server.repository.domain;
 
 import com.cq.panel.admin.server.common.annotation.Excel;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -38,9 +37,10 @@ public class ArchDiagramTag extends BaseEntity
     @Excel(name = "标签类型", readConverterExp = "system=系统,custom=自定义")
     private String tagType;
 
-    /** 使用次数 */
-    @Excel(name = "使用次数")
-    private Integer useCount;
+    /** 标签默认值 */
+    @Excel(name = "标签默认值")
+    @Size(max = 255, message = "标签默认值不能超过255个字符")
+    private String tagDefaultValue;
 
     /** 删除标志（0存在 1删除） */
     private String delFlag;

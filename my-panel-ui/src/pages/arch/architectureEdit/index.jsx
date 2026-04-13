@@ -50,7 +50,8 @@ import {
   DesktopOutlined,
   SecurityScanOutlined,
   NodeIndexOutlined,
-  DeploymentUnitOutlined
+  DeploymentUnitOutlined,
+  CopyOutlined
 } from '@ant-design/icons';
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
@@ -164,6 +165,7 @@ import {
 } from '@/api/op/architecture.js';
 import { listAllNodeType } from '@/api/op/archNodeType.js';
 import { listHistoryByDiagramId, createSnapshot, restoreVersion, deleteVersion } from '@/api/op/archHistory.js';
+import { getAllTags } from '@/api/op/archTag.js';
 
 const { Option } = Select;
 
@@ -1281,6 +1283,12 @@ const ArchitectureFlow = () => {
   const [alignmentLines, setAlignmentLines] = useState([]);
   // 复制粘贴相关状态
   const [copiedNode, setCopiedNode] = useState(null);
+  // 标签相关状态
+  const [tags, setTags] = useState([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+  const [nodeTags, setNodeTags] = useState([]);
+  const [currentTags, setCurrentTags] = useState([]);
+  const tagSelectRef = useRef(null);
 
   const ALIGNMENT_THRESHOLD = 10; // 像素阈值，用于判断是否吸附
   const ALIGNMENT_LINE_COLOR = '#ff0072'; // 辅助线颜色
@@ -1463,6 +1471,22 @@ const ArchitectureFlow = () => {
     }
   }, []);
 
+  // 加载所有标签
+  const loadTags = useCallback(async () => {
+    setLoadingTags(true);
+    try {
+      const response = await getAllTags();
+      if (response.code === 200) {
+        setTags(response.data || []);
+      }
+    } catch (error) {
+      console.error('加载标签失败:', error);
+      message.error('加载标签失败');
+    } finally {
+      setLoadingTags(false);
+    }
+  }, []);
+
   // 加载架构图数据
   const loadData = useCallback(async (id) => {
     if (!id) {
@@ -1519,7 +1543,7 @@ const ArchitectureFlow = () => {
               name: node.nodeName,
               type: nodeType,
               description: node.description || node.remark,
-              status: node.status === '0' ? 'running' : 'stopped',
+              status: properties.status || (node.status ? (node.status === '0' ? 'running' : 'stopped') : ''),
               ip: properties.ip || node.ip,
               port: properties.port || node.port,
               config: properties.config || node.config,
@@ -1923,8 +1947,9 @@ const ArchitectureFlow = () => {
 
   useEffect(() => {
     loadNodeTypes();
+    loadTags();
     loadData(diagramId);
-  }, [loadNodeTypes, loadData, diagramId]);
+  }, [loadNodeTypes, loadTags, loadData, diagramId]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -2004,7 +2029,11 @@ const ArchitectureFlow = () => {
             rotation: copiedNode.data.rotation || 0,
             nodeWidth: copiedNode.data.width || 180,
             nodeHeight: copiedNode.data.height || 180,
-            nodeProperties: JSON.stringify(copiedNode.data.nodeProperties || {}),
+            nodeProperties: JSON.stringify(Object.fromEntries(
+              Object.entries(copiedNode.data.nodeProperties || {}).filter(
+                ([key]) => !['rotation', 'nodeWidth', 'nodeHeight'].includes(key)
+              )
+            ) || {}),
             nodeMeta: copiedNode.data.nodeMeta || ''
           };
 
@@ -2048,7 +2077,11 @@ const ArchitectureFlow = () => {
               data: {
                 ...copiedNode.data,
                 name: `${copiedNode.data.name} (副本)`,
-                nodeProperties: copiedNode.data.nodeProperties || {},
+                nodeProperties: Object.fromEntries(
+                  Object.entries(copiedNode.data.nodeProperties || {}).filter(
+                    ([key]) => !['rotation', 'nodeWidth', 'nodeHeight'].includes(key)
+                  )
+                ) || {},
                 nodeMeta: copiedNode.data.nodeMeta || ''
               }
             };
@@ -2102,6 +2135,10 @@ const ArchitectureFlow = () => {
       console.error('解析nodeMeta失败:', e);
       nodeMeta = [];
     }
+    
+    // 从nodeProperties中获取标签信息
+    const nodeTagsList = node.data.nodeProperties?.tags || [];
+    setNodeTags(nodeTagsList);
     
     drawerForm.setFieldsValue({
       id: node.id,
@@ -2720,6 +2757,9 @@ const ArchitectureFlow = () => {
   const handleAddNode = () => {
     modalForm.resetFields();
     setShowNetworkInfo(false);
+    setNodeTags([]);
+    // 重置currentTags状态
+    setCurrentTags([]);
     const firstType = customNodeTypes.length > 0 ? customNodeTypes[0] : null;
     const timestamp = Date.now();
     const defaultType = firstType ? firstType.type : 'general';
@@ -2732,17 +2772,18 @@ const ArchitectureFlow = () => {
       description: `这是一个${defaultTypeName}`,
       ip: '',
       port: 80,
-      status: 'running',
+      status: '',
       rotation: 0,
       width: firstType?.defaultWidth || 180,
       height: firstType?.defaultHeight || 180,
-      configContent: ''
+      configContent: '',
+      tags: []
     });
     setCurrentNode(null);
     setIsModalOpen(true);
   };
 
-  const handleEditNode = () => {
+  const handleEditNode = async () => {
     if (selectedNode) {
       const configContent = typeof selectedNode.data.config === 'string'
         ? selectedNode.data.config
@@ -2771,9 +2812,15 @@ const ArchitectureFlow = () => {
         nodeMeta = [];
       }
       
-      // 检查节点是否有网络信息
-      const hasNetworkInfo = selectedNode.data.ip || selectedNode.data.port || selectedNode.data.status;
-      setShowNetworkInfo(hasNetworkInfo);
+      // 从nodeProperties中获取网络信息显示状态
+      const showNetworkInfoValue = selectedNode.data.nodeProperties?.showNetworkInfo || false;
+      setShowNetworkInfo(showNetworkInfoValue);
+      
+      // 从nodeProperties中获取标签信息
+      const nodeTagsList = selectedNode.data.nodeProperties?.tags || [];
+      setNodeTags(nodeTagsList);
+      // 更新currentTags状态
+      setCurrentTags(nodeTagsList);
       
       modalForm.setFieldsValue({
         type: selectedNode.data.type,
@@ -2787,7 +2834,9 @@ const ArchitectureFlow = () => {
         width: selectedNode.data.width || 120,
         height: selectedNode.data.height || 80,
         configContent,
-        nodeMeta
+        nodeMeta,
+        tags: nodeTagsList,
+        showNetworkInfo: showNetworkInfoValue
       });
       setCurrentNode(selectedNode);
       setIsModalOpen(true);
@@ -2976,6 +3025,9 @@ const ArchitectureFlow = () => {
       const { configContent, rotation, width, height, nodeMeta, ...rest } = values;
       const configStr = typeof configContent === 'string' ? configContent : '';
       
+      // 获取标签数据
+      const tags = currentTags || [];
+      
       // 将nodeMeta数组转换为对象
       let nodeMetaObj = {};
       if (nodeMeta && Array.isArray(nodeMeta)) {
@@ -2990,11 +3042,17 @@ const ArchitectureFlow = () => {
       
       // 构建节点属性对象
       const nodeProperties = {
-        rotation: rotation || 0,
-        nodeWidth: width || 180,
-        nodeHeight: height || 180,
-        // 保留原有的其他属性
-        ...(currentNode?.data?.nodeProperties || {})
+        tags: tags,
+        // 保留原有的其他属性（排除rotation、nodeWidth、nodeHeight、tags）
+        ...Object.fromEntries(
+          Object.entries(currentNode?.data?.nodeProperties || {}).filter(
+            ([key]) => !['rotation', 'nodeWidth', 'nodeHeight', 'tags', 'status', 'showNetworkInfo'].includes(key)
+          )
+        ),
+        // 包含状态信息
+        status: rest.status,
+        // 包含网络信息显示状态
+        showNetworkInfo: rest.showNetworkInfo
       };
       
       setLoading(true);
@@ -3012,20 +3070,23 @@ const ArchitectureFlow = () => {
             rotation: rotation || 0,
             nodeWidth: width || 180,
             nodeHeight: height || 180,
-            nodeProperties: JSON.stringify(nodeProperties),
+            nodeProperties: JSON.stringify(nodeProperties || {}),
             nodeMeta: nodeMetaStr
           };
           
-          // 只有当显示网络信息时才包含IP、端口和状态
-          if (rest.showNetworkInfo) {
-            nodeData.ip = rest.ip;
-            nodeData.port = rest.port;
-            nodeData.status = rest.status === 'running' ? '0' : '1';
-          }
+          // 包含IP、端口和状态
+          nodeData.ip = rest.ip;
+          nodeData.port = rest.port;
+          if (rest.status) {
+              nodeData.status = rest.status === 'running' ? '0' : '1';
+            } else {
+              // 当状态为空时，不设置status字段，使用数据库默认值
+              delete nodeData.status;
+            }
           
           if (diagramId) {
-            await updateNode(nodeData);
-          }
+              await updateNode(nodeData);
+            }
 
           setNodes((currentNodes) =>
             currentNodes.map((node) =>
@@ -3063,16 +3124,19 @@ const ArchitectureFlow = () => {
             rotation: rotation || 0,
             nodeWidth: width || 180,
             nodeHeight: height || 180,
-            nodeProperties: JSON.stringify(nodeProperties),
+            nodeProperties: JSON.stringify(nodeProperties || {}),
             nodeMeta: nodeMetaStr
           };
           
-          // 只有当显示网络信息时才包含IP、端口和状态
-          if (rest.showNetworkInfo) {
-            nodeData.ip = rest.ip;
-            nodeData.port = rest.port;
-            nodeData.status = rest.status === 'running' ? '0' : '1';
-          }
+          // 包含IP、端口和状态
+          nodeData.ip = rest.ip;
+          nodeData.port = rest.port;
+          if (rest.status) {
+              nodeData.status = rest.status === 'running' ? '0' : '1';
+            } else {
+              // 当状态为空时，不设置status字段，使用数据库默认值
+              delete nodeData.status;
+            }
 
           let newNodeId = values.id || `node-${Date.now()}`;
           if (diagramId) {
@@ -3132,23 +3196,32 @@ const ArchitectureFlow = () => {
       await updateDiagram({ id: diagramId, diagramName: architectureName });
 
       // 2. 转换节点格式供后端保存
-      const backendNodes = nodes.map(node => ({
-        frontId: node.id, // 保留前端使用的ID（可能是数字字符串或临时字符串）
-        diagramId: diagramId,
-        nodeName: node.data.name,
-        nodeType: node.type,
-        positionX: Math.round(node.position.x),
-        positionY: Math.round(node.position.y),
-        nodeWidth: node.data.width || 180,
-        nodeHeight: node.data.height || 180,
-        rotation: node.data.rotation || 0,
-        ip: node.data.ip,
-        port: node.data.port,
-        status: node.data.status === 'running' ? '0' : '1',
-        remark: node.data.description,
-        config: node.data.config,
-        nodeMeta: node.data.nodeMeta || ''
-      }));
+      const backendNodes = nodes.map(node => {
+        // 确保nodeProperties中包含status字段
+        const nodeProperties = {
+          ...(node.data.nodeProperties || {}),
+          status: node.data.status
+        };
+        
+        return {
+          frontId: node.id, // 保留前端使用的ID（可能是数字字符串或临时字符串）
+          diagramId: diagramId,
+          nodeName: node.data.name,
+          nodeType: node.type,
+          positionX: Math.round(node.position.x),
+          positionY: Math.round(node.position.y),
+          nodeWidth: node.data.width || 180,
+          nodeHeight: node.data.height || 180,
+          rotation: node.data.rotation || 0,
+          ip: node.data.ip,
+          port: node.data.port,
+          status: node.data.status ? (node.data.status === 'running' ? '0' : '1') : undefined,
+          remark: node.data.description,
+          config: node.data.config,
+          nodeMeta: node.data.nodeMeta || '',
+          nodeProperties: JSON.stringify(nodeProperties)
+        };
+      });
 
       // 3. 转换连线格式供后端保存
       const nodeIdSet = new Set(nodes.map((n) => n.id));
@@ -3840,20 +3913,21 @@ const ArchitectureFlow = () => {
           </Form.Item>
           
           <Form.Item
+            name="showNetworkInfo"
             label="网络信息"
+            initialValue={false}
           >
             <Switch 
               size="large" 
               checkedChildren="显示" 
-              unCheckedChildren="隐藏" 
-              checked={showNetworkInfo}
+              unCheckedChildren="隐藏"
               onChange={(checked) => {
                 setShowNetworkInfo(checked);
               }}
             />
           </Form.Item>
           
-          {showNetworkInfo && (
+          {modalForm.getFieldValue('showNetworkInfo') && (
             <>
               <Form.Item
                 name="ip"
@@ -4009,6 +4083,133 @@ const ArchitectureFlow = () => {
           </Form.List>
 
           <Divider />
+          <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>Tag管理</div>
+          <div style={{ marginBottom: '12px' }}>
+            <Row gutter={16}>
+              <Col span={18}>
+                <Form.Item name="selectedTag" noStyle>
+                  <Select
+                    loading={loadingTags}
+                    placeholder="选择标签"
+                    style={{ width: '100%' }}
+                    allowClear
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {tags.map(tag => (
+                      <Option key={tag.id} value={tag.id}>{tag.tagName}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Button 
+                  type="primary" 
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    const selectedValue = modalForm.getFieldValue('selectedTag');
+                    if (!selectedValue) {
+                      message.warning('请先选择一个标签');
+                      return;
+                    }
+                    
+                    // 查找选中的标签
+                    const tag = tags.find(t => String(t.id) === String(selectedValue));
+                    if (!tag) {
+                      message.warning('找不到选中的标签');
+                      return;
+                    }
+                    
+                    // 获取当前标签列表
+                    let currentTags = modalForm.getFieldValue('tags') || [];
+                    if (!Array.isArray(currentTags)) {
+                      currentTags = [];
+                    }
+                    
+                    // 检查标签是否已存在
+                    const existingTag = currentTags.find(t => String(t.id) === String(selectedValue));
+                    if (existingTag) {
+                      message.warning('该标签已添加');
+                      return;
+                    }
+                    
+                    // 添加标签
+                    const newTag = {
+                      id: selectedValue,
+                      tagName: tag.tagName,
+                      tagColor: tag.tagColor,
+                      tagType: tag.tagType,
+                      tagDefaultValue: tag.tagDefaultValue || '',
+                      tagValue: tag.tagDefaultValue || ''
+                    };
+                    
+                    const updatedTags = [...currentTags, newTag];
+                    // 更新状态
+                    setCurrentTags(updatedTags);
+                    // 同时更新表单状态
+                    modalForm.setFieldsValue({
+                      tags: updatedTags,
+                      selectedTag: undefined // 清空选择框
+                    });
+                    
+
+                    
+                    message.success('标签添加成功');
+                    console.log('标签添加成功，当前标签列表:', updatedTags);
+                  }}
+                >
+                  添加
+                </Button>
+              </Col>
+            </Row>
+            <div style={{ marginBottom: '12px' }}>
+              <Space wrap>
+                {(() => {
+                  if (currentTags.length === 0) {
+                    return (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '20px', 
+                        color: '#999',
+                        border: '1px dashed #d9d9d9',
+                        borderRadius: '4px',
+                        width: '100%'
+                      }}>
+                        暂无标签，点击上方选择框添加
+                      </div>
+                    );
+                  }
+                  
+                  return currentTags.map(tag => (
+                    <Tag 
+                      key={tag.id} 
+                      color={tag.tagColor || '#1890ff'}
+                      closable
+                      onClose={() => {
+                        // 从currentTags中过滤
+                        const updatedTags = currentTags.filter(t => String(t.id) !== String(tag.id));
+                        // 更新状态
+                        setCurrentTags(updatedTags);
+                        // 同时更新表单状态
+                        modalForm.setFieldsValue({ tags: updatedTags });
+                        
+
+                        
+                        message.success('标签已删除');
+                        console.log('标签已删除，当前标签列表:', updatedTags);
+                      }}
+                    >
+                      {tag.tagName}
+                    </Tag>
+                  ));
+                })()}
+              </Space>
+            </div>
+            <Form.Item name="tags" noStyle />
+
+          </div>
+
+          <Divider />
           <div style={{ marginBottom: '8px', fontWeight: 'bold', color: '#262626' }}>配置信息</div>
           <Upload.Dragger
             name="file"
@@ -4095,24 +4296,79 @@ const ArchitectureFlow = () => {
                 alignItems: 'center',
                 gap: '8px'
               }}>
-                {selectedNode.data.type === 'nginx' && <ClusterOutlined />}
-                {selectedNode.data.type === 'my-panel' && <ApiOutlined />}
-                {selectedNode.data.type === 'proxy' && <DatabaseOutlined />}
-                {selectedNode.data.name || '无节点名称'}
+                {(() => {
+                  const type = selectedNode.data.type;
+                  const customType = customNodeTypes.find(t => t.type === type);
+                  const iconSize = '20px';
+                  
+                  if (customType) {
+                    const iconMap = {
+                      'ApiOutlined': ApiOutlined,
+                      'ClusterOutlined': ClusterOutlined,
+                      'DatabaseOutlined': DatabaseOutlined,
+                      'SettingOutlined': SettingOutlined,
+                      'DeleteOutlined': DeleteOutlined,
+                      'SyncOutlined': SyncOutlined,
+                      'PlusOutlined': PlusOutlined,
+                      'SaveOutlined': SaveOutlined,
+                      'ReloadOutlined': ReloadOutlined,
+                      'HddOutlined': HddOutlined,
+                      'CloudServerOutlined': CloudServerOutlined,
+                      'AppstoreOutlined': AppstoreOutlined,
+                      'MessageOutlined': MessageOutlined,
+                      'CodeOutlined': CodeOutlined,
+                      'LineChartOutlined': LineChartOutlined,
+                      'DashboardOutlined': DashboardOutlined,
+                      'SafetyCertificateOutlined': SafetyCertificateOutlined,
+                      'ControlOutlined': ControlOutlined,
+                      'FolderOpenOutlined': FolderOpenOutlined,
+                      'ApartmentOutlined': ApartmentOutlined,
+                      'GlobalOutlined': GlobalOutlined,
+                      'DesktopOutlined': DesktopOutlined,
+                      'SecurityScanOutlined': SecurityScanOutlined,
+                      'NodeIndexOutlined': NodeIndexOutlined,
+                      'DeploymentUnitOutlined': DeploymentUnitOutlined
+                    };
+                    
+                    if (BrandIcon({ type: customType.icon })) {
+                      return <BrandIcon type={customType.icon} size={iconSize} color={customType.color} />;
+                    }
+                    if (BrandIcon({ type: type })) {
+                      return <BrandIcon type={type} size={iconSize} color={customType.color} />;
+                    }
+                    
+                    const IconComponent = iconMap[customType.icon] || ApiOutlined;
+                    return <IconComponent style={{ fontSize: iconSize, color: customType.color }} />;
+                  }
+                  
+                  if (BrandIcon({ type: type })) {
+                    return <BrandIcon type={type} size={iconSize} />;
+                  }
+                  
+                  switch (type) {
+                    case 'nginx':
+                      return <DeploymentUnitOutlined style={{ fontSize: iconSize, color: '#1890ff' }} />;
+                    case 'my-panel':
+                      return <ApiOutlined style={{ fontSize: iconSize, color: '#52c41a' }} />;
+                    case 'proxy':
+                      return <DeploymentUnitOutlined style={{ fontSize: iconSize, color: '#fa8c16' }} />;
+                    default:
+                      return <ApiOutlined style={{ fontSize: iconSize }} />;
+                  }
+                })()}
+                {(() => {
+                  const type = selectedNode.data.type;
+                  const customType = customNodeTypes.find(t => t.type === type);
+                  return customType?.name || type || '未知类型';
+                })()}
               </h3>
               <Space size="middle">
-                <Tag color="blue" style={{ fontSize: '13px', fontWeight: '500' }}>
-                  {(selectedNode.data.type || 'unknown').toUpperCase()}
-                </Tag>
-                <Tag 
-                  color={selectedNode.data.status === 'running' ? 'green' : 'red'}
-                  style={{ fontSize: '13px', fontWeight: '500' }}
-                >
-                  {selectedNode.data.status === 'running' ? '运行中' : '已停止'}
-                </Tag>
-                {selectedNode.data.port && (
-                  <Tag color="purple" style={{ fontSize: '13px', fontWeight: '500' }}>
-                    端口: {selectedNode.data.port}
+                {selectedNode.data.status && (
+                  <Tag
+                      color={selectedNode.data.status === 'running' ? 'green' : 'red'}
+                      style={{ fontSize: '13px', fontWeight: '500' }}
+                  >
+                      {selectedNode.data.status === 'running' ? '运行中' : '已停止'}
                   </Tag>
                 )}
                 {selectedNode.data.ip && (
@@ -4120,6 +4376,27 @@ const ArchitectureFlow = () => {
                     IP: {selectedNode.data.ip}
                   </Tag>
                 )}
+                {selectedNode.data.port && (
+                  <Tag color="purple" style={{ fontSize: '13px', fontWeight: '500' }}>
+                    端口: {selectedNode.data.port}
+                  </Tag>
+                )}
+                {(() => {
+                  let tags = [];
+                  try {
+                    if (selectedNode.data.nodeProperties && selectedNode.data.nodeProperties.tags) {
+                      tags = selectedNode.data.nodeProperties.tags;
+                    }
+                  } catch (e) {
+                    console.error('获取tags失败:', e);
+                    tags = [];
+                  }
+                  return tags.map((tag, index) => (
+                    <Tag key={index} color={tag.tagColor || '#1890ff'} style={{ fontSize: '13px', fontWeight: '500' }}>
+                      {tag.tagName}{tag.tagValue ? `: ${tag.tagValue}` : ':'}
+                    </Tag>
+                  ));
+                })()}
               </Space>
             </div>
             
@@ -4172,7 +4449,10 @@ const ArchitectureFlow = () => {
               </Form.Item>
               
               <Form.Item name="status" label="状态">
-                <Select>
+                <Select allowClear placeholder="请选择状态">
+                  <Option value="">
+                    <Tag color="default">空</Tag>
+                  </Option>
                   <Option value="running">
                     <Tag color="green">运行中</Tag>
                   </Option>
@@ -4181,6 +4461,75 @@ const ArchitectureFlow = () => {
                   </Option>
                 </Select>
               </Form.Item>
+              
+              <div style={{ marginTop: '20px' }}>
+                <h4 style={{ 
+                  marginBottom: '12px', 
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#262626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>Tag管理</span>
+                  <Select
+                    loading={loadingTags}
+                    placeholder="选择标签"
+                    style={{ width: 200 }}
+                    allowClear
+                    showSearch
+                    optionFilterProp="children"
+                    onSelect={(value, option) => {
+                      // 检查标签是否已存在
+                      const existingTag = nodeTags.find(tag => tag.id === value);
+                      if (!existingTag) {
+                        const tag = tags.find(t => t.id === value);
+                        if (tag) {
+                          const newTag = {
+                            id: value,
+                            tagName: tag.tagName,
+                            tagColor: tag.tagColor
+                          };
+                          setNodeTags([...nodeTags, newTag]);
+                        }
+                      }
+                    }}
+                  >
+                    {tags.map(tag => (
+                      <Option key={tag.id} value={tag.id}>{tag.tagName}</Option>
+                    ))}
+                  </Select>
+                </h4>
+                <div style={{ marginBottom: '12px' }}>
+                  <Space wrap>
+                    {nodeTags.map(tag => (
+                      <Tag 
+                        key={tag.id} 
+                        color={tag.tagColor || '#1890ff'}
+                        closable
+                        onClose={() => {
+                          setNodeTags(nodeTags.filter(t => t.id !== tag.id));
+                        }}
+                      >
+                        {tag.tagName}
+                      </Tag>
+                    ))}
+                    {nodeTags.length === 0 && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '20px', 
+                        color: '#999',
+                        border: '1px dashed #d9d9d9',
+                        borderRadius: '4px',
+                        width: '100%'
+                      }}>
+                        暂无标签，点击上方选择框添加
+                      </div>
+                    )}
+                  </Space>
+                </div>
+              </div>
               
               <div style={{ marginTop: '20px' }}>
                 <h4 style={{ 
@@ -4259,16 +4608,37 @@ const ArchitectureFlow = () => {
                 </Form.List>
               </div>
               
-              {selectedNode.data.config && (
-                <div style={{ marginTop: '20px' }}>
-                  <h4 style={{ 
-                    marginBottom: '12px', 
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    color: '#262626'
-                  }}>
-                    配置信息
-                  </h4>
+              <div style={{ marginTop: '20px' }}>
+                <h4 style={{ 
+                  marginBottom: '12px', 
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  color: '#262626',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span>配置信息</span>
+                  {selectedNode.data.config && (
+                    <Button 
+                      size="small" 
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        const configText = typeof selectedNode.data.config === 'string'
+                          ? selectedNode.data.config
+                          : JSON.stringify(selectedNode.data.config, null, 2);
+                        navigator.clipboard.writeText(configText).then(() => {
+                          message.success('配置信息已复制到剪贴板');
+                        }).catch(() => {
+                          message.error('复制失败，请手动复制');
+                        });
+                      }}
+                    >
+                      复制
+                    </Button>
+                  )}
+                </h4>
+                {selectedNode.data.config ? (
                   <div style={{
                     backgroundColor: '#f5f5f5',
                     padding: '16px',
@@ -4277,14 +4647,25 @@ const ArchitectureFlow = () => {
                     overflow: 'auto',
                     border: '1px solid #e8e8e8',
                     whiteSpace: 'pre-wrap',
-                    lineHeight: 1.6
+                    lineHeight: 1.6,
+                    maxHeight: '300px'
                   }}>
                     {typeof selectedNode.data.config === 'string'
                       ? selectedNode.data.config
                       : JSON.stringify(selectedNode.data.config, null, 2)}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div style={{
+                    textAlign: 'center', 
+                    padding: '40px', 
+                    color: '#999',
+                    border: '1px dashed #d9d9d9',
+                    borderRadius: '8px'
+                  }}>
+                    暂无配置信息
+                  </div>
+                )}
+              </div>
             </Form>
           </div>
         )}

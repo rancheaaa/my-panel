@@ -28,6 +28,11 @@ public class ArchDiagramTagRel extends BaseEntity
     @NotNull(message = "架构图ID不能为空")
     private Long diagramId;
 
+    /** 节点ID */
+    @Excel(name = "节点ID")
+    @NotNull(message = "节点ID不能为空")
+    private Long nodeId;
+
     /** 标签ID */
     @Excel(name = "标签ID")
     @NotNull(message = "标签ID不能为空")

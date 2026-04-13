@@ -589,25 +589,26 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_tag` (
     `tag_name` varchar(100) NOT NULL COMMENT '标签名称',
     `tag_color` varchar(20) DEFAULT '#1890ff' COMMENT '标签颜色',
     `tag_type` varchar(50) DEFAULT 'custom' COMMENT '标签类型（system系统/custom自定义）',
-    `use_count` int(11) DEFAULT 0 COMMENT '使用次数',
+    `tag_default_value` varchar(255) DEFAULT NULL COMMENT '标签默认值',
     `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `del_flag` char(1) DEFAULT '0' COMMENT '删除标志（0存在 1删除）',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_tag_name` (`tag_name`),
-    KEY `idx_use_count` (`use_count`)
+    UNIQUE KEY `uk_tag_name` (`tag_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图标签表';
 
 -- 6.14 架构图标签关联表
 CREATE TABLE IF NOT EXISTS `arch_diagram_tag_rel` (
     `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '关联ID',
     `diagram_id` bigint(20) NOT NULL COMMENT '架构图ID',
+    `node_id` bigint(20) NOT NULL COMMENT 'nodeID',
     `tag_id` bigint(20) NOT NULL COMMENT '标签ID',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_diagram_tag` (`diagram_id`, `tag_id`),
-    KEY `idx_tag_id` (`tag_id`)
+    UNIQUE KEY `uk_diagram_node_tag` (`diagram_id`, `node_id`, `tag_id`),
+    KEY `idx_tag_id` (`tag_id`),
+    KEY `idx_node_id` (`node_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图标签关联表';
 
 -- 6.15 架构图版本主表

@@ -100,6 +100,8 @@ public class LogInterceptor implements HandlerInterceptor
         logger.info("请求URI: {}", uri);
         logger.info("响应状态: {}", status);
         logger.info("响应头: {}", JSON.toJSONString(responseHeaders));
+        // todo 打印出报文响应体
+        logger.info("响应体: {}", "");
         logger.info("执行时间: {} ms", executeTime);
         
         if (ex != null)

@@ -9,14 +9,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="tagName"    column="tag_name"    />
         <result property="tagColor"    column="tag_color"    />
         <result property="tagType"    column="tag_type"    />
-        <result property="useCount"    column="use_count"    />
+        <result property="tagDefaultValue"    column="tag_default_value"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
         <result property="delFlag"    column="del_flag"    />
     </resultMap>
 
     <sql id="selectArchDiagramTagVo">
-        select id, tag_name, tag_color, tag_type, use_count, create_by, create_time, del_flag from arch_diagram_tag
+        select id, tag_name, tag_color, tag_type, tag_default_value, create_by, create_time, del_flag from arch_diagram_tag
     </sql>
 
     <select id="selectArchDiagramTagList" parameterType="ArchDiagramTag" resultMap="ArchDiagramTagResult">
@@ -26,13 +26,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="tagName != null and tagName != ''"> and tag_name like concat('%', #{tagName}, '%')</if>
             <if test="tagType != null and tagType != ''"> and tag_type = #{tagType}</if>
         </where>
-        order by use_count desc, create_time desc
+        order by create_time desc
     </select>
     
     <select id="selectArchDiagramTagAll" resultMap="ArchDiagramTagResult">
         <include refid="selectArchDiagramTagVo"/>
         where del_flag = '0'
-        order by use_count desc
+        order by create_time desc
     </select>
 
     <select id="selectArchDiagramTagById" parameterType="Long" resultMap="ArchDiagramTagResult">
@@ -52,7 +52,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="tagName != null and tagName != ''">tag_name,</if>
             <if test="tagColor != null">tag_color,</if>
             <if test="tagType != null">tag_type,</if>
-            <if test="useCount != null">use_count,</if>
+            <if test="tagDefaultValue != null">tag_default_value,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="delFlag != null">del_flag,</if>
@@ -61,7 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="tagName != null and tagName != ''">#{tagName},</if>
             <if test="tagColor != null">#{tagColor},</if>
             <if test="tagType != null">#{tagType},</if>
-            <if test="useCount != null">#{useCount},</if>
+            <if test="tagDefaultValue != null">#{tagDefaultValue},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="delFlag != null">#{delFlag},</if>
@@ -73,13 +73,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="tagColor != null">tag_color = #{tagColor},</if>
             <if test="tagType != null">tag_type = #{tagType},</if>
-            <if test="useCount != null">use_count = #{useCount},</if>
+            <if test="tagDefaultValue != null">tag_default_value = #{tagDefaultValue},</if>
         </trim>
         where id = #{id}
-    </update>
-
-    <update id="incrementUseCount" parameterType="Long">
-        update arch_diagram_tag set use_count = use_count + 1 where id = #{id}
     </update>
 
     <delete id="deleteArchDiagramTagById" parameterType="Long">

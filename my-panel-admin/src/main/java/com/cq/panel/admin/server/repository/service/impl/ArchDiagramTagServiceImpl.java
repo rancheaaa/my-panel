@@ -66,11 +66,7 @@ public class ArchDiagramTagServiceImpl implements IArchDiagramTagService
         return archDiagramTagMapper.deleteArchDiagramTagByIds(ids);
     }
 
-    @Override
-    public int incrementUseCount(Long id)
-    {
-        return archDiagramTagMapper.incrementUseCount(id);
-    }
+
 
     @Override
     public boolean checkTagNameUnique(ArchDiagramTag archDiagramTag)

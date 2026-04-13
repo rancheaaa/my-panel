@@ -16,7 +16,7 @@ public class ArchDiagramTagVO implements Serializable {
     private String tagName;
     private String tagColor;
     private String tagType;
-    private Integer useCount;
+    private String tagDefaultValue;
     private String createBy;
     private String createTime;
     private String delFlag;

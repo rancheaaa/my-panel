@@ -424,16 +424,38 @@ public class ArchController extends BaseController {
         }
 
         // 3. 处理节点属性 -> JSON
-        if (dto.getIp() != null || dto.getPort() != null || dto.getConfig() != null) {
-            Map<String, Object> props = new LinkedHashMap<>();
-            if (dto.getIp() != null) props.put("ip", dto.getIp());
-            if (dto.getPort() != null) props.put("port", dto.getPort());
-            if (dto.getConfig() != null) props.put("config", dto.getConfig());
+        Map<String, Object> props = new LinkedHashMap<>();
+        
+        // 先尝试解析现有的nodeProperties，保留原有属性
+        if (dto.getNodeProperties() != null && !dto.getNodeProperties().isBlank()) {
             try {
-                dto.setNodeProperties(objectMapper.writeValueAsString(props));
+                Object propsObj = objectMapper.readValue(dto.getNodeProperties(), Object.class);
+                if (propsObj instanceof Map<?, ?> existingProps) {
+                    for (Map.Entry<?, ?> entry : existingProps.entrySet()) {
+                        if (entry.getKey() != null) {
+                            props.put(String.valueOf(entry.getKey()), entry.getValue());
+                        }
+                    }
+                }
             } catch (JsonProcessingException e) {
-                log.error("序列化节点属性失败", e);
+                log.error("解析现有节点属性失败", e);
             }
+        }
+        
+        // 添加或更新新的属性
+        if (dto.getIp() != null) props.put("ip", dto.getIp());
+        if (dto.getPort() != null) props.put("port", dto.getPort());
+        if (dto.getConfig() != null) props.put("config", dto.getConfig());
+        
+        // 处理标签信息
+        if (dto.getTags() != null) {
+            props.put("tags", dto.getTags());
+        }
+        
+        try {
+            dto.setNodeProperties(objectMapper.writeValueAsString(props));
+        } catch (JsonProcessingException e) {
+            log.error("序列化节点属性失败", e);
         }
     }
 

@@ -38,6 +38,12 @@ public class ArchDiagramTagRelServiceImpl implements IArchDiagramTagRelService
     }
 
     @Override
+    public List<Long> selectTagIdsByNodeId(Long nodeId)
+    {
+        return archDiagramTagRelMapper.selectTagIdsByNodeId(nodeId);
+    }
+
+    @Override
     public int insertArchDiagramTagRel(ArchDiagramTagRel archDiagramTagRel)
     {
         return archDiagramTagRelMapper.insertArchDiagramTagRel(archDiagramTagRel);
@@ -76,5 +82,11 @@ public class ArchDiagramTagRelServiceImpl implements IArchDiagramTagRelService
     public int deleteArchDiagramTagRelByTagId(Long tagId)
     {
         return archDiagramTagRelMapper.deleteArchDiagramTagRelByTagId(tagId);
+    }
+
+    @Override
+    public int deleteArchDiagramTagRelByNodeId(Long nodeId)
+    {
+        return archDiagramTagRelMapper.deleteArchDiagramTagRelByNodeId(nodeId);
     }
 }

@@ -91,4 +91,6 @@ public class ArchDiagramTagController extends BaseController {
         tagService.deleteArchDiagramTagByIds(ids);
         return Result.success();
     }
+
+
 }

@@ -9,7 +9,7 @@ import java.util.Properties;
 
 /**
  * 定时任务配置（集群模式下使用数据库持久化）
- * 
+ *
  * @author cq
  */
 @Configuration

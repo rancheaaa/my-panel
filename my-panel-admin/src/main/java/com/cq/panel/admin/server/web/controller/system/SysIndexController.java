@@ -5,7 +5,6 @@ import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,8 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class SysIndexController
 {
     /** 系统基础配置 */
-    @Autowired
-    private AppConfig cqConfig;
+    private final AppConfig cqConfig;
+
+    public SysIndexController(AppConfig cqConfig) {
+        this.cqConfig = cqConfig;
+    }
 
     /**
      * 访问首页，提示语

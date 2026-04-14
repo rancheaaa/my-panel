@@ -1,11 +1,11 @@
 package com.cq.panel.admin.server.web.controller.rc;
 
 import com.cq.panel.admin.server.repository.domain.RcConfig;
+import com.cq.panel.admin.server.repository.service.IRcConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,14 +16,10 @@ import static org.junit.jupiter.api.Assertions.*;
 public class RcConfigExportTest {
 
     @Autowired
-    private RcConfigController rcConfigController;
+    private IRcConfigService rcConfigService;
 
     @Test
     public void testConvertToNestedMap() throws Exception {
-        // 使用反射访问私有方法 convertToNestedMap
-        Method method = RcConfigController.class.getDeclaredMethod("convertToNestedMap", List.class);
-        method.setAccessible(true);
-
         List<RcConfig> configs = new ArrayList<>();
         
         // 1. 测试常规嵌套
@@ -38,7 +34,7 @@ public class RcConfigExportTest {
         configs.add(createConfig("mybatis.type-aliases-package", "com.cq.panel.admin.server.domain", "别名"));
         configs.add(createConfig("spring.datasource.druid.InitialSize", "5", "初始连接"));
 
-        Map<String, Object> result = (Map<String, Object>) method.invoke(rcConfigController, configs);
+        Map<String, Object> result = rcConfigService.convertToNestedMap(configs);
 
         System.out.println("Result Map: " + result);
 

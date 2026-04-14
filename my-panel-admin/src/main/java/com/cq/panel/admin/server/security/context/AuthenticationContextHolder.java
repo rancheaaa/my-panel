@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.security.context;
 
-import org.springframework.security.core.Authentication;
+import com.cq.panel.authlite.AuthenticationToken;
 
 /**
  * 身份验证信息
@@ -9,14 +9,14 @@ import org.springframework.security.core.Authentication;
  */
 public class AuthenticationContextHolder
 {
-    private static final ThreadLocal<Authentication> contextHolder = new ThreadLocal<>();
+    private static final ThreadLocal<AuthenticationToken> contextHolder = new ThreadLocal<>();
 
-    public static Authentication getContext()
+    public static AuthenticationToken getContext()
     {
         return contextHolder.get();
     }
 
-    public static void setContext(Authentication context)
+    public static void setContext(AuthenticationToken context)
     {
         contextHolder.set(context);
     }

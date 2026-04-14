@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchNodeMapper">
+    
+    <resultMap type="ArchNode" id="ArchNodeResult">
+        <result property="id"    column="id"    />
+        <result property="diagramId"    column="diagram_id"    />
+        <result property="nodeTypeId"    column="node_type_id"    />
+        <result property="nodeName"    column="node_name"    />
+        <result property="nodeType"    column="node_type"    />
+        <result property="nodeCode"    column="node_code"    />
+        <result property="xPosition"    column="x_position"    />
+        <result property="yPosition"    column="y_position"    />
+        <result property="nodeWidth"    column="node_width"    />
+        <result property="nodeHeight"    column="node_height"    />
+        <result property="zIndex"    column="z_index"    />
+        <result property="rotation"    column="rotation"    />
+        <result property="nodeStyle"    column="node_style"    />
+        <result property="nodeProperties"    column="node_properties"    />
+        <result property="nodeMeta"    column="node_meta"    />
+        <result property="label"    column="label"    />
+        <result property="description"    column="description"    />
+        <result property="status"    column="status"    />
+        <result property="locked"    column="locked"    />
+        <result property="visible"    column="visible"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectArchNodeVo">
+        select n.id, n.diagram_id, n.node_type_id, n.node_name, n.node_code, n.x_position, n.y_position, n.node_width, n.node_height, n.z_index, n.rotation, n.node_style, n.node_properties, n.node_meta, n.label, n.description, n.status, n.locked, n.visible, n.create_by, n.create_time, n.update_by, n.update_time, n.del_flag, n.remark, t.type_code as node_type
+        from arch_node n
+        left join arch_node_type t on n.node_type_id = t.id
+    </sql>
+
+    <select id="selectArchNodeList" parameterType="ArchNode" resultMap="ArchNodeResult">
+        <include refid="selectArchNodeVo"/>
+        <where>  
+            n.del_flag = '0'
+            <if test="diagramId != null"> and n.diagram_id = #{diagramId}</if>
+            <if test="nodeTypeId != null"> and n.node_type_id = #{nodeTypeId}</if>
+            <if test="nodeName != null  and nodeName != ''"> and n.node_name like concat('%', #{nodeName}, '%')</if>
+            <if test="nodeCode != null  and nodeCode != ''"> and n.node_code = #{nodeCode}</if>
+            <if test="status != null  and status != ''"> and n.status = #{status}</if>
+        </where>
+        order by n.create_time desc
+    </select>
+
+    <select id="selectNodesByDiagramId" parameterType="Long" resultMap="ArchNodeResult">
+        <include refid="selectArchNodeVo"/>
+        where n.diagram_id = #{diagramId} and n.del_flag = '0'
+        order by n.z_index asc, n.create_time asc
+    </select>
+    
+    <select id="selectArchNodeById" parameterType="Long" resultMap="ArchNodeResult">
+        <include refid="selectArchNodeVo"/>
+        where n.id = #{id} and n.del_flag = '0'
+    </select>
+        
+    <insert id="insertArchNode" parameterType="ArchNode" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_node
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">diagram_id,</if>
+            <if test="nodeTypeId != null">node_type_id,</if>
+            <if test="nodeName != null and nodeName != ''">node_name,</if>
+            <if test="nodeCode != null">node_code,</if>
+            <if test="xPosition != null">x_position,</if>
+            <if test="yPosition != null">y_position,</if>
+            <if test="nodeWidth != null">node_width,</if>
+            <if test="nodeHeight != null">node_height,</if>
+            <if test="zIndex != null">z_index,</if>
+            <if test="rotation != null">rotation,</if>
+            <if test="nodeStyle != null">node_style,</if>
+            <if test="nodeProperties != null">node_properties,</if>
+            <if test="nodeMeta != null">node_meta,</if>
+            <if test="label != null">label,</if>
+            <if test="description != null">description,</if>
+            <if test="status != null">status,</if>
+            <if test="locked != null">locked,</if>
+            <if test="visible != null">visible,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">#{diagramId},</if>
+            <if test="nodeTypeId != null">#{nodeTypeId},</if>
+            <if test="nodeName != null and nodeName != ''">#{nodeName},</if>
+            <if test="nodeCode != null">#{nodeCode},</if>
+            <if test="xPosition != null">#{xPosition},</if>
+            <if test="yPosition != null">#{yPosition},</if>
+            <if test="nodeWidth != null">#{nodeWidth},</if>
+            <if test="nodeHeight != null">#{nodeHeight},</if>
+            <if test="zIndex != null">#{zIndex},</if>
+            <if test="rotation != null">#{rotation},</if>
+            <if test="nodeStyle != null">#{nodeStyle},</if>
+            <if test="nodeProperties != null">#{nodeProperties},</if>
+            <if test="nodeMeta != null">#{nodeMeta},</if>
+            <if test="label != null">#{label},</if>
+            <if test="description != null">#{description},</if>
+            <if test="status != null">#{status},</if>
+            <if test="locked != null">#{locked},</if>
+            <if test="visible != null">#{visible},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <insert id="batchInsertArchNode" parameterType="java.util.List" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_node (diagram_id, node_type_id, node_name, node_code, x_position, y_position, node_width, node_height, z_index, rotation, node_style, node_properties, node_meta, label, description, status, locked, visible, create_by, create_time, update_by, update_time, del_flag, remark)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.diagramId}, #{item.nodeTypeId}, #{item.nodeName}, #{item.nodeCode}, #{item.xPosition}, #{item.yPosition}, #{item.nodeWidth}, #{item.nodeHeight}, #{item.zIndex}, #{item.rotation}, #{item.nodeStyle}, #{item.nodeProperties}, #{item.nodeMeta}, #{item.label}, #{item.description}, #{item.status}, #{item.locked}, #{item.visible}, #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime}, #{item.delFlag}, #{item.remark})
+        </foreach>
+    </insert>
+
+    <update id="updateArchNode" parameterType="ArchNode">
+        update arch_node
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="diagramId != null">diagram_id = #{diagramId},</if>
+            <if test="nodeTypeId != null">node_type_id = #{nodeTypeId},</if>
+            <if test="nodeName != null and nodeName != ''">node_name = #{nodeName},</if>
+            <if test="nodeCode != null">node_code = #{nodeCode},</if>
+            <if test="xPosition != null">x_position = #{xPosition},</if>
+            <if test="yPosition != null">y_position = #{yPosition},</if>
+            <if test="nodeWidth != null">node_width = #{nodeWidth},</if>
+            <if test="nodeHeight != null">node_height = #{nodeHeight},</if>
+            <if test="zIndex != null">z_index = #{zIndex},</if>
+            <if test="rotation != null">rotation = #{rotation},</if>
+            <if test="nodeStyle != null">node_style = #{nodeStyle},</if>
+            <if test="nodeProperties != null">node_properties = #{nodeProperties},</if>
+            <if test="nodeMeta != null">node_meta = #{nodeMeta},</if>
+            <if test="label != null">label = #{label},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="locked != null">locked = #{locked},</if>
+            <if test="visible != null">visible = #{visible},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteArchNodeById" parameterType="Long">
+        update arch_node set del_flag = '1' where id = #{id}
+    </delete>
+
+    <delete id="deleteArchNodeByIds" parameterType="String">
+        update arch_node set del_flag = '1' where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

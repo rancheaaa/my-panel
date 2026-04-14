@@ -8,7 +8,10 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -33,6 +36,7 @@ public class AgentConfig {
     private int serverPort;
     private int bossThreads;
     private int workerThreads;
+    private int portProbeMaxSteps;
 
     // Executor configuration
     private int executorThreadPoolSize;
@@ -80,7 +84,7 @@ public class AgentConfig {
     private int downloadRequestTimeoutSeconds;
 
     // Registry configuration
-    private String registryServerUrl;
+    private List<String> registryServerUrls;
     private String nodeName;
     private String osType;
     private String appId;
@@ -146,7 +150,7 @@ public class AgentConfig {
         this.agentApiUrl = getStringProperty("agent.api.url", null);
         if (this.agentApiUrl == null || this.agentApiUrl.isBlank()) {
             this.agentApiUrl = "http://" + this.agentIp + ":" + this.serverPort + "/";
-            logger.info("agent.api.url is not configured, using default: {}", this.agentApiUrl);
+            logger.info("agent.api.url has not configured, using default: {}", this.agentApiUrl);
         } else {
             if (!this.agentApiUrl.endsWith("/")) {
                 this.agentApiUrl = this.agentApiUrl + "/";
@@ -158,14 +162,28 @@ public class AgentConfig {
         this.serverPort = getIntProperty("server.port", 7777);
         this.bossThreads = getIntProperty("server.boss.threads", 1);
         this.workerThreads = getIntProperty("server.worker.threads", Runtime.getRuntime().availableProcessors() * 2);
+        this.portProbeMaxSteps = getIntProperty("server.port.probe.max.steps", 10);
 
         // Registry server configuration
-        this.registryServerUrl = getStringProperty("registry.server.url", "http://localhost:8888");
+        String registryServerUrlStr = getStringProperty("registry.server.url", "http://localhost:9876,http://localhost:9877");
+        if (registryServerUrlStr != null && !registryServerUrlStr.isEmpty()) {
+            String[] urls = registryServerUrlStr.split(",");
+            List<String> urlList = new ArrayList<>();
+            for (String url : urls) {
+                String trimmedUrl = url.trim();
+                if (!trimmedUrl.isEmpty()) {
+                    urlList.add(trimmedUrl);
+                }
+            }
+            this.registryServerUrls = urlList;
+        } else {
+            this.registryServerUrls = Collections.emptyList();
+        }
         this.nodeName = getStringProperty("registry.node.name", null);
         this.osType = getStringProperty("registry.os.type", null);
         this.appId = getStringProperty("registry.app.id", null);
         this.remark = getStringProperty("registry.remark", null);
-        this.heartbeatIntervalSeconds = getIntProperty("registry.heartbeat.interval.seconds", 300);
+        this.heartbeatIntervalSeconds = getIntProperty("registry.heartbeat.interval.seconds", 30);
         this.autoRegister = getBooleanProperty("registry.auto.register", true);
         this.autoHeartbeat = getBooleanProperty("registry.auto.heartbeat", true);
 
@@ -263,10 +281,16 @@ public class AgentConfig {
     }
 
     private int getIntProperty(String key, int defaultValue) {
-        String value = properties.getProperty(key);
-        if (value == null || value.trim().isEmpty()) {
-            return defaultValue;
+        String value = getConfigValue(key);
+        if (value != null) {
+            return parseIntegerValue(key, value, defaultValue);
         }
+        
+        logger.debug("Using default value for {}: {}", key, defaultValue);
+        return defaultValue;
+    }
+    
+    private int parseIntegerValue(String key, String value, int defaultValue) {
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
@@ -276,10 +300,16 @@ public class AgentConfig {
     }
 
     private long getLongProperty(String key, long defaultValue) {
-        String value = properties.getProperty(key);
-        if (value == null || value.trim().isEmpty()) {
-            return defaultValue;
+        String value = getConfigValue(key);
+        if (value != null) {
+            return parseLongValue(key, value, defaultValue);
         }
+        
+        logger.debug("Using default Long value for {}: {}", key, defaultValue);
+        return defaultValue;
+    }
+    
+    private long parseLongValue(String key, String value, long defaultValue) {
         try {
             return Long.parseLong(value.trim());
         } catch (NumberFormatException e) {
@@ -289,19 +319,71 @@ public class AgentConfig {
     }
 
     private String getStringProperty(String key, String defaultValue) {
-        String value = properties.getProperty(key);
-        if (value == null || value.trim().isEmpty()) {
-            return defaultValue;
+        String value = getConfigValue(key);
+        if (value != null) {
+            return value.trim();
         }
-        return value.trim();
+        
+        logger.debug("Using default String value for {}: {}", key, defaultValue);
+        return defaultValue;
     }
 
     private boolean getBooleanProperty(String key, boolean defaultValue) {
-        String value = properties.getProperty(key);
-        if (value == null || value.trim().isEmpty()) {
+        String value = getConfigValue(key);
+        if (value != null) {
+            return parseBooleanValue(key, value, defaultValue);
+        }
+        
+        logger.debug("Using default Boolean value for {}: {}", key, defaultValue);
+        return defaultValue;
+    }
+    
+    private boolean parseBooleanValue(String key, String value, boolean defaultValue) {
+        String trimmedValue = value.trim().toLowerCase();
+        if ("true".equals(trimmedValue) || "1".equals(trimmedValue) || "yes".equals(trimmedValue) || "on".equals(trimmedValue)) {
+            return true;
+        } else if ("false".equals(trimmedValue) || "0".equals(trimmedValue) || "no".equals(trimmedValue) || "off".equals(trimmedValue)) {
+            return false;
+        } else {
+            logger.warn("Invalid boolean value for {}: {}, using default: {}", key, value, defaultValue);
             return defaultValue;
         }
-        return Boolean.parseBoolean(value.trim());
+    }
+    
+    /**
+     * 公共配置获取方法 - 按照优先级顺序获取配置值
+     * 优先级: 系统属性 -> 环境变量 -> 配置文件
+     * 
+     * @param key 配置键
+     * @return 配置值，如果所有来源都没有找到则返回null
+     */
+    private String getConfigValue(String key) {
+        String value = null;
+        
+        // 1. 首先检查系统属性
+        value = System.getProperty(key);
+        if (value != null && !value.trim().isEmpty()) {
+            logger.debug("Using system property for {}: {}", key, value);
+            return value;
+        }
+        
+        // 2. 检查环境变量（将点转换为下划线，并转为大写）
+        String envKey = key.replace('.', '_').toUpperCase();
+        value = System.getenv(envKey);
+        if (value != null && !value.trim().isEmpty()) {
+            logger.debug("Using environment variable for {} ({}): {}", key, envKey, value);
+            return value;
+        }
+        
+        // 3. 检查配置文件
+        value = properties.getProperty(key);
+        if (value != null && !value.trim().isEmpty()) {
+            logger.debug("Using config file for {}: {}", key, value);
+            return value;
+        }
+        
+        // 所有来源都没有找到配置值
+        return null;
     }
 
     private String findFirstNonLoopbackAddress() {
@@ -351,6 +433,10 @@ public class AgentConfig {
 
     public int getWorkerThreads() {
         return workerThreads;
+    }
+
+    public int getPortProbeMaxSteps() {
+        return portProbeMaxSteps;
     }
 
     public int getExecutorThreadPoolSize() {
@@ -478,7 +564,11 @@ public class AgentConfig {
     }
 
     public String getRegistryServerUrl() {
-        return registryServerUrl;
+        return registryServerUrls.isEmpty() ? null : registryServerUrls.get(0);
+    }
+
+    public List<String> getRegistryServerUrls() {
+        return registryServerUrls;
     }
 
     public String getNodeName() {
@@ -535,6 +625,7 @@ public class AgentConfig {
                 ", serverPort=" + serverPort +
                 ", bossThreads=" + bossThreads +
                 ", workerThreads=" + workerThreads +
+                ", portProbeMaxSteps=" + portProbeMaxSteps +
                 ", executorThreadPoolSize=" + executorThreadPoolSize +
                 ", defaultTimeoutSeconds=" + defaultTimeoutSeconds +
                 ", maxTimeoutSeconds=" + maxTimeoutSeconds +
@@ -566,6 +657,14 @@ public class AgentConfig {
                 ", downloadRetryDelayMs=" + downloadRetryDelayMs +
                 ", downloadConnectTimeoutSeconds=" + downloadConnectTimeoutSeconds +
                 ", downloadRequestTimeoutSeconds=" + downloadRequestTimeoutSeconds +
+                ", registryServerUrls=" + registryServerUrls +
+                ", nodeName='" + nodeName + '\'' +
+                ", osType='" + osType + '\'' +
+                ", appId='" + appId + '\'' +
+                ", remark='" + remark + '\'' +
+                ", heartbeatIntervalSeconds=" + heartbeatIntervalSeconds +
+                ", autoRegister=" + autoRegister +
+                ", autoHeartbeat=" + autoHeartbeat +
                 '}';
     }
 }

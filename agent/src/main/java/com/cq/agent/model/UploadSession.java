@@ -222,13 +222,14 @@ public class UploadSession {
 
     public ChunkInitResponse toChunkInitResponse() {
         refresh();
-        return new ChunkInitResponse(
-                this.getTransferId(),
-                this.getTotalSize(),
-                this.getTotalChunks(),
-                this.getChunkSize(),
-                this.getMissingChunks()
-        );
+        final ChunkInitResponse chunkInitResponse = new ChunkInitResponse();
+        chunkInitResponse.setTransferId(this.getTransferId());
+        chunkInitResponse.setTotalSize(this.getTotalSize());
+        chunkInitResponse.setTotalChunks(this.getTotalChunks());
+        chunkInitResponse.setChunkSize(this.getChunkSize());
+        chunkInitResponse.setMissingChunks(this.getMissingChunks());
+
+        return chunkInitResponse;
     }
 
     @Override

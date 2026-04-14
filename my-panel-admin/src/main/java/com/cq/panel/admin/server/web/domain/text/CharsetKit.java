@@ -1,7 +1,6 @@
 package com.cq.panel.admin.server.web.domain.text;
 
 import com.cq.panel.admin.server.common.utils.StringUtils;
-
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -10,6 +9,7 @@ import java.nio.charset.StandardCharsets;
  * 
  * @author cq
  */
+@SuppressWarnings("all")
 public class CharsetKit
 {
     /** ISO-8859-1 */

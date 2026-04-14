@@ -1,22 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, message, Popconfirm, Tag, Tooltip, Dropdown, Row, Col } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, message, Popconfirm, Tag, Tooltip, Dropdown, Row, Col, Spin } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
   PlusOutlined, 
   DeleteOutlined, 
   EditOutlined,
-  ColumnHeightOutlined
+  ColumnHeightOutlined,
+  HolderOutlined
 } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
-import { listPost, getPost, addPost, updatePost, delPost } from '../../../api/post';
+import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { listPost, getPost, addPost, updatePost, delPost, sortPost } from '../../../api/post';
 import { getDicts } from '../../../api/dict/data';
 import './Post.scss';
+
+const SortableRow = (props) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props['data-row-key'],
+  });
+  const style = {
+    ...props.style,
+    transform: CSS.Translate.toString(transform),
+    transition,
+    cursor: 'move',
+    ...(isDragging ? { position: 'relative', zIndex: 9999 } : {}),
+  };
+  return <tr {...props} ref={setNodeRef} style={style} {...attributes} {...listeners} />;
+};
 
 const { Option } = Select;
 
 const Post = () => {
   const [data, setData] = useState([]);
+  const [originalData, setOriginalData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [tableSize, setTableSize] = useState('large');
@@ -37,9 +62,25 @@ const Post = () => {
   const [modalForm] = Form.useForm();
   const [currentId, setCurrentId] = useState(null);
   const [sysNormalDisable, setSysNormalDisable] = useState([]);
+  const [dragLoading, setDragLoading] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   // Resizable Columns State
   const [columns, setColumns] = useState([
+    {
+      title: '排序',
+      key: 'drag',
+      width: 60,
+      align: 'center',
+      render: () => <HolderOutlined style={{ cursor: 'move', color: '#999' }} />,
+    },
     { title: '岗位编号', dataIndex: 'postId', key: 'postId', align: 'center', width: 100 },
     { title: '岗位编码', dataIndex: 'postCode', key: 'postCode', align: 'center', width: 150, ellipsis: true },
     { title: '岗位名称', dataIndex: 'postName', key: 'postName', align: 'center', width: 150, ellipsis: true },
@@ -94,6 +135,7 @@ const Post = () => {
       const res = await listPost(queryParams);
       if (res.code === 200) {
         setData(res.data.rows);
+        setOriginalData(res.data.rows);
         setTotal(res.data.total);
       }
     } catch (error) {
@@ -143,10 +185,28 @@ const Post = () => {
   };
 
   // Add Post
-  const handleAdd = () => {
+  const handleAdd = async () => {
     setModalTitle('新增岗位');
     setCurrentId(null);
     modalForm.resetFields();
+    
+    // Calculate auto sort order
+    let maxSort = 0;
+    try {
+      const res = await listPost({ pageNum: 1, pageSize: 1000 });
+      if (res.code === 200) {
+        const allPosts = res.data.rows || [];
+        if (allPosts.length > 0) {
+          maxSort = Math.max(...allPosts.map(item => item.postSort || 0));
+        }
+      }
+    } catch (e) {
+      console.error('Calculate sort order failed:', e);
+    }
+
+    modalForm.setFieldsValue({ 
+      postSort: maxSort + 1
+    });
     setIsModalOpen(true);
   };
 
@@ -189,6 +249,45 @@ const Post = () => {
       }
   };
 
+  // Handle drag end
+  const onDragEnd = async ({ active, over }) => {
+    if (active.id !== over?.id) {
+      const oldIndex = data.findIndex((i) => i.postId === active.id);
+      const newIndex = data.findIndex((i) => i.postId === over.id);
+      const newData = arrayMove(data, oldIndex, newIndex);
+      
+      // Immediately update the UI to show the new order
+      setData(newData);
+
+      setDragLoading(true);
+      
+      try {
+        // Calculate sort values based on current page data
+        const sortData = newData.map((item, index) => ({
+          postId: item.postId,
+          postSort: index + 1
+        }));
+
+        const sortRes = await sortPost(sortData);
+        if (sortRes.code === 200) {
+          message.success('排序更新成功');
+          await fetchData();
+        } else {
+          message.error(sortRes.msg || '排序更新失败');
+          // Revert to original data on error
+          setData(originalData);
+        }
+      } catch (error) {
+        console.error(error);
+        message.error('排序更新失败，请重试');
+        // Revert to original data on error
+        setData(originalData);
+      } finally {
+        setDragLoading(false);
+      }
+    }
+  };
+
   // Handle Form Submit
   const handleModalOk = async () => {
     try {
@@ -218,6 +317,14 @@ const Post = () => {
 
   return (
     <div className="post-container">
+      {dragLoading && (
+        <div className="drag-loading-overlay">
+          <div className="drag-loading-content">
+            <Spin size="large" />
+            <span className="drag-loading-text">正在保存排序...</span>
+          </div>
+        </div>
+      )}
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
         <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
@@ -242,8 +349,8 @@ const Post = () => {
             </Col>
             <Col span={6} style={{ textAlign: 'right' }}>
               <Space>
-                <Button type="primary" icon="<SearchOutlined />" onClick={handleSearch}>搜索</Button>
-                <Button icon="<ReloadOutlined />" onClick={handleReset}>重置</Button>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
               </Space>
             </Col>
           </Row>
@@ -284,29 +391,39 @@ const Post = () => {
           </Space>
         </div>
 
-        <Table
-          rowSelection={rowSelection}
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          rowKey="postId"
-          loading={loading}
-          size={tableSize}
-          scroll={{ x: 1000 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-                setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            }
-          }}
-        />
+        <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={onDragEnd}>
+          <SortableContext items={data.map(item => item.postId)} strategy={verticalListSortingStrategy}>
+            <Table
+              rowSelection={rowSelection}
+              components={{
+                header: {
+                  cell: ResizableTitle,
+                },
+                body: {
+                  row: SortableRow,
+                },
+              }}
+              columns={resizableColumns}
+              dataSource={data}
+              rowKey="postId"
+              loading={loading}
+              size={tableSize}
+              scroll={{ x: 1000 }}
+              pagination={{
+                current: queryParams.pageNum,
+                pageSize: queryParams.pageSize,
+                total: total,
+                showTotal: (total, range) => `共 ${total} 条`,
+                onChange: (page, pageSize) => {
+                    setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
+                },
+                position: ['bottomRight'],
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100']
+              }}
+            />
+          </SortableContext>
+        </DndContext>
       </Card>
 
       <Modal
@@ -323,8 +440,8 @@ const Post = () => {
           <Form.Item name="postCode" label="岗位编码" rules={[{ required: true, message: '请输入岗位编码' }]}>
              <Input placeholder="请输入岗位编码" />
           </Form.Item>
-          <Form.Item name="postSort" label="岗位排序" rules={[{ required: true, message: '请输入岗位排序' }]}>
-            <InputNumber min={0} style={{ width: '100%' }} />
+          <Form.Item name="postSort" label="岗位排序">
+            <InputNumber min={0} style={{ width: '100%' }} disabled placeholder="拖拽排序自动计算" />
           </Form.Item>
           <Form.Item name="status" label="岗位状态" initialValue="0">
             <Radio.Group>

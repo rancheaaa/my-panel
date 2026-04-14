@@ -19,6 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 import org.yaml.snakeyaml.Yaml;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfigurationLayout;
 import java.io.StringReader;
 import java.util.*;
 
@@ -45,8 +47,8 @@ public class RcConfigServiceImpl implements IRcConfigService
      * 配置值及描述包装类
      */
     public static class ConfigValueWithDesc {
-        private String value;
-        private String desc;
+        private final String value;
+        private final String desc;
 
         public ConfigValueWithDesc(String value, String desc) {
             this.value = value;
@@ -70,8 +72,7 @@ public class RcConfigServiceImpl implements IRcConfigService
         // 包含大写字母（类名特征）
         if (!part.equals(part.toLowerCase())) return true;
         // 包含数字（通常不是配置层级）
-        if (part.matches(".*\\d.*")) return true;
-        return false;
+        return part.matches(".*\\d.*");
     }
 
     /**
@@ -123,7 +124,7 @@ public class RcConfigServiceImpl implements IRcConfigService
             // 处理剩余部分
             StringBuilder finalKey = new StringBuilder();
             for (int i = splitIndex; i < parts.length; i++) {
-                if (finalKey.length() > 0) finalKey.append(".");
+                if (!finalKey.isEmpty()) finalKey.append(".");
                 finalKey.append(parts[i]);
             }
             current.put(finalKey.toString(), value);
@@ -209,8 +210,7 @@ public class RcConfigServiceImpl implements IRcConfigService
             if (value instanceof Map) {
                 sb.append(space).append(key).append(":\n");
                 buildYaml(sb, (Map<String, Object>) value, indent + 1);
-            } else if (value instanceof ConfigValueWithDesc) {
-                ConfigValueWithDesc cv = (ConfigValueWithDesc) value;
+            } else if (value instanceof ConfigValueWithDesc cv) {
                 if (StringUtils.isNotEmpty(cv.getDesc())) {
                     sb.append(space).append("# ").append(cv.getDesc()).append("\n");
                 }
@@ -345,11 +345,20 @@ public class RcConfigServiceImpl implements IRcConfigService
             }
             else
             {
-                Properties properties = new Properties();
-                properties.load(new StringReader(content));
-                for (String key : properties.stringPropertyNames())
-                {
-                    saveOrUpdateConfig(envId, projectId, key, properties.getProperty(key), operName);
+                // 使用commons-configuration2解析properties文件，支持读取注释
+                PropertiesConfiguration config = new PropertiesConfiguration();
+                config.read(new StringReader(content));
+                
+                // 获取布局信息，包含注释
+                PropertiesConfigurationLayout layout = config.getLayout();
+
+                for (Iterator<String> it = config.getKeys(); it.hasNext(); ) {
+                    String key = it.next();
+                    String value = config.getString(key);
+                    String comment = layout.getComment(key);
+
+                    // 保存配置项和注释信息
+                    saveOrUpdateConfigWithComment(envId, projectId, key, value, comment, operName);
                 }
             }
             log.info("Batch import completed successfully for envId={}, projectId={}", envId, projectId);
@@ -377,6 +386,45 @@ public class RcConfigServiceImpl implements IRcConfigService
             {
                 saveOrUpdateConfig(envId, projectId, key, value == null ? "" : value.toString(), operName);
             }
+        }
+    }
+
+    /**
+     * 保存或更新配置项，包含注释信息
+     */
+    private void saveOrUpdateConfigWithComment(Long envId, Long projectId, String key, String value, String comment, String operName)
+    {
+        RcConfig rcConfig = new RcConfig();
+        rcConfig.setEnvId(envId);
+        rcConfig.setProjectId(projectId);
+        rcConfig.setConfigKey(key);
+        rcConfig.setConfigValue(value);
+        
+        // 设置注释信息，如果注释为空则使用空字符串
+        if (StringUtils.isNotEmpty(comment)) {
+            // 清理注释中的注释符号和换行符
+            comment = comment.replace("#", "").replace("!", "");
+            // 限制注释长度不超过200字符
+            if (comment.length() > 200) {
+                comment = comment.substring(0, 200);
+            }
+        }
+        rcConfig.setConfigDesc(StringUtils.isEmpty(comment) ? "" : comment);
+
+        // 1: 批量导入
+        rcConfig.setSource("1");
+
+        RcConfig exist = rcConfigMapper.checkConfigKeyUnique(envId, projectId, key);
+        if (exist != null)
+        {
+            rcConfig.setId(exist.getId());
+            rcConfig.setUpdateBy(operName);
+            updateRcConfig(rcConfig);
+        }
+        else
+        {
+            rcConfig.setCreateBy(operName);
+            insertRcConfig(rcConfig);
         }
     }
 

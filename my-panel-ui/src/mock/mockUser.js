@@ -50,7 +50,6 @@ let userList = Mock.mock({
 
 // 获取用户列表
 Mock.mock(/\/api\/system\/user\/list(\?.*)?$/, 'get', (options) => {
-  console.log('Mock: listUser', options.url);
   // In a real app, we would filter by query params (userName, phonenumber, etc.)
   return {
     code: 200,
@@ -172,7 +171,6 @@ Mock.mock(/\/api\/system\/user\/.*/, 'delete', (options) => {
 
 // 获取用户详细 (For Edit)
 Mock.mock(/\/api\/system\/user\/\d+/, 'get', (options) => {
-    console.log('Mock: getUser detail', options.url);
     const url = options.url;
     const id = parseInt(url.match(/\/api\/system\/user\/(\d+)/)[1]);
     const user = userList.find(u => u.userId === id);
@@ -201,7 +199,6 @@ Mock.mock(/\/api\/system\/user\/\d+/, 'get', (options) => {
 
 // 获取用户初始化数据 (Add User modal)
 Mock.mock(/\/api\/system\/user\/?$/, 'get', () => {
-    console.log('Mock: getUser init data');
     return {
         code: 200,
         msg: '操作成功',

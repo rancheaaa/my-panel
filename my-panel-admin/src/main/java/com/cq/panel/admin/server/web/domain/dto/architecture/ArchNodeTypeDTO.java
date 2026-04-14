@@ -1,0 +1,30 @@
+package com.cq.panel.admin.server.web.domain.dto.architecture;
+
+import lombok.Data;
+import java.io.Serializable;
+
+/**
+ * 节点类型 DTO
+ * 
+ * @author cq
+ */
+@Data
+public class ArchNodeTypeDTO implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private Long id;
+    private String typeCode;
+    private String typeName;
+    private String icon;
+    private String category;
+    private Integer defaultWidth;
+    private Integer defaultHeight;
+    private String defaultStyle;
+    private String defaultProperties;
+    private String validationRules;
+    private String isSystem;
+    private String isActive;
+    private Integer sortOrder;
+    private String delFlag;
+    private String remark;
+}

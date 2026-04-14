@@ -34,4 +34,7 @@ public class RcNodeDTO {
 
     @Schema(description = "状态（0在线 1离线）")
     private String status;
+
+    @Schema(description = "服务所在区域")
+    private String zone;
 }

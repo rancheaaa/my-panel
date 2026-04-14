@@ -10,9 +10,7 @@ import com.cq.panel.admin.server.web.exception.ServiceException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,10 +26,9 @@ import java.util.Map;
 @RequestMapping("/test/user")
 public class TestController extends BaseController
 {
-    @Autowired
-    private TestUserConverter testUserConverter;
+    private final TestUserConverter testUserConverter;
 
-    private final static Map<Integer, TestUserVO> users = new LinkedHashMap<Integer, TestUserVO>();
+    private final static Map<Integer, TestUserVO> users = new LinkedHashMap<>();
     {
         TestUserVO user1 = new TestUserVO();
         user1.setUserId(1);
@@ -47,7 +44,11 @@ public class TestController extends BaseController
         user2.setMobile("15666666666");
         users.put(2, user2);
     }
-    
+
+    public TestController(TestUserConverter testUserConverter) {
+        this.testUserConverter = testUserConverter;
+    }
+
     @Operation(summary = "获取用户列表", description = "获取所有测试用户列表")
     @GetMapping("/list")
     public Result<List<TestUserVO>> userList()
@@ -71,7 +72,7 @@ public class TestController extends BaseController
     
     @Operation(summary = "新增用户", description = "新增测试用户")
     @PostMapping("/save")
-    public Result<Void> save(@RequestBody TestUserDTO user)
+    public Result<Map<Integer, TestUserVO>> save(@RequestBody TestUserDTO user)
     {
         if (StringUtils.isNull(user) || StringUtils.isNull(user.getUserId()))
         {
@@ -79,12 +80,12 @@ public class TestController extends BaseController
         }
         TestUserVO userVO = testUserConverter.toVO(user);
         users.put(user.getUserId(), userVO);
-        return Result.success();
+        return Result.success(users);
     }
     
     @Operation(summary = "更新用户", description = "更新测试用户")
     @PutMapping("/update")
-    public Result<Void> update(@RequestBody TestUserDTO user)
+    public Result<Map<Integer, TestUserVO>> update(@RequestBody TestUserDTO user)
     {
         if (StringUtils.isNull(user) || StringUtils.isNull(user.getUserId()))
         {
@@ -97,7 +98,7 @@ public class TestController extends BaseController
         users.remove(user.getUserId());
         TestUserVO userVO = testUserConverter.toVO(user);
         users.put(user.getUserId(), userVO);
-        return Result.success();
+        return Result.success(users);
     }
     
     @Operation(summary = "删除用户信息", description = "根据用户ID删除测试用户")

@@ -23,7 +23,7 @@
         <java.version>21</java.version>
         <maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
 
-        <springboot.version>3.5.10</springboot.version>
+        <springboot.version>3.5.13</springboot.version>
         <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
         <druid.version>1.2.23</druid.version>
         <bitwalker.version>1.21</bitwalker.version>
@@ -42,6 +42,7 @@
         <commons.lang3.version>3.20.0</commons.lang3.version>
         <guava.version>31.1-jre</guava.version>
         <rocksdb.version>6.10.2</rocksdb.version>
+        <lombok.version>1.18.36</lombok.version>
     </properties>
 
     <!-- 依赖声明 -->
@@ -52,7 +53,16 @@
                 <artifactId>my-panel-admin</artifactId>
                 <version>${revision}</version>
             </dependency>
-
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>my-panel-auth-lite</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>my-panel-common</artifactId>
+                <version>${revision}</version>
+            </dependency>
 
             <!-- SpringBoot的依赖配置-->
             <dependency>
@@ -171,13 +181,38 @@
                 <version>${rocksdb.version}</version>
             </dependency>
 
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- Testing -->
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>5.14.2</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>5.14.2</version>
+                <scope>test</scope>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
     <modules>
+        <module>my-panel-auth-lite</module>
         <module>my-panel-admin</module>
         <module>distribution</module>
         <module>agent</module>
+        <module>proxy</module>
+        <module>common</module>
     </modules>
     <packaging>pom</packaging>
 
@@ -192,6 +227,13 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
 

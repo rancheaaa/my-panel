@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchDiagramTagRelMapper">
+    
+    <resultMap type="ArchDiagramTagRel" id="ArchDiagramTagRelResult">
+        <result property="id"    column="id"    />
+        <result property="diagramId"    column="diagram_id"    />
+        <result property="nodeId"    column="node_id"    />
+        <result property="tagId"    column="tag_id"    />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <sql id="selectArchDiagramTagRelVo">
+        select id, diagram_id, node_id, tag_id, create_time from arch_diagram_tag_rel
+    </sql>
+
+    <select id="selectArchDiagramTagRelList" parameterType="ArchDiagramTagRel" resultMap="ArchDiagramTagRelResult">
+        <include refid="selectArchDiagramTagRelVo"/>
+        <where>  
+            <if test="diagramId != null">diagram_id = #{diagramId}</if>
+            <if test="nodeId != null"> and node_id = #{nodeId}</if>
+            <if test="tagId != null"> and tag_id = #{tagId}</if>
+        </where>
+        order by create_time desc
+    </select>
+    
+    <select id="selectTagIdsByDiagramId" parameterType="Long" resultType="Long">
+        select tag_id from arch_diagram_tag_rel where diagram_id = #{diagramId}
+    </select>
+
+    <select id="selectDiagramIdsByTagId" parameterType="Long" resultType="Long">
+        select diagram_id from arch_diagram_tag_rel where tag_id = #{tagId}
+    </select>
+
+    <select id="selectTagIdsByNodeId" parameterType="Long" resultType="Long">
+        select tag_id from arch_diagram_tag_rel where node_id = #{nodeId}
+    </select>
+        
+    <insert id="insertArchDiagramTagRel" parameterType="ArchDiagramTagRel" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_diagram_tag_rel (diagram_id, node_id, tag_id, create_time)
+        values (#{diagramId}, #{nodeId}, #{tagId}, now())
+    </insert>
+
+    <insert id="batchInsertArchDiagramTagRel" parameterType="java.util.List">
+        insert into arch_diagram_tag_rel (diagram_id, node_id, tag_id, create_time)
+        values 
+        <foreach collection="list" item="item" separator=",">
+            (#{item.diagramId}, #{item.nodeId}, #{item.tagId}, now())
+        </foreach>
+    </insert>
+
+    <delete id="deleteArchDiagramTagRelById" parameterType="Long">
+        delete from arch_diagram_tag_rel where id = #{id}
+    </delete>
+
+    <delete id="deleteArchDiagramTagRelByIds" parameterType="String">
+        delete from arch_diagram_tag_rel where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteArchDiagramTagRelByDiagramId" parameterType="Long">
+        delete from arch_diagram_tag_rel where diagram_id = #{diagramId}
+    </delete>
+
+    <delete id="deleteArchDiagramTagRelByTagId" parameterType="Long">
+        delete from arch_diagram_tag_rel where tag_id = #{tagId}
+    </delete>
+
+    <delete id="deleteArchDiagramTagRelByNodeId" parameterType="Long">
+        delete from arch_diagram_tag_rel where node_id = #{nodeId}
+    </delete>
+</mapper>

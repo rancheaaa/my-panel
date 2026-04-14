@@ -9,7 +9,7 @@ import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.ip.AddressUtils;
 import com.cq.panel.admin.server.common.utils.ip.IpUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
-import com.cq.panel.admin.server.repository.domain.SysLogininfor;
+import com.cq.panel.admin.server.repository.domain.SysLoginInfo;
 import com.cq.panel.admin.server.repository.domain.SysOperLog;
 import com.cq.panel.admin.server.repository.service.ISysLogininforService;
 import com.cq.panel.admin.server.repository.service.ISysOperLogService;
@@ -35,8 +35,8 @@ public class AsyncFactory
      * @param args 列表
      * @return 任务task
      */
-    public static TimerTask recordLogininfor(final String username, final String status, final String message,
-            final Object... args)
+    public static TimerTask recordLoginInfo(final String username, final String status, final String message,
+                                            final Object... args)
     {
         final UserAgent userAgent = UserAgent.parseUserAgentString(ServletUtils.getRequest().getHeader("User-Agent"));
         final String ip = IpUtils.getIpAddr();
@@ -59,7 +59,7 @@ public class AsyncFactory
                 // 获取客户端浏览器
                 String browser = userAgent.getBrowser().getName();
                 // 封装对象
-                SysLogininfor logininfor = new SysLogininfor();
+                SysLoginInfo logininfor = new SysLoginInfo();
                 logininfor.setUserName(username);
                 logininfor.setIpaddr(ip);
                 logininfor.setLoginLocation(address);

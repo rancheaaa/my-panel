@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, TreeSelect, message, Popconfirm, Tag, Tooltip, Row, Col, Dropdown, Switch } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, TreeSelect, message, Popconfirm, Tag, Tooltip, Row, Col, Dropdown, Switch, Spin } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -90,6 +90,7 @@ const handleTree = (data, id, parentId, children) => {
 
 const Menu = () => {
   const [data, setData] = useState([]);
+  const [originalData, setOriginalData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [tableSize, setTableSize] = useState('large');
   const [queryParams, setQueryParams] = useState({
@@ -214,7 +215,7 @@ const Menu = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 200,
+      width: 300,
       fixed: 'right',
       render: (_, record) => (
         <Space size="small">
@@ -282,7 +283,9 @@ const Menu = () => {
           });
         };
         
-        setData(addLevel(treeData));
+        const finalData = addLevel(treeData);
+        setData(finalData);
+        setOriginalData(finalData);
       }
     } catch (error) {
       console.error(error);
@@ -370,6 +373,29 @@ const Menu = () => {
       const newIndex = siblings.findIndex((i) => i.menuId === over.id);
       const newSiblings = arrayMove(siblings, oldIndex, newIndex);
 
+      // Update parent's children with new order
+      const updateTree = (nodes) => {
+        // If the siblings are root-level (parentId is 0), return the new siblings directly
+        if (siblings[0].parentId === 0) {
+          return newSiblings;
+        }
+        
+        return nodes.map(node => {
+          if (node.menuId === siblings[0].parentId) {
+            return { ...node, children: newSiblings };
+          }
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: updateTree(node.children) };
+          }
+          return node;
+        });
+      };
+      
+      const newData = updateTree(data);
+      
+      // Immediately update UI to show the new order
+      setData(newData);
+
       // Prepare batch update data
       const sortData = newSiblings.map((item, index) => ({
         menuId: item.menuId,
@@ -381,14 +407,18 @@ const Menu = () => {
         const res = await sortMenu(sortData);
         if (res.code === 200) {
           message.success('排序更新成功');
-          fetchData();
+          await fetchData();
           refreshMenuCache();
         } else {
           message.error(res.msg || '排序更新失败');
+          // Revert to original data on error
+          setData(originalData);
         }
       } catch (error) {
         console.error(error);
         message.error('排序更新失败，请重试');
+        // Revert to original data on error
+        setData(originalData);
       } finally {
         setDragLoading(false);
       }
@@ -505,25 +535,10 @@ const Menu = () => {
   return (
     <div className="menu-container">
       {dragLoading && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          backgroundColor: 'rgba(255, 255, 255, 0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }}>
-          <div className="ant-spin ant-spin-spinning">
-            <span className="ant-spin-dot ant-spin-dot-spin">
-              <i className="ant-spin-dot-item"></i>
-              <i className="ant-spin-dot-item"></i>
-              <i className="ant-spin-dot-item"></i>
-              <i className="ant-spin-dot-item"></i>
-            </span>
+        <div className="drag-loading-overlay">
+          <div className="drag-loading-content">
+            <Spin size="large" />
+            <span className="drag-loading-text">正在保存排序...</span>
           </div>
         </div>
       )}

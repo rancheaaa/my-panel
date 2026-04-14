@@ -144,7 +144,7 @@ public class FileService {
                     names.add(entry.getFileName().toString());
                 }
             }
-            Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+            names.sort(String.CASE_INSENSITIVE_ORDER);
             return ApiResponse.success(names);
         } catch (SecurityException e) {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);

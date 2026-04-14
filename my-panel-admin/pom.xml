@@ -57,10 +57,18 @@
             <artifactId>spring-web</artifactId>
         </dependency>
 
-        <!-- spring security 安全认证 -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
+            <groupId>com.cq</groupId>
+            <artifactId>my-panel-auth-lite</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>my-panel-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
         </dependency>
 
         <!-- pagehelper 分页插件 -->
@@ -98,6 +106,8 @@
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
         </dependency>
+
+
 
         <!-- excel工具 -->
         <dependency>
@@ -145,6 +155,13 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
+        </dependency>
+
+        <!-- commons-configuration2 for properties comments -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-configuration2</artifactId>
+            <version>2.10.1</version>
         </dependency>
 
         <!-- 解析客户端操作系统、浏览器等 -->
@@ -255,6 +272,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <version>4.12.0</version>
             <scope>test</scope>
         </dependency>
 

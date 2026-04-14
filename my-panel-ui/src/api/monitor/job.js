@@ -56,15 +56,50 @@ export function changeJobStatus(jobId, status) {
   });
 }
 
-// 定时任务立即执行一次
-export function runJob(jobId, jobGroup) {
+// 执行一次任务
+export function runJob(jobId) {
   const data = {
-    jobId,
-    jobGroup
+    jobId
   };
   return request({
     url: '/monitor/job/run',
     method: 'put',
+    data: data
+  });
+}
+
+// 导出定时任务
+export function exportJob(query) {
+  return request({
+    url: '/monitor/job/export',
+    method: 'post',
+    params: query,
+    responseType: 'blob'
+  });
+}
+
+// 查询任务组名列表
+export function getJobGroups(jobGroup) {
+  return request({
+    url: '/monitor/job/jobGroups',
+    method: 'get',
+    params: { jobGroup }
+  });
+}
+
+// 扫描内置方法列表
+export function scanMethods() {
+  return request({
+    url: '/monitor/job/methods',
+    method: 'get'
+  });
+}
+
+// 验证内置方法
+export function validateMethod(data) {
+  return request({
+    url: '/monitor/job/validateMethod',
+    method: 'post',
     data: data
   });
 }

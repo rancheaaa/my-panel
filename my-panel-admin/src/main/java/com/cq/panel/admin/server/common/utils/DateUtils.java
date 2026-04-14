@@ -125,6 +125,33 @@ public class DateUtils extends org.apache.commons.lang3.time.DateUtils
     }
 
     /**
+     * 日期型字符串转化为日期 格式（带错误日志）
+     */
+    public static Date parseDateWithErrorLog(Object str, String fieldName)
+    {
+        if (str == null)
+        {
+            return null;
+        }
+        try
+        {
+            Date date = parseDate(str.toString(), parsePatterns);
+            if (date == null)
+            {
+                throw new ParseException("无法解析日期字符串: " + str.toString(), 0);
+            }
+            return date;
+        }
+        catch (ParseException e)
+        {
+            org.slf4j.LoggerFactory.getLogger(DateUtils.class)
+                .error("日期解析失败 - 字段: {}, 值: {}, 支持的格式: {}", 
+                    fieldName, str, java.util.Arrays.toString(parsePatterns), e);
+            return null;
+        }
+    }
+
+    /**
      * 获取服务器启动时间
      */
     public static Date getServerStartDate()

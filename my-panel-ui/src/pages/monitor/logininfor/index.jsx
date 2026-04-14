@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Popconfirm, Tag, Tooltip, Dropdown } from 'antd';
+import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, UnlockOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, delLogininfor, cleanLogininfor, unlockLogininfor, exportLogininfor } from '../../../api/monitor/logininfor';
@@ -14,7 +15,7 @@ const Logininfor = () => {
   const [total, setTotal] = useState(0);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [tableSize, setTableSize] = useState('large');
-  const [expand, setExpand] = useState(false);
+  const [expand, setExpand] = useState(true);
   const [queryParams, setQueryParams] = useState({
     pageNum: 1,
     pageSize: 10,
@@ -137,7 +138,7 @@ const Logininfor = () => {
         width: getWidth('status', 100),
         render: (text) => {
           const dict = sysCommonStatus.find(d => d.dictValue == text);
-          return dict ? <Tag color={String(text) === '0' ? 'success' : 'error'}>{dict.dictLabel}</Tag> : text;
+          return dict ? <Tag color={String(text) === '0' ? '#1890ff' : 'error'}>{dict.dictLabel}</Tag> : text;
         }
       },
       { title: '操作信息', dataIndex: 'msg', key: 'msg', align: 'center', width: getWidth('msg', 150), ellipsis: true },
@@ -238,11 +239,14 @@ const Logininfor = () => {
                       value={dateRange} 
                       onChange={setDateRange} 
                       style={{ width: '100%' }}
+                      locale={zhCN}
+                      showTime
+                      format="YYYY-MM-DD HH:mm:ss"
                   />
                 </Form.Item>
               </Col>
             )}
-            <Col span={expand ? 18 : 6} style={{ textAlign: 'right' }}>
+            <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
               <Space>
                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
                 <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
@@ -320,11 +324,13 @@ const Logininfor = () => {
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
             total: total,
+            showTotal: (total, range) => `共 ${total} 条`,
+            onChange: (page, pageSize) => {
+                setQueryParams({ ...queryParams, pageNum: page, pageSize });
+            },
+            position: ['bottomRight'],
             showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            onChange: (page, size) => {
-                setQueryParams({ ...queryParams, pageNum: page, pageSize: size });
-            }
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
           rowSelection={{
             selectedRowKeys,

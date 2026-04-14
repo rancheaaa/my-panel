@@ -58,7 +58,8 @@ service.interceptors.response.use(
   },
   (error) => {
     console.error('Response Error:', error);
-    const { response } = error;
+    const { response } = error || {};
+    
     if (response && response.status === 401) {
        message.error('登录过期，请重新登录');
        localStorage.removeItem('token');

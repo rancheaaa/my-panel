@@ -10,39 +10,50 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="jobGroup"       column="job_group"       />
 		<result property="invokeTarget"   column="invoke_target"   />
 		<result property="jobMessage"     column="job_message"     />
+		<result property="triggerType"    column="trigger_type"    />
 		<result property="status"         column="status"          />
 		<result property="exceptionInfo"  column="exception_info"  />
-		<result property="createTime"     column="create_time"     />
+		<result property="startTime"      column="start_time"      />
+		<result property="endTime"        column="end_time"        />
 	</resultMap>
 	
 	<sql id="selectJobLogVo">
-        select job_log_id, job_name, job_group, invoke_target, job_message, status, exception_info, create_time 
+        select job_log_id, job_name, job_group, invoke_target, job_message, trigger_type, status, exception_info, start_time, end_time 
 		from sys_job_log
     </sql>
 	
-	<select id="selectJobLogList" parameterType="SysJobLog" resultMap="SysJobLogResult">
+	<select id="selectJobLogList" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
 		<where>
-			<if test="jobName != null and jobName != ''">
-				AND job_name like concat('%', #{jobName}, '%')
+			<if test="jobLog.jobName != null and jobLog.jobName != ''">
+				AND job_name like concat('%', #{jobLog.jobName}, '%')
 			</if>
-			<if test="jobGroup != null and jobGroup != ''">
-				AND job_group = #{jobGroup}
+			<if test="jobLog.jobGroup != null and jobLog.jobGroup != ''">
+				AND job_group = #{jobLog.jobGroup}
 			</if>
-			<if test="status != null and status != ''">
-				AND status = #{status}
+			<if test="jobLog.status != null and jobLog.status != ''">
+				AND status = #{jobLog.status}
 			</if>
-			<if test="invokeTarget != null and invokeTarget != ''">
-				AND invoke_target like concat('%', #{invokeTarget}, '%')
+			<if test="jobLog.triggerType != null and jobLog.triggerType != ''">
+				AND trigger_type = #{jobLog.triggerType}
 			</if>
-			<if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
-				and date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+			<if test="jobLog.invokeTarget != null and jobLog.invokeTarget != ''">
+				AND invoke_target like concat('%', #{jobLog.invokeTarget}, '%')
 			</if>
-			<if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
-				and date_format(create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+			<if test="jobLog.startTimeStart != null">
+				AND start_time &gt;= #{jobLog.startTimeStart}
+			</if>
+			<if test="jobLog.startTimeEnd != null">
+				AND start_time &lt;= #{jobLog.startTimeEnd}
+			</if>
+			<if test="jobLog.endTimeStart != null">
+				AND end_time &gt;= #{jobLog.endTimeStart}
+			</if>
+			<if test="jobLog.endTimeEnd != null">
+				AND end_time &lt;= #{jobLog.endTimeEnd}
 			</if>
 		</where>
-		order by create_time desc
+		order by start_time desc
 	</select>
 	
 	<select id="selectJobLogAll" resultMap="SysJobLogResult">
@@ -76,19 +87,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			<if test="jobGroup != null and jobGroup != ''">job_group,</if>
  			<if test="invokeTarget != null and invokeTarget != ''">invoke_target,</if>
  			<if test="jobMessage != null and jobMessage != ''">job_message,</if>
+ 			<if test="triggerType != null and triggerType != ''">trigger_type,</if>
  			<if test="status != null and status != ''">status,</if>
  			<if test="exceptionInfo != null and exceptionInfo != ''">exception_info,</if>
- 			create_time
+ 			<if test="startTime != null">start_time,</if>
+ 			<if test="endTime != null">end_time</if>
  		)values(
  			<if test="jobLogId != null and jobLogId != 0">#{jobLogId},</if>
  			<if test="jobName != null and jobName != ''">#{jobName},</if>
  			<if test="jobGroup != null and jobGroup != ''">#{jobGroup},</if>
  			<if test="invokeTarget != null and invokeTarget != ''">#{invokeTarget},</if>
  			<if test="jobMessage != null and jobMessage != ''">#{jobMessage},</if>
+ 			<if test="triggerType != null and triggerType != ''">#{triggerType},</if>
  			<if test="status != null and status != ''">#{status},</if>
  			<if test="exceptionInfo != null and exceptionInfo != ''">#{exceptionInfo},</if>
- 			now()
+ 			<if test="startTime != null">#{startTime},</if>
+ 			<if test="endTime != null">#{endTime}</if>
  		)
 	</insert>
 
-</mapper> 
+</mapper>

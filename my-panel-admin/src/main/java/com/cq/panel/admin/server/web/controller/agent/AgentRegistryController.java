@@ -17,11 +17,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+
+import com.cq.panel.admin.server.web.domain.dto.agent.AgentExecuteCommandDTO;
 
 /**
  * Agent注册信息 Controller
@@ -33,17 +34,20 @@ import java.util.List;
 @RequestMapping("/agent/registry")
 public class AgentRegistryController extends BaseController
 {
-    @Autowired
-    private IAgentRegistryService agentRegistryService;
+    private final IAgentRegistryService agentRegistryService;
 
-    @Autowired
-    private AgentRegistryConverter agentRegistryConverter;
+    private final AgentRegistryConverter agentRegistryConverter;
+
+    public AgentRegistryController(IAgentRegistryService agentRegistryService, AgentRegistryConverter agentRegistryConverter) {
+        this.agentRegistryService = agentRegistryService;
+        this.agentRegistryConverter = agentRegistryConverter;
+    }
 
     /**
      * 查询Agent注册信息列表
      */
     @Operation(summary = "查询Agent注册信息列表", description = "根据条件分页获取Agent注册信息列表")
-    @PreAuthorize("@ss.hasPermi('agent:registry:list')")
+    @RequirePermission("agent:registry:list")
     @GetMapping("/list")
     public Result<PageVO<AgentRegistryVO>> list(@Parameter(description = "查询参数") AgentRegistryQueryDTO query)
     {
@@ -51,7 +55,7 @@ public class AgentRegistryController extends BaseController
         AgentRegistry agentRegistry = agentRegistryConverter.toEntity(query);
         List<AgentRegistry> list = agentRegistryService.selectAgentRegistryList(agentRegistry);
         List<AgentRegistryVO> voList = agentRegistryConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo(list).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(list).getTotal()));
     }
 
     /**
@@ -59,13 +63,13 @@ public class AgentRegistryController extends BaseController
      */
     @Operation(summary = "导出Agent注册信息列表", description = "导出符合条件的Agent注册信息数据")
     @Log(title = "Agent注册信息", businessType = BusinessType.EXPORT)
-    @PreAuthorize("@ss.hasPermi('agent:registry:export')")
+    @RequirePermission("agent:registry:export")
     @PostMapping("/export")
     public void export(HttpServletResponse response, @Parameter(description = "查询参数") AgentRegistryQueryDTO query)
     {
         AgentRegistry agentRegistry = agentRegistryConverter.toEntity(query);
         List<AgentRegistry> list = agentRegistryService.selectAgentRegistryList(agentRegistry);
-        ExcelUtil<AgentRegistry> util = new ExcelUtil<AgentRegistry>(AgentRegistry.class);
+        ExcelUtil<AgentRegistry> util = new ExcelUtil<>(AgentRegistry.class);
         util.exportExcel(response, list, "Agent注册信息数据");
     }
 
@@ -73,7 +77,7 @@ public class AgentRegistryController extends BaseController
      * 获取Agent注册信息详细信息
      */
     @Operation(summary = "获取Agent注册信息详细信息", description = "根据节点ID获取Agent注册信息详细信息")
-    @PreAuthorize("@ss.hasPermi('agent:registry:query')")
+    @RequirePermission("agent:registry:query")
     @GetMapping(value = "/{id}")
     public Result<AgentRegistryVO> getInfo(@Parameter(description = "节点ID", required = true) @PathVariable("id") String id)
     {
@@ -84,7 +88,7 @@ public class AgentRegistryController extends BaseController
      * 新增Agent注册信息
      */
     @Operation(summary = "新增Agent注册信息", description = "新增Agent注册信息")
-    @PreAuthorize("@ss.hasPermi('agent:registry:add')")
+    @RequirePermission("agent:registry:add")
     @Log(title = "Agent注册信息", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody AgentRegistryDTO dto)
@@ -98,7 +102,7 @@ public class AgentRegistryController extends BaseController
      * 修改Agent注册信息
      */
     @Operation(summary = "修改Agent注册信息", description = "修改Agent注册信息")
-    @PreAuthorize("@ss.hasPermi('agent:registry:edit')")
+    @RequirePermission("agent:registry:edit")
     @Log(title = "Agent注册信息", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody AgentRegistryDTO dto)
@@ -112,7 +116,7 @@ public class AgentRegistryController extends BaseController
      * 删除Agent注册信息
      */
     @Operation(summary = "删除Agent注册信息", description = "批量删除Agent注册信息")
-    @PreAuthorize("@ss.hasPermi('agent:registry:remove')")
+    @RequirePermission("agent:registry:remove")
     @Log(title = "Agent注册信息", businessType = BusinessType.DELETE)
     @DeleteMapping("/{ids}")
     public Result<Void> remove(@Parameter(description = "节点ID数组", required = true) @PathVariable String[] ids)
@@ -149,12 +153,29 @@ public class AgentRegistryController extends BaseController
      * 下线超时节点
      */
     @Operation(summary = "下线超时节点", description = "下线超时的Agent节点")
-    @PreAuthorize("@ss.hasPermi('agent:registry:offline')")
+    @RequirePermission("agent:registry:offline")
     @Log(title = "Agent注册信息", businessType = BusinessType.UPDATE)
     @PostMapping("/offline")
     public Result<Integer> offline(@Parameter(description = "超时时间（秒）", required = true) @RequestParam Integer timeoutSeconds)
     {
         int count = agentRegistryService.offlineTimeoutNodes(timeoutSeconds);
         return Result.success(count);
+    }
+
+    /**
+     * 执行Agent命令
+     */
+    @Operation(summary = "执行Agent命令", description = "在指定的Agent节点上执行命令")
+    @RequirePermission("agent:registry:execute")
+    @Log(title = "Agent注册信息", businessType = BusinessType.OTHER)
+    @PostMapping("/execute")
+    public Result<Object> executeCommand(@Validated @RequestBody AgentExecuteCommandDTO dto)
+    {
+        try {
+            Object result = agentRegistryService.executeCommand(dto.getAgentId(), dto.getCommand(), dto.getTimeout());
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error("执行命令失败: " + e.getMessage());
+        }
     }
 }

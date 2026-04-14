@@ -7,10 +7,53 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  // 深邃的星空渐变背景
-  background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
   overflow: hidden;
   font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  transition: background 2s ease-in-out; // Smooth transition
+
+  &.daytime {
+    background: linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 100%);
+  }
+
+  &.daytime::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 200px;
+    height: 100vh;
+    background: linear-gradient(45deg, rgba(255, 255, 0, 0.3) 0%, rgba(255, 255, 0, 0.1) 50%, transparent 100%);
+    transform: translateX(-50%);
+    animation: sunbeam 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  @keyframes sunbeam {
+    0% { opacity: 0.2; transform: translateX(-50%) scaleY(0.8); }
+    100% { opacity: 0.4; transform: translateX(-50%) scaleY(1.2); }
+  }
+
+  &.nighttime {
+    background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+  }
+
+  &.nighttime::before {
+    content: '';
+    position: absolute;
+    top: 10%;
+    right: 10%;
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle at 30% 30%, #ffffff 0%, #e0e0e0 50%, #b0b0b0 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+    animation: moonGlow 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes moonGlow {
+    0% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.3); }
+    100% { box-shadow: 0 0 30px rgba(255, 255, 255, 0.7); }
+  }
 }
 
 // Particle Container
@@ -26,24 +69,38 @@
 
 // Generate 50 particles
 @for $i from 1 through 50 {
+  $isStar: math.random(10) > 7; // 30% chance to be a star
+  
+  // 使用 @if 指令替代已弃用的 if() 函数
+  $color: rgba(255, 255, 255, math.random(5) * 0.1 + 0.1);
+  $size: (math.random(4) + 1) * 1px;
+  
+  @if $isStar {
+    $color: rgba(255, 255, 255, 0.9);
+    $size: (math.random(3) + 2) * 1px;
+  }
+  
+  $opacity: math.random(5) * 0.1 + 0.1;
+  $left: math.random(100) * 1%;
+  $top: math.random(100) * 1%;
+  $duration: (math.random(20) + 15) * 1s; // 变慢一点
+  $delay: (math.random(10) * -1) * 1s;
+
   .particle-#{$i} {
-    $size: (math.random(4) + 1) * 1px; // 稍微减小粒子尺寸
-    $opacity: math.random(5) * 0.1 + 0.1;
-    $left: math.random(100) * 1%;
-    $top: math.random(100) * 1%;
-    $duration: (math.random(20) + 15) * 1s; // 变慢一点
-    $delay: (math.random(10) * -1) * 1s;
-    
     position: absolute;
     width: $size;
     height: $size;
-    background: rgba(255, 255, 255, $opacity);
+    background: $color;
     border-radius: 50%;
     left: $left;
     top: $top;
     box-shadow: 0 0 5px rgba(255, 255, 255, 0.8); // 发光效果
     animation: float-#{$i} $duration linear infinite;
     animation-delay: $delay;
+
+    @if $isStar {
+      animation: float-#{$i} $duration linear infinite, twinkle-#{$i} 2s ease-in-out infinite;
+    }
   }
 
   @keyframes float-#{$i} {
@@ -60,6 +117,76 @@
     100% {
       transform: translateY(-100vh) translateX(#{math.random(100) - 50}px); // 向上浮动
       opacity: 0;
+    }
+  }
+
+  @if $isStar {
+    @keyframes twinkle-#{$i} {
+      0%, 100% { opacity: 0.5; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+  }
+}
+
+// Cloud Container
+.clouds {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+// Generate 5 clouds
+@for $i from 1 through 5 {
+  .cloud-#{$i} {
+    $size: math.random(200) + 100; // Cloud size between 100-300px
+    $left: math.random(100) * 1%;
+    $top: math.random(50) * 1% + 10%; // Clouds in upper half
+    $duration: (math.random(60) + 60) * 1s; // Slow drift
+    $delay: math.random(30) * 1s;
+
+    position: absolute;
+    width: #{$size}px;
+    height: #{$size * 0.6}px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    left: $left;
+    top: $top;
+    box-shadow: inset -20px -20px 0 rgba(255, 255, 255, 0.9), 20px 20px 40px rgba(255, 255, 255, 0.5);
+    animation: drift-#{$i} $duration linear infinite;
+    animation-delay: $delay;
+
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+    }
+
+    &::before {
+      width: #{$size * 0.8}px;
+      height: #{$size * 0.5}px;
+      top: -#{$size * 0.2}px;
+      left: #{$size * 0.1}px;
+    }
+
+    &::after {
+      width: #{$size * 0.6}px;
+      height: #{$size * 0.4}px;
+      top: -#{$size * 0.1}px;
+      right: #{$size * 0.1}px;
+    }
+  }
+
+  @keyframes drift-#{$i} {
+    0% {
+      transform: translateX(-100px);
+    }
+    100% {
+      transform: translateX(calc(100vw + 100px));
     }
   }
 }
@@ -79,11 +206,56 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background 2s ease, border-color 2s ease;
 
   &:hover {
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   }
+}
+
+// Daytime adjustments
+.daytime .login-box {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+
+  &:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.daytime .login-title {
+  background: linear-gradient(90deg, #1e293b, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.daytime .login-subtitle {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.daytime .login-box .ant-input-affix-wrapper {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #1e293b;
+
+  &:hover, &:focus-within {
+    border-color: #1890ff;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+  }
+}
+
+.daytime .login-box .ant-input {
+  color: #1e293b;
+}
+
+.daytime .login-box .ant-input::placeholder {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.daytime .login-box .ant-input-prefix {
+  color: rgba(0, 0, 0, 0.5);
 }
 
 .login-header {
@@ -174,4 +346,25 @@
   &:active {
     transform: translateY(0);
   }
+}
+
+// Shooting star effect for nighttime
+.nighttime .particles::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  left: -100px;
+  width: 100px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  animation: shootingStar 8s linear infinite;
+  animation-delay: 3s;
+  opacity: 0;
+}
+
+@keyframes shootingStar {
+  0% { transform: translateX(-100px) translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 100px)) translateY(100px); opacity: 0; }
 }

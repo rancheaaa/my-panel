@@ -324,39 +324,42 @@ const Dict = () => {
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
             total: total,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total, range) => `共 ${total} 条`,
             onChange: (page, pageSize) => {
                 setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            }
+            },
+            position: ['bottomRight'],
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
         />
-      </Card>
 
-      <Modal
-        title={modalTitle}
-        open={isModalOpen}
-        onOk={handleModalOk}
-        onCancel={() => setIsModalOpen(false)}
-        destroyOnClose
-      >
-        <Form form={modalForm} layout="vertical">
-          <Form.Item name="dictName" label="字典名称" rules={[{ required: true, message: '请输入字典名称' }]}>
-            <Input placeholder="请输入字典名称" />
-          </Form.Item>
-          <Form.Item name="dictType" label="字典类型" rules={[{ required: true, message: '请输入字典类型' }]}>
-             <Input placeholder="请输入字典类型" />
-          </Form.Item>
-          <Form.Item name="status" label="状态" initialValue="0">
-            <Radio.Group>
-                <Radio value="0">正常</Radio>
-                <Radio value="1">停用</Radio>
-            </Radio.Group>
-          </Form.Item>
-          <Form.Item name="remark" label="备注">
-            <Input.TextArea placeholder="请输入备注" />
-          </Form.Item>
-        </Form>
-      </Modal>
+        <Modal
+          title={modalTitle}
+          open={isModalOpen}
+          onOk={handleModalOk}
+          onCancel={() => setIsModalOpen(false)}
+          destroyOnClose
+        >
+          <Form form={modalForm} layout="vertical">
+            <Form.Item name="dictName" label="字典名称" rules={[{ required: true, message: '请输入字典名称' }]}>
+              <Input placeholder="请输入字典名称" />
+            </Form.Item>
+            <Form.Item name="dictType" label="字典类型" rules={[{ required: true, message: '请输入字典类型' }]}>
+               <Input placeholder="请输入字典类型" />
+            </Form.Item>
+            <Form.Item name="status" label="状态" initialValue="0">
+              <Radio.Group>
+                  <Radio value="0">正常</Radio>
+                  <Radio value="1">停用</Radio>
+              </Radio.Group>
+            </Form.Item>
+            <Form.Item name="remark" label="备注">
+              <Input.TextArea placeholder="请输入备注" />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Card>
     </div>
   );
 };

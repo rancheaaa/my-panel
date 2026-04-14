@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="nodeIp"    column="node_ip"    />
         <result property="nodePort"    column="node_port"    />
         <result property="status"    column="status"    />
+        <result property="zone"    column="zone"    />
         <result property="lastRefreshTime"    column="last_refresh_time"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -21,7 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectRcNodeVo">
-        select n.id, n.env_id, n.project_id, n.node_ip, n.node_port, n.status, n.last_refresh_time, n.create_by, n.create_time, n.update_by, n.update_time,
+        select n.id, n.env_id, n.project_id, n.node_ip, n.node_port, n.status, n.zone, n.last_refresh_time, n.create_by, n.create_time, n.update_by, n.update_time,
                e.env_name, p.project_name
         from rc_node n
         left join rc_env e on n.env_id = e.id
@@ -35,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="projectId != null "> and n.project_id = #{projectId}</if>
             <if test="nodeIp != null  and nodeIp != ''"> and n.node_ip like concat('%', #{nodeIp}, '%')</if>
             <if test="status != null  and status != ''"> and n.status = #{status}</if>
+            <if test="zone != null  and zone != ''"> and n.zone like concat('%', #{zone}, '%')</if>
         </where>
     </select>
     
@@ -51,6 +53,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="nodeIp != null and nodeIp != ''">node_ip,</if>
             <if test="nodePort != null">node_port,</if>
             <if test="status != null">status,</if>
+            <if test="zone != null and zone != ''">zone,</if>
             <if test="lastRefreshTime != null">last_refresh_time,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -63,6 +66,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="nodeIp != null and nodeIp != ''">#{nodeIp},</if>
             <if test="nodePort != null">#{nodePort},</if>
             <if test="status != null">#{status},</if>
+            <if test="zone != null and zone != ''">#{zone},</if>
             <if test="lastRefreshTime != null">#{lastRefreshTime},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -79,6 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="nodeIp != null and nodeIp != ''">node_ip = #{nodeIp},</if>
             <if test="nodePort != null">node_port = #{nodePort},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="zone != null and zone != ''">zone = #{zone},</if>
             <if test="lastRefreshTime != null">last_refresh_time = #{lastRefreshTime},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
@@ -105,10 +110,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
-    <update id="updateNodeOfflineByTimeout" parameterType="Integer">
-        update rc_node
-        set status = '1', update_time = now()
-        where status = '0' 
-        and TIMESTAMPDIFF(SECOND, last_refresh_time, now()) &gt; #{timeoutSeconds}
-    </update>
+    <select id="selectOnlineNodes" resultMap="RcNodeResult">
+        <include refid="selectRcNodeVo"/>
+        where n.status = '0'
+    </select>
 </mapper>

@@ -121,10 +121,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where agent_ip = #{agentIp} and agent_port = #{agentPort}
     </update>
 
-    <update id="updateNodeOfflineByTimeout" parameterType="Integer">
-        update agent_registry
-        set node_status = 0, update_time = now()
-        where node_status = 1 
-        and TIMESTAMPDIFF(SECOND, update_time, now()) &gt; #{timeoutSeconds}
-    </update>
+    <select id="selectOnlineNodes" resultMap="AgentRegistryResult">
+        <include refid="selectAgentRegistryVo"/>
+        where node_status = 1
+    </select>
 </mapper>

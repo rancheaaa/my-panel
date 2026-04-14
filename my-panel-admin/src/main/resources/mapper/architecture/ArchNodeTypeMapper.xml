@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchNodeTypeMapper">
+    
+    <resultMap type="ArchNodeType" id="ArchNodeTypeResult">
+        <result property="id"    column="id"    />
+        <result property="typeCode"    column="type_code"    />
+        <result property="typeName"    column="type_name"    />
+        <result property="icon"    column="icon"    />
+        <result property="category"    column="category"    />
+        <result property="defaultWidth"    column="default_width"    />
+        <result property="defaultHeight"    column="default_height"    />
+        <result property="defaultStyle"    column="default_style"    />
+        <result property="defaultProperties"    column="default_properties"    />
+        <result property="validationRules"    column="validation_rules"    />
+        <result property="isSystem"    column="is_system"    />
+        <result property="isActive"    column="is_active"    />
+        <result property="sortOrder"    column="sort_order"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectArchNodeTypeVo">
+        select id, type_code, type_name, icon, category, default_width, default_height, default_style, default_properties, validation_rules, is_system, is_active, sort_order, create_by, create_time, update_by, update_time, del_flag, remark from arch_node_type
+    </sql>
+
+    <select id="selectArchNodeTypeList" parameterType="ArchNodeType" resultMap="ArchNodeTypeResult">
+        <include refid="selectArchNodeTypeVo"/>
+        <where>  
+            del_flag = '0'
+            <if test="typeCode != null and typeCode != ''"> and type_code like concat('%', #{typeCode}, '%')</if>
+            <if test="typeName != null and typeName != ''"> and type_name like concat('%', #{typeName}, '%')</if>
+            <if test="category != null and category != ''"> and category = #{category}</if>
+            <if test="isSystem != null and isSystem != ''"> and is_system = #{isSystem}</if>
+            <if test="isActive != null and isActive != ''"> and is_active = #{isActive}</if>
+        </where>
+        order by sort_order asc, create_time desc
+    </select>
+    
+    <select id="selectArchNodeTypeAll" resultMap="ArchNodeTypeResult">
+        <include refid="selectArchNodeTypeVo"/>
+        where del_flag = '0' and is_active = '1'
+        order by sort_order asc
+    </select>
+
+    <select id="selectArchNodeTypeById" parameterType="Long" resultMap="ArchNodeTypeResult">
+        <include refid="selectArchNodeTypeVo"/>
+        where id = #{id} and del_flag = '0'
+    </select>
+
+    <select id="selectArchNodeTypeByCode" parameterType="String" resultMap="ArchNodeTypeResult">
+        <include refid="selectArchNodeTypeVo"/>
+        where type_code = #{typeCode} and del_flag = '0'
+    </select>
+        
+    <insert id="insertArchNodeType" parameterType="ArchNodeType" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_node_type
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="typeCode != null and typeCode != ''">type_code,</if>
+            <if test="typeName != null and typeName != ''">type_name,</if>
+            <if test="icon != null">icon,</if>
+            <if test="category != null">category,</if>
+            <if test="defaultWidth != null">default_width,</if>
+            <if test="defaultHeight != null">default_height,</if>
+            <if test="defaultStyle != null">default_style,</if>
+            <if test="defaultProperties != null">default_properties,</if>
+            <if test="validationRules != null">validation_rules,</if>
+            <if test="isSystem != null">is_system,</if>
+            <if test="isActive != null">is_active,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="typeCode != null and typeCode != ''">#{typeCode},</if>
+            <if test="typeName != null and typeName != ''">#{typeName},</if>
+            <if test="icon != null">#{icon},</if>
+            <if test="category != null">#{category},</if>
+            <if test="defaultWidth != null">#{defaultWidth},</if>
+            <if test="defaultHeight != null">#{defaultHeight},</if>
+            <if test="defaultStyle != null">#{defaultStyle},</if>
+            <if test="defaultProperties != null">#{defaultProperties},</if>
+            <if test="validationRules != null">#{validationRules},</if>
+            <if test="isSystem != null">#{isSystem},</if>
+            <if test="isActive != null">#{isActive},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateArchNodeType" parameterType="ArchNodeType">
+        update arch_node_type
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="typeCode != null and typeCode != ''">type_code = #{typeCode},</if>
+            <if test="typeName != null and typeName != ''">type_name = #{typeName},</if>
+            <if test="icon != null">icon = #{icon},</if>
+            <if test="category != null">category = #{category},</if>
+            <if test="defaultWidth != null">default_width = #{defaultWidth},</if>
+            <if test="defaultHeight != null">default_height = #{defaultHeight},</if>
+            <if test="defaultStyle != null">default_style = #{defaultStyle},</if>
+            <if test="defaultProperties != null">default_properties = #{defaultProperties},</if>
+            <if test="validationRules != null">validation_rules = #{validationRules},</if>
+            <if test="isSystem != null">is_system = #{isSystem},</if>
+            <if test="isActive != null">is_active = #{isActive},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteArchNodeTypeById" parameterType="Long">
+        update arch_node_type set del_flag = '1' where id = #{id}
+    </delete>
+
+    <delete id="deleteArchNodeTypeByIds" parameterType="String">
+        update arch_node_type set del_flag = '1' where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="checkTypeCodeUnique" parameterType="ArchNodeType" resultMap="ArchNodeTypeResult">
+        <include refid="selectArchNodeTypeVo"/>
+        where type_code = #{typeCode} and del_flag = '0'
+        <if test="id != null"> and id != #{id}</if>
+        limit 1
+    </select>
+</mapper>

@@ -1,8 +1,9 @@
 package com.cq.panel.admin.server.repository.domain;
 
 import com.cq.panel.admin.server.common.annotation.Excel;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import java.io.Serial;
 import java.util.Date;
 
 /**
@@ -10,8 +11,12 @@ import java.util.Date;
  * 
  * @author cq
  */
+
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class SysJobLog extends BaseEntity
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /** ID */
@@ -34,6 +39,10 @@ public class SysJobLog extends BaseEntity
     @Excel(name = "日志信息")
     private String jobMessage;
 
+    /** 触发类型（0定时触发 1手动触发） */
+    @Excel(name = "触发类型", readConverterExp = "0=定时触发,1=手动触发")
+    private String triggerType;
+
     /** 执行状态（0正常 1失败） */
     @Excel(name = "执行状态", readConverterExp = "0=正常,1=失败")
     private String status;
@@ -45,110 +54,18 @@ public class SysJobLog extends BaseEntity
     /** 开始时间 */
     private Date startTime;
 
-    /** 停止时间 */
-    private Date stopTime;
+    /** 结束时间 */
+    private Date endTime;
 
-    public Long getJobLogId()
-    {
-        return jobLogId;
-    }
+    /** 开始时间起（用于查询） */
+    private transient Date startTimeStart;
 
-    public void setJobLogId(Long jobLogId)
-    {
-        this.jobLogId = jobLogId;
-    }
+    /** 开始时间止（用于查询） */
+    private transient Date startTimeEnd;
 
-    public String getJobName()
-    {
-        return jobName;
-    }
+    /** 结束时间起（用于查询） */
+    private transient Date endTimeStart;
 
-    public void setJobName(String jobName)
-    {
-        this.jobName = jobName;
-    }
-
-    public String getJobGroup()
-    {
-        return jobGroup;
-    }
-
-    public void setJobGroup(String jobGroup)
-    {
-        this.jobGroup = jobGroup;
-    }
-
-    public String getInvokeTarget()
-    {
-        return invokeTarget;
-    }
-
-    public void setInvokeTarget(String invokeTarget)
-    {
-        this.invokeTarget = invokeTarget;
-    }
-
-    public String getJobMessage()
-    {
-        return jobMessage;
-    }
-
-    public void setJobMessage(String jobMessage)
-    {
-        this.jobMessage = jobMessage;
-    }
-
-    public String getStatus()
-    {
-        return status;
-    }
-
-    public void setStatus(String status)
-    {
-        this.status = status;
-    }
-
-    public String getExceptionInfo()
-    {
-        return exceptionInfo;
-    }
-
-    public void setExceptionInfo(String exceptionInfo)
-    {
-        this.exceptionInfo = exceptionInfo;
-    }
-
-    public Date getStartTime()
-    {
-        return startTime;
-    }
-
-    public void setStartTime(Date startTime)
-    {
-        this.startTime = startTime;
-    }
-    
-    public Date getStopTime()
-    {
-        return stopTime;
-    }
-
-    public void setStopTime(Date stopTime)
-    {
-        this.stopTime = stopTime;
-    }
-
-    @Override
-    public String toString() {
-        return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
-            .append("jobLogId", getJobLogId())
-            .append("jobName", getJobName())
-            .append("jobGroup", getJobGroup())
-            .append("jobMessage", getJobMessage())
-            .append("status", getStatus())
-            .append("exceptionInfo", getExceptionInfo())
-            .append("startTime", getStartTime())
-            .append("stopTime", getStopTime())
-            .toString();
-    }
+    /** 结束时间止（用于查询） */
+    private transient Date endTimeEnd;
 }

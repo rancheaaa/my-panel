@@ -1,147 +1,106 @@
 package com.cq.panel.admin.server.config;
 
 import com.cq.panel.admin.server.common.properties.PermitAllUrlProperties;
-import com.cq.panel.admin.server.security.filter.JwtAuthenticationTokenFilter;
-import com.cq.panel.admin.server.security.handle.AuthenticationEntryPointImpl;
-import com.cq.panel.admin.server.security.handle.LogoutSuccessHandlerImpl;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.repository.domain.SysRole;
+import com.cq.panel.admin.server.web.domain.model.LoginUser;
+import com.cq.panel.admin.server.web.service.TokenService;
+import com.cq.panel.authlite.User;
+import com.cq.panel.authlite.filter.AuthFilter;
+import com.cq.panel.authlite.filter.TokenValidator;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.web.filter.CorsFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 /**
- * spring security配置
- * 
- * @author cq
+ * 轻量级鉴权配置（无 spring-security）
  */
-@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true)
 @Configuration
 public class SecurityConfig
 {
-    /**
-     * 自定义用户认证逻辑
-     */
-    @Autowired
-    private UserDetailsService userDetailsService;
-    
-    /**
-     * 认证失败处理类
-     */
-    @Autowired
-    private AuthenticationEntryPointImpl unauthorizedHandler;
-
-    /**
-     * 退出处理类
-     */
-    @Autowired
-    private LogoutSuccessHandlerImpl logoutSuccessHandler;
-
-    /**
-     * token认证过滤器
-     */
-    @Autowired
-    private JwtAuthenticationTokenFilter authenticationTokenFilter;
-    
-    /**
-     * 跨域过滤器
-     */
-    @Autowired
-    private CorsFilter corsFilter;
-
-    /**
-     * 允许匿名访问的地址
-     */
-    @Autowired
-    private PermitAllUrlProperties permitAllUrl;
-
-    /**
-     * 身份验证实现
-     */
     @Bean
-    public AuthenticationManager authenticationManager()
+    public TokenValidator tokenValidator(TokenService tokenService)
     {
-        DaoAuthenticationProvider daoAuthenticationProvider = new DaoAuthenticationProvider();
-        daoAuthenticationProvider.setUserDetailsService(userDetailsService);
-        daoAuthenticationProvider.setPasswordEncoder(bCryptPasswordEncoder());
-        return new ProviderManager(daoAuthenticationProvider);
+        return token -> {
+            LoginUser loginUser = tokenService.getLoginUser(token);
+            if (loginUser == null)
+            {
+                return null;
+            }
+            tokenService.verifyToken(loginUser);
+
+            Set<String> roles = new HashSet<>();
+            if (loginUser.getUser() != null && loginUser.getUser().getRoles() != null)
+            {
+                for (SysRole role : loginUser.getUser().getRoles())
+                {
+                    if (role != null && StringUtils.isNotEmpty(role.getRoleKey()))
+                    {
+                        roles.add(role.getRoleKey());
+                    }
+                }
+            }
+            
+            // 确保超级管理员拥有admin角色
+            if (loginUser.getUser() != null && loginUser.getUser().isAdmin()) {
+                roles.add("admin");
+            }
+            
+            Set<String> permissions = loginUser.getPermissions() == null ? Set.of() : loginUser.getPermissions();
+            
+            // 使用用户ID作为username，确保不为null
+            String username = loginUser.getUser() != null && loginUser.getUser().getUserName() != null 
+                ? loginUser.getUser().getUserName() 
+                : "user_" + loginUser.getUserId();
+            
+            return new User(username, roles, permissions);
+        };
     }
 
-    /**
-     * anyRequest          |   匹配所有请求路径
-     * access              |   SpringEl表达式结果为true时可以访问
-     * anonymous           |   匿名可以访问
-     * denyAll             |   用户不能访问
-     * fullyAuthenticated  |   用户完全认证可以访问（非remember-me下自动登录）
-     * hasAnyAuthority     |   如果有参数，参数表示权限，则其中任何一个权限可以访问
-     * hasAnyRole          |   如果有参数，参数表示角色，则其中任何一个角色可以访问
-     * hasAuthority        |   如果有参数，参数表示权限，则其权限可以访问
-     * hasIpAddress        |   如果有参数，参数表示IP地址，如果用户IP和参数匹配，则可以访问
-     * hasRole             |   如果有参数，参数表示角色，则其角色可以访问
-     * permitAll           |   用户可以任意访问
-     * rememberMe          |   允许通过remember-me登录的用户访问
-     * authenticated       |   用户登录后可访问
-     */
     @Bean
-    protected SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
+    public AuthFilter authFilter(TokenValidator tokenValidator, PermitAllUrlProperties permitAllUrl)
     {
-        return httpSecurity
-            // CSRF禁用，因为不使用session
-            .csrf(csrf -> csrf.disable())
-            // 禁用HTTP响应标头
-            .headers((headersCustomizer) -> {
-                headersCustomizer.cacheControl(cache -> cache.disable()).frameOptions(options -> options.sameOrigin());
-            })
-            // 认证失败处理类
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-            // 基于token，所以不需要session
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // 注解标记允许匿名访问的url
-            .authorizeHttpRequests((requests) -> {
-                permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
-                // 对于登录login 注册register 验证码captchaImage 允许匿名访问
-                requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
-                    // 允许 Actuator 监控端点匿名访问
-                    .requestMatchers("/actuator/**").permitAll()
-                    // 允许 Spring Boot Admin 静态资源和 API 访问
-                    .requestMatchers("/admin/server/**").permitAll()
-                    // 允许 agent 注册api接口访问
-                    .requestMatchers("/agent/registry/register").permitAll()
-                    // 允许 agent 心跳api接口访问
-                    .requestMatchers("/agent/registry/heartbeat").permitAll()
-                    // 静态资源，可匿名访问
-                    .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
-                    .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**", "/doc.html").permitAll()
-                    // 除上面外的所有请求全部需要鉴权认证
-                    .anyRequest().authenticated();
-            })
-            // 添加Logout filter
-            .logout(logout -> logout.logoutUrl("/logout").logoutSuccessHandler(logoutSuccessHandler))
-            // 添加JWT filter
-            .addFilterBefore(authenticationTokenFilter, UsernamePasswordAuthenticationFilter.class)
-            // 添加CORS filter
-            .addFilterBefore(corsFilter, JwtAuthenticationTokenFilter.class)
-            .addFilterBefore(corsFilter, LogoutFilter.class)
-            .build();
+        List<String> ignore = new ArrayList<>();
+        if (permitAllUrl != null && permitAllUrl.getUrls() != null)
+        {
+            ignore.addAll(permitAllUrl.getUrls());
+        }
+        ignore.add("/login");
+        ignore.add("/register");
+        ignore.add("/captchaImage");
+        ignore.add("/logout");
+        ignore.add("/actuator/**");
+        ignore.add("/admin/server/**");
+        ignore.add("/agent/registry/register");
+        ignore.add("/agent/registry/heartbeat");
+        ignore.add("/test/user/**");
+        ignore.add("/");
+        ignore.add("/*.html");
+        ignore.add("/**/*.html");
+        ignore.add("/**/*.css");
+        ignore.add("/**/*.js");
+        ignore.add("/profile/**");
+        ignore.add("/swagger-ui.html");
+        ignore.add("/v3/api-docs/**");
+        ignore.add("/swagger-ui/**");
+        ignore.add("/druid/**");
+        ignore.add("/doc.html");
+
+        return new AuthFilter(tokenValidator, ignore);
     }
 
-    /**
-     * 强散列哈希加密实现
-     */
     @Bean
-    public BCryptPasswordEncoder bCryptPasswordEncoder()
+    public FilterRegistrationBean<AuthFilter> authFilterRegistration(AuthFilter authFilter)
     {
-        return new BCryptPasswordEncoder();
+        FilterRegistrationBean<AuthFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(authFilter);
+        registration.addUrlPatterns("/*");
+        registration.setName("authFilter");
+        registration.setOrder(FilterRegistrationBean.HIGHEST_PRECEDENCE + 50);
+        return registration;
     }
 }

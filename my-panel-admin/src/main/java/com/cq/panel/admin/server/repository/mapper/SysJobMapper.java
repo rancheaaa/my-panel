@@ -64,4 +64,12 @@ public interface SysJobMapper
      * @return 结果
      */
     public int insertJob(SysJob job);
+    
+    /**
+     * 查询任务组名列表（用于自动完成）
+     * 
+     * @param jobGroup 任务组名（支持模糊查询）
+     * @return 任务组名列表
+     */
+    public List<String> selectJobGroupList(String jobGroup);
 }

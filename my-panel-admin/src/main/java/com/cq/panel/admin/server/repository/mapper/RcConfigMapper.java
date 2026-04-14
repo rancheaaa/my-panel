@@ -17,7 +17,7 @@ public interface RcConfigMapper
      * @param id 配置中心主键
      * @return 配置中心
      */
-    public RcConfig selectRcConfigById(Long id);
+    RcConfig selectRcConfigById(Long id);
 
     /**
      * 查询配置中心列表
@@ -25,7 +25,7 @@ public interface RcConfigMapper
      * @param rcConfig 配置中心
      * @return 配置中心集合
      */
-    public List<RcConfig> selectRcConfigList(RcConfig rcConfig);
+    List<RcConfig> selectRcConfigList(RcConfig rcConfig);
 
     /**
      * 新增配置中心
@@ -33,7 +33,7 @@ public interface RcConfigMapper
      * @param rcConfig 配置中心
      * @return 结果
      */
-    public int insertRcConfig(RcConfig rcConfig);
+    int insertRcConfig(RcConfig rcConfig);
 
     /**
      * 修改配置中心
@@ -41,7 +41,7 @@ public interface RcConfigMapper
      * @param rcConfig 配置中心
      * @return 结果
      */
-    public int updateRcConfig(RcConfig rcConfig);
+    int updateRcConfig(RcConfig rcConfig);
 
     /**
      * 删除配置中心
@@ -49,7 +49,7 @@ public interface RcConfigMapper
      * @param id 配置中心主键
      * @return 结果
      */
-    public int deleteRcConfigById(Long id);
+    int deleteRcConfigById(Long id);
 
     /**
      * 批量删除配置中心
@@ -57,7 +57,7 @@ public interface RcConfigMapper
      * @param ids 需要删除的数据主键集合
      * @return 结果
      */
-    public int deleteRcConfigByIds(Long[] ids);
+    int deleteRcConfigByIds(Long[] ids);
 
     /**
      * 校验配置键是否唯一
@@ -67,5 +67,5 @@ public interface RcConfigMapper
      * @param configKey 配置键
      * @return 结果
      */
-    public RcConfig checkConfigKeyUnique(@Param("envId") Long envId, @Param("projectId") Long projectId, @Param("configKey") String configKey);
+    RcConfig checkConfigKeyUnique(@Param("envId") Long envId, @Param("projectId") Long projectId, @Param("configKey") String configKey);
 }

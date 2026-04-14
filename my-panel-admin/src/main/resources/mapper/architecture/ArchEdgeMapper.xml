@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.ArchEdgeMapper">
+    
+    <resultMap type="ArchEdge" id="ArchEdgeResult">
+        <result property="id"    column="id"    />
+        <result property="diagramId"    column="diagram_id"    />
+        <result property="edgeType"    column="edge_type"    />
+        <result property="sourceNodeId"    column="source_node_id"    />
+        <result property="targetNodeId"    column="target_node_id"    />
+        <result property="sourceAnchor"    column="source_anchor"    />
+        <result property="targetAnchor"    column="target_anchor"    />
+        <result property="edgeLabel"    column="edge_label"    />
+        <result property="edgeStyle"    column="edge_style"    />
+        <result property="edgeProperties"    column="edge_properties"    />
+        <result property="edgeMeta"    column="edge_meta"    />
+        <result property="weight"    column="weight"    />
+        <result property="animated"    column="animated"    />
+        <result property="status"    column="status"    />
+        <result property="visible"    column="visible"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="delFlag"    column="del_flag"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectArchEdgeVo">
+        select id, diagram_id, edge_type, source_node_id, target_node_id, source_anchor, target_anchor, edge_label, edge_style, edge_properties, edge_meta, weight, animated, status, visible, create_by, create_time, update_by, update_time, del_flag, remark from arch_edge
+    </sql>
+
+    <select id="selectArchEdgeList" parameterType="ArchEdge" resultMap="ArchEdgeResult">
+        <include refid="selectArchEdgeVo"/>
+        <where>  
+            del_flag = '0'
+            <if test="diagramId != null"> and diagram_id = #{diagramId}</if>
+            <if test="edgeType != null  and edgeType != ''"> and edge_type = #{edgeType}</if>
+            <if test="sourceNodeId != null"> and source_node_id = #{sourceNodeId}</if>
+            <if test="targetNodeId != null"> and target_node_id = #{targetNodeId}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectEdgesByDiagramId" parameterType="Long" resultMap="ArchEdgeResult">
+        <include refid="selectArchEdgeVo"/>
+        where diagram_id = #{diagramId} and del_flag = '0'
+        order by create_time asc
+    </select>
+    
+    <select id="selectArchEdgeById" parameterType="Long" resultMap="ArchEdgeResult">
+        <include refid="selectArchEdgeVo"/>
+        where id = #{id} and del_flag = '0'
+    </select>
+        
+    <insert id="insertArchEdge" parameterType="ArchEdge" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_edge
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">diagram_id,</if>
+            <if test="edgeType != null">edge_type,</if>
+            <if test="sourceNodeId != null">source_node_id,</if>
+            <if test="targetNodeId != null">target_node_id,</if>
+            <if test="sourceAnchor != null">source_anchor,</if>
+            <if test="targetAnchor != null">target_anchor,</if>
+            <if test="edgeLabel != null">edge_label,</if>
+            <if test="edgeStyle != null">edge_style,</if>
+            <if test="edgeProperties != null">edge_properties,</if>
+            <if test="edgeMeta != null">edge_meta,</if>
+            <if test="weight != null">weight,</if>
+            <if test="animated != null">animated,</if>
+            <if test="status != null">status,</if>
+            <if test="visible != null">visible,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="delFlag != null">del_flag,</if>
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="diagramId != null">#{diagramId},</if>
+            <if test="edgeType != null">#{edgeType},</if>
+            <if test="sourceNodeId != null">#{sourceNodeId},</if>
+            <if test="targetNodeId != null">#{targetNodeId},</if>
+            <if test="sourceAnchor != null">#{sourceAnchor},</if>
+            <if test="targetAnchor != null">#{targetAnchor},</if>
+            <if test="edgeLabel != null">#{edgeLabel},</if>
+            <if test="edgeStyle != null">#{edgeStyle},</if>
+            <if test="edgeProperties != null">#{edgeProperties},</if>
+            <if test="edgeMeta != null">#{edgeMeta},</if>
+            <if test="weight != null">#{weight},</if>
+            <if test="animated != null">#{animated},</if>
+            <if test="status != null">#{status},</if>
+            <if test="visible != null">#{visible},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="delFlag != null">#{delFlag},</if>
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <insert id="batchInsertArchEdge" parameterType="java.util.List" useGeneratedKeys="true" keyProperty="id">
+        insert into arch_edge (diagram_id, edge_type, source_node_id, target_node_id, source_anchor, target_anchor, edge_label, edge_style, edge_properties, edge_meta, weight, animated, status, visible, create_by, create_time, update_by, update_time, del_flag, remark)
+        values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.diagramId}, #{item.edgeType}, #{item.sourceNodeId}, #{item.targetNodeId}, #{item.sourceAnchor}, #{item.targetAnchor}, #{item.edgeLabel}, #{item.edgeStyle}, #{item.edgeProperties}, #{item.edgeMeta}, #{item.weight}, #{item.animated}, #{item.status}, #{item.visible}, #{item.createBy}, #{item.createTime}, #{item.updateBy}, #{item.updateTime}, #{item.delFlag}, #{item.remark})
+        </foreach>
+    </insert>
+
+    <update id="updateArchEdge" parameterType="ArchEdge">
+        update arch_edge
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="diagramId != null">diagram_id = #{diagramId},</if>
+            <if test="edgeType != null">edge_type = #{edgeType},</if>
+            <if test="sourceNodeId != null">source_node_id = #{sourceNodeId},</if>
+            <if test="targetNodeId != null">target_node_id = #{targetNodeId},</if>
+            <if test="sourceAnchor != null">source_anchor = #{sourceAnchor},</if>
+            <if test="targetAnchor != null">target_anchor = #{targetAnchor},</if>
+            <if test="edgeLabel != null">edge_label = #{edgeLabel},</if>
+            <if test="edgeStyle != null">edge_style = #{edgeStyle},</if>
+            <if test="edgeProperties != null">edge_properties = #{edgeProperties},</if>
+            <if test="edgeMeta != null">edge_meta = #{edgeMeta},</if>
+            <if test="weight != null">weight = #{weight},</if>
+            <if test="animated != null">animated = #{animated},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="visible != null">visible = #{visible},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteArchEdgeById" parameterType="Long">
+        update arch_edge set del_flag = '1' where id = #{id}
+    </delete>
+
+    <delete id="deleteArchEdgeByIds" parameterType="String">
+        update arch_edge set del_flag = '1' where id in 
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

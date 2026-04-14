@@ -1,0 +1,65 @@
+package com.cq.panel.admin.server.web.converter.architecture;
+
+import com.cq.panel.admin.server.repository.domain.ArchDiagram;
+import com.cq.panel.admin.server.repository.domain.ArchNode;
+import com.cq.panel.admin.server.repository.domain.ArchEdge;
+import com.cq.panel.admin.server.repository.domain.ArchNodeType;
+import com.cq.panel.admin.server.repository.domain.ArchDiagramFavorite;
+import com.cq.panel.admin.server.repository.domain.ArchDiagramTag;
+import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramDTO;
+import com.cq.panel.admin.server.web.domain.dto.architecture.ArchNodeDTO;
+import com.cq.panel.admin.server.web.domain.dto.architecture.ArchEdgeDTO;
+import com.cq.panel.admin.server.web.domain.dto.architecture.ArchNodeTypeDTO;
+import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramFavoriteDTO;
+import com.cq.panel.admin.server.web.domain.dto.architecture.ArchDiagramTagDTO;
+import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramVO;
+import com.cq.panel.admin.server.web.domain.vo.architecture.ArchNodeVO;
+import com.cq.panel.admin.server.web.domain.vo.architecture.ArchEdgeVO;
+import com.cq.panel.admin.server.web.domain.vo.architecture.ArchNodeTypeVO;
+import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramFavoriteVO;
+import com.cq.panel.admin.server.web.domain.vo.architecture.ArchDiagramTagVO;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
+import java.util.List;
+
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
+public interface ArchConverter {
+    ArchDiagram toEntity(ArchDiagramDTO dto);
+    ArchDiagramVO toVO(ArchDiagram entity);
+    List<ArchDiagram> toDiagramEntityList(List<ArchDiagramDTO> dtoList);
+    List<ArchDiagramVO> toDiagramVOList(List<ArchDiagram> entityList);
+
+    @Mapping(source = "positionX", target = "XPosition")
+    @Mapping(source = "positionY", target = "YPosition")
+    ArchNode toEntity(ArchNodeDTO dto);
+
+    @Mapping(source = "XPosition", target = "positionX")
+    @Mapping(source = "YPosition", target = "positionY")
+    ArchNodeVO toVO(ArchNode entity);
+    List<ArchNode> toNodeEntityList(List<ArchNodeDTO> dtoList);
+    List<ArchNodeVO> toNodeVOList(List<ArchNode> entityList);
+
+    @Mapping(source = "sourceHandle", target = "sourceAnchor")
+    @Mapping(source = "targetHandle", target = "targetAnchor")
+    ArchEdge toEntity(ArchEdgeDTO dto);
+
+    @Mapping(source = "sourceAnchor", target = "sourceHandle")
+    @Mapping(source = "targetAnchor", target = "targetHandle")
+    ArchEdgeVO toVO(ArchEdge entity);
+    List<ArchEdge> toEdgeEntityList(List<ArchEdgeDTO> dtoList);
+    List<ArchEdgeVO> toEdgeVOList(List<ArchEdge> entityList);
+
+    ArchNodeType toEntity(ArchNodeTypeDTO dto);
+    ArchNodeTypeVO toNodeTypeVO(ArchNodeType entity);
+    List<ArchNodeType> toNodeTypeEntityList(List<ArchNodeTypeDTO> dtoList);
+    List<ArchNodeTypeVO> toNodeTypeVOList(List<ArchNodeType> entityList);
+    ArchDiagramFavorite toEntity(ArchDiagramFavoriteDTO dto);
+    ArchDiagramFavoriteVO toFavoriteVO(ArchDiagramFavorite entity);
+    List<ArchDiagramFavorite> toFavoriteEntityList(List<ArchDiagramFavoriteDTO> dtoList);
+    List<ArchDiagramFavoriteVO> toFavoriteVOList(List<ArchDiagramFavorite> entityList);
+    ArchDiagramTag toEntity(ArchDiagramTagDTO dto);
+    ArchDiagramTagVO toTagVO(ArchDiagramTag entity);
+    List<ArchDiagramTag> toTagEntityList(List<ArchDiagramTagDTO> dtoList);
+    List<ArchDiagramTagVO> toTagVOList(List<ArchDiagramTag> entityList);
+}

@@ -4,11 +4,11 @@
   gap: 16px;
   flex: 1;
   width: 100%;
-  
+
   .search-card {
     border-radius: 12px;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
-    
+
     :global {
       .ant-card-body {
         padding: 24px 24px 0 24px;
@@ -21,11 +21,11 @@
 
   .table-card {
     border-radius: 12px;
-    min-height: calc(100vh - 300px); 
+    min-height: calc(100vh - 300px);
     display: flex;
     flex-direction: column;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
-    
+
     :global {
       .ant-card-body {
         flex: 1;
@@ -33,13 +33,13 @@
         flex-direction: column;
         padding: 24px 24px 0 24px;
       }
-      
+
       .ant-table-cell {
         padding: 8px 16px !important;
       }
     }
 
-    
+
     .ant-table-wrapper {
         :global {
           .ant-pagination {
@@ -48,5 +48,11 @@
           }
         }
     }
+
+    // Remove the old fixed pagination styles
+    .fixed-pagination {
+      display: none;
+    }
   }
 }
+

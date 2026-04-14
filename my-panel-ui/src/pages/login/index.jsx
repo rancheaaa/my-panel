@@ -10,13 +10,22 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [codeUrl, setCodeUrl] = useState('');
   const [uuid, setUuid] = useState('');
+  const [isDaytime, setIsDaytime] = useState(true);
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
   const codeRef = useRef(null);
 
   useEffect(() => {
     fetchCode();
+    updateTimeBasedTheme();
+    const interval = setInterval(updateTimeBasedTheme, 60000); // Check every minute
+    return () => clearInterval(interval);
   }, []);
+
+  const updateTimeBasedTheme = () => {
+    const hour = new Date().getHours();
+    setIsDaytime(hour >= 6 && hour < 18);
+  };
 
   const fetchCode = async () => {
     try {
@@ -106,12 +115,25 @@ const Login = () => {
     ));
   };
 
+  // 生成云元素
+  const renderClouds = () => {
+    return Array.from({ length: 5 }).map((_, index) => (
+      <div key={index} className={`cloud cloud-${index + 1}`} />
+    ));
+  };
+
   return (
-    <div className="login-container">
-      <div className="particles">
-        {renderParticles()}
-      </div>
-      
+    <div className={`login-container ${isDaytime ? 'daytime' : 'nighttime'}`}>
+      {isDaytime ? (
+        <div className="clouds">
+          {renderClouds()}
+        </div>
+      ) : (
+        <div className="particles">
+          {renderParticles()}
+        </div>
+      )}
+
       <div className="login-box">
         <div className="login-header">
           <RocketOutlined className="logo-icon" />
@@ -124,6 +146,7 @@ const Login = () => {
           onFinish={onFinish}
           layout="vertical"
           size="large"
+          autoComplete="on"
         >
           <div onClick={() => usernameRef.current && usernameRef.current.focus()}>
             <Form.Item
@@ -134,6 +157,7 @@ const Login = () => {
                 ref={usernameRef}
                 prefix={<UserOutlined />} 
                 placeholder="用户名" 
+                autoComplete="username"
               />
             </Form.Item>
           </div>
@@ -152,6 +176,7 @@ const Login = () => {
                 ref={passwordRef}
                 prefix={<LockOutlined />} 
                 placeholder="密码" 
+                autoComplete="current-password"
               />
             </Form.Item>
           </div>

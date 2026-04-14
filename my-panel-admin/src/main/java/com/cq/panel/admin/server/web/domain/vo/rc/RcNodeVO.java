@@ -36,6 +36,9 @@ public class RcNodeVO {
     @Schema(description = "状态（0在线 1离线）")
     private String status;
 
+    @Schema(description = "服务所在区域")
+    private String zone;
+
     @Schema(description = "最后刷新时间")
     private Date lastRefreshTime;
 

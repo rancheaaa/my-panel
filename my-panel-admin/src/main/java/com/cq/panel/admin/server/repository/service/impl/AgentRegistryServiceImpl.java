@@ -10,6 +10,12 @@ import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
 
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Agent注册信息Service业务层处理
  * 
@@ -175,6 +181,99 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int offlineTimeoutNodes(Integer timeoutSeconds)
     {
-        return agentRegistryMapper.updateNodeOfflineByTimeout(timeoutSeconds);
+        Date now = DateUtils.getNowDate();
+        long timeoutMillis = timeoutSeconds * 1000L;
+        
+        List<AgentRegistry> onlineNodes = agentRegistryMapper.selectOnlineNodes();
+        if (onlineNodes == null || onlineNodes.isEmpty())
+        {
+            return 0;
+        }
+        
+        int offlineCount = 0;
+        for (AgentRegistry node : onlineNodes)
+        {
+            Date updateTime = node.getUpdateTime();
+            if (updateTime == null)
+            {
+                node.setNodeStatus(0);
+                node.setUpdateTime(DateUtils.getNowDate());
+                agentRegistryMapper.updateAgentRegistry(node);
+                offlineCount++;
+                continue;
+            }
+            
+            long timeDiff = now.getTime() - updateTime.getTime();
+            if (timeDiff > timeoutMillis)
+            {
+                node.setNodeStatus(0);
+                node.setUpdateTime(DateUtils.getNowDate());
+                agentRegistryMapper.updateAgentRegistry(node);
+                offlineCount++;
+            }
+        }
+        
+        return offlineCount;
+    }
+
+    /**
+     * 执行Agent命令
+     * 
+     * @param agentId Agent节点ID
+     * @param command 要执行的命令
+     * @param timeout 超时时间（秒）
+     * @return 执行结果
+     */
+    @Override
+    public Object executeCommand(String agentId, String command, Integer timeout)
+    {
+        // 1. 根据agentId查询Agent信息
+        AgentRegistry agent = agentRegistryMapper.selectAgentRegistryById(agentId);
+        if (agent == null)
+        {
+            throw new RuntimeException("Agent节点不存在");
+        }
+        
+        // 2. 检查Agent是否在线
+        if (agent.getNodeStatus() != 1)
+        {
+            throw new RuntimeException("Agent节点不在线，无法执行命令");
+        }
+        
+        // 3. 构建Agent API URL
+        String agentUrl = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort() + "/api/execute";
+        
+        // 4. 准备请求参数
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("command", command);
+        requestBody.put("timeout", timeout);
+        
+        // 5. 发送HTTP请求到Agent
+        try
+        {
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+            
+            // 设置超时时间
+            ResponseEntity<String> response = restTemplate.postForEntity(agentUrl, requestEntity, String.class);
+            
+            if (response.getStatusCode() == HttpStatus.OK)
+            {
+                // 解析Agent返回的JSON响应
+                ObjectMapper objectMapper = new ObjectMapper();
+                return objectMapper.readValue(response.getBody(), Object.class);
+            }
+            else
+            {
+                throw new RuntimeException("Agent服务返回错误状态码: " + response.getStatusCode());
+            }
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("调用Agent服务失败: " + e.getMessage(), e);
+        }
     }
 }

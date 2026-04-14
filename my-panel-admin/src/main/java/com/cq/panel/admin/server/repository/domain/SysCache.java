@@ -1,14 +1,18 @@
 package com.cq.panel.admin.server.repository.domain;
 
-
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 /**
  * 缓存信息
  * 
  * @author cq
  */
-public class SysCache
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+public class SysCache extends BaseEntity
 {
     /** 缓存名称 */
     private String cacheName = "";
@@ -25,71 +29,13 @@ public class SysCache
     /** 剩余时间 */
     private String ttl = "";
 
-    public SysCache()
-    {
-
-    }
-
-    public SysCache(String cacheName, String remark)
-    {
-        this.cacheName = cacheName;
-        this.remark = remark;
-    }
-
-    public SysCache(String cacheName, String cacheKey, String cacheValue)
-    {
-        this.cacheName = StringUtils.replace(cacheName, ":", "");
-        this.cacheKey = StringUtils.replace(cacheKey, cacheName, "");
-        this.cacheValue = cacheValue;
-    }
-
-    public String getCacheName()
-    {
-        return cacheName;
-    }
-
-    public void setCacheName(String cacheName)
-    {
-        this.cacheName = cacheName;
-    }
-
-    public String getCacheKey()
-    {
-        return cacheKey;
-    }
-
-    public void setCacheKey(String cacheKey)
-    {
+    /**
+     * 带参数构造器
+     * @param cacheKey 缓存键名
+     * @param cacheName 缓存名称
+     */
+    public SysCache(String cacheKey, String cacheName) {
         this.cacheKey = cacheKey;
-    }
-
-    public String getCacheValue()
-    {
-        return cacheValue;
-    }
-
-    public void setCacheValue(String cacheValue)
-    {
-        this.cacheValue = cacheValue;
-    }
-
-    public String getRemark()
-    {
-        return remark;
-    }
-
-    public void setRemark(String remark)
-    {
-        this.remark = remark;
-    }
-
-    public String getTtl()
-    {
-        return ttl;
-    }
-
-    public void setTtl(String ttl)
-    {
-        this.ttl = ttl;
+        this.cacheName = cacheName;
     }
 }

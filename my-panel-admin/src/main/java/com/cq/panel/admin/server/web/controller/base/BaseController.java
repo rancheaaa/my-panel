@@ -90,14 +90,6 @@ public class BaseController
     }
 
     /**
-     * 页面跳转
-     */
-    public String redirect(String url)
-    {
-        return StringUtils.format("redirect:{}", url);
-    }
-
-    /**
      * 获取用户缓存信息
      */
     public LoginUser getLoginUser()

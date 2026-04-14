@@ -1,12 +1,8 @@
 package com.cq.panel.admin.server.manager;
 
 import com.cq.panel.admin.server.common.utils.Threads;
-import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import java.util.TimerTask;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * 异步任务管理器
@@ -23,21 +19,21 @@ public class AsyncManager
     /**
      * 调度器（使用单线程平台线程）
      */
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
+    private final ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(1,
             Thread.ofPlatform().name("async-scheduler").factory()
     );
 
     /**
      * 执行器（使用虚拟线程）
      */
-    private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+    private final ExecutorService executor = createVirtualThreadExecutor();
 
     /**
      * 单例模式
      */
     private AsyncManager(){}
 
-    private static AsyncManager me = new AsyncManager();
+    private static final AsyncManager me = new AsyncManager();
 
     public static AsyncManager me()
     {
@@ -61,5 +57,16 @@ public class AsyncManager
     {
         Threads.shutdownAndAwaitTermination(executor);
         Threads.shutdownAndAwaitTermination(scheduler);
+    }
+
+    /**
+     * 创建虚拟线程执行器
+     */
+    private static ExecutorService createVirtualThreadExecutor() {
+        return new ThreadPoolExecutor(
+                0, Integer.MAX_VALUE,
+                60L, TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                Thread.ofVirtual().name("async-virtual-", 0).factory());
     }
 }

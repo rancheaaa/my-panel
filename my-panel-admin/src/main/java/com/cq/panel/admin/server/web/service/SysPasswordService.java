@@ -10,8 +10,8 @@ import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.admin.server.security.context.AuthenticationContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
+import com.cq.panel.authlite.AuthenticationToken;
 
 /**
  * 登录密码方法
@@ -43,8 +43,8 @@ public class SysPasswordService
 
     public void validate(SysUser user)
     {
-        Authentication usernamePasswordAuthenticationToken = AuthenticationContextHolder.getContext();
-        String username = usernamePasswordAuthenticationToken.getName();
+        AuthenticationToken usernamePasswordAuthenticationToken = AuthenticationContextHolder.getContext();
+        String username = usernamePasswordAuthenticationToken.getPrincipal().toString();
         String password = usernamePasswordAuthenticationToken.getCredentials().toString();
 
         Integer retryCount = cacheService.get(getCacheKey(username));

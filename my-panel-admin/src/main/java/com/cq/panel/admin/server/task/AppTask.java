@@ -28,16 +28,31 @@ public class AppTask
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void ryMultipleParams(String s, Boolean b, Long l, Double d, Integer i)
+    /**
+     * 测试多参数方法
+     * @param s 字符串参数
+     * @param b 布尔参数true false
+     * @param l long参数
+     * @param d double参数
+     * @param i 整型参数
+     */
+    public void runMultipleParams(String s, Boolean b, Long l, Double d, Integer i)
     {
-        System.out.println(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
+        log.info(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
     }
 
-    public void ryParams(String params)
+    /**
+     * 测试有参方法
+     * @param str 参数字符串
+     */
+    public void runSingleParam(String str)
     {
-        System.out.println("执行有参方法：" + params);
+        log.info("执行有参方法：{}", str);
     }
 
+    /**
+     * 备份系统所有表快照至data目录下，生成一个sql文件
+     */
     public void backupSystemAllTable()
     {
         String[] tables = {

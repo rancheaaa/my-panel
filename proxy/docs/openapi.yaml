@@ -1,0 +1,115 @@
+openapi: 3.0.3
+info:
+  title: Proxy Registry & Config API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8888
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/v1/registry/register:
+    post:
+      summary: Register service instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRegisterRequest'
+      responses:
+        '200':
+          description: OK
+  /api/v1/registry/discover:
+    get:
+      summary: Discover service instances
+      parameters:
+        - name: serviceName
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: environment
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /api/v1/config/{configKey}:
+    get:
+      summary: Get config value
+      parameters:
+        - name: configKey
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: environment
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: serviceName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: Update config value
+      parameters:
+        - name: configKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigUpdateRequest'
+      responses:
+        '200':
+          description: OK
+  /api/v1/ws:
+    get:
+      summary: WebSocket for config change notifications
+      responses:
+        '101':
+          description: Switching Protocols
+components:
+  schemas:
+    ServiceRegisterRequest:
+      type: object
+      required: [serviceName, environment, host, port]
+      properties:
+        serviceName:
+          type: string
+        environment:
+          type: string
+        host:
+          type: string
+        port:
+          type: integer
+          format: int32
+    ConfigUpdateRequest:
+      type: object
+      required: [environment, serviceName, configValue]
+      properties:
+        environment:
+          type: string
+        serviceName:
+          type: string
+        configValue:
+          type: string
+        configDesc:
+          type: string
+

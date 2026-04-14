@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit;
 import com.cq.panel.admin.server.common.annotation.RepeatSubmit;
 import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
-import com.cq.panel.admin.server.common.filter.RepeatedlyRequestWrapper;
+import com.cq.panel.admin.server.filter.RepeatedlyRequestWrapper;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.http.HttpHelper;
 import com.cq.panel.admin.server.interceptor.RepeatSubmitInterceptor;

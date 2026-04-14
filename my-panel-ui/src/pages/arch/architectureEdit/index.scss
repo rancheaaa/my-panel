@@ -1,0 +1,423 @@
+.architecture-edit-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f5f5;
+
+  .header-toolbar {
+    padding: 16px 24px;
+    background-color: #fff;
+    border-bottom: 2px solid #e8e8e8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+    .title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: bold;
+      color: #262626;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .architecture-name-input {
+      width: 320px;
+      border-radius: 6px;
+    }
+
+    .toolbar-button {
+      border-radius: 6px;
+      font-weight: 500;
+      
+      &.primary {
+        box-shadow: 0 2px 4px rgba(24, 144, 255, 0.2);
+      }
+    }
+  }
+
+  .flow-canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+
+    // 拖拽时禁用所有过渡动画，提高丝滑度
+    &.is-dragging {
+      * {
+        transition: none !important;
+        animation-play-state: paused !important;
+      }
+      
+      .react-flow__node {
+        cursor: grabbing !important;
+      }
+    }
+    
+    // 确保 Spin 及其内部容器铺满
+    .ant-spin-nested-loading,
+    .ant-spin-container {
+      height: 100%;
+      width: 100%;
+    }
+
+    .react-flow-wrapper {
+      height: 100%;
+      width: 100%;
+      background-color: #fafafa;
+      background-image: radial-gradient(circle at 1px 1px, #ddd 1px, transparent 0);
+      background-size: 20px 20px;
+    }
+  }
+  
+  .alignment-line {
+    stroke: #ff0072; /* 使用 ALIGNMENT_LINE_COLOR */
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+  }
+}
+
+.custom-handle {
+  z-index: 1000 !important;
+  cursor: crosshair !important;
+  width: 14px !important;
+  height: 14px !important;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  }
+}
+
+/* 逻辑形状左侧连接点1 - 向上偏移 */
+.custom-handle-left-1 {
+  transform: translateY(-30%) !important;
+}
+
+/* 逻辑形状左侧连接点2 - 向下偏移 */
+.custom-handle-left-2 {
+  transform: translateY(30%) !important;
+}
+
+.node-rotation-handle {
+  transition: all 0.2s;
+  
+  &:hover {
+    transform: translateX(-50%) scale(1.2) !important;
+    background-color: #f0f5ff !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+  
+  &:active {
+    cursor: grabbing !important;
+  }
+}
+
+.custom-node-wrapper {
+  // 当旋转时，确保连接点也跟着旋转（默认行为，不需要特殊处理）
+  // 但我们可能需要一些特定的过渡效果
+}
+
+.react-flow__handle {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  border: 3px solid #fff !important;
+  transition: all 0.3s ease !important;
+  cursor: crosshair !important;
+  
+  /* 让连接点紧贴边框 */
+  &.react-flow__handle-top {
+    /* margin-top: 24px !important; */
+  }
+  
+  &.react-flow__handle-bottom {
+    /* margin-bottom: 24px !important; */
+  }
+  
+  &.react-flow__handle-left {
+    /* margin-left: 62px !important; */
+  }
+  
+  &.react-flow__handle-right {
+    /* margin-right: 62px !important; */
+  }
+
+  &:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+  }
+}
+
+.react-flow__handle-connecting {
+  background: #1890ff !important;
+  transform: scale(1.5) !important;
+  box-shadow: 0 0 16px rgba(24, 144, 255, 0.8) !important;
+}
+
+.react-flow__handle-valid {
+  background: #52c41a !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2px !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 4px rgba(24, 144, 255, 0.5));
+}
+
+.react-flow__node {
+  pointer-events: all !important;
+  cursor: grab !important;
+}
+
+.react-flow__node:active {
+  cursor: grabbing !important;
+}
+
+.react-flow__pane {
+  cursor: default !important;
+}
+
+.react-flow__connection-line {
+  stroke: #1890ff !important;
+  stroke-width: 2px !important;
+}
+
+.react-flow__edge-updater {
+  fill: #1890ff !important;
+  stroke: #fff !important;
+  stroke-width: 2px !important;
+  cursor: crosshair !important;
+  transition: all 0.3s ease;
+
+  &:hover {
+    fill: #40a9ff !important;
+    transform: scale(1.3);
+  }
+}
+
+.editable-edge-group {
+  &.hovered, &.selected {
+    .react-flow__edge-path {
+      stroke-width: 3px !important;
+      stroke: #1890ff !important;
+      filter: drop-shadow(0 0 4px rgba(24, 144, 255, 0.4));
+    }
+  }
+
+  /* 交互路径：始终保持透明但可交互 */
+  path {
+    transition: all 0.2s ease;
+  }
+}
+
+/* 可编辑连线标签样式 */
+.editable-edge-label-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  padding: 2px 6px;
+  border-radius: 12px;
+  border: 1px solid #d9d9d9;
+  font-size: 10px;
+  font-weight: 500;
+  color: #595959;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  border: 2px solid transparent;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    border-color: #40a9ff;
+    color: #1890ff;
+
+    .edge-edit-action {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  &.hovered {
+    border-color: #1890ff;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+  }
+
+  .editable-edge-label {
+    white-space: nowrap;
+  }
+
+  .edge-edit-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: #f0f7ff;
+    color: #1890ff;
+    border-radius: 50%;
+    opacity: 0.6;
+    transform: scale(0.8);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #1890ff;
+      color: white;
+      transform: scale(1.1) !important;
+    }
+  }
+}
+
+/* 可编辑连线顶点样式 */
+.editable-edge-handle {
+  width: 26px;
+  height: 26px;
+  background-color: #1890ff;
+  border-radius: 50%;
+  border: 5px solid #fff;
+  cursor: move;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+  position: relative; /* 为删除按钮提供定位基准 */
+
+  &::after {
+    /* 极致点击热区：25px 的透明感应层，几乎不可能点空 */
+    content: '';
+    position: absolute;
+    top: -25px;
+    left: -25px;
+    right: -25px;
+    bottom: -25px;
+    cursor: move; /* 即使在热区范围内也显示移动指针 */
+  }
+
+  &.selected {
+    background-color: #52c41a; 
+    transform: scale(1.15);
+    box-shadow: 0 0 15px rgba(82, 196, 26, 0.7);
+  }
+
+  &:hover {
+    transform: scale(1.25);
+    background-color: #40a9ff;
+    box-shadow: 0 0 16px rgba(64, 169, 255, 0.9);
+
+    &.selected {
+      background-color: #73d13d;
+    }
+
+    .remove-point-button {
+      display: flex;
+    }
+  }
+
+  .remove-point-button {
+    position: absolute;
+    top: -16px;
+    right: -16px;
+    width: 26px;
+    height: 26px;
+    background-color: #ff4d4f;
+    color: #fff;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(255, 77, 79, 0.7);
+    z-index: 110;
+
+    &:hover {
+      background-color: #ff7875;
+      transform: scale(1.15);
+    }
+
+    svg {
+      font-size: 12px;
+      font-weight: bold;
+    }
+  }
+}
+
+.add-point-button {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  background-color: #52c41a;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(82, 196, 26, 0.4);
+  transition: all 0.2s ease;
+  opacity: 0.8;
+
+  &:hover {
+    opacity: 1;
+    transform: scale(1.2);
+    background-color: #73d13d;
+  }
+
+  svg {
+    font-size: 10px;
+  }
+}
+
+/* 自定义节点样式 */
+.custom-node-wrapper {
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background-color: transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: inherit;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &.selected {
+    transform: scale(1.05);
+    z-index: 1001;
+  }
+
+  // 内部内容容器
+  .node-content-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    pointer-events: none;
+  }
+
+  .config-title {
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .config-item {
+    display: flex;
+    justify-content: space-between;
+
+    .config-label {
+      color: #8c8c8c;
+    }
+
+    .config-value {
+      font-weight: 500;
+    }
+  }
+}

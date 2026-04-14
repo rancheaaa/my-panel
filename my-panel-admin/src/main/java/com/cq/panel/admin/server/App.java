@@ -11,7 +11,7 @@ import de.codecentric.boot.admin.server.config.EnableAdminServer;
  * @author cq
  */
 @EnableAdminServer
-@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
+@SpringBootApplication(scanBasePackages = { "com.cq.panel.admin.server", "com.cq.panel.authlite" }, exclude = { DataSourceAutoConfiguration.class })
 public class App
 {
     public static void main(String[] args)

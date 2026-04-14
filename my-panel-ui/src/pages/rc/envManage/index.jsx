@@ -248,14 +248,16 @@ const EnvManage = () => {
           size={tableSize}
           scroll={{ x: 1300 }}
           pagination={{
-            total: total,
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
+            total: total,
+            showTotal: (total, range) => `共 ${total} 条`,
             onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize: pageSize });
+              setQueryParams({ ...queryParams, pageNum: page, pageSize });
             },
+            position: ['bottomRight'],
             showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
         />
       </Card>

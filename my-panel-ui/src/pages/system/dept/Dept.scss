@@ -5,6 +5,64 @@
   flex: 1;
   width: 100%;
   
+  .drag-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s ease-in-out;
+    
+    .drag-loading-content {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      animation: scaleIn 0.3s ease-in-out;
+    }
+    
+    .drag-loading-text {
+      font-size: 16px;
+      color: #1890ff;
+      font-weight: 500;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      transform: scale(0.8);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+
   .search-card {
     border-radius: 12px;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
@@ -37,6 +95,101 @@
       .ant-table-cell {
         padding: 8px 16px !important;
       }
+
+      .ant-table-row {
+        &.ant-table-row-selected {
+          background-color: #f5f5f5;
+        }
+        &:hover {
+          .anticon-holder {
+            opacity: 1;
+          }
+        }
+
+        // High contrast level distinction
+        &.dept-level-0 {
+          background-color: #f0f5ff !important; // Blue-0
+          font-weight: 600;
+          .ant-table-cell {
+            border-bottom: 1px solid #adc6ff !important;
+          }
+        }
+        &.dept-level-1 {
+          background-color: #f6ffed !important; // Green-0
+          .ant-table-cell {
+            border-bottom: 1px solid #b7eb8f !important;
+          }
+        }
+        &.dept-level-2 {
+          background-color: #fffbe6 !important; // Yellow-0
+          .ant-table-cell {
+            border-bottom: 1px solid #ffe58f !important;
+          }
+        }
+        &.dept-level-3 {
+          background-color: #fff1f0 !important; // Red-0
+          .ant-table-cell {
+            border-bottom: 1px solid #ffccc7 !important;
+          }
+        }
+
+        // Add indentation vertical guide lines
+        .ant-table-row-indent {
+            position: relative;
+            float: left;
+            height: 1px;
+            margin-right: 4px;
+            
+            &::after {
+                content: '';
+                position: absolute;
+                left: 50%;
+                top: -12px;
+                bottom: -12px;
+                width: 1px;
+                background-color: #d9d9d9;
+            }
+        }
+
+        // Distinct Left Border for each level
+        &.dept-level-0 .ant-table-cell:first-child {
+            border-left: 10px solid #1890ff !important;
+        }
+        &.dept-level-1 .ant-table-cell:first-child {
+            border-left: 10px solid #52c41a !important;
+        }
+        &.dept-level-2 .ant-table-cell:first-child {
+            border-left: 10px solid #faad14 !important;
+        }
+        &.dept-level-3 .ant-table-cell:first-child {
+            border-left: 10px solid #ff4d4f !important;
+        }
+
+        &:hover {
+          background-color: rgba(0, 0, 0, 0.05) !important;
+          .anticon-holder {
+            opacity: 1;
+          }
+        }
+      }
+
+      .anticon-holder {
+        opacity: 0.5;
+        transition: opacity 0.3s;
+        &:hover {
+          color: #1890ff;
+        }
+      }
+    }
+
+    
+    .ant-table-wrapper {
+        :global {
+          .ant-pagination {
+            margin: 16px 0 !important;
+            text-align: right;
+          }
+        }
     }
   }
 }

@@ -3,7 +3,6 @@ package com.cq.panel.admin.server.web.domain.vo.monitor;
 import com.cq.panel.admin.server.common.annotation.Excel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
-import java.util.Date;
 
 @Data
 @Schema(description = "定时任务调度日志视图对象")
@@ -29,6 +28,10 @@ public class SysJobLogVO {
     @Excel(name = "日志信息")
     private String jobMessage;
 
+    @Schema(description = "触发类型")
+    @Excel(name = "触发类型", readConverterExp = "0=定时触发,1=手动触发")
+    private String triggerType;
+
     @Schema(description = "执行状态")
     @Excel(name = "执行状态", readConverterExp = "0=正常,1=失败")
     private String status;
@@ -38,9 +41,10 @@ public class SysJobLogVO {
     private String exceptionInfo;
 
     @Schema(description = "开始时间")
-    private Date startTime;
+    @Excel(name = "开始时间")
+    private String startTime;
 
-    @Schema(description = "停止时间")
-    private Date stopTime;
+    @Schema(description = "结束时间")
+    @Excel(name = "结束时间")
+    private String endTime;
 }
-

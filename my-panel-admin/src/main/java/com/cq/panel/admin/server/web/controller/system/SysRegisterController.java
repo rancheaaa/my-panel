@@ -8,7 +8,6 @@ import com.cq.panel.admin.server.web.service.SysRegisterService;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,11 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class SysRegisterController extends BaseController
 {
-    @Autowired
-    private SysRegisterService registerService;
+    private final SysRegisterService registerService;
 
-    @Autowired
-    private ISysConfigService configService;
+    private final ISysConfigService configService;
+
+    public SysRegisterController(SysRegisterService registerService, ISysConfigService configService) {
+        this.registerService = registerService;
+        this.configService = configService;
+    }
 
     @Operation(summary = "注册")
     @PostMapping("/register")

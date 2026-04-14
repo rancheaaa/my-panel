@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import com.alibaba.druid.pool.DruidDataSource;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 
 /**
@@ -90,8 +91,8 @@ public class DruidProperties
 
         // 使用虚拟线程处理 create 和 destroy 任务
         ThreadFactory virtualThreadFactory = Thread.ofVirtual().name("druid-virtual-", 0).factory();
-        ScheduledExecutorService createScheduler = Executors.newScheduledThreadPool(1, virtualThreadFactory);
-        ScheduledExecutorService destroyScheduler = Executors.newScheduledThreadPool(1, virtualThreadFactory);
+        ScheduledExecutorService createScheduler = new ScheduledThreadPoolExecutor(1, virtualThreadFactory);
+        ScheduledExecutorService destroyScheduler = new ScheduledThreadPoolExecutor(1, virtualThreadFactory);
         datasource.setCreateScheduler(createScheduler);
         datasource.setDestroyScheduler(destroyScheduler);
 

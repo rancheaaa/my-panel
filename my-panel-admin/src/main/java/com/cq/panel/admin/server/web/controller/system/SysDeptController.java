@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.web.controller.system;
 
 import com.cq.panel.admin.server.web.domain.dto.system.SysDeptDTO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysDeptQueryDTO;
+import com.cq.panel.admin.server.web.domain.dto.system.SysDeptSortDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.system.SysDeptVO;
 import com.cq.panel.admin.server.web.converter.system.SysDeptConverter;
@@ -16,8 +17,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.commons.lang3.ArrayUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -32,17 +32,20 @@ import java.util.List;
 @RequestMapping("/system/dept")
 public class SysDeptController extends BaseController
 {
-    @Autowired
-    private ISysDeptService deptService;
+    private final ISysDeptService deptService;
 
-    @Autowired
-    private SysDeptConverter deptConverter;
+    private final SysDeptConverter deptConverter;
+
+    public SysDeptController(ISysDeptService deptService, SysDeptConverter deptConverter) {
+        this.deptService = deptService;
+        this.deptConverter = deptConverter;
+    }
 
     /**
      * 获取部门列表
      */
     @Operation(summary = "获取部门列表", description = "根据条件获取部门列表")
-    @PreAuthorize("@ss.hasPermi('system:dept:list')")
+    @RequirePermission("system:dept:list")
     @GetMapping("/list")
     public Result<List<SysDeptVO>> list(@Parameter(description = "查询参数") SysDeptQueryDTO query)
     {
@@ -55,7 +58,7 @@ public class SysDeptController extends BaseController
      * 查询部门列表（排除节点）
      */
     @Operation(summary = "查询部门列表（排除节点）", description = "查询部门列表，排除指定节点及其子节点")
-    @PreAuthorize("@ss.hasPermi('system:dept:list')")
+    @RequirePermission("system:dept:list")
     @GetMapping("/list/exclude/{deptId}")
     public Result<List<SysDeptVO>> excludeChild(@Parameter(description = "排除的部门ID", required = true) @PathVariable(value = "deptId", required = false) Long deptId)
     {
@@ -68,7 +71,7 @@ public class SysDeptController extends BaseController
      * 根据部门编号获取详细信息
      */
     @Operation(summary = "根据部门编号获取详细信息", description = "根据部门ID获取部门详细信息")
-    @PreAuthorize("@ss.hasPermi('system:dept:query')")
+    @RequirePermission("system:dept:query")
     @GetMapping(value = "/{deptId}")
     public Result<SysDeptVO> getInfo(@Parameter(description = "部门ID", required = true) @PathVariable Long deptId)
     {
@@ -80,7 +83,7 @@ public class SysDeptController extends BaseController
      * 新增部门
      */
     @Operation(summary = "新增部门", description = "新增部门信息")
-    @PreAuthorize("@ss.hasPermi('system:dept:add')")
+    @RequirePermission("system:dept:add")
     @Log(title = "部门管理", businessType = BusinessType.INSERT)
     @PostMapping
     public Result<Void> add(@Validated @RequestBody SysDeptDTO dto)
@@ -99,7 +102,7 @@ public class SysDeptController extends BaseController
      * 修改部门
      */
     @Operation(summary = "修改部门", description = "修改部门信息")
-    @PreAuthorize("@ss.hasPermi('system:dept:edit')")
+    @RequirePermission("system:dept:edit")
     @Log(title = "部门管理", businessType = BusinessType.UPDATE)
     @PutMapping
     public Result<Void> edit(@Validated @RequestBody SysDeptDTO dto)
@@ -125,10 +128,30 @@ public class SysDeptController extends BaseController
     }
 
     /**
+     * 部门排序
+     */
+    @Operation(summary = "部门排序", description = "批量修改部门排序")
+    @RequirePermission("system:dept:edit")
+    @Log(title = "部门管理", businessType = BusinessType.UPDATE)
+    @PutMapping("/sort")
+    public Result<Void> sort(@Validated @RequestBody List<SysDeptSortDTO> sortList)
+    {
+        for (SysDeptSortDTO sort : sortList)
+        {
+            SysDept dept = new SysDept();
+            dept.setDeptId(sort.getDeptId());
+            dept.setOrderNum(sort.getOrderNum());
+            dept.setUpdateBy(getUsername());
+            deptService.updateDept(dept);
+        }
+        return Result.success();
+    }
+
+    /**
      * 删除部门
      */
     @Operation(summary = "删除部门", description = "删除部门")
-    @PreAuthorize("@ss.hasPermi('system:dept:remove')")
+    @RequirePermission("system:dept:remove")
     @Log(title = "部门管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{deptId}")
     public Result<Void> remove(@Parameter(description = "部门ID", required = true) @PathVariable Long deptId)

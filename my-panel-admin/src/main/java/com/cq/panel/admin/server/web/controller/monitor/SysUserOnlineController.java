@@ -18,8 +18,7 @@ import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,22 +35,25 @@ import java.util.List;
 @RequestMapping("/monitor/online")
 public class SysUserOnlineController extends BaseController
 {
-    @Autowired
-    private ISysUserOnlineService userOnlineService;
+    private final ISysUserOnlineService userOnlineService;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
 
-    @Autowired
-    private SysUserOnlineConverter userOnlineConverter;
+    private final SysUserOnlineConverter userOnlineConverter;
+
+    public SysUserOnlineController(ISysUserOnlineService userOnlineService, CacheService cacheService, SysUserOnlineConverter userOnlineConverter) {
+        this.userOnlineService = userOnlineService;
+        this.cacheService = cacheService;
+        this.userOnlineConverter = userOnlineConverter;
+    }
 
     @Operation(summary = "查询在线用户列表", description = "获取当前在线用户列表，支持分页和条件查询")
-    @PreAuthorize("@ss.hasPermi('monitor:online:list')")
+    @RequirePermission("monitor:online:list")
     @GetMapping("/list")
     public Result<PageVO<SysUserOnlineVO>> list(@Parameter(description = "查询条件") SysUserOnlineQueryDTO query)
     {
         Collection<String> keys = cacheService.keys(CacheConstants.LOGIN_TOKEN_KEY + "*");
-        List<SysUserOnline> userOnlineList = new ArrayList<SysUserOnline>();
+        List<SysUserOnline> userOnlineList = new ArrayList<>();
         for (String key : keys)
         {
             LoginUser user = cacheService.get(key);
@@ -84,11 +86,11 @@ public class SysUserOnlineController extends BaseController
         Collections.reverse(userOnlineList);
         userOnlineList.removeAll(Collections.singleton(null));
         List<SysUserOnlineVO> voList = userOnlineConverter.toVOList(userOnlineList);
-        return Result.success(new PageVO<>(voList, new PageInfo(userOnlineList).getTotal()));
+        return Result.success(new PageVO<>(voList, new PageInfo<>(userOnlineList).getTotal()));
     }
 
     @Operation(summary = "强退用户", description = "强制退出指定用户的会话")
-    @PreAuthorize("@ss.hasPermi('monitor:online:forceLogout')")
+    @RequirePermission("monitor:online:forceLogout")
     @Log(title = "在线用户", businessType = BusinessType.FORCE)
     @DeleteMapping("/{tokenId}")
     public Result<Void> forceLogout(@Parameter(description = "会话编号", required = true) @PathVariable String tokenId)

@@ -1,5 +1,7 @@
 package com.cq.agent.model;
 
+import lombok.Data;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +14,7 @@ import java.time.format.DateTimeFormatter;
 /**
  * File information model.
  */
+@Data
 public class FileInfo {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -58,99 +61,8 @@ public class FileInfo {
     }
 
     private static String buildPermissionString(FileInfo info) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(info.readable ? "r" : "-");
-        sb.append(info.writable ? "w" : "-");
-        sb.append(info.executable ? "x" : "-");
-        return sb.toString();
-    }
-
-    // Getters and setters
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
-    }
-
-    public boolean isDirectory() {
-        return directory;
-    }
-
-    public void setDirectory(boolean directory) {
-        this.directory = directory;
-    }
-
-    public long getSize() {
-        return size;
-    }
-
-    public void setSize(long size) {
-        this.size = size;
-    }
-
-    public String getModifiedTime() {
-        return modifiedTime;
-    }
-
-    public void setModifiedTime(String modifiedTime) {
-        this.modifiedTime = modifiedTime;
-    }
-
-    public long getModifiedTimestamp() {
-        return modifiedTimestamp;
-    }
-
-    public void setModifiedTimestamp(long modifiedTimestamp) {
-        this.modifiedTimestamp = modifiedTimestamp;
-    }
-
-    public String getPermissions() {
-        return permissions;
-    }
-
-    public void setPermissions(String permissions) {
-        this.permissions = permissions;
-    }
-
-    public boolean isReadable() {
-        return readable;
-    }
-
-    public void setReadable(boolean readable) {
-        this.readable = readable;
-    }
-
-    public boolean isWritable() {
-        return writable;
-    }
-
-    public void setWritable(boolean writable) {
-        this.writable = writable;
-    }
-
-    public boolean isExecutable() {
-        return executable;
-    }
-
-    public void setExecutable(boolean executable) {
-        this.executable = executable;
-    }
-
-    public boolean isHidden() {
-        return hidden;
-    }
-
-    public void setHidden(boolean hidden) {
-        this.hidden = hidden;
+        return (info.readable ? "r" : "-") +
+                (info.writable ? "w" : "-") +
+                (info.executable ? "x" : "-");
     }
 }

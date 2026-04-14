@@ -326,19 +326,13 @@ const ConfigCenter = () => {
     setPreviewLoading(true);
     setPreviewContent(''); // 开始请求前清空内容
     try {
-      console.log('Fetching preview with:', { envId, projectId, format });
       const res = await previewConfig({
         envId,
         projectId,
         exportFormat: format
       });
-      console.log('Preview response:', res);
       if (res.code === 200) {
         const content = res.data || '';
-        console.log('Preview content length:', content.length);
-        if (content.length > 0) {
-          console.log('Preview content first 50 chars:', content.substring(0, 50));
-        }
         setPreviewContent(content);
         if (!content) {
           if (res.msg && res.msg !== '操作成功' && res.msg !== '查询成功') {
@@ -374,57 +368,72 @@ const ConfigCenter = () => {
     }
   };
 
-  const [columns, setColumns] = useState([
-    { title: '配置ID', dataIndex: 'id', key: 'id', align: 'center', width: 80 },
-    { 
-      title: '环境', 
-      dataIndex: 'envId', 
-      key: 'envId', 
-      align: 'center',
-      width: 100,
-      ellipsis: true,
-      render: (envId) => envs.find(e => e.id === envId)?.envName || envId
-    },
-    { 
-      title: '应用', 
-      dataIndex: 'projectId', 
-      key: 'projectId', 
-      align: 'center',
-      width: 150,
-      ellipsis: true,
-      render: (projectId) => projects.find(p => p.id === projectId)?.projectName || projectId
-    },
-    { title: '配置键', dataIndex: 'configKey', key: 'configKey', align: 'center', width: 200, ellipsis: true },
-    { title: '配置值', dataIndex: 'configValue', key: 'configValue', align: 'center', width: 250, ellipsis: true },
-    { title: '配置描述', dataIndex: 'configDesc', key: 'configDesc', align: 'center', width: 200, ellipsis: true },
-    { 
-      title: '来源', 
-      dataIndex: 'source', 
-      key: 'source', 
-      align: 'center',
-      width: 100,
-      render: (source) => source === '1' ? '批量导入' : '手工新增'
-    },
-    { title: '更新人', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: 100, ellipsis: true },
-    { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: 180 },
-    { title: '创建人', dataIndex: 'createBy', key: 'createBy', align: 'center', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: 180 },
-    {
-      title: '操作',
-      key: 'action',
-      align: 'center',
-      width: 180,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>
-          <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id)}>
-            <Button type="text" icon={<DeleteOutlined />} danger>删除</Button>
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ]);
+  const buildColumns = (prevColumns = []) => {
+    const widthByKey = new Map(prevColumns.map((c) => [c.key ?? c.dataIndex, c.width]));
+    const getWidth = (key, defaultWidth) => widthByKey.get(key) ?? defaultWidth;
+
+    return [
+      { title: '配置ID', dataIndex: 'id', key: 'id', align: 'center', width: getWidth('id', 80) },
+      {
+        title: '环境',
+        dataIndex: 'envId',
+        key: 'envId',
+        align: 'center',
+        width: getWidth('envId', 100),
+        ellipsis: true,
+        render: (envId) => envs.find((e) => String(e.id) === String(envId))?.envName || '-',
+      },
+      {
+        title: '应用',
+        dataIndex: 'projectId',
+        key: 'projectId',
+        align: 'center',
+        width: getWidth('projectId', 150),
+        ellipsis: true,
+        render: (projectId) => projects.find((p) => String(p.id) === String(projectId))?.projectName || '-',
+      },
+      { title: '配置键', dataIndex: 'configKey', key: 'configKey', align: 'center', width: getWidth('configKey', 200), ellipsis: true },
+      { title: '配置值', dataIndex: 'configValue', key: 'configValue', align: 'center', width: getWidth('configValue', 250), ellipsis: true },
+      { title: '配置描述', dataIndex: 'configDesc', key: 'configDesc', align: 'center', width: getWidth('configDesc', 200), ellipsis: true },
+      {
+        title: '来源',
+        dataIndex: 'source',
+        key: 'source',
+        align: 'center',
+        width: getWidth('source', 100),
+        render: (source) => (source === '1' ? '批量导入' : '手工新增'),
+      },
+      { title: '更新人', dataIndex: 'updateBy', key: 'updateBy', align: 'center', width: getWidth('updateBy', 100), ellipsis: true },
+      { title: '更新时间', dataIndex: 'updateTime', key: 'updateTime', align: 'center', width: getWidth('updateTime', 180) },
+      { title: '创建人', dataIndex: 'createBy', key: 'createBy', align: 'center', width: getWidth('createBy', 100), ellipsis: true },
+      { title: '创建时间', dataIndex: 'createTime', key: 'createTime', align: 'center', width: getWidth('createTime', 180) },
+      {
+        title: '操作',
+        key: 'action',
+        align: 'center',
+        width: getWidth('action', 180),
+        fixed: 'right',
+        render: (_, record) => (
+          <Space size="middle">
+            <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>
+              修改
+            </Button>
+            <Popconfirm title="确定删除吗？" onConfirm={() => handleDelete(record.id)}>
+              <Button type="text" icon={<DeleteOutlined />} danger>
+                删除
+              </Button>
+            </Popconfirm>
+          </Space>
+        ),
+      },
+    ];
+  };
+
+  const [columns, setColumns] = useState(() => buildColumns());
+
+  useEffect(() => {
+    setColumns((prev) => buildColumns(prev));
+  }, [envs, projects]);
 
   const handleResize = (index) => (e, { size }) => {
     setColumns((prevColumns) => {
@@ -553,14 +562,16 @@ const ConfigCenter = () => {
           size={tableSize}
           scroll={{ x: 1600 }}
           pagination={{
-            total: total,
             current: queryParams.pageNum,
             pageSize: queryParams.pageSize,
+            total: total,
+            showTotal: (total, range) => `共 ${total} 条`,
             onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize: pageSize });
+              setQueryParams({ ...queryParams, pageNum: page, pageSize });
             },
+            position: ['bottomRight'],
             showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
         />
       </Card>
@@ -611,13 +622,13 @@ const ConfigCenter = () => {
             label="配置值"
             rules={[{ required: true, message: '请输入配置值' }]}
           >
-            <Input.TextArea placeholder="请输入配置值" rows={6} />
+            <Input.TextArea placeholder="请输入配置值" rows={1} />
           </Form.Item>
           <Form.Item
             name="configDesc"
             label="配置描述"
           >
-            <Input placeholder="请输入配置描述" />
+            <Input.TextArea placeholder="请输入配置描述" rows={8} />
           </Form.Item>
         </Form>
       </Modal>

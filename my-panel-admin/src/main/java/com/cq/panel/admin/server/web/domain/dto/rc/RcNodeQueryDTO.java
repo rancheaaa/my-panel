@@ -22,4 +22,7 @@ public class RcNodeQueryDTO {
 
     @Schema(description = "状态")
     private String status;
+
+    @Schema(description = "服务所在区域")
+    private String zone;
 }

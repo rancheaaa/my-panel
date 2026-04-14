@@ -11,9 +11,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.connection.DefaultedRedisConnection;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.security.access.prepost.PreAuthorize;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
@@ -27,16 +29,14 @@ import java.util.*;
 @RequestMapping("/monitor/cache")
 public class CacheController
 {
-    @Autowired(required = false)
-    private RedisTemplate<String, String> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
 
-    @org.springframework.beans.factory.annotation.Value("${app.mode:cluster}")
+    @Value("${app.mode:cluster}")
     private String appMode;
 
-    private final static List<SysCache> caches = new ArrayList<SysCache>();
+    private final static List<SysCache> caches = new ArrayList<>();
     {
         caches.add(new SysCache(CacheConstants.LOGIN_TOKEN_KEY, "用户信息"));
         caches.add(new SysCache(CacheConstants.SYS_CONFIG_KEY, "配置信息"));
@@ -47,8 +47,13 @@ public class CacheController
         caches.add(new SysCache(CacheConstants.PWD_ERR_CNT_KEY, "密码错误次数"));
     }
 
+    public CacheController(@Autowired(required = false) RedisTemplate<String, String> redisTemplate, CacheService cacheService) {
+        this.redisTemplate = redisTemplate;
+        this.cacheService = cacheService;
+    }
+
     @SuppressWarnings("deprecation")
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "获取缓存监控信息", description = "获取Redis内存、命令统计等监控信息")
     @GetMapping()
     public Result<CacheInfoVO> getInfo() throws Exception
@@ -56,21 +61,23 @@ public class CacheController
         CacheInfoVO result = new CacheInfoVO();
         
         if ("cluster".equalsIgnoreCase(appMode) && redisTemplate != null) {
-            Properties info = (Properties) redisTemplate.execute((RedisCallback<Object>) connection -> connection.info());
+            Properties info = (Properties) redisTemplate.execute((RedisCallback<Object>) DefaultedRedisConnection::info);
             Properties commandStats = (Properties) redisTemplate.execute((RedisCallback<Object>) connection -> connection.info("commandstats"));
-            Object dbSize = redisTemplate.execute((RedisCallback<Object>) connection -> connection.dbSize());
+            Object dbSize = redisTemplate.execute((RedisCallback<Object>) DefaultedRedisConnection::dbSize);
 
             result.setInfo(info);
             result.setDbSize(dbSize);
 
             List<Map<String, String>> pieList = new ArrayList<>();
-            commandStats.stringPropertyNames().forEach(key -> {
-                Map<String, String> data = new HashMap<>(2);
-                String property = commandStats.getProperty(key);
-                data.put("name", StringUtils.removeStart(key, "cmdstat_"));
-                data.put("value", StringUtils.substringBetween(property, "calls=", ",usec"));
-                pieList.add(data);
-            });
+            if (commandStats != null) {
+                commandStats.stringPropertyNames().forEach(key -> {
+                    Map<String, String> data = new HashMap<>(2);
+                    String property = commandStats.getProperty(key);
+                    data.put("name", StringUtils.removeStart(key, "cmdstat_"));
+                    data.put("value", StringUtils.substringBetween(property, "calls=", ",usec"));
+                    pieList.add(data);
+                });
+            }
             result.setCommandStats(pieList);
         } else {
             // Standalone mode (Caffeine)
@@ -86,7 +93,7 @@ public class CacheController
         return Result.success(result);
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "获取缓存名称列表", description = "获取系统定义的缓存名称列表")
     @GetMapping("/getNames")
     public Result<List<SysCacheVO>> cache()
@@ -98,13 +105,13 @@ public class CacheController
         return Result.success(list);
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "获取缓存键名列表", description = "根据缓存名称获取键名列表")
     @GetMapping("/getKeys/{cacheName}")
     public Result<List<SysCacheVO>> getCacheKeys(@Parameter(description = "缓存名称", required = true) @PathVariable String cacheName)
     {
         Collection<String> cacheKeys = cacheService.keys(cacheName + "*");
-        List<SysCacheVO> list = new ArrayList<SysCacheVO>();
+        List<SysCacheVO> list = new ArrayList<>();
         if (StringUtils.isNotEmpty(cacheKeys))
         {
             for (String cacheKey : cacheKeys)
@@ -118,7 +125,7 @@ public class CacheController
         return Result.success(list);
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "获取缓存内容", description = "根据缓存名称和键名获取缓存内容")
     @GetMapping("/getValue/{cacheName}/{cacheKey}")
     public Result<SysCacheVO> getCacheValue(@Parameter(description = "缓存名称", required = true) @PathVariable String cacheName, 
@@ -130,7 +137,7 @@ public class CacheController
         return Result.success(sysCache);
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "清理缓存名称", description = "根据缓存名称清理缓存")
     @DeleteMapping("/clearCacheName/{cacheName}")
     public Result<Void> clearCacheName(@Parameter(description = "缓存名称", required = true) @PathVariable String cacheName)
@@ -140,7 +147,7 @@ public class CacheController
         return Result.success();
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "清理缓存键名", description = "根据缓存键名清理缓存")
     @DeleteMapping("/clearCacheKey/{cacheKey}")
     public Result<Void> clearCacheKey(@Parameter(description = "缓存键名", required = true) @PathVariable String cacheKey)
@@ -149,7 +156,7 @@ public class CacheController
         return Result.success();
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @RequirePermission("monitor:cache:list")
     @Operation(summary = "清理全部缓存", description = "清理所有Redis缓存")
     @DeleteMapping("/clearCacheAll")
     public Result<Void> clearCacheAll()

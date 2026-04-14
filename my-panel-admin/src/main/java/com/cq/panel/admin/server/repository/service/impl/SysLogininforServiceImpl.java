@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
-import com.cq.panel.admin.server.repository.domain.SysLogininfor;
-import com.cq.panel.admin.server.repository.mapper.SysLogininforMapper;
+import com.cq.panel.admin.server.repository.domain.SysLoginInfo;
+import com.cq.panel.admin.server.repository.mapper.SysLoginInfoMapper;
 import com.cq.panel.admin.server.repository.service.ISysLogininforService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,7 @@ public class SysLogininforServiceImpl implements ISysLogininforService
 {
 
     @Autowired
-    private SysLogininforMapper logininforMapper;
+    private SysLoginInfoMapper logininforMapper;
 
     /**
      * 新增系统登录日志
@@ -25,9 +25,9 @@ public class SysLogininforServiceImpl implements ISysLogininforService
      * @param logininfor 访问日志对象
      */
     @Override
-    public void insertLogininfor(SysLogininfor logininfor)
+    public void insertLogininfor(SysLoginInfo logininfor)
     {
-        logininforMapper.insertLogininfor(logininfor);
+        logininforMapper.insertLoginInfo(logininfor);
     }
 
     /**
@@ -37,9 +37,9 @@ public class SysLogininforServiceImpl implements ISysLogininforService
      * @return 登录记录集合
      */
     @Override
-    public List<SysLogininfor> selectLogininforList(SysLogininfor logininfor)
+    public List<SysLoginInfo> selectLogininforList(SysLoginInfo logininfor)
     {
-        return logininforMapper.selectLogininforList(logininfor);
+        return logininforMapper.selectLoginInfoList(logininfor);
     }
 
     /**
@@ -51,7 +51,7 @@ public class SysLogininforServiceImpl implements ISysLogininforService
     @Override
     public int deleteLogininforByIds(Long[] infoIds)
     {
-        return logininforMapper.deleteLogininforByIds(infoIds);
+        return logininforMapper.deleteLoginInfoByIds(infoIds);
     }
 
     /**
@@ -60,6 +60,6 @@ public class SysLogininforServiceImpl implements ISysLogininforService
     @Override
     public void cleanLogininfor()
     {
-        logininforMapper.cleanLogininfor();
+        logininforMapper.cleanLoginInfo();
     }
 }

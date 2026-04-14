@@ -1,8 +1,8 @@
 package com.cq.agent.handler;
 
+import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.model.FileInfo;
 import com.cq.agent.service.FileService;
-import com.cq.agent.service.FileService.ServiceResult;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
@@ -15,8 +15,6 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.multipart.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -123,13 +121,13 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     private void handleList(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
-        ServiceResult<List<FileInfo>> result = fileService.list(path);
+        ApiResponse<List<FileInfo>> result = fileService.list(path);
         sendServiceResult(ctx, result);
     }
 
     private void handleNlst(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
-        ServiceResult<List<String>> result = fileService.nameList(path);
+        ApiResponse<List<String>> result = fileService.nameList(path);
         sendServiceResult(ctx, result);
     }
 
@@ -144,10 +142,10 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         String charset = getQueryParam(request, "charset", "UTF-8");
 
         if ("text".equals(mode)) {
-            ServiceResult<String> result = fileService.retrieveText(path, charset);
+            ApiResponse<String> result = fileService.retrieveText(path, charset);
             sendServiceResult(ctx, result);
         } else {
-            ServiceResult<byte[]> result = fileService.retrieve(path);
+            ApiResponse<byte[]> result = fileService.retrieve(path);
             if (result.isSuccess()) {
                 // Return as base64 encoded string for JSON response
                 String base64 = Base64.getEncoder().encodeToString(result.getData());
@@ -158,7 +156,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 response.addProperty("encoding", "base64");
                 sendResponse(ctx, HttpResponseStatus.OK, gson.toJson(response));
             } else {
-                sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getError()));
+                sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
             }
         }
     }
@@ -186,7 +184,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 return;
             }
 
-            ServiceResult<FileInfo> result = fileService.store(path, content);
+            ApiResponse<FileInfo> result = fileService.store(path, content);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -217,7 +215,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 return;
             }
 
-            ServiceResult<FileInfo> result = fileService.storeUnique(directory, content, prefix);
+            ApiResponse<FileInfo> result = fileService.storeUnique(directory, content, prefix);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -247,7 +245,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 return;
             }
 
-            ServiceResult<FileInfo> result = fileService.append(path, content);
+            ApiResponse<FileInfo> result = fileService.append(path, content);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -260,7 +258,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
-        ServiceResult<Void> result = fileService.delete(path);
+        ApiResponse<Void> result = fileService.delete(path);
         sendServiceResult(ctx, result);
     }
 
@@ -270,7 +268,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
-        ServiceResult<FileInfo> result = fileService.makeDirectory(path);
+        ApiResponse<FileInfo> result = fileService.makeDirectory(path);
         sendServiceResult(ctx, result);
     }
 
@@ -281,13 +279,13 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             return;
         }
         boolean recursive = "true".equals(getQueryParam(request, "recursive", "false"));
-        ServiceResult<Void> result = fileService.removeDirectory(path, recursive);
+        ApiResponse<Void> result = fileService.removeDirectory(path, recursive);
         sendServiceResult(ctx, result);
     }
 
     private void handlePwd(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
-        ServiceResult<FileInfo> result = fileService.printWorkingDirectory(path);
+        ApiResponse<FileInfo> result = fileService.printWorkingDirectory(path);
         sendServiceResult(ctx, result);
     }
 
@@ -297,7 +295,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
-        ServiceResult<Long> result = fileService.getSize(path);
+        ApiResponse<Long> result = fileService.getSize(path);
         sendServiceResult(ctx, result);
     }
 
@@ -307,7 +305,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
-        ServiceResult<Long> result = fileService.getModificationTime(path);
+        ApiResponse<Long> result = fileService.getModificationTime(path);
         sendServiceResult(ctx, result);
     }
 
@@ -324,7 +322,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 return;
             }
             long timestamp = body.get("timestamp").getAsLong();
-            ServiceResult<FileInfo> result = fileService.setModificationTime(path, timestamp);
+            ApiResponse<FileInfo> result = fileService.setModificationTime(path, timestamp);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -340,7 +338,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'from' and 'to' fields are required"));
                 return;
             }
-            ServiceResult<FileInfo> result = fileService.rename(from, to);
+            ApiResponse<FileInfo> result = fileService.rename(from, to);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -356,7 +354,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'from' and 'to' fields are required"));
                 return;
             }
-            ServiceResult<FileInfo> result = fileService.copy(from, to);
+            ApiResponse<FileInfo> result = fileService.copy(from, to);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -369,7 +367,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
-        ServiceResult<FileInfo> result = fileService.stat(path);
+        ApiResponse<FileInfo> result = fileService.stat(path);
         sendServiceResult(ctx, result);
     }
 
@@ -379,7 +377,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' parameter is required"));
             return;
         }
-        ServiceResult<Boolean> result = fileService.exists(path);
+        ApiResponse<Boolean> result = fileService.exists(path);
         sendServiceResult(ctx, result);
     }
 
@@ -392,7 +390,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("'path' and 'permissions' fields are required"));
                 return;
             }
-            ServiceResult<FileInfo> result = fileService.chmod(path, permissions);
+            ApiResponse<FileInfo> result = fileService.chmod(path, permissions);
             sendServiceResult(ctx, result);
         } catch (JsonSyntaxException e) {
             sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, createErrorResponse("Invalid JSON format"));
@@ -406,7 +404,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
             return;
         }
         String algorithm = getQueryParam(request, "algorithm", "MD5");
-        ServiceResult<String> result = fileService.checksum(path, algorithm);
+        ApiResponse<String> result = fileService.checksum(path, algorithm);
         sendServiceResult(ctx, result);
     }
 
@@ -414,13 +412,13 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         String path = getQueryParam(request, "path", ".");
         String pattern = getQueryParam(request, "pattern", "*");
         int maxDepth = Integer.parseInt(getQueryParam(request, "maxDepth", "10"));
-        ServiceResult<List<FileInfo>> result = fileService.search(path, pattern, maxDepth);
+        ApiResponse<List<FileInfo>> result = fileService.search(path, pattern, maxDepth);
         sendServiceResult(ctx, result);
     }
 
     private void handleDisk(ChannelHandlerContext ctx, FullHttpRequest request) {
         String path = getQueryParam(request, "path", ".");
-        ServiceResult<Map<String, Long>> result = fileService.getDiskSpace(path);
+        ApiResponse<Map<String, Long>> result = fileService.getDiskSpace(path);
         sendServiceResult(ctx, result);
     }
 
@@ -429,7 +427,7 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         QueryStringDecoder decoder = new QueryStringDecoder(request.uri());
         List<String> values = decoder.parameters().get(name);
         if (values != null && !values.isEmpty()) {
-            return values.get(0);
+            return values.getFirst();
         }
         return defaultValue;
     }
@@ -449,11 +447,11 @@ public class FileHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         return null;
     }
 
-    private <T> void sendServiceResult(ChannelHandlerContext ctx, ServiceResult<T> result) {
+    private <T> void sendServiceResult(ChannelHandlerContext ctx, ApiResponse<T> result) {
         if (result.isSuccess()) {
             sendSuccessResponse(ctx, result.getData());
         } else {
-            sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getError()));
+            sendResponse(ctx, HttpResponseStatus.OK, createErrorResponse(result.getMsg()));
         }
     }
 

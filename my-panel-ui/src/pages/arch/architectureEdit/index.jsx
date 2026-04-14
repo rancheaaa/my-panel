@@ -3077,7 +3077,7 @@ const ArchitectureFlow = () => {
           // 包含IP、端口和状态
           nodeData.ip = rest.ip;
           nodeData.port = rest.port;
-          if (rest.status) {
+            if (rest.status) {
               nodeData.status = rest.status === 'running' ? '0' : '1';
             } else {
               // 当状态为空时，不设置status字段，使用数据库默认值
@@ -3946,9 +3946,11 @@ const ArchitectureFlow = () => {
               <Form.Item
                 name="status"
                 label="状态"
-                initialValue="running"
               >
                 <Select size="large">
+                    <Option value="unknown">
+                        <Tag color="default">未知</Tag>
+                    </Option>
                   <Option value="running">
                     <Tag color="green">运行中</Tag>
                   </Option>
@@ -4450,8 +4452,8 @@ const ArchitectureFlow = () => {
               
               <Form.Item name="status" label="状态">
                 <Select allowClear placeholder="请选择状态">
-                  <Option value="">
-                    <Tag color="default">空</Tag>
+                  <Option value="unknown">
+                    <Tag color="default">未知</Tag>
                   </Option>
                   <Option value="running">
                     <Tag color="green">运行中</Tag>

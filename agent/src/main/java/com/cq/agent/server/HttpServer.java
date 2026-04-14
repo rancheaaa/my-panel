@@ -95,7 +95,7 @@ public class HttpServer {
                         pipeline.addLast(new IdleStateHandler(idleTimeout, 0, 0, TimeUnit.SECONDS));
                         pipeline.addLast(new HttpServerCodec());
                         pipeline.addLast(new HttpObjectAggregator(maxContentLength));
-                        pipeline.addLast(new FileHandler(handlerFactory));
+                        pipeline.addLast(new FileHandler(fileService));
                         pipeline.addLast(new HttpServerHandler(commandExecutor));
                     }
                 });

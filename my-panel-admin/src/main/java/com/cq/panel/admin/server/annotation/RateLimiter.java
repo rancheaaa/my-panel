@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.common.annotation;
+package com.cq.panel.admin.server.annotation;
 
 import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.common.enums.LimitType;

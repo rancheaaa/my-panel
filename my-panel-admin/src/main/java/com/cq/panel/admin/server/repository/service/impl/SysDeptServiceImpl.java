@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
-import com.cq.panel.admin.server.common.annotation.DataScope;
+import com.cq.panel.admin.server.annotation.DataScope;
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.web.domain.model.TreeSelect;
 import com.cq.panel.admin.server.repository.domain.SysDept;

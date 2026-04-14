@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.common.serializer;
 
-import com.cq.panel.admin.server.common.annotation.Sensitive;
+import com.cq.panel.admin.server.annotation.Sensitive;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.enums.DesensitizedType;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;

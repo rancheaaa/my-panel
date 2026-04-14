@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import com.cq.panel.admin.server.common.annotation.Anonymous;
+import com.cq.panel.admin.server.annotation.Anonymous;
 import org.apache.commons.lang3.RegExUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.InitializingBean;

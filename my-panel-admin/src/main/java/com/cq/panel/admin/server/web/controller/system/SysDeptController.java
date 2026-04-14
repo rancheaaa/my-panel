@@ -6,7 +6,7 @@ import com.cq.panel.admin.server.web.domain.dto.system.SysDeptSortDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.system.SysDeptVO;
 import com.cq.panel.admin.server.web.converter.system.SysDeptConverter;
-import com.cq.panel.admin.server.common.annotation.Log;
+import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;

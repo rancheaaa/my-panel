@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.security.context;
+package com.cq.panel.admin.server.context;
 
 import com.cq.panel.authlite.AuthenticationToken;
 

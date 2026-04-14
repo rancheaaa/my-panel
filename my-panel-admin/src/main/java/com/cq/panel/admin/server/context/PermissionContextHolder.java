@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.security.context;
+package com.cq.panel.admin.server.context;
 
 import com.cq.panel.admin.server.web.domain.text.Convert;
 import org.springframework.web.context.request.RequestAttributes;

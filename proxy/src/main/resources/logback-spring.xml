@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="60 seconds">
-  <property name="LOG_HOME" value="logs/proxy"/>
+  <property name="LOG_HOME" value="/tmp/my-panel/proxy/logs/"/>
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>

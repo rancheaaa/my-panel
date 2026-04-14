@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.web.domain.vo.system;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import com.cq.panel.admin.server.common.annotation.Excel;
+import com.cq.panel.admin.server.annotation.Excel;
 import lombok.Data;
 import java.util.Date;
 

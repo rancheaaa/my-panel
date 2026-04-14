@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.aspectj;
 
 import java.util.Collection;
 import java.util.Map;
-import com.cq.panel.admin.server.common.annotation.Log;
+import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.enums.BusinessStatus;
@@ -13,7 +13,7 @@ import com.cq.panel.admin.server.common.utils.ServletUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.ip.IpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
-import com.cq.panel.admin.server.manager.factory.AsyncFactory;
+import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.repository.domain.SysOperLog;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

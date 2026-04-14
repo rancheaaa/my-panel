@@ -14,7 +14,7 @@ import com.cq.panel.admin.server.web.converter.monitor.SysJobConverter;
 import com.cq.panel.admin.server.web.exception.ServiceException;
 import com.cq.panel.admin.server.service.IMethodScannerService;
 import com.github.pagehelper.PageInfo;
-import com.cq.panel.admin.server.common.annotation.Log;
+import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;

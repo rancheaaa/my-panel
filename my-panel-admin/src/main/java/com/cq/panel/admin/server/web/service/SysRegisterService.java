@@ -12,10 +12,9 @@ import com.cq.panel.admin.server.common.utils.MessageUtils;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
-import com.cq.panel.admin.server.manager.factory.AsyncFactory;
+import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
 import com.cq.panel.admin.server.repository.service.ISysUserService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 
@@ -27,14 +26,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class SysRegisterService
 {
-    @Autowired
-    private ISysUserService userService;
+    private final ISysUserService userService;
 
-    @Autowired
-    private ISysConfigService configService;
+    private final ISysConfigService configService;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
+
+    public SysRegisterService(ISysUserService userService, ISysConfigService configService, CacheService cacheService) {
+        this.userService = userService;
+        this.configService = configService;
+        this.cacheService = cacheService;
+    }
 
     /**
      * 注册
@@ -97,8 +99,8 @@ public class SysRegisterService
      * @param username 用户名
      * @param code 验证码
      * @param uuid 唯一标识
-     * @return 结果
      */
+    @SuppressWarnings("all")
     public void validateCaptcha(String username, String code, String uuid)
     {
         String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");

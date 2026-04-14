@@ -7,7 +7,7 @@ import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.exception.user.UserPasswordNotMatchException;
 import com.cq.panel.admin.server.web.exception.user.UserPasswordRetryLimitExceedException;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.security.context.AuthenticationContextHolder;
+import com.cq.panel.admin.server.context.AuthenticationContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

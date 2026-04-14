@@ -3,7 +3,6 @@ package com.cq.panel.admin.server.config;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.interceptor.LogInterceptor;
 import com.cq.panel.admin.server.interceptor.RepeatSubmitInterceptor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -21,19 +20,22 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class ResourcesConfig implements WebMvcConfigurer
 {
-    @Autowired
-    private RepeatSubmitInterceptor repeatSubmitInterceptor;
+    private final RepeatSubmitInterceptor repeatSubmitInterceptor;
 
-    @Autowired
-    private LogInterceptor logInterceptor;
+    private final LogInterceptor logInterceptor;
 
-    @Autowired
-    private AppConfig appConfig;
+    private final AppConfig appConfig;
+
+    public ResourcesConfig(RepeatSubmitInterceptor repeatSubmitInterceptor, LogInterceptor logInterceptor, AppConfig appConfig) {
+        this.repeatSubmitInterceptor = repeatSubmitInterceptor;
+        this.logInterceptor = logInterceptor;
+        this.appConfig = appConfig;
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry)
     {
-        /** 本地文件上传路径 */
+        // 本地文件上传路径
         registry.addResourceHandler(Constants.RESOURCE_PREFIX + "/**")
                 .addResourceLocations("file:" + appConfig.getProfile() + "/");
     }

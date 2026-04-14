@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.controller.system;
 
-import com.cq.panel.admin.server.common.annotation.Log;
+import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;

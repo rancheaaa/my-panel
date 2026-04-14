@@ -4,7 +4,7 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 
-import com.cq.panel.admin.server.common.annotation.RateLimiter;
+import com.cq.panel.admin.server.annotation.RateLimiter;
 import com.cq.panel.admin.server.common.enums.LimitType;
 import com.cq.panel.admin.server.web.exception.ServiceException;
 import com.cq.panel.admin.server.common.utils.StringUtils;
@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 

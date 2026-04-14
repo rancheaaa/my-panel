@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.manager.factory;
+package com.cq.panel.admin.server.manager;
 
 import java.util.Date;
 import java.util.TimerTask;

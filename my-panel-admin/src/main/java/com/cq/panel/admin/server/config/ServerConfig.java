@@ -2,7 +2,6 @@ package com.cq.panel.admin.server.config;
 
 import com.cq.panel.admin.server.common.utils.ServletUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**

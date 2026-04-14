@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.common.annotation;
+package com.cq.panel.admin.server.annotation;
 
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.enums.OperatorType;

@@ -6,7 +6,7 @@ import com.cq.panel.admin.server.repository.domain.SysRole;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.security.context.PermissionContextHolder;
+import com.cq.panel.admin.server.context.PermissionContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 

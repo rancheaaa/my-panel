@@ -8,7 +8,6 @@ import com.cq.panel.admin.server.common.enums.DataSourceType;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.common.properties.DruidProperties;
 import com.cq.panel.admin.server.datasource.DynamicDataSource;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -77,6 +76,7 @@ public class DruidConfig
         }
         catch (Exception e)
         {
+            //
         }
     }
 
@@ -98,8 +98,7 @@ public class DruidConfig
         Filter filter = new Filter()
         {
             @Override
-            public void init(jakarta.servlet.FilterConfig filterConfig) throws ServletException
-            {
+            public void init(jakarta.servlet.FilterConfig filterConfig) {
             }
             @Override
             public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)

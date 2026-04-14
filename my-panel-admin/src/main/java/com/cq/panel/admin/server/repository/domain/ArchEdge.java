@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.repository.domain;
 
-import com.cq.panel.admin.server.common.annotation.Excel;
+import com.cq.panel.admin.server.annotation.Excel;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;

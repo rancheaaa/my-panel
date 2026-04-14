@@ -4,7 +4,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.cq.panel.admin.server.common.annotation.RepeatSubmit;
+import com.cq.panel.admin.server.annotation.RepeatSubmit;
 import com.cq.panel.admin.server.common.constant.HttpStatus;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
 import jakarta.servlet.http.HttpServletRequest;

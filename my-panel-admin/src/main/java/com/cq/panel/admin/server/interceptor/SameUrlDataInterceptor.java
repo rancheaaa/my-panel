@@ -1,15 +1,14 @@
-package com.cq.panel.admin.server.interceptor.impl;
+package com.cq.panel.admin.server.interceptor;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import com.cq.panel.admin.server.common.annotation.RepeatSubmit;
+import com.cq.panel.admin.server.annotation.RepeatSubmit;
 import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
 import com.cq.panel.admin.server.filter.RepeatedlyRequestWrapper;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.http.HttpHelper;
-import com.cq.panel.admin.server.interceptor.RepeatSubmitInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

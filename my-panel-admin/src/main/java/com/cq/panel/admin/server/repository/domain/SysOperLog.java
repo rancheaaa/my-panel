@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.repository.domain;
 
-import com.cq.panel.admin.server.common.annotation.Excel;
+import com.cq.panel.admin.server.annotation.Excel;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

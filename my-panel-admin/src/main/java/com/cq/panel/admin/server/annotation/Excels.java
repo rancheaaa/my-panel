@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.common.annotation;
+package com.cq.panel.admin.server.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
-import com.cq.panel.admin.server.common.annotation.DataSource;
+import com.cq.panel.admin.server.annotation.DataSource;
 import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.web.service.cache.CacheService;

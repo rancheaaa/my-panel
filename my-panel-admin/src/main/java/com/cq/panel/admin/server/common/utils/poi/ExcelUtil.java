@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.poi;
 
-import com.cq.panel.admin.server.common.annotation.Excel;
-import com.cq.panel.admin.server.common.annotation.Excels;
+import com.cq.panel.admin.server.annotation.Excel;
+import com.cq.panel.admin.server.annotation.Excels;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.config.AppConfig;
 import com.cq.panel.admin.server.web.domain.text.Convert;

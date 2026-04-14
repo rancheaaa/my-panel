@@ -7,7 +7,7 @@ import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysLogininforVO;
 import com.cq.panel.admin.server.web.converter.monitor.SysLogininforConverter;
 import com.github.pagehelper.PageInfo;
-import com.cq.panel.admin.server.common.annotation.Log;
+import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;

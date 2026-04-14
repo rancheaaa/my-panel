@@ -1,5 +1,6 @@
 package com.cq.agent.config;
 
+import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.*;
@@ -20,6 +21,7 @@ import java.util.UUID;
  * Loads configuration from agent.properties file.
  * Supports external config file override.
  */
+@Data
 public class AgentConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentConfig.class);
@@ -133,6 +135,7 @@ public class AgentConfig {
         }
     }
 
+    @SuppressWarnings("all")
     private void parseConfiguration() {
         // Agent ID
         this.agentId = getStringProperty("agent.id", null);
@@ -328,6 +331,7 @@ public class AgentConfig {
         return defaultValue;
     }
 
+    @SuppressWarnings("all")
     private boolean getBooleanProperty(String key, boolean defaultValue) {
         String value = getConfigValue(key);
         if (value != null) {
@@ -358,7 +362,7 @@ public class AgentConfig {
      * @return 配置值，如果所有来源都没有找到则返回null
      */
     private String getConfigValue(String key) {
-        String value = null;
+        String value;
         
         // 1. 首先检查系统属性
         value = System.getProperty(key);
@@ -408,263 +412,5 @@ public class AgentConfig {
         }
         logger.info("Could not find a suitable non-loopback IP, defaulting to 0.0.0.0");
         return "0.0.0.0";
-    }
-
-    // Getters
-    public String getAgentId() {
-        return agentId;
-    }
-
-    public String getAgentIp() {
-        return agentIp;
-    }
-
-    public String getAgentApiUrl() {
-        return agentApiUrl;
-    }
-
-    public int getServerPort() {
-        return serverPort;
-    }
-
-    public int getBossThreads() {
-        return bossThreads;
-    }
-
-    public int getWorkerThreads() {
-        return workerThreads;
-    }
-
-    public int getPortProbeMaxSteps() {
-        return portProbeMaxSteps;
-    }
-
-    public int getExecutorThreadPoolSize() {
-        return executorThreadPoolSize;
-    }
-
-    public long getDefaultTimeoutSeconds() {
-        return defaultTimeoutSeconds;
-    }
-
-    public long getMaxTimeoutSeconds() {
-        return maxTimeoutSeconds;
-    }
-
-    public int getConnectionIdleTimeoutSeconds() {
-        return connectionIdleTimeoutSeconds;
-    }
-
-    public int getMaxContentLength() {
-        return maxContentLength;
-    }
-
-    public String getFileBaseDirectory() {
-        return fileBaseDirectory;
-    }
-
-    public boolean isAllowOutsideBaseDirectory() {
-        return allowOutsideBaseDirectory;
-    }
-
-    public long getMaxFileSize() {
-        return maxFileSize;
-    }
-
-    public int getChunkSize() {
-        return chunkSize;
-    }
-
-    public long getUploadSessionTimeoutMinutes() {
-        return uploadSessionTimeoutMinutes;
-    }
-
-    public int getMaxUploadRateKBPerSecond() {
-        return maxUploadRateKBPerSecond;
-    }
-
-    public String getUploadQueueDbPath() {
-        return uploadQueueDbPath;
-    }
-
-    public String getUploadMapDbPath() {
-        return uploadMapDbPath;
-    }
-
-    public String getUploadSessionsDbPath() {
-        return uploadSessionsDbPath;
-    }
-
-    public String getDownloadQueueDbPath() {
-        return downloadQueueDbPath;
-    }
-
-    public String getDownloadMapDbPath() {
-        return downloadMapDbPath;
-    }
-
-    public int getMaxDownloadRateKBPerSecond() {
-        return maxDownloadRateKBPerSecond;
-    }
-
-    public int getUploadConcurrentUploads() {
-        return uploadConcurrentUploads;
-    }
-
-    public int getUploadMaxQueueDepth() {
-        return uploadMaxQueueDepth;
-    }
-
-    public int getUploadWorkerCount() {
-        return uploadWorkerCount;
-    }
-
-    public int getUploadMaxRetries() {
-        return uploadMaxRetries;
-    }
-
-    public long getUploadRetryDelayMs() {
-        return uploadRetryDelayMs;
-    }
-
-    public int getUploadConnectTimeoutSeconds() {
-        return uploadConnectTimeoutSeconds;
-    }
-
-    public int getUploadRequestTimeoutSeconds() {
-        return uploadRequestTimeoutSeconds;
-    }
-
-    public int getDownloadConcurrentDownloads() {
-        return downloadConcurrentDownloads;
-    }
-
-    public int getDownloadMaxQueueDepth() {
-        return downloadMaxQueueDepth;
-    }
-
-    public int getDownloadWorkerCount() {
-        return downloadWorkerCount;
-    }
-
-    public int getDownloadMaxRetries() {
-        return downloadMaxRetries;
-    }
-
-    public long getDownloadRetryDelayMs() {
-        return downloadRetryDelayMs;
-    }
-
-    public int getDownloadConnectTimeoutSeconds() {
-        return downloadConnectTimeoutSeconds;
-    }
-
-    public int getDownloadRequestTimeoutSeconds() {
-        return downloadRequestTimeoutSeconds;
-    }
-
-    public String getRegistryServerUrl() {
-        return registryServerUrls.isEmpty() ? null : registryServerUrls.get(0);
-    }
-
-    public List<String> getRegistryServerUrls() {
-        return registryServerUrls;
-    }
-
-    public String getNodeName() {
-        return nodeName;
-    }
-
-    public String getOsType() {
-        return osType;
-    }
-
-    public String getAppId() {
-        return appId;
-    }
-
-    public String getRemark() {
-        return remark;
-    }
-
-    public int getHeartbeatIntervalSeconds() {
-        return heartbeatIntervalSeconds;
-    }
-
-    public boolean isAutoRegister() {
-        return autoRegister;
-    }
-
-    public boolean isAutoHeartbeat() {
-        return autoHeartbeat;
-    }
-
-    public void setAgentApiUrl(String agentApiUrl) {
-        this.agentApiUrl = agentApiUrl;
-    }
-
-    public void setUploadMapDbPath(String uploadMapDbPath) {
-        this.uploadMapDbPath = uploadMapDbPath;
-    }
-
-    public void setUploadQueueDbPath(String uploadQueueDbPath) {
-        this.uploadQueueDbPath = uploadQueueDbPath;
-    }
-
-    public void setAppId(String appId) {
-        this.appId = appId;
-    }
-
-    @Override
-    public String toString() {
-        return "AgentConfig{" +
-                "properties=" + properties +
-                ", agentId='" + agentId + '\'' +
-                ", agentIp='" + agentIp + '\'' +
-                ", agentApiUrl='" + agentApiUrl + '\'' +
-                ", serverPort=" + serverPort +
-                ", bossThreads=" + bossThreads +
-                ", workerThreads=" + workerThreads +
-                ", portProbeMaxSteps=" + portProbeMaxSteps +
-                ", executorThreadPoolSize=" + executorThreadPoolSize +
-                ", defaultTimeoutSeconds=" + defaultTimeoutSeconds +
-                ", maxTimeoutSeconds=" + maxTimeoutSeconds +
-                ", connectionIdleTimeoutSeconds=" + connectionIdleTimeoutSeconds +
-                ", maxContentLength=" + maxContentLength +
-                ", fileBaseDirectory='" + fileBaseDirectory + '\'' +
-                ", allowOutsideBaseDirectory=" + allowOutsideBaseDirectory +
-                ", maxFileSize=" + maxFileSize +
-                ", chunkSize=" + chunkSize +
-                ", uploadSessionTimeoutMinutes=" + uploadSessionTimeoutMinutes +
-                ", maxUploadRateKBPerSecond=" + maxUploadRateKBPerSecond +
-                ", maxDownloadRateKBPerSecond=" + maxDownloadRateKBPerSecond +
-                ", uploadQueueDbPath='" + uploadQueueDbPath + '\'' +
-                ", uploadMapDbPath='" + uploadMapDbPath + '\'' +
-                ", uploadSessionsDbPath='" + uploadSessionsDbPath + '\'' +
-                ", downloadQueueDbPath='" + downloadQueueDbPath + '\'' +
-                ", downloadMapDbPath='" + downloadMapDbPath + '\'' +
-                ", uploadConcurrentUploads=" + uploadConcurrentUploads +
-                ", uploadMaxQueueDepth=" + uploadMaxQueueDepth +
-                ", uploadWorkerCount=" + uploadWorkerCount +
-                ", uploadMaxRetries=" + uploadMaxRetries +
-                ", uploadRetryDelayMs=" + uploadRetryDelayMs +
-                ", uploadConnectTimeoutSeconds=" + uploadConnectTimeoutSeconds +
-                ", uploadRequestTimeoutSeconds=" + uploadRequestTimeoutSeconds +
-                ", downloadConcurrentDownloads=" + downloadConcurrentDownloads +
-                ", downloadMaxQueueDepth=" + downloadMaxQueueDepth +
-                ", downloadWorkerCount=" + downloadWorkerCount +
-                ", downloadMaxRetries=" + downloadMaxRetries +
-                ", downloadRetryDelayMs=" + downloadRetryDelayMs +
-                ", downloadConnectTimeoutSeconds=" + downloadConnectTimeoutSeconds +
-                ", downloadRequestTimeoutSeconds=" + downloadRequestTimeoutSeconds +
-                ", registryServerUrls=" + registryServerUrls +
-                ", nodeName='" + nodeName + '\'' +
-                ", osType='" + osType + '\'' +
-                ", appId='" + appId + '\'' +
-                ", remark='" + remark + '\'' +
-                ", heartbeatIntervalSeconds=" + heartbeatIntervalSeconds +
-                ", autoRegister=" + autoRegister +
-                ", autoHeartbeat=" + autoHeartbeat +
-                '}';
     }
 }

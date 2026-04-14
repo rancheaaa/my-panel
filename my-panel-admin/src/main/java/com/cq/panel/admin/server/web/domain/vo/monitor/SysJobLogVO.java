@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.vo.monitor;
 
-import com.cq.panel.admin.server.common.annotation.Excel;
+import com.cq.panel.admin.server.annotation.Excel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 

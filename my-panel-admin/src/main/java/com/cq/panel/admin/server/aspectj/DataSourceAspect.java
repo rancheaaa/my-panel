@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.aspectj;
 
 import java.util.Objects;
 
-import com.cq.panel.admin.server.common.annotation.DataSource;
+import com.cq.panel.admin.server.annotation.DataSource;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.datasource.DynamicDataSourceContextHolder;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -28,8 +28,8 @@ public class DataSourceAspect
 {
     protected Logger logger = LoggerFactory.getLogger(getClass());
 
-    @Pointcut("@annotation(com.cq.panel.admin.server.common.annotation.DataSource)"
-            + "|| @within(com.cq.panel.admin.server.common.annotation.DataSource)")
+    @Pointcut("@annotation(com.cq.panel.admin.server.annotation.DataSource)"
+            + "|| @within(com.cq.panel.admin.server.annotation.DataSource)")
     public void dsPointCut()
     {
 

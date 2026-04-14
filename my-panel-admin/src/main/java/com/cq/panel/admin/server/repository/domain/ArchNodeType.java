@@ -1,13 +1,11 @@
 package com.cq.panel.admin.server.repository.domain;
 
-import com.cq.panel.admin.server.common.annotation.Excel;
-import com.fasterxml.jackson.annotation.JsonFormat;
+import com.cq.panel.admin.server.annotation.Excel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.io.Serial;
-import java.util.Date;
 
 /**
  * 节点类型表 arch_node_type

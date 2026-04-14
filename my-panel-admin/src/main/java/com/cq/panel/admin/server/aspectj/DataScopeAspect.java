@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.aspectj;
 
 import java.util.ArrayList;
 import java.util.List;
-import com.cq.panel.admin.server.common.annotation.DataScope;
+import com.cq.panel.admin.server.annotation.DataScope;
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.repository.domain.BaseEntity;
 import com.cq.panel.admin.server.repository.domain.SysRole;
@@ -11,7 +11,7 @@ import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.web.domain.text.Convert;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.security.context.PermissionContextHolder;
+import com.cq.panel.admin.server.context.PermissionContextHolder;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;

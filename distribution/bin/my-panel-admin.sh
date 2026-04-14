@@ -87,7 +87,7 @@ fi
 
 install() {
     info "Checking dependencies..."
-    
+
     # 1. Java Detection
     if [ "$TARGET" = "app" ] || [ "$TARGET" = "all" ]; then
         JAVA_CMD=""
@@ -105,7 +105,7 @@ install() {
         if [ -z "$JAVA_CMD" ]; then
             if [ -d "$JDK_DIR" ]; then
                 JDK_PATH=$(find "$JDK_DIR" -maxdepth 3 -name "java" -path "*/bin/java" | head -n 1)
-                
+
                 # If not found, check if there is a tar.gz to extract
                 if [ -z "$JDK_PATH" ]; then
                     JDK_ARCHIVE=$(ls "$JDK_DIR"/"$JDK_PKG_NAME" 2>/dev/null | head -n 1)
@@ -138,7 +138,7 @@ install() {
             error "JDK 21 not found."
             exit 1
         fi
-        
+
         info "Java Source:  $JAVA_SOURCE"
         info "Java Path:    $JAVA_CMD"
     fi
@@ -150,14 +150,14 @@ install() {
 
         if [ -d "$NGINX_DIR" ]; then
             FOUND_NGINX=$(find "$NGINX_DIR" -maxdepth 5 -type f -name "nginx" | grep "/sbin/nginx$" | head -n 1)
-            
+
             if [ -z "$FOUND_NGINX" ]; then
                  NGINX_ARCHIVE=$(ls "$NGINX_DIR"/"$NGINX_PKG_NAME" "$NGINX_DIR"/nginx-*.zip 2>/dev/null | head -n 1)
                  if [ -f "$NGINX_ARCHIVE" ]; then
                      EXTRACT_DIR="$NGINX_DIR/src"
                      mkdir -p "$EXTRACT_DIR"
                      info "Extracting Nginx to $EXTRACT_DIR..."
-                     
+
                      if [[ "$NGINX_ARCHIVE" == *.tar.gz ]]; then
                          if tar -xzf "$NGINX_ARCHIVE" -C "$EXTRACT_DIR" --strip-components=1 2>/dev/null; then
                              info "Extracted Nginx using tar -xzf"
@@ -174,10 +174,10 @@ install() {
                              rmdir "$SUB_DIR"
                          fi
                      fi
-                     
+
                      if [ -f "$EXTRACT_DIR/configure" ]; then
                          info "Nginx source code detected. Compiling with production-grade modules..."
-                         
+
                          DEPS_OK=0
                         if command -v apt-get >/dev/null 2>&1; then
                             REQ_PKGS=("build-essential" "libpcre3" "libpcre3-dev" "zlib1g" "zlib1g-dev" "libssl-dev" "libxml2-dev" "libxslt1-dev" "libgd-dev")
@@ -233,7 +233,7 @@ install() {
                              info "You can download .deb or .rpm packages from another machine and"
                              info "install them using 'dpkg -i' or 'rpm -ivh'."
                              info "----------------------------------------------------------------"
-                             
+
                              # Check if basic tools exist anyway
                              if command -v gcc >/dev/null 2>&1 && command -v make >/dev/null 2>&1; then
                                  warn "Found gcc and make, attempting to compile anyway..."
@@ -299,13 +299,26 @@ install() {
     if [ "$TARGET" = "app" ] || [ "$TARGET" = "all" ]; then
         success "Found JAR: $JAR_PATH"
     fi
+    
+    # Replace /tmp/my-panel/admin paths with ROOT_DIR in config files
+    info "Updating configuration paths..."
+    CONFIG_DIR="$ROOT_DIR/config"
+    if [ -d "$CONFIG_DIR" ]; then
+        find "$CONFIG_DIR" -type f -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.xml" | while read -r file; do
+            if grep -q "/tmp/my-panel/admin" "$file"; then
+                sed -i 's|/tmp/my-panel/admin|'"$ROOT_DIR"'|g' "$file"
+                info "Updated paths in $file"
+            fi
+        done
+    fi
+    
     echo ""
     success "Installation/Check complete."
 }
 
 get_app_pid() {
     local pid=""
-    
+
     # 1. Try jps (most reliable for Java)
     local jps_cmd=""
     if [ -n "$JAVA_CMD" ]; then
@@ -314,7 +327,7 @@ get_app_pid() {
             jps_cmd="$java_bin_dir/jps"
         fi
     fi
-    
+
     if [ -z "$jps_cmd" ] && type jps >/dev/null 2>&1; then
         jps_cmd="jps"
     fi
@@ -327,7 +340,7 @@ get_app_pid() {
     if [ -z "$pid" ]; then
          pid=$(ps -ef | grep "$JAR_NAME_PATTERN" | grep -v grep | grep -v "$0" | awk '{print $2}' | head -n 1)
     fi
-    
+
     echo "$pid"
 }
 
@@ -339,13 +352,13 @@ do_start_app() {
     PID=$!
     cd "$BIN_DIR"
     echo $PID > "$PID_FILE"
-    
+
     # Wait for application to start (Health Check)
     info "Waiting for $APP_NAME to start..."
     MAX_WAIT=90
     COUNT=0
     SUCCESS=0
-    
+
     while [ $COUNT -lt $MAX_WAIT ]; do
         # Check if process is still running
         if ! kill -0 $PID >/dev/null 2>&1; then
@@ -354,7 +367,7 @@ do_start_app() {
             rm -f "$PID_FILE"
             return 1
         fi
-        
+
         # Check if the process is listening on ANY TCP port
         LISTENING=0
         if command -v lsof >/dev/null 2>&1; then
@@ -374,7 +387,7 @@ do_start_app() {
             success "$APP_NAME started successfully."
             break
         fi
-        
+
         printf "."
         sleep 1
         COUNT=$((COUNT + 1))
@@ -389,7 +402,7 @@ do_start_app() {
 
 init_nginx_conf() {
     CONF_FILE="$NGINX_HOME/conf/nginx.conf"
-    
+
     if [ -f "$CONF_FILE" ]; then
         if grep -q "# MY-PANEL-ADMIN-CONFIG" "$CONF_FILE"; then
             info "Nginx configuration already exists and is initialized. Skipping."
@@ -401,21 +414,21 @@ init_nginx_conf() {
     fi
 
     info "Initializing Nginx (Port: $NGINX_PORT)..."
-    
+
     # Ensure logs directory exists
     mkdir -p "$NGINX_HOME/logs"
-    
+
     # Get backend app port from application.yml
     APP_PORT=$(grep -E "^[[:space:]]*port:" "$ROOT_DIR/config/application.yml" | head -n 1 | awk '{print $2}' | tr -d '\r')
     if [ -z "$APP_PORT" ]; then
         APP_PORT=8080
     fi
     info "Backend app port: $APP_PORT"
-    
+
     # Create new config
     # Use absolute path for pages directory
     PAGES_DIR="$ROOT_DIR/pages"
-    
+
     cat > "$CONF_FILE" <<EOF
 # MY-PANEL-ADMIN-CONFIG
 pid $NGINX_PID_FILE;
@@ -504,7 +517,7 @@ start() {
     # 1. Start Java App
     if [ "$TARGET" = "app" ] || [ "$TARGET" = "all" ]; then
         PID=$(get_app_pid)
-        
+
         if [ -n "$PID" ]; then
             warn "$APP_NAME is already running (PID: $PID)."
             # Update PID file just in case
@@ -535,24 +548,24 @@ stop() {
     if [ "$TARGET" = "app" ] || [ "$TARGET" = "all" ]; then
         # Get all possible PIDs
         PIDS=$(get_app_pid)
-        
+
         if [ -n "$PIDS" ]; then
             for PID in $PIDS; do
                 info "Stopping $APP_NAME (PID: $PID)..."
-                
+
                 # Try graceful stop first
                 kill $PID 2>/dev/null
-                
+
                 TIMEOUT=10
                 while [ $TIMEOUT -gt 0 ]; do
-                    if ! kill -0 $PID >/dev/null 2>&1; then 
-                        break; 
+                    if ! kill -0 $PID >/dev/null 2>&1; then
+                        break;
                     fi
                     sleep 1
                     let TIMEOUT=TIMEOUT-1
                     printf "."
                 done
-                
+
                 if ! kill -0 $PID >/dev/null 2>&1; then
                     printf "\n"
                     success "$APP_NAME (PID: $PID) stopped."
@@ -588,7 +601,7 @@ status() {
         PID=$(get_app_pid)
         if [ -n "$PID" ]; then
             status_line "$APP_NAME" "${GREEN}RUNNING (PID: $PID)${NC}"
-            
+
             # Show listening ports
             if command -v lsof >/dev/null 2>&1; then
                 PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk 'NR>1 {print $9}' | cut -d: -f2 | sort -n | uniq | xargs)
@@ -642,10 +655,10 @@ if [ "$ACTION" != "install" ]; then
             JAVA_CHECK="java"
         fi
     fi
-    
+
     # Try to find Nginx
     NGINX_CHECK=$(find "$NGINX_DIR" -maxdepth 5 -type f -name "nginx" | grep "/sbin/nginx$" | head -n 1)
-    
+
     # Check dependencies based on TARGET
     if [ "$TARGET" = "app" ] || [ "$TARGET" = "all" ]; then
         if [ -z "$JAVA_CHECK" ]; then
@@ -654,7 +667,7 @@ if [ "$ACTION" != "install" ]; then
             exit 1
         fi
     fi
-    
+
     if [ "$TARGET" = "nginx" ] || [ "$TARGET" = "all" ]; then
         if [ -z "$NGINX_CHECK" ]; then
             error "Nginx dependency is not installed."
@@ -662,7 +675,7 @@ if [ "$ACTION" != "install" ]; then
             exit 1
         fi
     fi
-    
+
     # Set variables for the commands
     JAVA_CMD="$JAVA_CHECK"
     NGINX_CMD="$NGINX_CHECK"

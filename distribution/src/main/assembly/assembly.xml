@@ -15,7 +15,7 @@
             <outputDirectory>libs</outputDirectory>
             <scope>runtime</scope>
             <includes>
-                <include>com.cq:my-panel-admin</include>
+                <include>com.cq.panel.admin:panel-admin</include>
             </includes>
         </dependencySet>
     </dependencySets>

@@ -13,7 +13,6 @@
     <artifactId>my-panel-common</artifactId>
     <name>my-panel-common</name>
     <description>Common utilities and simplified load balancer</description>
-    <packaging>pom</packaging>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

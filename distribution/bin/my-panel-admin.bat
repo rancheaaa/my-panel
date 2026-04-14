@@ -253,6 +253,20 @@ exit /b 1
 
     if /i "%TARGET%"=="app" echo %SUCCESS_PREFIX% Found JAR: %JAR_PATH%
     if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found JAR: %JAR_PATH%
+    
+    :: Replace /tmp/my-panel/admin paths with ROOT_DIR in config files
+    echo %INFO_PREFIX% Updating configuration paths...
+    set "CONFIG_DIR=%ROOT_DIR%\config"
+    if exist "%CONFIG_DIR%" (
+        for /r "%CONFIG_DIR%" %%f in (*.yml, *.yaml, *.properties *.xml) do (
+            findstr "/tmp/my-panel/admin" "%%f" >nul
+            if !errorlevel! equ 0 (
+                powershell -Command "(Get-Content '%%f') -replace '/tmp/my-panel/admin', '%ROOT_DIR:\=/%' | Set-Content '%%f'"
+                echo %INFO_PREFIX% Updated paths in %%f
+            )
+        )
+    )
+    
     echo.
     echo %SUCCESS_PREFIX% Installation/Check complete for %TARGET%.
     goto :eof

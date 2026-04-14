@@ -212,7 +212,7 @@
         <module>distribution</module>
         <module>agent</module>
         <module>proxy</module>
-        <module>common</module>
+        <module>my-panel-common</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -9,8 +9,8 @@
     <version>${revision}</version>
   </parent>
 
-  <artifactId>proxy</artifactId>
-  <name>proxy</name>
+  <artifactId>my-panel-proxy</artifactId>
+  <name>my-panel-proxy</name>
   <description>Registry &amp; Config Center Proxy Service</description>
   <packaging>jar</packaging>
 

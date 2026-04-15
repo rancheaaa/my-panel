@@ -13,7 +13,9 @@ set "ERROR_PREFIX=[ERROR]"
 
 :: --- Configuration ---
 set "APP_NAME=my-panel-admin"
-set "JAR_NAME_PATTERN=my-panel-admin*.jar"
+set "APP_JAR_PATTERN=my-panel-admin*.jar"
+set "PROXY_NAME=my-panel-proxy"
+set "PROXY_JAR_PATTERN=my-panel-proxy*.jar"
 set "BIN_DIR=%~dp0"
 set "ROOT_DIR=%BIN_DIR%.."
 set "NGINX_PORT=8888"
@@ -26,28 +28,44 @@ set "JDK_DIR=%ROOT_DIR%\jdk"
 set "LOG_DIR=%ROOT_DIR%\logs"
 set "NGINX_DIR=%ROOT_DIR%\nginx"
 set "DATA_DIR=%ROOT_DIR%\data"
-set "PID_FILE=%ROOT_DIR%\%APP_NAME%.pid"
+
 :: JDK & Nginx Package Names (for easy modification)
 set "JDK_PKG_NAME=jdk-21-windows.zip"
 set "NGINX_PKG_NAME=nginx-1.24.0.zip"
 set "JAVA_OPTS=-Xms512m -Xmx1024m -XX:+UseG1GC"
 set "WINDOW_TITLE=MyPanelAdminServer"
+set "PROXY_WINDOW_TITLE=MyPanelProxyServer"
 
-:: --- Find JAR ---
-set "JAR_PATH="
-if exist "%ROOT_DIR%\libs\%JAR_NAME_PATTERN%" (
-    for %%F in ("%ROOT_DIR%\libs\%JAR_NAME_PATTERN%") do set "JAR_PATH=%%F"
+:: --- Find JARs ---
+set "APP_JAR_PATH="
+if exist "%ROOT_DIR%\libs\%APP_JAR_PATTERN%" (
+    for %%F in ("%ROOT_DIR%\libs\%APP_JAR_PATTERN%") do set "APP_JAR_PATH=%%F"
 )
-if not defined JAR_PATH (
-    if exist "%ROOT_DIR%\%JAR_NAME_PATTERN%" (
-        for %%F in ("%ROOT_DIR%\%JAR_NAME_PATTERN%") do set "JAR_PATH=%%F"
+if not defined APP_JAR_PATH (
+    if exist "%ROOT_DIR%\%APP_JAR_PATTERN%" (
+        for %%F in ("%ROOT_DIR%\%APP_JAR_PATTERN%") do set "APP_JAR_PATH=%%F"
     )
 )
 
-if not defined JAR_PATH (
-    echo %ERROR_PREFIX% %JAR_NAME_PATTERN% not found in root or libs directory.
+if not defined APP_JAR_PATH (
+    echo %ERROR_PREFIX% %APP_JAR_PATTERN% not found in root or libs directory.
     pause
     exit /b 1
+)
+
+:: Find proxy JAR
+set "PROXY_JAR_PATH="
+if exist "%ROOT_DIR%\proxy\libs\%PROXY_JAR_PATTERN%" (
+    for %%F in ("%ROOT_DIR%\proxy\libs\%PROXY_JAR_PATTERN%") do set "PROXY_JAR_PATH=%%F"
+)
+if not defined PROXY_JAR_PATH (
+    if exist "%ROOT_DIR%\proxy\%PROXY_JAR_PATTERN%" (
+        for %%F in ("%ROOT_DIR%\proxy\%PROXY_JAR_PATTERN%") do set "PROXY_JAR_PATH=%%F"
+    )
+)
+
+if not defined PROXY_JAR_PATH (
+    echo %WARN_PREFIX% %PROXY_JAR_PATTERN% not found in proxy directory. Proxy service will not be available.
 )
 
 :: --- Main ---
@@ -56,6 +74,9 @@ set "ACTION=%~1"
 
 if /i "%ACTION%"=="app" (
     set "TARGET=app"
+    set "ACTION=%~2"
+) else if /i "%ACTION%"=="proxy" (
+    set "TARGET=proxy"
     set "ACTION=%~2"
 ) else if /i "%ACTION%"=="nginx" (
     set "TARGET=nginx"
@@ -73,6 +94,8 @@ if /i "%ACTION%"=="install" (
 call :check_installed
 if %errorlevel% neq 0 (
     if /i "%TARGET%"=="app" (
+        echo %ERROR_PREFIX% Java dependency is not installed.
+    ) else if /i "%TARGET%"=="proxy" (
         echo %ERROR_PREFIX% Java dependency is not installed.
     ) else if /i "%TARGET%"=="nginx" (
         echo %ERROR_PREFIX% Nginx dependency is not installed.
@@ -102,12 +125,13 @@ if /i "%ACTION%"=="status" (
 )
 
 echo %ERROR_PREFIX% Unknown action: "%ACTION%"
-echo Usage: %~nx0 [app^|nginx] {install^|start^|stop^|restart^|status}
+echo Usage: %~nx0 [app^|proxy^|nginx] {install^|start^|stop^|restart^|status}
 echo.
 echo Example:
 echo   %~nx0 app start      # Only start the Java application
-echo   %~nx0 nginx status   # Only check Nginx status
-echo   %~nx0 start          # Start both application and Nginx
+echo   %~nx0 proxy status   # Only check Proxy status
+echo   %~nx0 nginx start    # Only start Nginx
+echo   %~nx0 start          # Start all services
 echo.
 echo Actions:
 echo   install  Check/Install dependencies (JDK and Nginx). Default action.
@@ -123,6 +147,7 @@ exit /b 1
     
     :: Check Java if needed
     if /i "%TARGET%"=="app" set "NEED_JAVA=1"
+    if /i "%TARGET%"=="proxy" set "NEED_JAVA=1"
     if /i "%TARGET%"=="all" set "NEED_JAVA=1"
     
     if defined NEED_JAVA (
@@ -251,14 +276,29 @@ exit /b 1
         )
     )
 
-    if /i "%TARGET%"=="app" echo %SUCCESS_PREFIX% Found JAR: %JAR_PATH%
-    if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found JAR: %JAR_PATH%
+    if /i "%TARGET%"=="app" echo %SUCCESS_PREFIX% Found JAR: %APP_JAR_PATH%
+    if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found JAR: %APP_JAR_PATH%
+    
+    if /i "%TARGET%"=="proxy" echo %SUCCESS_PREFIX% Found Proxy JAR: %PROXY_JAR_PATH%
+    if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found Proxy JAR: %PROXY_JAR_PATH%
     
     :: Replace /tmp/my-panel/admin paths with ROOT_DIR in config files
     echo %INFO_PREFIX% Updating configuration paths...
     set "CONFIG_DIR=%ROOT_DIR%\config"
     if exist "%CONFIG_DIR%" (
-        for /r "%CONFIG_DIR%" %%f in (*.yml, *.yaml, *.properties *.xml) do (
+        for /r "%CONFIG_DIR%" %%f in (*.yml, *.yaml, *.properties, *.xml) do (
+            findstr "/tmp/my-panel/admin" "%%f" >nul
+            if !errorlevel! equ 0 (
+                powershell -Command "(Get-Content '%%f') -replace '/tmp/my-panel/admin', '%ROOT_DIR:\=/%' | Set-Content '%%f'"
+                echo %INFO_PREFIX% Updated paths in %%f
+            )
+        )
+    )
+    
+    :: Update proxy config paths
+    set "PROXY_CONFIG_DIR=%ROOT_DIR%\proxy\config"
+    if exist "%PROXY_CONFIG_DIR%" (
+        for /r "%PROXY_CONFIG_DIR%" %%f in (*.yml, *.yaml, *.properties, *.xml) do (
             findstr "/tmp/my-panel/admin" "%%f" >nul
             if !errorlevel! equ 0 (
                 powershell -Command "(Get-Content '%%f') -replace '/tmp/my-panel/admin', '%ROOT_DIR:\=/%' | Set-Content '%%f'"
@@ -281,6 +321,7 @@ exit /b 1
     echo ^>^>^> Starting Services (%TARGET%)...
     
     if /i "%TARGET%"=="nginx" goto :start_nginx_section
+    if /i "%TARGET%"=="proxy" goto :start_proxy_section
     
     :: Start App Section
     echo %INFO_PREFIX% Starting %APP_NAME%...
@@ -294,25 +335,27 @@ exit /b 1
         if !errorlevel! == 0 set "IS_RUNNING=1"
     )
     if "!IS_RUNNING!"=="0" (
-        if exist "%PID_FILE%" del /f /q "%PID_FILE%"
+        :: Clean up any stale PID files
+        del /f /q "%ROOT_DIR%\my-panel-admin-*.pid" 2>nul
         wmic process where "Name='java.exe' and CommandLine like '%%my-panel-admin%%'" get ProcessId /value 2>nul | findstr "ProcessId" >nul
         if !errorlevel! == 0 set "IS_RUNNING=1"
     )
     
     if "!IS_RUNNING!"=="1" (
         echo %WARN_PREFIX% %APP_NAME% is already running.
-        goto :start_nginx_check
+        goto :start_proxy_check
     )
 
     :: Start App
     pushd "%ROOT_DIR%"
-    start "%WINDOW_TITLE%" /b "%JAVA_CMD%" %JAVA_OPTS% -jar "%JAR_PATH%"
+    start "%WINDOW_TITLE%" /b "%JAVA_CMD%" %JAVA_OPTS% -jar "%APP_JAR_PATH%"
     popd
 
     :: Get PID and write to file
     timeout /t 2 /nobreak >nul
     for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%my-panel-admin%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
-        echo %%i > "%PID_FILE%"
+        set "APP_PID_FILE=%ROOT_DIR%\%APP_NAME%-%%i.pid"
+        echo %%i > "!APP_PID_FILE!"
     )
     
     echo %INFO_PREFIX% Waiting for %APP_NAME% to start...
@@ -320,7 +363,7 @@ exit /b 1
     set "COUNT=0"
     set "SUCCESS=0"
 
-:check_loop
+:check_app_loop
     set "LISTENING=0"
     set "CURRENT_PID="
     if exist "%JAVA_HOME%\bin\jps.exe" (
@@ -336,21 +379,21 @@ exit /b 1
     ) else (
         echo.
         echo %ERROR_PREFIX% %APP_NAME% failed to start.
-        goto :start_nginx_check
+        goto :start_proxy_check
     )
 
     if "!LISTENING!"=="1" (
         set "SUCCESS=1"
-        goto :check_done
+        goto :check_app_done
     )
 
     set /a COUNT+=1
-    if %COUNT% geq %MAX_WAIT% goto :check_done
+    if %COUNT% geq %MAX_WAIT% goto :check_app_done
     <nul set /p=.
     timeout /t 1 /nobreak >nul
-    goto :check_loop
+    goto :check_app_loop
 
-:check_done
+:check_app_done
     echo.
     if "%SUCCESS%"=="1" (
         echo %SUCCESS_PREFIX% %APP_NAME% started successfully.
@@ -358,8 +401,76 @@ exit /b 1
         echo %ERROR_PREFIX% Timeout: %APP_NAME% failed to start within %MAX_WAIT%s.
     )
 
+:start_proxy_check
+    if /i "%TARGET%"=="app" goto :start_nginx_check
+    
+:start_proxy_section
+    if defined PROXY_JAR_PATH (
+        echo %INFO_PREFIX% Starting %PROXY_NAME%...
+        if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+        
+
+
+        :: Start Proxy
+        pushd "%ROOT_DIR%/proxy"
+        start "%PROXY_WINDOW_TITLE%" /b "%JAVA_CMD%" %JAVA_OPTS% -jar "%PROXY_JAR_PATH%"
+        popd
+
+        :: Get PID and write to file
+        timeout /t 2 /nobreak >nul
+        for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%my-panel-proxy%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
+            set "PROXY_PID_FILE=%ROOT_DIR%\%PROXY_NAME%-%%i.pid"
+            echo %%i > "!PROXY_PID_FILE!"
+        )
+        
+        echo %INFO_PREFIX% Waiting for %PROXY_NAME% to start...
+        set "MAX_WAIT=90"
+        set "COUNT=0"
+        set "SUCCESS=0"
+
+:check_proxy_loop
+        set "LISTENING=0"
+        set "CURRENT_PID="
+        if exist "%JAVA_HOME%\bin\jps.exe" (
+            for /f "tokens=1" %%i in ('""%JAVA_HOME%\bin\jps" -l | findstr "my-panel-proxy""') do set "CURRENT_PID=%%i"
+        )
+        if not defined CURRENT_PID (
+            for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%my-panel-proxy%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do set "CURRENT_PID=%%i"
+        )
+
+        if defined CURRENT_PID (
+            netstat -ano | findstr "LISTENING" | findstr " !CURRENT_PID!$" >nul
+            if !errorlevel! == 0 set "LISTENING=1"
+        ) else (
+            echo.
+            echo %ERROR_PREFIX% %PROXY_NAME% failed to start.
+            goto :start_nginx_check
+        )
+
+        if "!LISTENING!"=="1" (
+            set "SUCCESS=1"
+            goto :check_proxy_done
+        )
+
+        set /a COUNT+=1
+        if %COUNT% geq %MAX_WAIT% goto :check_proxy_done
+        <nul set /p=.
+        timeout /t 1 /nobreak >nul
+        goto :check_proxy_loop
+
+:check_proxy_done
+        echo.
+        if "%SUCCESS%"=="1" (
+            echo %SUCCESS_PREFIX% %PROXY_NAME% started successfully.
+        ) else (
+            echo %ERROR_PREFIX% Timeout: %PROXY_NAME% failed to start within %MAX_WAIT%s.
+        )
+    ) else (
+        echo %WARN_PREFIX% Proxy JAR not found. Cannot start proxy service.
+    )
+
 :start_nginx_check
-    if /i "%TARGET%"=="app" goto :start_complete
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :start_complete
     
 :start_nginx_section
     if exist "%ROOT_DIR%\tools\nginx-ops.bat" (
@@ -374,6 +485,7 @@ exit /b 1
     echo ^<^<^< Stopping Services (%TARGET%)...
     
     if /i "%TARGET%"=="nginx" goto :stop_nginx_section
+    if /i "%TARGET%"=="proxy" goto :stop_proxy_section
     
     :: Stop App Section
     echo %INFO_PREFIX% Stopping %APP_NAME%...
@@ -391,44 +503,173 @@ exit /b 1
 
     if "!FOUND_PIDS!"=="" (
         echo %APP_NAME% is not running.
-        goto :stop_nginx_check
+        goto :stop_proxy_check
     )
 
-    for %%P in (!FOUND_PIDS!) do (
-        set "TARGET_PID=%%P"
-        echo Found PID: !TARGET_PID!
-        taskkill /PID !TARGET_PID! >nul 2>&1
-        set "RETRY_COUNT=0"
-        :stop_loop_inner
-        tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
-        if !errorlevel! neq 0 (
-            set "STOP_SUCCESS=1"
-        ) else (
-            set /a RETRY_COUNT+=1
-            if !RETRY_COUNT! lss 5 (
-                <nul set /p=.
-                timeout /t 1 /nobreak >nul
-                goto :stop_loop_inner
-            )
-            echo.
-            echo Force killing PID !TARGET_PID!...
-            taskkill /F /T /PID !TARGET_PID! >nul 2>&1
-            timeout /t 1 /nobreak >nul
+    if /i "%TARGET%"=="all" (
+        :: Stop all app processes
+        for %%P in (!FOUND_PIDS!) do (
+            set "TARGET_PID=%%P"
+            echo Found PID: !TARGET_PID!
+            taskkill /PID !TARGET_PID! >nul 2>&1
+            set "RETRY_COUNT=0"
+            :stop_app_loop_inner
             tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
             if !errorlevel! neq 0 (
                 set "STOP_SUCCESS=1"
             ) else (
-                echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                set /a RETRY_COUNT+=1
+                if !RETRY_COUNT! lss 5 (
+                    <nul set /p=.
+                    timeout /t 1 /nobreak >nul
+                    goto :stop_app_loop_inner
+                )
+                echo.
+                echo Force killing PID !TARGET_PID!...
+                taskkill /F /T /PID !TARGET_PID! >nul 2>&1
+                timeout /t 1 /nobreak >nul
+                tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                if !errorlevel! neq 0 (
+                    set "STOP_SUCCESS=1"
+                ) else (
+                    echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                )
             )
         )
+    ) else (
+        :: Stop only the first app process
+        for /f "tokens=1" %%P in ("!FOUND_PIDS!") do (
+            set "TARGET_PID=%%P"
+            echo Found PID: !TARGET_PID!
+            taskkill /PID !TARGET_PID! >nul 2>&1
+            set "RETRY_COUNT=0"
+            :stop_app_single_loop_inner
+            tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+            if !errorlevel! neq 0 (
+                set "STOP_SUCCESS=1"
+            ) else (
+                set /a RETRY_COUNT+=1
+                if !RETRY_COUNT! lss 5 (
+                    <nul set /p=.
+                    timeout /t 1 /nobreak >nul
+                    goto :stop_app_single_loop_inner
+                )
+                echo.
+                echo Force killing PID !TARGET_PID!...
+                taskkill /F /T /PID !TARGET_PID! >nul 2>&1
+                timeout /t 1 /nobreak >nul
+                tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                if !errorlevel! neq 0 (
+                    set "STOP_SUCCESS=1"
+                ) else (
+                    echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                )
+            )
+            goto :stop_app_single_done
+        )
+        :stop_app_single_done
     )
     if "%STOP_SUCCESS%"=="1" (
         echo %SUCCESS_PREFIX% %APP_NAME% stopped successfully.
-        if exist "%PID_FILE%" del /f /q "%PID_FILE%"
+        del /f /q "%ROOT_DIR%\my-panel-admin-*.pid" 2>nul
+    )
+
+:stop_proxy_check
+    if /i "%TARGET%"=="app" goto :stop_nginx_check
+    
+:stop_proxy_section
+    if defined PROXY_JAR_PATH (
+        echo %INFO_PREFIX% Stopping %PROXY_NAME%...
+        set "STOP_SUCCESS=0"
+        
+        set "FOUND_PIDS="
+        for /f "tokens=2 delims==" %%P in ('wmic process where "Name='java.exe' and CommandLine like '%%my-panel-proxy%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
+            if not "%%P"=="" set "FOUND_PIDS=!FOUND_PIDS! %%P"
+        )
+        if exist "%JAVA_HOME%\bin\jps.exe" (
+            for /f "tokens=1" %%i in ('""%JAVA_HOME%\bin\jps" -l | findstr "my-panel-proxy""') do (
+                set "FOUND_PIDS=!FOUND_PIDS! %%i"
+            )
+        )
+
+        if "!FOUND_PIDS!"=="" (
+            echo %PROXY_NAME% is not running.
+            goto :stop_nginx_check
+        )
+
+        if /i "%TARGET%"=="all" (
+            :: Stop all proxy processes
+            for %%P in (!FOUND_PIDS!) do (
+                set "TARGET_PID=%%P"
+                echo Found PID: !TARGET_PID!
+                taskkill /PID !TARGET_PID! >nul 2>&1
+                set "RETRY_COUNT=0"
+                :stop_proxy_loop_inner
+                tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                if !errorlevel! neq 0 (
+                    set "STOP_SUCCESS=1"
+                ) else (
+                    set /a RETRY_COUNT+=1
+                    if !RETRY_COUNT! lss 5 (
+                        <nul set /p=.
+                        timeout /t 1 /nobreak >nul
+                        goto :stop_proxy_loop_inner
+                    )
+                    echo.
+                    echo Force killing PID !TARGET_PID!...
+                    taskkill /F /T /PID !TARGET_PID! >nul 2>&1
+                    timeout /t 1 /nobreak >nul
+                    tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                    if !errorlevel! neq 0 (
+                        set "STOP_SUCCESS=1"
+                    ) else (
+                        echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                    )
+                )
+            )
+        ) else (
+            :: Stop only the first proxy process
+            for /f "tokens=1" %%P in ("!FOUND_PIDS!") do (
+                set "TARGET_PID=%%P"
+                echo Found PID: !TARGET_PID!
+                taskkill /PID !TARGET_PID! >nul 2>&1
+                set "RETRY_COUNT=0"
+                :stop_proxy_single_loop_inner
+                tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                if !errorlevel! neq 0 (
+                    set "STOP_SUCCESS=1"
+                ) else (
+                    set /a RETRY_COUNT+=1
+                    if !RETRY_COUNT! lss 5 (
+                        <nul set /p=.
+                        timeout /t 1 /nobreak >nul
+                        goto :stop_proxy_single_loop_inner
+                    )
+                    echo.
+                    echo Force killing PID !TARGET_PID!...
+                    taskkill /F /T /PID !TARGET_PID! >nul 2>&1
+                    timeout /t 1 /nobreak >nul
+                    tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                    if !errorlevel! neq 0 (
+                        set "STOP_SUCCESS=1"
+                    ) else (
+                        echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                    )
+                )
+                goto :stop_proxy_single_done
+            )
+            :stop_proxy_single_done
+        )
+        if "%STOP_SUCCESS%"=="1" (
+            echo %SUCCESS_PREFIX% %PROXY_NAME% stopped successfully.
+            del /f /q "%ROOT_DIR%\my-panel-proxy-*.pid" 2>nul
+        )
+    ) else (
+        echo %WARN_PREFIX% Proxy JAR not found. Cannot stop proxy service.
     )
 
 :stop_nginx_check
-    if /i "%TARGET%"=="app" goto :stop_complete
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :stop_complete
 
 :stop_nginx_section
     if exist "%ROOT_DIR%\tools\nginx-ops.bat" (
@@ -443,6 +684,7 @@ exit /b 1
     echo === Service Status (%TARGET%) ===
     
     if /i "%TARGET%"=="nginx" goto :status_nginx_section
+    if /i "%TARGET%"=="proxy" goto :status_proxy_section
     
     :: Status App Section
     set "IS_RUNNING=0"
@@ -460,8 +702,57 @@ exit /b 1
         echo %APP_NAME% is STOPPED.
     )
 
+:status_proxy_check
+    if /i "%TARGET%"=="app" goto :status_nginx_check
+    
+:status_proxy_section
+    if defined PROXY_JAR_PATH (
+        :: Status Proxy Section - collect all PIDs
+        set "PROXY_PIDS="
+        set "PID_COUNT=0"
+        
+        :: Try jps first
+        if exist "%JAVA_HOME%\bin\jps.exe" (
+            for /f "tokens=1" %%i in ('"%JAVA_HOME%\bin\jps" -l ^| findstr "my-panel-proxy"') do (
+                set "PROXY_PIDS=!PROXY_PIDS! %%i"
+                set /a PID_COUNT+=1
+            )
+        )
+        
+        :: Fallback to wmic if jps didn't find anything
+        if !PID_COUNT! == 0 (
+            for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%my-panel-proxy%%'" get ProcessId /value 2^>nul ^| findstr "ProcessId"') do (
+                set "PROXY_PIDS=!PROXY_PIDS! %%i"
+                set /a PID_COUNT+=1
+            )
+        )
+        
+        if !PID_COUNT! gtr 0 (
+            echo %PROXY_NAME% is RUNNING (!PID_COUNT! instances).
+            echo.
+            echo   Instances:
+            for %%p in (!PROXY_PIDS!) do (
+                echo     - PID: %%p
+                :: Try to get listening ports for each instance
+                netstat -ano | findstr "LISTENING" | findstr " %%p$") >nul
+                if !errorlevel! == 0 (
+                    echo       Listening ports: 
+                    for /f "tokens=2" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr " %%p$" ^| findstr "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*:"') do (
+                        for /f "tokens=2 delims=:" %%b in ("%%a") do (
+                            echo         - %%b
+                        )
+                    )
+                )
+            )
+        ) else (
+            echo %PROXY_NAME% is STOPPED.
+        )
+    ) else (
+        echo %PROXY_NAME% is NOT AVAILABLE (JAR not found).
+    )
+
 :status_nginx_check
-    if /i "%TARGET%"=="app" goto :status_complete
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :status_complete
 
 :status_nginx_section
     if exist "%ROOT_DIR%\tools\nginx-ops.bat" (

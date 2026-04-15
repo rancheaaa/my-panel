@@ -53,6 +53,12 @@
                 <artifactId>my-panel-admin</artifactId>
                 <version>${revision}</version>
             </dependency>
+
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>my-panel-proxy</artifactId>
+                <version>${revision}</version>
+            </dependency>
             <dependency>
                 <groupId>com.cq</groupId>
                 <artifactId>my-panel-auth-lite</artifactId>
@@ -211,7 +217,7 @@
         <module>my-panel-admin</module>
         <module>distribution</module>
         <module>agent</module>
-        <module>proxy</module>
+        <module>my-panel-proxy</module>
         <module>my-panel-common</module>
     </modules>
     <packaging>pom</packaging>

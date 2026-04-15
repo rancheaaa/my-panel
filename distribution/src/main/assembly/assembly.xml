@@ -3,8 +3,8 @@
           xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.1.0 http://maven.apache.org/xsd/assembly-2.1.0.xsd">
     <id>bin</id>
     <formats>
-        <format>zip</format>
-        <format>tar.gz</format>
+<!--        <format>zip</format>-->
+<!--        <format>tar.gz</format>-->
         <format>dir</format>
     </formats>
     <includeBaseDirectory>true</includeBaseDirectory>
@@ -15,7 +15,16 @@
             <outputDirectory>libs</outputDirectory>
             <scope>runtime</scope>
             <includes>
-                <include>com.cq.panel.admin:panel-admin</include>
+                <include>com.cq:my-panel-admin</include>
+            </includes>
+        </dependencySet>
+
+        <dependencySet>
+            <useProjectArtifact>false</useProjectArtifact>
+            <outputDirectory>proxy/libs</outputDirectory>
+            <scope>runtime</scope>
+            <includes>
+                <include>com.cq:my-panel-proxy</include>
             </includes>
         </dependencySet>
     </dependencySets>
@@ -48,8 +57,18 @@
             <outputDirectory>config</outputDirectory>
             <includes>
                 <include>application*.yml</include>
-                <include>logback.xml</include>
+                <include>logback*.xml</include>
                 <include>banner.txt</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>../my-panel-proxy/src/main/resources</directory>
+            <outputDirectory>proxy/config</outputDirectory>
+            <includes>
+                <include>application*.yml</include>
+                <include>application*.properties</include>
+                <include>logback*.xml</include>
             </includes>
         </fileSet>
         <!-- also include README from distribution/config if exists -->

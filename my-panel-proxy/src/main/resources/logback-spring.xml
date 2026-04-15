@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="60 seconds">
-  <property name="LOG_HOME" value="/tmp/my-panel/proxy/logs/"/>
+    <!-- 读取 Spring 配置 -->
+    <springProperty name="appName" source="spring.application.name" defaultValue="app"/>
+    <springProperty name="logPath" source="logging.file.path" defaultValue="/tmp/my-panel/admin/logs/proxy"/>
+
+  <property name="LOG_HOME" value="${logPath}"/>
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>

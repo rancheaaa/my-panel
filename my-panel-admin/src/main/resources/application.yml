@@ -41,6 +41,8 @@ server:
 
 # 日志配置
 logging:
+  file:
+    path: /tmp/my-panel/admin/logs/admin
   level:
     com.cq.panel.admin.server: debug
     org.springframework: warn

@@ -2,7 +2,7 @@ package com.cq.proxy.config;
 
 import com.cq.panel.common.utils.PortUtils;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
-import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
+import org.springframework.boot.web.server.servlet.ConfigurableServletWebServerFactory;
 import org.springframework.stereotype.Component;
 
 @Component

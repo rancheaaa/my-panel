@@ -143,7 +143,7 @@ public class JobInvokeUtil
             headerMap.forEach(headers::add);
         }
         
-        if (!headers.containsKey(HttpHeaders.CONTENT_TYPE) && StringUtils.isNotEmpty(body)) {
+        if (headers.getContentType() == null && StringUtils.isNotEmpty(body)) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
 

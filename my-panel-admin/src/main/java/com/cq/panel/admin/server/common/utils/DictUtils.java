@@ -1,6 +1,5 @@
 package com.cq.panel.admin.server.common.utils;
 
-import com.alibaba.fastjson2.JSONArray;
 import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysDictData;

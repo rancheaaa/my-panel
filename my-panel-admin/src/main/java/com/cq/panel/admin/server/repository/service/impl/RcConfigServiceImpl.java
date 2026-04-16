@@ -13,8 +13,7 @@ import com.cq.panel.admin.server.repository.domain.RcEnv;
 import com.cq.panel.admin.server.repository.domain.RcProject;
 import com.cq.panel.admin.server.repository.service.IRcEnvService;
 import com.cq.panel.admin.server.repository.service.IRcProjectService;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONWriter;
+import com.cq.panel.admin.server.common.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
@@ -165,7 +164,7 @@ public class RcConfigServiceImpl implements IRcConfigService
             log.info("Nested map keys: {}", nestedMap.keySet());
             if ("json".equals(extension)) {
                 Map<String, Object> jsonMap = stripDesc(nestedMap);
-                content = JSON.toJSONString(jsonMap, JSONWriter.Feature.PrettyFormat);
+                content = JsonUtils.toPrettyJSONString(jsonMap);
                 contentType = "application/json";
             } else {
                 StringBuilder yamlSb = new StringBuilder();

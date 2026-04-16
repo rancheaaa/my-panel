@@ -30,7 +30,7 @@ import org.springframework.core.NamedThreadLocal;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.multipart.MultipartFile;
-import com.alibaba.fastjson2.JSON;
+import com.cq.panel.admin.server.common.utils.JsonUtils;
 
 /**
  * 操作日志记录处理
@@ -158,7 +158,7 @@ public class LogAspect
         // 是否需要保存response，参数和值
         if (log.isSaveResponseData() && StringUtils.isNotNull(jsonResult))
         {
-            operLog.setJsonResult(StringUtils.substring(JSON.toJSONString(jsonResult), 0, 2000));
+            operLog.setJsonResult(StringUtils.substring(JsonUtils.toJSONString(jsonResult), 0, 2000));
         }
     }
 
@@ -180,7 +180,7 @@ public class LogAspect
         }
         else
         {
-            operLog.setOperParam(StringUtils.substring(JSON.toJSONString(paramsMap, excludePropertyPreFilter(excludeParamNames)), 0, 2000));
+            operLog.setOperParam(StringUtils.substring(JsonUtils.toJSONString(paramsMap, excludePropertyPreFilter(excludeParamNames)), 0, 2000));
         }
     }
 
@@ -198,7 +198,7 @@ public class LogAspect
                 {
                     try
                     {
-                        String jsonObj = JSON.toJSONString(o, excludePropertyPreFilter(excludeParamNames));
+                        String jsonObj = JsonUtils.toJSONString(o);
                         params.append(jsonObj).append(" ");
                     }
                     catch (Exception ignored)

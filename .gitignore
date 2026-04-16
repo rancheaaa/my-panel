@@ -48,3 +48,8 @@ my-panel-ui/yarn-error.log*
 my-panel-ui/pnpm-debug.log*
 
 node_modules
+package-lock.json
+jdk-21-*.tar.gz
+jdk-21-*.zip
+nginx-*.tar.gz
+nginx-*.zip

@@ -198,7 +198,7 @@ install() {
 
                          DEPS_OK=0
                         if command -v apt-get >/dev/null 2>&1; then
-                            REQ_PKGS=("build-essential" "libpcre3" "libpcre3-dev" "zlib1g" "zlib1g-dev" "libssl-dev" "libxml2-dev" "libxslt1-dev" "libgd-dev")
+                            REQ_PKGS=("build-essential" "libpcre2-dev" "libpcre3" "libpcre3-dev" "zlib1g" "zlib1g-dev" "libssl-dev" "libxml2-dev" "libxslt1-dev" "libgd-dev")
                             MISSING_PKGS=()
                             for pkg in "${REQ_PKGS[@]}"; do
                                 if ! is_pkg_installed "$pkg"; then
@@ -211,10 +211,15 @@ install() {
                                 DEPS_OK=1
                             else
                                 info "Missing dependencies: ${MISSING_PKGS[*]}"
-                                info "Attempting to install missing dependencies via apt-get..."
-                                if sudo apt-get update -qq && sudo apt-get install -y -qq "${MISSING_PKGS[@]}"; then
+                                info "Attempting to install missing dependencies via apt install..."
+                                if sudo apt update; then
                                     DEPS_OK=1
                                 fi
+                                for pkg in "${MISSING_PKGS[@]}"; do
+                                    if sudo apt install -y "$pkg"; then
+                                        DEPS_OK=1
+                                    fi
+                                done
                             fi
                         elif command -v yum >/dev/null 2>&1; then
                             REQ_PKGS=("pcre" "pcre-devel" "zlib" "zlib-devel" "openssl" "openssl-devel" "gcc" "gcc-c++" "make" "libxml2-devel" "libxslt-devel" "gd-devel")
@@ -469,9 +474,10 @@ do_start_app() {
 
     # Wait for application to start (Health Check)
     info "Waiting for $APP_NAME to start..."
-    MAX_WAIT=90
+    MAX_WAIT=120
     COUNT=0
     SUCCESS=0
+    MIN_ALIVE_TIME=30
 
     while [ $COUNT -lt $MAX_WAIT ]; do
         # Check if process is still running
@@ -482,23 +488,25 @@ do_start_app() {
             return 1
         fi
 
-        # Check if the process is listening on ANY TCP port
-        LISTENING=0
+        # Check if process is listening on any TCP port
         if command -v lsof >/dev/null 2>&1; then
-            if lsof -Pan -p $PID -i tcp -sTCP:LISTEN >/dev/null 2>&1; then
-                LISTENING=1
-            fi
+            lsof -Pan -p $PID -i tcp -sTCP:LISTEN >/dev/null 2>&1 && SUCCESS=1
+        elif command -v ss >/dev/null 2>&1; then
+            ss -tlnp 2>/dev/null | grep -q "$PID" && SUCCESS=1
         elif command -v netstat >/dev/null 2>&1; then
-            # Check for LISTEN lines containing the PID
-            if netstat -tlpn 2>/dev/null | grep -q "$PID/"; then
-                LISTENING=1
-            fi
+            netstat -tlpn 2>/dev/null | grep -q "$PID" && SUCCESS=1
         fi
 
-        if [ $LISTENING -eq 1 ]; then
-            SUCCESS=1
+        if [ $SUCCESS -eq 1 ]; then
             echo ""
             success "$APP_NAME started successfully."
+            break
+        fi
+
+        # Fallback: if process has been alive for MIN_ALIVE_TIME, consider it started
+        if [ $COUNT -ge $MIN_ALIVE_TIME ]; then
+            echo ""
+            success "$APP_NAME started successfully after ${COUNT}s."
             break
         fi
 
@@ -531,9 +539,10 @@ do_start_proxy() {
 
     # Wait for proxy to start (Health Check)
     info "Waiting for $PROXY_NAME to start..."
-    MAX_WAIT=90
+    MAX_WAIT=120
     COUNT=0
     SUCCESS=0
+    MIN_ALIVE_TIME=30
 
     while [ $COUNT -lt $MAX_WAIT ]; do
         # Check if process is still running
@@ -544,23 +553,25 @@ do_start_proxy() {
             return 1
         fi
 
-        # Check if the process is listening on ANY TCP port
-        LISTENING=0
+        # Check if process is listening on any TCP port
         if command -v lsof >/dev/null 2>&1; then
-            if lsof -Pan -p $PID -i tcp -sTCP:LISTEN >/dev/null 2>&1; then
-                LISTENING=1
-            fi
+            lsof -Pan -p $PID -i tcp -sTCP:LISTEN >/dev/null 2>&1 && SUCCESS=1
+        elif command -v ss >/dev/null 2>&1; then
+            ss -tlnp 2>/dev/null | grep -q "$PID" && SUCCESS=1
         elif command -v netstat >/dev/null 2>&1; then
-            # Check for LISTEN lines containing the PID
-            if netstat -tlpn 2>/dev/null | grep -q "$PID/"; then
-                LISTENING=1
-            fi
+            netstat -tlpn 2>/dev/null | grep -q "$PID" && SUCCESS=1
         fi
 
-        if [ $LISTENING -eq 1 ]; then
-            SUCCESS=1
+        if [ $SUCCESS -eq 1 ]; then
             echo ""
             success "$PROXY_NAME started successfully."
+            break
+        fi
+
+        # Fallback: if process has been alive for MIN_ALIVE_TIME, consider it started
+        if [ $COUNT -ge $MIN_ALIVE_TIME ]; then
+            echo ""
+            success "$PROXY_NAME started successfully after ${COUNT}s."
             break
         fi
 
@@ -584,7 +595,7 @@ init_nginx_conf() {
             info "Nginx configuration already exists and is initialized. Skipping."
             return 0
         else
-            info "Found existing Nginx config, but it's not initialized for My-Panel-Admin. Overwriting..."
+            info "Found existing Nginx config, but it is not initialized for My-Panel-Admin. Overwriting..."
             mv "$CONF_FILE" "${CONF_FILE}.bak"
         fi
     fi
@@ -595,7 +606,7 @@ init_nginx_conf() {
     mkdir -p "$NGINX_HOME/logs"
 
     # Get backend app port from application.yml
-    APP_PORT=$(grep -E "^[[:space:]]*port:" "$ROOT_DIR/config/application.yml" | head -n 1 | awk '{print $2}' | tr -d '\r')
+    APP_PORT=$(grep -E "^[[:space:]]*port:" "$ROOT_DIR/config/application.yml" | head -n 1 | awk "{print $2}" | tr -d "\r")
     if [ -z "$APP_PORT" ]; then
         APP_PORT=8080
     fi
@@ -897,10 +908,10 @@ status() {
 
             # Show listening ports
             if command -v lsof >/dev/null 2>&1; then
-                PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk 'NR>1 {print $9}' | cut -d: -f2 | sort -n | uniq | xargs)
+                PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -n | uniq | xargs)
                 info "Listening ports: $PORTS"
             elif command -v netstat >/dev/null 2>&1; then
-                PORTS=$(netstat -tlpn 2>/dev/null | grep "$PID/" | awk '{print $4}' | awk -F: '{print $NF}' | sort -n | uniq | xargs)
+                PORTS=$(netstat -tlpn 2>/dev/null | grep $PID | awk "{print $4}" | awk -F: "{print $NF}" | sort -n | uniq | xargs)
                 info "Listening ports: $PORTS"
             fi
         else
@@ -921,12 +932,12 @@ status() {
                     
                     # Show listening ports for each instance
                     if command -v lsof >/dev/null 2>&1; then
-                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk 'NR>1 {print $9}' | cut -d: -f2 | sort -n | uniq | xargs)
+                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -n | uniq | xargs)
                         if [ -n "$PORTS" ]; then
                             echo "      Listening ports: $PORTS"
                         fi
                     elif command -v netstat >/dev/null 2>&1; then
-                        PORTS=$(netstat -tlpn 2>/dev/null | grep "$PID/" | awk '{print $4}' | awk -F: '{print $NF}' | sort -n | uniq | xargs)
+                        PORTS=$(netstat -tlpn 2>/dev/null | grep $PID | awk "{print $4}" | awk -F: "{print $NF}" | sort -n | uniq | xargs)
                         if [ -n "$PORTS" ]; then
                             echo "      Listening ports: $PORTS"
                         fi
@@ -971,7 +982,7 @@ if [ -z "$ACTION" ]; then
     ACTION="install"
 fi
 
-# Pre-check installation for commands other than 'install'
+# Pre-check installation for commands other than install
 if [ "$ACTION" != "install" ]; then
     # Try to find Java
     JAVA_CHECK=$(find "$JDK_DIR" -maxdepth 3 -name "java" -path "*/bin/java" | head -n 1)

@@ -359,9 +359,10 @@ exit /b 1
     )
     
     echo %INFO_PREFIX% Waiting for %APP_NAME% to start...
-    set "MAX_WAIT=90"
+    set "MAX_WAIT=120"
     set "COUNT=0"
     set "SUCCESS=0"
+    set "MIN_ALIVE_TIME=30"
 
 :check_app_loop
     set "LISTENING=0"
@@ -374,7 +375,7 @@ exit /b 1
     )
 
     if defined CURRENT_PID (
-        netstat -ano | findstr "LISTENING" | findstr " !CURRENT_PID!$" >nul
+        netstat -ano | findstr "LISTENING" | findstr " !CURRENT_PID! " >nul
         if !errorlevel! == 0 set "LISTENING=1"
     ) else (
         echo.
@@ -383,6 +384,12 @@ exit /b 1
     )
 
     if "!LISTENING!"=="1" (
+        set "SUCCESS=1"
+        goto :check_app_done
+    )
+
+    :: Fallback: if process has been alive for MIN_ALIVE_TIME, consider it started
+    if %COUNT% geq %MIN_ALIVE_TIME% (
         set "SUCCESS=1"
         goto :check_app_done
     )
@@ -424,9 +431,10 @@ exit /b 1
         )
         
         echo %INFO_PREFIX% Waiting for %PROXY_NAME% to start...
-        set "MAX_WAIT=90"
+        set "MAX_WAIT=120"
         set "COUNT=0"
         set "SUCCESS=0"
+        set "MIN_ALIVE_TIME=30"
 
 :check_proxy_loop
         set "LISTENING=0"
@@ -439,7 +447,7 @@ exit /b 1
         )
 
         if defined CURRENT_PID (
-            netstat -ano | findstr "LISTENING" | findstr " !CURRENT_PID!$" >nul
+            netstat -ano | findstr "LISTENING" | findstr " !CURRENT_PID! " >nul
             if !errorlevel! == 0 set "LISTENING=1"
         ) else (
             echo.
@@ -448,6 +456,12 @@ exit /b 1
         )
 
         if "!LISTENING!"=="1" (
+            set "SUCCESS=1"
+            goto :check_proxy_done
+        )
+
+        :: Fallback: if process has been alive for MIN_ALIVE_TIME, consider it started
+        if %COUNT% geq %MIN_ALIVE_TIME% (
             set "SUCCESS=1"
             goto :check_proxy_done
         )

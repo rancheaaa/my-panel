@@ -32,7 +32,8 @@
                 <executions>
                     <execution>
                         <id>npm-install</id>
-                        <phase>generate-resources</phase>
+<!--                        <phase>generate-resources</phase>-->
+                        <phase>package</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
@@ -46,7 +47,8 @@
                     </execution>
                     <execution>
                         <id>npm-run-build</id>
-                        <phase>generate-resources</phase>
+<!--                        <phase>generate-resources</phase>-->
+                        <phase>package</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>

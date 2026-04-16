@@ -37,6 +37,12 @@ server:
     uri-encoding: UTF-8
     # 连接数满后的排队数，默认为100
     accept-count: 1000
+    # 最大连接数（仍然有意义，限制并发连接数）
+    max-connections: 10000
+    # 虚拟线程模式下，线程数配置意义降低，但仍可设置参考值
+    # threads.max: 200
+    # 保持连接超时（毫秒）
+    keep-alive-timeout: 60000
 
 
 # 日志配置

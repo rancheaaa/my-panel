@@ -64,12 +64,7 @@ public class AgentApplication {
         try {
             server.start();
             logger.info("Agent started successfully on port {}", server.getActualPort());
-            
-            // Update agent API URL with actual port
-            String actualApiUrl = "http://" + config.getAgentIp() + ":" + server.getActualPort() + "/";
-            config.setAgentApiUrl(actualApiUrl);
-            logger.info("Agent API URL updated to: {}", actualApiUrl);
-            
+
             // Set actual port to registry service
             registryService.setActualPort(server.getActualPort());
             

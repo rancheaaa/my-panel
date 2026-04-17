@@ -30,7 +30,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
     private static final Logger logger = LoggerFactory.getLogger(AgentDownloader.class);
 
     public AgentDownloader(AgentConfig agentConfig) {
-        super(agentConfig, agentConfig.getAgentApiUrl(), agentConfig.getDownloadConcurrentDownloads(),
+        super(agentConfig, agentConfig.getDownloadConcurrentDownloads(),
                 agentConfig.getDownloadMaxQueueDepth(), agentConfig.getDownloadWorkerCount(),
                 agentConfig.getDownloadMaxRetries(), agentConfig.getDownloadRetryDelayMs(),
                 agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
@@ -294,7 +294,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
 
         try {
-            URI uri = new URI(agentApiUrl);
+            URI uri = new URI(task.getRemoteAgentApiUrl());
             req.setDestAgentIp(uri.getHost());
             req.setDestAgentPort(uri.getPort());
         } catch (java.net.URISyntaxException e) {
@@ -326,7 +326,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         File chunkFile = new File(tmpDir, destFileName + "_chunk_" + chunkIndex);
 
         try {
-            String url = agentApiUrl + "api/file/chunk/download";
+            String url = task.getRemoteAgentApiUrl() + "api/file/chunk/download";
             String jsonBody = gson.toJson(req);
 
             HttpRequest request = HttpRequest.newBuilder()

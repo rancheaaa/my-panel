@@ -24,7 +24,6 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         AgentConfig config = new AgentConfig();
-        config.setAgentApiUrl(AGENT_URL);
         this.uploader = new AgentUploader(config);
         this.uploader.init();
     }

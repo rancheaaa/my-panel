@@ -35,7 +35,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
     private final AgentConfig agentConfig;
 
     public AgentUploader(AgentConfig agentConfig) {
-        super(agentConfig, agentConfig.getAgentApiUrl(), agentConfig.getUploadConcurrentUploads(),
+        super(agentConfig, agentConfig.getUploadConcurrentUploads(),
                 agentConfig.getUploadMaxQueueDepth(), agentConfig.getUploadWorkerCount(),
                 agentConfig.getUploadMaxRetries(), agentConfig.getUploadRetryDelayMs(),
                 agentConfig.getUploadConnectTimeoutSeconds(), agentConfig.getUploadRequestTimeoutSeconds(),
@@ -370,7 +370,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         req.setDestFileDir(Util.transferToLinuxPath(destFile.getParent()));
         req.setDestFileName(destFile.getName());
         try {
-            URI uri = new URI(agentApiUrl);
+            URI uri = new URI(task.getRemoteAgentApiUrl());
             req.setDestAgentIp(uri.getHost());
             req.setDestAgentPort(uri.getPort());
         } catch (java.net.URISyntaxException e) {
@@ -407,7 +407,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         }
 
         try {
-            URI uri = new URI(agentApiUrl);
+            URI uri = new URI(remoteAgentApiUrl);
             req.setDestAgentIp(uri.getHost());
             req.setDestAgentPort(uri.getPort());
         } catch (java.net.URISyntaxException e) {

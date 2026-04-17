@@ -32,7 +32,6 @@ public class AgentConfig {
     // Agent identifier
     private String agentId;
     private String agentIp;
-    private String agentApiUrl;
 
     // Server configuration
     private int serverPort;
@@ -150,17 +149,6 @@ public class AgentConfig {
             logger.info("agent.ip is {}", this.agentIp);
         }
 
-        this.agentApiUrl = getStringProperty("agent.api.url", null);
-        if (this.agentApiUrl == null || this.agentApiUrl.isBlank()) {
-            this.agentApiUrl = "http://" + this.agentIp + ":" + this.serverPort + "/";
-            logger.info("agent.api.url has not configured, using default: {}", this.agentApiUrl);
-        } else {
-            if (!this.agentApiUrl.endsWith("/")) {
-                this.agentApiUrl = this.agentApiUrl + "/";
-            }
-            logger.info("agent.api.url is {}", this.agentApiUrl);
-        }
-
         // Server configuration
         this.serverPort = getIntProperty("server.port", 7777);
         this.bossThreads = getIntProperty("server.boss.threads", 1);
@@ -200,7 +188,7 @@ public class AgentConfig {
         this.maxContentLength = getIntProperty("connection.max.content.length", 8 * 1024 * 1024);
 
         // File operation configuration
-        this.fileBaseDirectory = getStringProperty("file.base.directory", "/tmp/my-panel/agent/agent_data");
+        this.fileBaseDirectory = getStringProperty("file.base.directory", "/tmp/my-panel/admin/agent/agent_data");
         this.allowOutsideBaseDirectory = getBooleanProperty("file.allow.outside.base", true);
         this.maxFileSize = getLongProperty("file.max.size", 107374182400L);
         this.chunkSize = getIntProperty("file.chunk.size.bytes", 5 * 1024 * 1024);

@@ -22,7 +22,6 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
 
     protected static final Logger logger = LoggerFactory.getLogger(BaseAgentClient.class);
 
-    protected final String agentApiUrl;
     protected final HttpClient httpClient;
     protected final Gson gson = new Gson();
     protected final PersistentQueue<TASK> taskQueue;
@@ -45,13 +44,10 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     protected final TrafficRateLimiter rateLimiter;
     protected final int maxQueueDepth;
 
-    protected BaseAgentClient(AgentConfig agentConfig, String agentApiUrl, int concurrentThreads,
+    protected BaseAgentClient(AgentConfig agentConfig, int concurrentThreads,
                             int maxQueueDepth, int workerCount, int maxRetries, long retryDelayMs,
                             int connectTimeoutSeconds, int requestTimeoutSeconds, String queueDbPath, String mapDbPath,
                             int maxRateKBPerSecond, Class<TASK> taskClass, String operationType) {
-        if (agentApiUrl == null || agentApiUrl.isBlank()) {
-            throw new IllegalArgumentException("agentApiUrl must not be null or blank");
-        }
         if (concurrentThreads < 1 || concurrentThreads > 64) {
             throw new IllegalArgumentException("concurrentThreads must be between 1 and 64");
         }
@@ -63,7 +59,6 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         }
 
         this.agentConfig = agentConfig;
-        this.agentApiUrl = agentApiUrl.endsWith("/") ? agentApiUrl : agentApiUrl + "/";
         this.maxQueueDepth = maxQueueDepth;
 
         try {

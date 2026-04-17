@@ -21,6 +21,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.timeout.IdleStateHandler;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,20 +36,23 @@ public class HttpServer {
 
     private final AgentConfig config;
     private final CommandExecutor commandExecutor;
-    private final FileService fileService;
-    private final ChunkedTransferService chunkedTransferService;
     private final HandlerFactory handlerFactory;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
+
+    /**
+     * -- GETTER --
+     *  获取实际监听的端口号
+     *
+     */
+    @Getter
     private int actualPort;
 
     public HttpServer(AgentConfig config, CommandExecutor commandExecutor, FileService fileService, ChunkedTransferService chunkedTransferService) {
         this.config = config;
         this.commandExecutor = commandExecutor;
-        this.fileService = fileService;
         this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService);
-        this.chunkedTransferService = chunkedTransferService;
     }
 
     /**
@@ -95,7 +99,7 @@ public class HttpServer {
                         pipeline.addLast(new IdleStateHandler(idleTimeout, 0, 0, TimeUnit.SECONDS));
                         pipeline.addLast(new HttpServerCodec());
                         pipeline.addLast(new HttpObjectAggregator(maxContentLength));
-                        pipeline.addLast(new FileHandler(fileService));
+                        pipeline.addLast(new FileHandler(handlerFactory));
                         pipeline.addLast(new HttpServerHandler(commandExecutor));
                     }
                 });
@@ -135,14 +139,5 @@ public class HttpServer {
             serverChannel.closeFuture().sync();
         }
     }
-    
-    /**
-     * 获取实际监听的端口号
-     * 
-     * @return 实际端口号
-     */
-    public int getActualPort()
-    {
-        return actualPort;
-    }
+
 }

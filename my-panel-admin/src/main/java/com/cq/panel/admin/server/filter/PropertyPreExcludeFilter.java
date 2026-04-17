@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.filter;
 
+import lombok.Getter;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -8,6 +10,7 @@ import java.util.Set;
  * 
  * @author cq
  */
+@Getter
 public class PropertyPreExcludeFilter
 {
     private final Set<String> excludes = new HashSet<>();
@@ -18,16 +21,8 @@ public class PropertyPreExcludeFilter
 
     public PropertyPreExcludeFilter addExcludes(String... filters)
     {
-        for (String filter : filters)
-        {
-            this.excludes.add(filter);
-        }
+        Collections.addAll(this.excludes, filters);
         return this;
-    }
-
-    public Set<String> getExcludes()
-    {
-        return excludes;
     }
 
     public boolean shouldExclude(String property)

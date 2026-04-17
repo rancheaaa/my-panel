@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.AgentCommandHistoryMapper">
+
+    <resultMap type="AgentCommandHistory" id="AgentCommandHistoryResult">
+        <result property="id" column="id"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="agentName" column="agent_name"/>
+        <result property="agentIp" column="agent_ip"/>
+        <result property="agentPort" column="agent_port"/>
+        <result property="command" column="command"/>
+        <result property="commandStatus" column="command_status"/>
+        <result property="exitCode" column="exit_code"/>
+        <result property="output" column="output"/>
+        <result property="error" column="error"/>
+        <result property="executeTime" column="execute_time"/>
+        <result property="submitTime" column="submit_time"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="userId" column="user_id"/>
+        <result property="userName" column="user_name"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select id, agent_id, agent_name, agent_ip, agent_port, command,
+               command_status, exit_code, output, error, execute_time,
+               submit_time, start_time, end_time, user_id, user_name,
+               create_by, create_time
+        from agent_command_history
+    </sql>
+
+    <select id="selectById" parameterType="Long" resultMap="AgentCommandHistoryResult">
+        <include refid="selectVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectList" parameterType="AgentCommandHistory" resultMap="AgentCommandHistoryResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="agentId != null and agentId != ''">and agent_id = #{agentId}</if>
+            <if test="agentName != null and agentName != ''">and agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="commandStatus != null">and command_status = #{commandStatus}</if>
+            <if test="userId != null">and user_id = #{userId}</if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                and submit_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                and submit_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by submit_time desc
+    </select>
+
+    <insert id="insert" parameterType="AgentCommandHistory" useGeneratedKeys="true" keyProperty="id">
+        insert into agent_command_history (
+            agent_id, agent_name, agent_ip, agent_port, command,
+            command_status, exit_code, output, error, execute_time,
+            submit_time, start_time, end_time, user_id, user_name,
+            create_by, create_time
+        ) values (
+            #{agentId}, #{agentName}, #{agentIp}, #{agentPort}, #{command},
+            #{commandStatus}, #{exitCode}, #{output}, #{error}, #{executeTime},
+            #{submitTime}, #{startTime}, #{endTime}, #{userId}, #{userName},
+            #{createBy}, #{createTime}
+        )
+    </insert>
+
+    <delete id="deleteByIds" parameterType="Long">
+        delete from agent_command_history where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleteByAgentId" parameterType="String">
+        delete from agent_command_history where agent_id = #{agentId}
+    </delete>
+</mapper>

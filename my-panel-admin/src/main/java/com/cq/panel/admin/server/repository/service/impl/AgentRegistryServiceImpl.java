@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
+import com.cq.panel.admin.server.repository.domain.AgentCommandHistory;
 import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
+import com.cq.panel.admin.server.repository.service.IAgentCommandHistoryService;
 
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
@@ -25,9 +27,11 @@ import java.util.Map;
 public class AgentRegistryServiceImpl implements IAgentRegistryService {
 
     private final AgentRegistryMapper agentRegistryMapper;
+    private final IAgentCommandHistoryService agentCommandHistoryService;
 
-    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper) {
+    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper, IAgentCommandHistoryService agentCommandHistoryService) {
         this.agentRegistryMapper = agentRegistryMapper;
+        this.agentCommandHistoryService = agentCommandHistoryService;
     }
 
     /**
@@ -227,28 +231,30 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public Object executeCommand(String agentId, String command, Integer timeout)
     {
-        // 1. 根据agentId查询Agent信息
         AgentRegistry agent = agentRegistryMapper.selectAgentRegistryById(agentId);
         if (agent == null)
         {
             throw new RuntimeException("Agent节点不存在");
         }
         
-        // 2. 检查Agent是否在线
         if (agent.getNodeStatus() != 1)
         {
             throw new RuntimeException("Agent节点不在线，无法执行命令");
         }
-        
-        // 3. 构建Agent API URL
+
         String agentUrl = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort() + "/api/execute";
         
-        // 4. 准备请求参数
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("command", command);
         requestBody.put("timeout", timeout);
-        
-        // 5. 发送HTTP请求到Agent
+
+        AgentCommandHistory history = new AgentCommandHistory();
+        history.setAgentId(agent.getId());
+        history.setAgentName(agent.getNodeName());
+        history.setAgentIp(agent.getAgentIp());
+        history.setAgentPort(agent.getAgentPort());
+        history.setCommand(command);
+        history.setSubmitTime(DateUtils.getNowDate());
         try
         {
             RestTemplate restTemplate = new RestTemplate();
@@ -257,22 +263,91 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
             
-            // 设置超时时间
+            Date startTime = DateUtils.getNowDate();
+            history.setStartTime(startTime);
+            
             ResponseEntity<String> response = restTemplate.postForEntity(agentUrl, requestEntity, String.class);
+            
+            Date endTime = DateUtils.getNowDate();
+            long duration = endTime.getTime() - startTime.getTime();
+            history.setEndTime(endTime);
+            history.setExecuteTime(duration);
             
             if (response.getStatusCode() == HttpStatus.OK)
             {
-                // 解析Agent返回的JSON响应
                 ObjectMapper objectMapper = new ObjectMapper();
-                return objectMapper.readValue(response.getBody(), Object.class);
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> result = objectMapper.readValue(response.getBody(), java.util.Map.class);
+                
+                Boolean success = result.containsKey("success") ? (Boolean) result.get("success") : null;
+                Integer exitCode = result.containsKey("exitCode") ? ((Number) result.get("exitCode")).intValue() : null;
+                String output = result.containsKey("output") ? String.valueOf(result.get("output")) : null;
+                String error = result.containsKey("error") ? String.valueOf(result.get("error")) : null;
+
+                if (Boolean.TRUE.equals(success))
+                {
+                    history.setCommandStatus(0);
+                }
+                else if (result.containsKey("timeout") && Boolean.TRUE.equals(result.get("timeout")))
+                {
+                    history.setCommandStatus(2);
+                }
+                else
+                {
+                    history.setCommandStatus(1);
+                }
+                
+                history.setExitCode(exitCode);
+                history.setOutput(output);
+                history.setError(error);
+                
+                agentCommandHistoryService.insert(history);
+                
+                return result;
             }
             else
             {
+                history.setCommandStatus(1);
+                history.setError("HTTP " + response.getStatusCode().value());
+                agentCommandHistoryService.insert(history);
                 throw new RuntimeException("Agent服务返回错误状态码: " + response.getStatusCode());
             }
         }
+        catch (RuntimeException e)
+        {
+            if (history.getEndTime() == null)
+            {
+                history.setEndTime(DateUtils.getNowDate());
+                if (history.getStartTime() != null)
+                {
+                    history.setExecuteTime(history.getEndTime().getTime() - history.getStartTime().getTime());
+                }
+            }
+            if (e.getMessage() != null && e.getMessage().contains("超时"))
+            {
+                history.setCommandStatus(2);
+            }
+            else
+            {
+                history.setCommandStatus(1);
+            }
+            history.setError(e.getMessage());
+            agentCommandHistoryService.insert(history);
+            throw e;
+        }
         catch (Exception e)
         {
+            if (history.getEndTime() == null)
+            {
+                history.setEndTime(DateUtils.getNowDate());
+                if (history.getStartTime() != null)
+                {
+                    history.setExecuteTime(history.getEndTime().getTime() - history.getStartTime().getTime());
+                }
+            }
+            history.setCommandStatus(3);
+            history.setError(e.getMessage());
+            agentCommandHistoryService.insert(history);
             throw new RuntimeException("调用Agent服务失败: " + e.getMessage(), e);
         }
     }

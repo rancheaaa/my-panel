@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber, Dropdown, Row, Col } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, PlayCircleOutlined, ConsoleSqlOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, PlayCircleOutlined, ConsoleSqlOutlined, HistoryOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { 
   listAgentRegistry, 
@@ -18,6 +19,7 @@ import { listType } from '../../../api/dict/type';
 const { Option } = Select;
 
 const AgentManage = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -549,6 +551,13 @@ const AgentManage = () => {
               style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: '#fff' }}
             >
               下线超时节点
+            </Button>
+            <Button 
+              icon={<HistoryOutlined />} 
+              onClick={() => navigate('/op/command-history')}
+              style={{ color: '#722ed1' }}
+            >
+              命令历史
             </Button>
             <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />

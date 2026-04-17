@@ -446,6 +446,37 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent客户端注册表';
 
 -- ----------------------------
+-- 5.2 Agent命令执行历史表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `agent_command_history` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    `agent_id` varchar(64) NOT NULL COMMENT 'Agent节点ID',
+    `agent_name` varchar(128) DEFAULT NULL COMMENT 'Agent节点名称',
+    `agent_ip` varchar(64) DEFAULT NULL COMMENT 'Agent IP地址',
+    `agent_port` int DEFAULT NULL COMMENT 'Agent端口',
+    `command` text NOT NULL COMMENT '执行的命令内容',
+    `command_status` tinyint NOT NULL DEFAULT '0' COMMENT '命令执行状态：0-成功 1-失败 2-超时 3-未知',
+    `exit_code` int DEFAULT NULL COMMENT '进程退出码',
+    `output` longtext COMMENT '标准输出内容',
+    `error` longtext COMMENT '错误输出内容',
+    `execute_time` bigint(20) DEFAULT NULL COMMENT '执行耗时（毫秒）',
+    `submit_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '命令提交时间',
+    `start_time` datetime DEFAULT NULL COMMENT '命令开始执行时间',
+    `end_time` datetime DEFAULT NULL COMMENT '命令完成时间',
+    `user_id` bigint(20) DEFAULT NULL COMMENT '操作用户ID',
+    `user_name` varchar(64) DEFAULT NULL COMMENT '操作用户名',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_agent_command_history_agent_id` (`agent_id`),
+    KEY `idx_agent_command_history_agent_name` (`agent_name`),
+    KEY `idx_agent_command_history_command_status` (`command_status`),
+    KEY `idx_agent_command_history_user_id` (`user_id`),
+    KEY `idx_agent_command_history_submit_time` (`submit_time`),
+    KEY `idx_agent_command_history_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent命令执行历史表';
+
+-- ----------------------------
 -- 6. 架构编排页面表结构
 -- ----------------------------
 

@@ -36,6 +36,9 @@ APP_JAR_PATTERN="my-panel-admin*.jar"
 PROXY_NAME="my-panel-proxy"
 PROXY_JAR_PATTERN="my-panel-proxy*.jar"
 
+AGENT_NAME="agent"
+AGENT_JAR_PATTERN="agent*.jar"
+
 # JDK & Nginx Package Names (for easy modification)
 JDK_PKG_NAME="jdk-21-linux.tar.gz"
 NGINX_PKG_NAME="nginx-1.24.0.tar.gz"
@@ -101,6 +104,22 @@ fi
 
 if [ -z "$PROXY_JAR_PATH" ]; then
     warn "$PROXY_JAR_PATTERN not found in proxy directory. Proxy service will not be available."
+fi
+
+# Find agent JAR
+AGENT_JAR_PATH=""
+if [ -d "$ROOT_DIR/agent/libs" ]; then
+    AGENT_JAR_PATH=$(ls -t "$ROOT_DIR"/agent/libs/$AGENT_JAR_PATTERN 2>/dev/null | head -n 1)
+fi
+
+if [ -z "$AGENT_JAR_PATH" ]; then
+    if [ -f "$ROOT_DIR/agent/$AGENT_JAR_PATTERN" ]; then
+        AGENT_JAR_PATH=$(ls -t "$ROOT_DIR"/agent/$AGENT_JAR_PATTERN | head -n 1)
+    fi
+fi
+
+if [ -z "$AGENT_JAR_PATH" ]; then
+    warn "$AGENT_JAR_PATTERN not found in agent directory. Agent service will not be available."
 fi
 
 install() {
@@ -198,7 +217,7 @@ install() {
 
                          DEPS_OK=0
                         if command -v apt-get >/dev/null 2>&1; then
-                            REQ_PKGS=("build-essential" "libpcre2-dev" "libpcre3" "libpcre3-dev" "zlib1g" "zlib1g-dev" "libssl-dev" "libxml2-dev" "libxslt1-dev" "libgd-dev")
+                            REQ_PKGS=("build-essential" "libpcre3" "libpcre3-dev" "zlib1g" "zlib1g-dev" "libssl-dev" "libxml2-dev" "libxslt1-dev" "libgd-dev")
                             MISSING_PKGS=()
                             for pkg in "${REQ_PKGS[@]}"; do
                                 if ! is_pkg_installed "$pkg"; then
@@ -353,7 +372,18 @@ install() {
             fi
         done
     fi
-    
+
+    # Update agent config paths
+    AGENT_CONFIG_DIR="$ROOT_DIR/agent/config"
+    if [ -d "$AGENT_CONFIG_DIR" ]; then
+        find "$AGENT_CONFIG_DIR" -type f -name "*.yml" -o -name "*.yaml" -o -name "*.properties" -o -name "*.xml" | while read -r file; do
+            if grep -q "/tmp/my-panel/admin" "$file"; then
+                sed -i 's|/tmp/my-panel/admin|'"$ROOT_DIR"'|g' "$file"
+                info "Updated paths in $file"
+            fi
+        done
+    fi
+
     echo ""
     success "Installation/Check complete."
 }
@@ -459,6 +489,41 @@ get_proxy_pids() {
 
 get_proxy_pid() {
     local pids=($(get_proxy_pids))
+    echo "${pids[0]}"
+}
+
+get_agent_pids() {
+    local pids=()
+
+    local jps_cmd=""
+    if [ -n "$JAVA_CMD" ]; then
+        local java_bin_dir=$(dirname "$JAVA_CMD")
+        if [ -x "$java_bin_dir/jps" ]; then
+            jps_cmd="$java_bin_dir/jps"
+        fi
+    fi
+
+    if [ -z "$jps_cmd" ] && type jps >/dev/null 2>&1; then
+        jps_cmd="jps"
+    fi
+
+    if [ -n "$jps_cmd" ]; then
+        while IFS= read -r line; do
+            pids+=($(echo "$line" | awk '{print $1}'))
+        done < <($jps_cmd -l | grep -E "(AgentApplication|agent-.*\.jar)" | grep -v grep)
+    fi
+
+    if [ ${#pids[@]} -eq 0 ]; then
+        while IFS= read -r line; do
+            pids+=($(echo "$line" | awk '{print $2}'))
+        done < <(ps -ef | grep -E "$AGENT_JAR_PATTERN" | grep -v grep | grep -v "$0")
+    fi
+
+    echo "${pids[@]}"
+}
+
+get_agent_pid() {
+    local pids=($(get_agent_pids))
     echo "${pids[0]}"
 }
 
@@ -587,6 +652,71 @@ do_start_proxy() {
     fi
 }
 
+do_start_agent() {
+    if [ -z "$AGENT_JAR_PATH" ]; then
+        warn "Agent JAR not found. Cannot start agent service."
+        return 1
+    fi
+
+    info "Starting $AGENT_NAME..."
+    mkdir -p "$LOG_DIR"
+    cd "$ROOT_DIR/agent"
+    nohup $JAVA_CMD $JAVA_OPTS "-Dlogback.configurationFile=$ROOT_DIR/agent/config/logback.xml" -jar "$AGENT_JAR_PATH" > /dev/null 2>&1 &
+    PID=$!
+    cd "$BIN_DIR"
+    AGENT_PID_FILE="$ROOT_DIR/$AGENT_NAME-$PID.pid"
+    echo $PID > "$AGENT_PID_FILE"
+
+    # Wait for agent to start (Health Check)
+    info "Waiting for $AGENT_NAME to start..."
+    MAX_WAIT=120
+    COUNT=0
+    SUCCESS=0
+    MIN_ALIVE_TIME=30
+
+    while [ $COUNT -lt $MAX_WAIT ]; do
+        # Check if process is still running
+        if ! kill -0 $PID >/dev/null 2>&1; then
+            echo ""
+            error "$AGENT_NAME failed to start. Please check the logs in $LOG_DIR"
+            rm -f "$AGENT_PID_FILE"
+            return 1
+        fi
+
+        # Check if process is listening on any TCP port
+        if command -v lsof >/dev/null 2>&1; then
+            lsof -Pan -p $PID -i tcp -sTCP:LISTEN >/dev/null 2>&1 && SUCCESS=1
+        elif command -v ss >/dev/null 2>&1; then
+            ss -tlnp 2>/dev/null | grep -q "$PID" && SUCCESS=1
+        elif command -v netstat >/dev/null 2>&1; then
+            netstat -tlpn 2>/dev/null | grep -q "$PID" && SUCCESS=1
+        fi
+
+        if [ $SUCCESS -eq 1 ]; then
+            echo ""
+            success "$AGENT_NAME started successfully."
+            break
+        fi
+
+        # Fallback: if process has been alive for MIN_ALIVE_TIME, consider it started
+        if [ $COUNT -ge $MIN_ALIVE_TIME ]; then
+            echo ""
+            success "$AGENT_NAME started successfully after ${COUNT}s."
+            break
+        fi
+
+        printf "."
+        sleep 1
+        COUNT=$((COUNT + 1))
+    done
+
+    if [ $SUCCESS -eq 0 ]; then
+        echo ""
+        error "Timeout: $AGENT_NAME failed to start within ${MAX_WAIT}s."
+        return 1
+    fi
+}
+
 init_nginx_conf() {
     CONF_FILE="$NGINX_HOME/conf/nginx.conf"
 
@@ -606,9 +736,10 @@ init_nginx_conf() {
     mkdir -p "$NGINX_HOME/logs"
 
     # Get backend app port from application.yml
-    APP_PORT=$(grep -E "^[[:space:]]*port:" "$ROOT_DIR/config/application.yml" | head -n 1 | awk "{print $2}" | tr -d "\r")
+    APP_PORT=$(grep -E "^[[:space:]]*port:" "$ROOT_DIR/config/application.yml" | head -n 1 | awk '{print $2}' | tr -d '\r' | xargs)
     if [ -z "$APP_PORT" ]; then
         APP_PORT=8080
+        info "Could not determine app port from config, using default: $APP_PORT"
     fi
     info "Backend app port: $APP_PORT"
 
@@ -732,7 +863,21 @@ start() {
         fi
     fi
 
-    # 3. Start Nginx
+    # 3. Start Agent
+    if [ "$TARGET" = "agent" ] || [ "$TARGET" = "all" ]; then
+        if [ -n "$AGENT_JAR_PATH" ]; then
+            PID=$(get_agent_pid)
+
+            if [ -n "$PID" ]; then
+                warn "$AGENT_NAME is already running (PID: $PID)."
+            fi
+            do_start_agent
+        else
+            warn "Agent JAR not found. Cannot start agent service."
+        fi
+    fi
+
+    # 4. Start Nginx
     if [ "$TARGET" = "nginx" ] || [ "$TARGET" = "all" ]; then
         if [ -f "$ROOT_DIR/tools/nginx-ops.sh" ]; then
             bash "$ROOT_DIR/tools/nginx-ops.sh" start
@@ -887,7 +1032,71 @@ stop() {
         fi
     fi
 
-    # 3. Stop Nginx
+    # 3. Stop Agent
+    if [ "$TARGET" = "agent" ] || [ "$TARGET" = "all" ]; then
+        ALL_PIDS=($(get_agent_pids))
+
+        if [ ${#ALL_PIDS[@]} -gt 0 ]; then
+            if [ "$TARGET" = "all" ]; then
+                for PID in "${ALL_PIDS[@]}"; do
+                    info "Stopping $AGENT_NAME (PID: $PID)..."
+
+                    kill $PID 2>/dev/null
+
+                    TIMEOUT=10
+                    while [ $TIMEOUT -gt 0 ]; do
+                        if ! kill -0 $PID >/dev/null 2>&1; then
+                            break;
+                        fi
+                        sleep 1
+                        let TIMEOUT=TIMEOUT-1
+                        printf "."
+                    done
+
+                    if ! kill -0 $PID >/dev/null 2>&1; then
+                        printf "\n"
+                        success "$AGENT_NAME (PID: $PID) stopped."
+                    else
+                        printf "\n"
+                        warn "Forcing stop $AGENT_NAME (PID: $PID)..."
+                        kill -9 $PID 2>/dev/null
+                        success "$AGENT_NAME (PID: $PID) force stopped."
+                    fi
+                done
+            else
+                PID=${ALL_PIDS[0]}
+                info "Stopping $AGENT_NAME (PID: $PID)..."
+
+                kill $PID 2>/dev/null
+
+                TIMEOUT=10
+                while [ $TIMEOUT -gt 0 ]; do
+                    if ! kill -0 $PID >/dev/null 2>&1; then
+                        break;
+                    fi
+                    sleep 1
+                    let TIMEOUT=TIMEOUT-1
+                    printf "."
+                done
+
+                if ! kill -0 $PID >/dev/null 2>&1; then
+                    printf "\n"
+                    success "$AGENT_NAME (PID: $PID) stopped."
+                else
+                    printf "\n"
+                    warn "Forcing stop $AGENT_NAME (PID: $PID)..."
+                    kill -9 $PID 2>/dev/null
+                    success "$AGENT_NAME (PID: $PID) force stopped."
+                fi
+            fi
+            rm -f "$ROOT_DIR"/agent-*.pid
+        else
+            warn "$AGENT_NAME is not running."
+            rm -f "$ROOT_DIR"/agent-*.pid
+        fi
+    fi
+
+    # 4. Stop Nginx
     if [ "$TARGET" = "nginx" ] || [ "$TARGET" = "all" ]; then
         if [ -f "$ROOT_DIR/tools/nginx-ops.sh" ]; then
             bash "$ROOT_DIR/tools/nginx-ops.sh" stop
@@ -951,6 +1160,36 @@ status() {
         fi
     fi
 
+    # Check Agent
+    if [ "$TARGET" = "agent" ] || [ "$TARGET" = "all" ]; then
+        if [ -n "$AGENT_JAR_PATH" ]; then
+            PIDS=($(get_agent_pids))
+            if [ ${#PIDS[@]} -gt 0 ]; then
+                status_line "$AGENT_NAME" "${GREEN}RUNNING (${#PIDS[@]} instances)${NC}"
+
+                for PID in "${PIDS[@]}"; do
+                    echo "    - Instance (PID: $PID)"
+
+                    if command -v lsof >/dev/null 2>&1; then
+                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -n | uniq | xargs)
+                        if [ -n "$PORTS" ]; then
+                            echo "      Listening ports: $PORTS"
+                        fi
+                    elif command -v netstat >/dev/null 2>&1; then
+                        PORTS=$(netstat -tlpn 2>/dev/null | grep $PID | awk "{print $4}" | awk -F: "{print $NF}" | sort -n | uniq | xargs)
+                        if [ -n "$PORTS" ]; then
+                            echo "      Listening ports: $PORTS"
+                        fi
+                    fi
+                done
+            else
+                status_line "$AGENT_NAME" "${RED}STOPPED${NC}"
+            fi
+        else
+            status_line "$AGENT_NAME" "${YELLOW}NOT AVAILABLE (JAR not found)${NC}"
+        fi
+    fi
+
     # Check Nginx
     if [ "$TARGET" = "nginx" ] || [ "$TARGET" = "all" ]; then
         if [ -f "$ROOT_DIR/tools/nginx-ops.sh" ]; then
@@ -973,7 +1212,7 @@ restart() {
 TARGET="all"
 ACTION=$1
 
-if [ "$ACTION" = "app" ] || [ "$ACTION" = "proxy" ] || [ "$ACTION" = "nginx" ]; then
+if [ "$ACTION" = "app" ] || [ "$ACTION" = "proxy" ] || [ "$ACTION" = "agent" ] || [ "$ACTION" = "nginx" ]; then
     TARGET=$ACTION
     ACTION=$2
 fi
@@ -1040,11 +1279,12 @@ case "$ACTION" in
         ;;
     *)
         error "Unknown action: $ACTION"
-        echo "Usage: $0 [app|proxy|nginx] {install|start|stop|restart|status}"
+        echo "Usage: $0 [app|proxy|agent|nginx] {install|start|stop|restart|status}"
         echo ""
         echo "Example:"
         echo "  $0 app start      # Only start the Java application"
         echo "  $0 proxy status   # Only check Proxy status"
+        echo "  $0 agent start    # Only start Agent"
         echo "  $0 nginx start    # Only start Nginx"
         echo "  $0 start          # Start all services"
         echo ""

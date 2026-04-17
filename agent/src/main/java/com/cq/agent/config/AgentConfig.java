@@ -156,7 +156,7 @@ public class AgentConfig {
         this.portProbeMaxSteps = getIntProperty("server.port.probe.max.steps", 10);
 
         // Registry server configuration
-        String registryServerUrlStr = getStringProperty("registry.server.url", "http://localhost:9876,http://localhost:9877");
+        String registryServerUrlStr = getStringProperty("registry.server.url", "http://localhost:9876,http://localhost:9876");
         if (registryServerUrlStr != null && !registryServerUrlStr.isEmpty()) {
             String[] urls = registryServerUrlStr.split(",");
             List<String> urlList = new ArrayList<>();
@@ -188,7 +188,7 @@ public class AgentConfig {
         this.maxContentLength = getIntProperty("connection.max.content.length", 8 * 1024 * 1024);
 
         // File operation configuration
-        this.fileBaseDirectory = getStringProperty("file.base.directory", "/tmp/my-panel/admin/agent/agent_data");
+        this.fileBaseDirectory = getStringProperty("file.base.directory", "/tmp/my-panel/admin/data/");
         this.allowOutsideBaseDirectory = getBooleanProperty("file.allow.outside.base", true);
         this.maxFileSize = getLongProperty("file.max.size", 107374182400L);
         this.chunkSize = getIntProperty("file.chunk.size.bytes", 5 * 1024 * 1024);

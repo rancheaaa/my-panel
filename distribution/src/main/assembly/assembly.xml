@@ -27,6 +27,15 @@
                 <include>com.cq:my-panel-proxy</include>
             </includes>
         </dependencySet>
+
+        <dependencySet>
+            <useProjectArtifact>false</useProjectArtifact>
+            <outputDirectory>agent/libs</outputDirectory>
+            <scope>runtime</scope>
+            <includes>
+                <include>com.cq:agent</include>
+            </includes>
+        </dependencySet>
     </dependencySets>
 
     <fileSets>
@@ -71,6 +80,18 @@
                 <include>logback*.xml</include>
             </includes>
         </fileSet>
+
+        <fileSet>
+            <directory>../agent/src/main/resources</directory>
+            <outputDirectory>agent/config</outputDirectory>
+            <includes>
+                <include>application*.yml</include>
+                <include>application*.properties</include>
+                <include>agent*.properties</include>
+                <include>logback*.xml</include>
+            </includes>
+        </fileSet>
+
         <!-- also include README from distribution/config if exists -->
         <fileSet>
             <directory>${project.basedir}/config</directory>

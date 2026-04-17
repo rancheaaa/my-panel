@@ -15,9 +15,6 @@
     <name>agent</name>
     <description>Agent for executing Linux commands via HTTP interface</description>
 
-    <properties>
-    </properties>
-
     <dependencies>
         <!-- Netty -->
         <dependency>

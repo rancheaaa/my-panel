@@ -16,6 +16,9 @@ set "APP_NAME=my-panel-admin"
 set "APP_JAR_PATTERN=my-panel-admin*.jar"
 set "PROXY_NAME=my-panel-proxy"
 set "PROXY_JAR_PATTERN=my-panel-proxy*.jar"
+set "AGENT_NAME=agent"
+set "AGENT_JAR_PATTERN=agent*.jar"
+set "AGENT_WINDOW_TITLE=MyPanelAgentServer"
 set "BIN_DIR=%~dp0"
 set "ROOT_DIR=%BIN_DIR%.."
 set "NGINX_PORT=8888"
@@ -68,6 +71,21 @@ if not defined PROXY_JAR_PATH (
     echo %WARN_PREFIX% %PROXY_JAR_PATTERN% not found in proxy directory. Proxy service will not be available.
 )
 
+:: Find agent JAR
+set "AGENT_JAR_PATH="
+if exist "%ROOT_DIR%\agent\libs\%AGENT_JAR_PATTERN%" (
+    for %%F in ("%ROOT_DIR%\agent\libs\%AGENT_JAR_PATTERN%") do set "AGENT_JAR_PATH=%%F"
+)
+if not defined AGENT_JAR_PATH (
+    if exist "%ROOT_DIR%\agent\%AGENT_JAR_PATTERN%" (
+        for %%F in ("%ROOT_DIR%\agent\%AGENT_JAR_PATTERN%") do set "AGENT_JAR_PATH=%%F"
+    )
+)
+
+if not defined AGENT_JAR_PATH (
+    echo %WARN_PREFIX% %AGENT_JAR_PATTERN% not found in agent directory. Agent service will not be available.
+)
+
 :: --- Main ---
 set "TARGET=all"
 set "ACTION=%~1"
@@ -80,6 +98,9 @@ if /i "%ACTION%"=="app" (
     set "ACTION=%~2"
 ) else if /i "%ACTION%"=="nginx" (
     set "TARGET=nginx"
+    set "ACTION=%~2"
+) else if /i "%ACTION%"=="agent" (
+    set "TARGET=agent"
     set "ACTION=%~2"
 )
 
@@ -319,10 +340,11 @@ exit /b 1
 
 :start
     echo ^>^>^> Starting Services (%TARGET%)...
-    
+
     if /i "%TARGET%"=="nginx" goto :start_nginx_section
+    if /i "%TARGET%"=="agent" goto :start_agent_section
     if /i "%TARGET%"=="proxy" goto :start_proxy_section
-    
+
     :: Start App Section
     echo %INFO_PREFIX% Starting %APP_NAME%...
     if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
@@ -483,9 +505,80 @@ exit /b 1
         echo %WARN_PREFIX% Proxy JAR not found. Cannot start proxy service.
     )
 
+:start_agent_section
+    if /i "%TARGET%"=="proxy" goto :start_nginx_check
+    if defined AGENT_JAR_PATH (
+        echo %INFO_PREFIX% Starting %AGENT_NAME%...
+        if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+        :: Start Agent
+        pushd "%ROOT_DIR%/agent"
+        start "%AGENT_WINDOW_TITLE%" /b "%JAVA_CMD%" %JAVA_OPTS% "-Dlogback.configurationFile=%ROOT_DIR%/agent/config/logback.xml" -jar "%AGENT_JAR_PATH%"
+        popd
+
+        :: Get PID and write to file
+        timeout /t 2 /nobreak >nul
+        for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%agent%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
+            set "AGENT_PID_FILE=%ROOT_DIR%\%AGENT_NAME%-%%i.pid"
+            echo %%i > "!AGENT_PID_FILE!"
+        )
+
+        echo %INFO_PREFIX% Waiting for %AGENT_NAME% to start...
+        set "MAX_WAIT=120"
+        set "COUNT=0"
+        set "SUCCESS=0"
+        set "MIN_ALIVE_TIME=30"
+
+:check_agent_loop
+        set "LISTENING=0"
+        set "CURRENT_PID="
+        if exist "%JAVA_HOME%\bin\jps.exe" (
+            for /f "tokens=1" %%i in ('""%JAVA_HOME%\bin\jps" -l ^| findstr /C:"AgentApplication" /C:"agent-""') do set "CURRENT_PID=%%i"
+        )
+        if not defined CURRENT_PID (
+            for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%agent%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do set "CURRENT_PID=%%i"
+        )
+
+        if defined CURRENT_PID (
+            netstat -ano | findstr "LISTENING" | findstr "!CURRENT_PID! " >nul
+            if !errorlevel! == 0 set "LISTENING=1"
+        ) else (
+            echo.
+            echo %ERROR_PREFIX% %AGENT_NAME% failed to start.
+            goto :start_nginx_check
+        )
+
+        if "!LISTENING!"=="1" (
+            set "SUCCESS=1"
+            goto :check_agent_done
+        )
+
+        :: Fallback: if process has been alive for MIN_ALIVE_TIME, consider it started
+        if %COUNT% geq %MIN_ALIVE_TIME% (
+            set "SUCCESS=1"
+            goto :check_agent_done
+        )
+
+        set /a COUNT+=1
+        if %COUNT% geq %MAX_WAIT% goto :check_agent_done
+        <nul set /p=.
+        timeout /t 1 /nobreak >nul
+        goto :check_agent_loop
+
+:check_agent_done
+        echo.
+        if "%SUCCESS%"=="1" (
+            echo %SUCCESS_PREFIX% %AGENT_NAME% started successfully.
+        ) else (
+            echo %ERROR_PREFIX% Timeout: %AGENT_NAME% failed to start within %MAX_WAIT%s.
+        )
+    ) else (
+        echo %WARN_PREFIX% Agent JAR not found. Cannot start agent service.
+    )
+
 :start_nginx_check
-    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :start_complete
-    
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" if /i "%TARGET%"=="agent" goto :start_complete
+
 :start_nginx_section
     if exist "%ROOT_DIR%\tools\nginx-ops.bat" (
         call "%ROOT_DIR%\tools\nginx-ops.bat" start
@@ -497,10 +590,11 @@ exit /b 1
 
 :stop
     echo ^<^<^< Stopping Services (%TARGET%)...
-    
+
     if /i "%TARGET%"=="nginx" goto :stop_nginx_section
+    if /i "%TARGET%"=="agent" goto :stop_agent_section
     if /i "%TARGET%"=="proxy" goto :stop_proxy_section
-    
+
     :: Stop App Section
     echo %INFO_PREFIX% Stopping %APP_NAME%...
     set "STOP_SUCCESS=0"
@@ -683,7 +777,101 @@ exit /b 1
     )
 
 :stop_nginx_check
-    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :stop_complete
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :stop_agent_check
+
+:stop_agent_section
+    if defined AGENT_JAR_PATH (
+        echo %INFO_PREFIX% Stopping %AGENT_NAME%...
+        set "STOP_SUCCESS=0"
+
+        set "FOUND_PIDS="
+        for /f "tokens=2 delims==" %%P in ('wmic process where "Name='java.exe' and CommandLine like '%%agent%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
+            if not "%%P"=="" set "FOUND_PIDS=!FOUND_PIDS! %%P"
+        )
+        if exist "%JAVA_HOME%\bin\jps.exe" (
+            for /f "tokens=1" %%i in ('""%JAVA_HOME%\bin\jps" -l ^| findstr /C:"AgentApplication" /C:"agent-""') do (
+                set "FOUND_PIDS=!FOUND_PIDS! %%i"
+            )
+        )
+
+        if "!FOUND_PIDS!"=="" (
+            echo %AGENT_NAME% is not running.
+            goto :stop_nginx_check
+        )
+
+        if /i "%TARGET%"=="all" (
+            for %%P in (!FOUND_PIDS!) do (
+                set "TARGET_PID=%%P"
+                echo Found PID: !TARGET_PID!
+                taskkill /PID !TARGET_PID! >nul 2>&1
+                set "RETRY_COUNT=0"
+                :stop_agent_loop_inner
+                tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                if !errorlevel! neq 0 (
+                    set "STOP_SUCCESS=1"
+                ) else (
+                    set /a RETRY_COUNT+=1
+                    if !RETRY_COUNT! lss 5 (
+                        <nul set /p=.
+                        timeout /t 1 /nobreak >nul
+                        goto :stop_agent_loop_inner
+                    )
+                    echo.
+                    echo Force killing PID !TARGET_PID!...
+                    taskkill /F /T /PID !TARGET_PID! >nul 2>&1
+                    timeout /t 1 /nobreak >nul
+                    tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                    if !errorlevel! neq 0 (
+                        set "STOP_SUCCESS=1"
+                    ) else (
+                        echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                    )
+                )
+            )
+        ) else (
+            for /f "tokens=1" %%P in ("!FOUND_PIDS!") do (
+                set "TARGET_PID=%%P"
+                echo Found PID: !TARGET_PID!
+                taskkill /PID !TARGET_PID! >nul 2>&1
+                set "RETRY_COUNT=0"
+                :stop_agent_single_loop_inner
+                tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                if !errorlevel! neq 0 (
+                    set "STOP_SUCCESS=1"
+                ) else (
+                    set /a RETRY_COUNT+=1
+                    if !RETRY_COUNT! lss 5 (
+                        <nul set /p=.
+                        timeout /t 1 /nobreak >nul
+                        goto :stop_agent_single_loop_inner
+                    )
+                    echo.
+                    echo Force killing PID !TARGET_PID!...
+                    taskkill /F /T /PID !TARGET_PID! >nul 2>&1
+                    timeout /t 1 /nobreak >nul
+                    tasklist /FI "PID eq !TARGET_PID!" 2>nul | findstr "!TARGET_PID!" >nul
+                    if !errorlevel! neq 0 (
+                        set "STOP_SUCCESS=1"
+                    ) else (
+                        echo %ERROR_PREFIX% Failed to kill PID !TARGET_PID!.
+                    )
+                )
+                goto :stop_agent_single_done
+            )
+            :stop_agent_single_done
+        )
+        if "%STOP_SUCCESS%"=="1" (
+            echo %SUCCESS_PREFIX% %AGENT_NAME% stopped successfully.
+            del /f /q "%ROOT_DIR%\agent-*.pid" 2>nul
+        )
+    ) else (
+        echo %WARN_PREFIX% Agent JAR not found. Cannot stop agent service.
+    )
+
+:stop_agent_check
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :stop_nginx_check
+    if /i "%TARGET%"=="nginx" goto :stop_nginx_section
+    if /i "%TARGET%"=="agent" goto :stop_complete
 
 :stop_nginx_section
     if exist "%ROOT_DIR%\tools\nginx-ops.bat" (
@@ -696,10 +884,11 @@ exit /b 1
 
 :status
     echo === Service Status (%TARGET%) ===
-    
+
     if /i "%TARGET%"=="nginx" goto :status_nginx_section
+    if /i "%TARGET%"=="agent" goto :status_agent_section
     if /i "%TARGET%"=="proxy" goto :status_proxy_section
-    
+
     :: Status App Section
     set "IS_RUNNING=0"
     if exist "%JAVA_HOME%\bin\jps.exe" (
@@ -765,8 +954,55 @@ exit /b 1
         echo %PROXY_NAME% is NOT AVAILABLE (JAR not found).
     )
 
+:status_agent_check
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :status_nginx_check
+    if /i "%TARGET%"=="nginx" goto :status_nginx_section
+    if /i "%TARGET%"=="agent" goto :status_complete
+
+:status_agent_section
+    if defined AGENT_JAR_PATH (
+        set "AGENT_PIDS="
+        set "PID_COUNT=0"
+
+        if exist "%JAVA_HOME%\bin\jps.exe" (
+            for /f "tokens=1" %%i in ('"%JAVA_HOME%\bin\jps" -l ^| findstr /C:"AgentApplication" /C:"agent-"') do (
+                set "AGENT_PIDS=!AGENT_PIDS! %%i"
+                set /a PID_COUNT+=1
+            )
+        )
+
+        if !PID_COUNT! == 0 (
+            for /f "tokens=2 delims==" %%i in ('wmic process where "Name='java.exe' and CommandLine like '%%agent%%'" get ProcessId /value 2^>nul ^| findstr "ProcessId"') do (
+                set "AGENT_PIDS=!AGENT_PIDS! %%i"
+                set /a PID_COUNT+=1
+            )
+        )
+
+        if !PID_COUNT! gtr 0 (
+            echo %AGENT_NAME% is RUNNING (!PID_COUNT! instances).
+            echo.
+            echo   Instances:
+            for %%p in (!AGENT_PIDS!) do (
+                echo     - PID: %%p
+                netstat -ano | findstr "LISTENING" | findstr " %%p$") >nul
+                if !errorlevel! == 0 (
+                    echo       Listening ports:
+                    for /f "tokens=2" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr " %%p$" ^| findstr "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*:"') do (
+                        for /f "tokens=2 delims=:" %%b in ("%%a") do (
+                            echo         - %%b
+                        )
+                    )
+                )
+            )
+        ) else (
+            echo %AGENT_NAME% is STOPPED.
+        )
+    ) else (
+        echo %AGENT_NAME% is NOT AVAILABLE (JAR not found).
+    )
+
 :status_nginx_check
-    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" goto :status_complete
+    if /i "%TARGET%"=="app" if /i "%TARGET%"=="proxy" if /i "%TARGET%"=="agent" goto :status_complete
 
 :status_nginx_section
     if exist "%ROOT_DIR%\tools\nginx-ops.bat" (

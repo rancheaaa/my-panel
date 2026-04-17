@@ -20,6 +20,11 @@
             <groupId>com.cq</groupId>
             <artifactId>my-panel-proxy</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>agent</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

@@ -68,6 +68,11 @@
         <dependencies>
             <dependency>
                 <groupId>com.cq</groupId>
+                <artifactId>agent</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cq</groupId>
                 <artifactId>my-panel-admin</artifactId>
                 <version>${revision}</version>
             </dependency>

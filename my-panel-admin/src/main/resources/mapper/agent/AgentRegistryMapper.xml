@@ -14,6 +14,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="nodeEnabled"    column="node_enabled"    />
         <result property="nodeStatus"    column="node_status"    />
         <result property="remark"    column="remark"    />
+        <result property="lastRefreshTime"    column="last_refresh_time"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"    column="update_by"    />
@@ -21,7 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectAgentRegistryVo">
-        select id, node_name, os_type, app_id, agent_ip, agent_port, node_enabled, node_status, remark, create_by, create_time, update_by, update_time
+        select id, node_name, os_type, app_id, agent_ip, agent_port, node_enabled, node_status, remark, last_refresh_time, create_by, create_time, update_by, update_time
         from agent_registry
     </sql>
 
@@ -116,6 +117,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update agent_registry
         <trim prefix="SET" suffixOverrides=",">
             <if test="nodeStatus != null">node_status = #{nodeStatus},</if>
+            <if test="lastRefreshTime != null">last_refresh_time = #{lastRefreshTime},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>
         where agent_ip = #{agentIp} and agent_port = #{agentPort}

@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="agentIp" column="agent_ip"/>
         <result property="agentPort" column="agent_port"/>
         <result property="command" column="command"/>
+        <result property="commandTimeout" column="command_timeout"/>
         <result property="commandStatus" column="command_status"/>
         <result property="exitCode" column="exit_code"/>
         <result property="output" column="output"/>
@@ -26,7 +27,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectVo">
-        select id, agent_id, agent_name, agent_ip, agent_port, command,
+        select id, agent_id, agent_name, agent_ip, agent_port, command, command_timeout,
                command_status, exit_code, output, error, execute_time,
                submit_time, start_time, end_time, user_id, user_name,
                create_by, create_time
@@ -43,6 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <where>
             <if test="agentId != null and agentId != ''">and agent_id = #{agentId}</if>
             <if test="agentName != null and agentName != ''">and agent_name like concat('%', #{agentName}, '%')</if>
+            <if test="agentIp != null and agentIp != ''">and agent_ip like concat('%', #{agentIp}, '%')</if>
             <if test="commandStatus != null">and command_status = #{commandStatus}</if>
             <if test="userId != null">and user_id = #{userId}</if>
             <if test="params.beginTime != null and params.beginTime != ''">
@@ -57,12 +59,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insert" parameterType="AgentCommandHistory" useGeneratedKeys="true" keyProperty="id">
         insert into agent_command_history (
-            agent_id, agent_name, agent_ip, agent_port, command,
+            agent_id, agent_name, agent_ip, agent_port, command, command_timeout,
             command_status, exit_code, output, error, execute_time,
             submit_time, start_time, end_time, user_id, user_name,
             create_by, create_time
         ) values (
-            #{agentId}, #{agentName}, #{agentIp}, #{agentPort}, #{command},
+            #{agentId}, #{agentName}, #{agentIp}, #{agentPort}, #{command}, #{commandTimeout},
             #{commandStatus}, #{exitCode}, #{output}, #{error}, #{executeTime},
             #{submitTime}, #{startTime}, #{endTime}, #{userId}, #{userName},
             #{createBy}, #{createTime}

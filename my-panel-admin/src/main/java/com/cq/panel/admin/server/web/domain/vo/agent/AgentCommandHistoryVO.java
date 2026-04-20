@@ -25,6 +25,9 @@ public class AgentCommandHistoryVO {
     @Schema(description = "执行的命令内容")
     private String command;
 
+    @Schema(description = "命令超时时间（秒）")
+    private Integer commandTimeout;
+
     @Schema(description = "命令执行状态（0-成功 1-失败 2-超时 3-未知）")
     private Integer commandStatus;
 

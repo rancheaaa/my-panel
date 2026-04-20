@@ -4,6 +4,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.SecurityUtils;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandRequest;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
@@ -169,6 +172,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             update.setAgentIp(agentIp);
             update.setAgentPort(agentPort);
             update.setNodeStatus(1);
+            update.setLastRefreshTime(DateUtils.getNowDate());
             update.setUpdateTime(DateUtils.getNowDate());
             agentRegistryMapper.updateNodeStatusByIpAndPort(update);
             return true;
@@ -243,10 +247,10 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         }
 
         String agentUrl = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort() + "/api/execute";
-        
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("command", command);
-        requestBody.put("timeout", timeout);
+
+        final AgentExecuteCommandRequest requestBody = new AgentExecuteCommandRequest();
+        requestBody.setCommand(command);
+        requestBody.setTimeout((long)timeout);
 
         AgentCommandHistory history = new AgentCommandHistory();
         history.setAgentId(agent.getId());
@@ -254,14 +258,17 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         history.setAgentIp(agent.getAgentIp());
         history.setAgentPort(agent.getAgentPort());
         history.setCommand(command);
+        history.setCommandTimeout(timeout);
         history.setSubmitTime(DateUtils.getNowDate());
+        history.setUserId(SecurityUtils.getUserId());
+        history.setUserName(SecurityUtils.getUsername());
         try
         {
             RestTemplate restTemplate = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             
-            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+            HttpEntity<AgentExecuteCommandRequest> requestEntity = new HttpEntity<>(requestBody, headers);
             
             Date startTime = DateUtils.getNowDate();
             history.setStartTime(startTime);
@@ -276,24 +283,30 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             if (response.getStatusCode() == HttpStatus.OK)
             {
                 ObjectMapper objectMapper = new ObjectMapper();
-                @SuppressWarnings("unchecked")
-                java.util.Map<String, Object> result = objectMapper.readValue(response.getBody(), java.util.Map.class);
+                AgentExecuteCommandResponse result = objectMapper.readValue(response.getBody(), AgentExecuteCommandResponse.class);
                 
-                Boolean success = result.containsKey("success") ? (Boolean) result.get("success") : null;
-                Integer exitCode = result.containsKey("exitCode") ? ((Number) result.get("exitCode")).intValue() : null;
-                String output = result.containsKey("output") ? String.valueOf(result.get("output")) : null;
-                String error = result.containsKey("error") ? String.valueOf(result.get("error")) : null;
+                boolean success = result.isSuccess();
+                int exitCode = result.getExitCode();
+                String output = result.getOutput();
+                String error = result.getError();
 
-                if (Boolean.TRUE.equals(success))
+                if (success)
                 {
                     history.setCommandStatus(0);
                 }
-                else if (result.containsKey("timeout") && Boolean.TRUE.equals(result.get("timeout")))
+                else if (exitCode == -999)
                 {
+                    // timeout
                     history.setCommandStatus(2);
+                }
+                else if (exitCode < 0)
+                {
+                    // 未知
+                    history.setCommandStatus(3);
                 }
                 else
                 {
+                    // 失败
                     history.setCommandStatus(1);
                 }
                 

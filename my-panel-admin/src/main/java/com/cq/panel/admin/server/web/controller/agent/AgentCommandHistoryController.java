@@ -8,12 +8,14 @@ import com.cq.panel.admin.server.web.domain.vo.agent.AgentCommandHistoryVO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.web.converter.agent.AgentCommandHistoryConverter;
+import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 
 @Tag(name = "Agent命令执行历史", description = "Agent命令执行历史相关接口")
@@ -38,11 +40,14 @@ public class AgentCommandHistoryController extends BaseController
         AgentCommandHistory entity = new AgentCommandHistory();
         entity.setAgentId(query.getAgentId());
         entity.setAgentName(query.getAgentName());
+        entity.setAgentIp(query.getAgentIp());
         entity.setCommandStatus(query.getCommandStatus());
         entity.setUserId(query.getUserId());
-        if (query instanceof java.util.Map) {
-            // handled by base controller params
+        if (entity.getParams() == null) {
+            entity.setParams(new java.util.HashMap<>());
         }
+        entity.getParams().put("beginTime", query.getBeginTime());
+        entity.getParams().put("endTime", query.getEndTime());
         List<AgentCommandHistory> list = agentCommandHistoryService.selectList(entity);
         return Result.success(new PageVO<>(converter.toVOList(list), new PageInfo<>(list).getTotal()));
     }
@@ -60,5 +65,25 @@ public class AgentCommandHistoryController extends BaseController
     public Result<Void> remove(@PathVariable Long[] ids) {
         agentCommandHistoryService.deleteByIds(ids);
         return Result.success();
+    }
+
+    @Operation(summary = "导出命令历史", description = "导出符合条件的命令历史数据")
+    @RequirePermission("agent:registry:export")
+    @PostMapping("/export")
+    public void export(HttpServletResponse response, @Parameter(description = "查询参数") AgentCommandHistoryQueryDTO query) {
+        AgentCommandHistory entity = new AgentCommandHistory();
+        entity.setAgentId(query.getAgentId());
+        entity.setAgentName(query.getAgentName());
+        entity.setAgentIp(query.getAgentIp());
+        entity.setCommandStatus(query.getCommandStatus());
+        entity.setUserId(query.getUserId());
+        if (entity.getParams() == null) {
+            entity.setParams(new java.util.HashMap<>());
+        }
+        entity.getParams().put("beginTime", query.getBeginTime());
+        entity.getParams().put("endTime", query.getEndTime());
+        List<AgentCommandHistory> list = agentCommandHistoryService.selectList(entity);
+        ExcelUtil<AgentCommandHistory> util = new ExcelUtil<>(AgentCommandHistory.class);
+        util.exportExcel(response, list, "Agent命令历史数据");
     }
 }

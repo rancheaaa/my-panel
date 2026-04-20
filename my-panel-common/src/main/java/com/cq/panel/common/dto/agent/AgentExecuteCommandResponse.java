@@ -1,4 +1,4 @@
-package com.cq.agent.dto;
+package com.cq.panel.common.dto.agent;
 
 import lombok.Data;
 
@@ -7,7 +7,7 @@ import lombok.Data;
  */
 
 @Data
-public class ExecuteResponse {
+public class AgentExecuteCommandResponse {
 
     private boolean success;
     private int exitCode;

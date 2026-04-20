@@ -19,6 +19,7 @@ public class AgentCommandHistoryConverter
         vo.setAgentIp(entity.getAgentIp());
         vo.setAgentPort(entity.getAgentPort());
         vo.setCommand(entity.getCommand());
+        vo.setCommandTimeout(entity.getCommandTimeout());
         vo.setCommandStatus(entity.getCommandStatus());
         vo.setExitCode(entity.getExitCode());
         vo.setOutput(entity.getOutput());

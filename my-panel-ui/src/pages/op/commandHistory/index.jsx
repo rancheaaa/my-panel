@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Row, Col, DatePicker, Descriptions } from 'antd';
-import { SearchOutlined, ReloadOutlined, DeleteOutlined, HistoryOutlined, EyeOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined, HistoryOutlined, EyeOutlined, UpOutlined, DownOutlined, DownloadOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import {
   listCommandHistory,
   getCommandHistory,
-  delCommandHistory
+  delCommandHistory,
+  exportCommandHistory
 } from '../../../api/agent';
 
 const { RangePicker } = DatePicker;
@@ -23,13 +25,28 @@ const CommandHistory = () => {
     pageSize: 10,
     agentId: undefined,
     agentName: undefined,
+    agentIp: undefined,
     commandStatus: undefined
   });
 
+  const [expand, setExpand] = useState(true);
+
   const [form] = Form.useForm();
+  const [searchParams] = useSearchParams();
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailData, setDetailData] = useState(null);
+
+  useEffect(() => {
+    const agentIdParam = searchParams.get('agentId');
+    if (agentIdParam) {
+      setQueryParams(prev => ({
+        ...prev,
+        agentId: agentIdParam
+      }));
+      form.setFieldsValue({ agentId: agentIdParam });
+    }
+  }, [searchParams, form]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -73,6 +90,7 @@ const CommandHistory = () => {
       pageSize: 10,
       agentId: undefined,
       agentName: undefined,
+      agentIp: undefined,
       commandStatus: undefined
     });
   };
@@ -91,6 +109,21 @@ const CommandHistory = () => {
     } catch (error) {
       console.error(error);
       message.error('删除失败');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const response = await exportCommandHistory(queryParams);
+      const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `Agent命令历史_${new Date().getTime()}.xlsx`;
+      link.click();
+      message.success('导出成功');
+    } catch (error) {
+      console.error(error);
+      message.error('导出失败');
     }
   };
 
@@ -124,7 +157,15 @@ const CommandHistory = () => {
       ellipsis: true
     },
     {
-      title: 'Agent节点',
+      title: 'Agent ID',
+      dataIndex: 'agentId',
+      key: 'agentId',
+      align: 'center',
+      width: 200,
+      ellipsis: true
+    },
+    {
+      title: 'Agent节点名称',
       dataIndex: 'agentName',
       key: 'agentName',
       align: 'center',
@@ -132,7 +173,7 @@ const CommandHistory = () => {
       ellipsis: true
     },
     {
-      title: 'Agent地址',
+      title: 'Agent IP端口',
       key: 'agentAddr',
       align: 'center',
       width: 180,
@@ -149,6 +190,14 @@ const CommandHistory = () => {
           <span style={{ cursor: 'pointer' }}>{text}</span>
         </Tooltip>
       )
+    },
+    {
+      title: '超时(秒)',
+      dataIndex: 'commandTimeout',
+      key: 'commandTimeout',
+      align: 'center',
+      width: 90,
+      render: (timeout) => timeout !== null ? `${timeout}` : '-'
     },
     {
       title: '执行状态',
@@ -234,36 +283,53 @@ const CommandHistory = () => {
       <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
         <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
           <Row gutter={[24, 16]}>
-            <Col span={6}>
+            <Col span={8}>
               <Form.Item name="agentId" label="Agent ID">
                 <Input placeholder="请输入Agent节点ID" allowClear />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={8}>
               <Form.Item name="agentName" label="节点名称">
-                <Input placeholder="请输入节点名称" allowClear />
+                <Input placeholder="请输入Agent节点名称" allowClear />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item name="commandStatus" label="执行状态">
-                <Select placeholder="请选择状态" allowClear>
-                  <Option value={0}>成功</Option>
-                  <Option value={1}>失败</Option>
-                  <Option value={2}>超时</Option>
-                  <Option value={3}>未知</Option>
-                </Select>
+            <Col span={8}>
+              <Form.Item name="agentIp" label="Agent IP">
+                <Input placeholder="请输入Agent IP" allowClear />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item name="dateRange" label="时间范围">
-                <RangePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
+
+            {expand && (
+              <>
+                  <Col span={8}>
+                      <Form.Item name="commandStatus" label="执行状态">
+                          <Select placeholder="请选择状态" allowClear>
+                              <Option value={0}>成功</Option>
+                              <Option value={1}>失败</Option>
+                              <Option value={2}>超时</Option>
+                              <Option value={3}>未知</Option>
+                          </Select>
+                      </Form.Item>
+                  </Col>
+                <Col span={8}>
+                  <Form.Item name="dateRange" label="时间范围">
+                    <RangePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
 
             <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
               <Space size="small">
                 <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
                 <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button
+                    type="link"
+                    onClick={() => setExpand(!expand)}
+                    icon={expand ? <UpOutlined /> : <DownOutlined />}
+                >
+                  {expand ? '收起' : '展开'}
+                </Button>
               </Space>
             </Col>
           </Row>
@@ -280,6 +346,13 @@ const CommandHistory = () => {
               onClick={() => handleDelete()}
             >
               批量删除
+            </Button>
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+            >
+              导出
             </Button>
             <Tooltip title="刷新">
               <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
@@ -336,8 +409,10 @@ const CommandHistory = () => {
                   {(statusMap[detailData.commandStatus] || statusMap[3]).text}
                 </Tag>
               </Descriptions.Item>
-              <Descriptions.Item label="Agent节点">{detailData.agentName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Agent地址">{detailData.agentIp}:{detailData.agentPort}</Descriptions.Item>
+              <Descriptions.Item label="命令超时时间">{detailData.commandTimeout !== null ? `${detailData.commandTimeout} 秒` : '-'}</Descriptions.Item>
+              <Descriptions.Item label="Agent Id">{detailData.agentId || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Agent节点名称">{detailData.agentName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Agent IP端口">{detailData.agentIp}:{detailData.agentPort}</Descriptions.Item>
               <Descriptions.Item label="退出码">{detailData.exitCode !== null ? detailData.exitCode : '-'}</Descriptions.Item>
               <Descriptions.Item label="执行耗时">{detailData.executeTime !== null ? `${detailData.executeTime} ms` : '-'}</Descriptions.Item>
               <Descriptions.Item label="操作用户">{detailData.userName || '-'}</Descriptions.Item>

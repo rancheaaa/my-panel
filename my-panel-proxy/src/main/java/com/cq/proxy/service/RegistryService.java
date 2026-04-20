@@ -235,6 +235,7 @@ public class RegistryService {
             agentRegistry.setLastRefreshTime(now);
             agentRegistry.setCreateTime(now);
             agentRegistry.setUpdateTime(now);
+            agentRegistry.setRemark("auto register");
             agentRegistryMapper.insert(agentRegistry);
             result = agentRegistry;
         }

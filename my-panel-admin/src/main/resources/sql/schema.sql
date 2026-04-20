@@ -455,6 +455,7 @@ CREATE TABLE IF NOT EXISTS `agent_command_history` (
     `agent_ip` varchar(64) DEFAULT NULL COMMENT 'Agent IP地址',
     `agent_port` int DEFAULT NULL COMMENT 'Agent端口',
     `command` text NOT NULL COMMENT '执行的命令内容',
+    `command_timeout` int DEFAULT NULL COMMENT '命令超时时间（秒）',
     `command_status` tinyint NOT NULL DEFAULT '0' COMMENT '命令执行状态：0-成功 1-失败 2-超时 3-未知',
     `exit_code` int DEFAULT NULL COMMENT '进程退出码',
     `output` longtext COMMENT '标准输出内容',

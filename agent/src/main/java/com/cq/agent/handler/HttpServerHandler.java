@@ -1,9 +1,9 @@
 package com.cq.agent.handler;
 
 import com.cq.agent.dto.ApiCode;
-import com.cq.agent.dto.ExecuteRequest;
-import com.cq.agent.dto.ExecuteResponse;
-import com.cq.agent.dto.HealthResponse;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandRequest;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandResponse;
+import com.cq.panel.common.dto.agent.HealthBeatResponse;
 import com.cq.agent.executor.CommandExecutor;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
@@ -67,7 +67,7 @@ public class HttpServerHandler extends CommonNettyHandler {
     }
 
     private void handleHealthCheck(ChannelHandlerContext ctx, FullHttpRequest request) {
-        HealthResponse resp = new HealthResponse();
+        HealthBeatResponse resp = new HealthBeatResponse();
         resp.setStatus("UP");
         resp.setOs(commandExecutor.getOsName());
         resp.setOsType(commandExecutor.isWindows() ? "windows" : "unix");
@@ -87,7 +87,7 @@ public class HttpServerHandler extends CommonNettyHandler {
         }
 
         try {
-            ExecuteRequest requestJson = gson.fromJson(body, ExecuteRequest.class);
+            AgentExecuteCommandRequest requestJson = gson.fromJson(body, AgentExecuteCommandRequest.class);
             if (requestJson == null || requestJson.getCommand() == null || requestJson.getCommand().isBlank()) {
                 sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'command' field is required"));
                 return;
@@ -105,13 +105,7 @@ public class HttpServerHandler extends CommonNettyHandler {
                 timeout = commandExecutor.getDefaultTimeoutSeconds();
             }
 
-            CommandExecutor.CommandResult result = commandExecutor.execute(requestJson.getCommand(), timeout);
-
-            ExecuteResponse resp = new ExecuteResponse();
-            resp.setSuccess(result.isSuccess());
-            resp.setExitCode(result.exitCode());
-            resp.setOutput(result.output());
-            resp.setError(result.error());
+            AgentExecuteCommandResponse resp = commandExecutor.execute(requestJson.getCommand(), timeout);
 
             sendResponse(ctx, request, HttpResponseStatus.OK, gson.toJson(resp));
 

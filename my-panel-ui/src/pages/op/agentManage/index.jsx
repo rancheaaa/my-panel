@@ -414,14 +414,24 @@ const AgentManage = () => {
       render: (_, record) => (
         <Space size="middle">
           <Tooltip title="执行命令">
-            <Button 
-              type="text" 
-              icon={<ConsoleSqlOutlined />} 
-              onClick={() => handleExecute(record)} 
+            <Button
+              type="text"
+              icon={<ConsoleSqlOutlined />}
+              onClick={() => handleExecute(record)}
               style={{ color: '#52c41a' }}
               disabled={record.nodeStatus !== 1}
             >
               执行
+            </Button>
+          </Tooltip>
+          <Tooltip title="命令历史">
+            <Button
+              type="text"
+              icon={<HistoryOutlined />}
+              onClick={() => navigate('/op/command-history?agentId=' + record.id)}
+              style={{ color: '#722ed1' }}
+            >
+              历史
             </Button>
           </Tooltip>
           <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ color: '#1890ff' }}>修改</Button>

@@ -118,3 +118,12 @@ export function delCommandHistory(ids) {
     method: 'delete'
   });
 }
+
+// 导出命令历史
+export function exportCommandHistory(query) {
+  return request({
+    url: '/agent/command-history/export',
+    method: 'post',
+    responseType: 'blob'
+  });
+}

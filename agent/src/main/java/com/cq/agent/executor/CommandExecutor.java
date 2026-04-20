@@ -1,84 +1,63 @@
 package com.cq.agent.executor;
 
 import com.cq.agent.config.AgentConfig;
-import org.apache.commons.exec.*;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandResponse;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Command executor using Apache Commons Exec with timeout handling.
- * Supports both Windows and Linux/Unix systems.
- */
 public class CommandExecutor {
 
     private static final Logger logger = LoggerFactory.getLogger(CommandExecutor.class);
     private static final String OS_NAME = System.getProperty("os.name").toLowerCase();
     private static final boolean IS_WINDOWS = OS_NAME.contains("win");
 
-    // Charset for command output
     private static final Charset OUTPUT_CHARSET = IS_WINDOWS
             ? Charset.forName(System.getProperty("sun.jnu.encoding", "GBK"))
             : StandardCharsets.UTF_8;
 
+    @Getter
     private final long defaultTimeoutSeconds;
+    @Getter
     private final long maxTimeoutSeconds;
+
+    private final ExecutorService virtualThreadPool;
 
     public CommandExecutor(AgentConfig config) {
         this.defaultTimeoutSeconds = config.getDefaultTimeoutSeconds();
         this.maxTimeoutSeconds = config.getMaxTimeoutSeconds();
-        logger.info("CommandExecutor initialized for {} system, charset: {}",
+        this.virtualThreadPool = Executors.newVirtualThreadPerTaskExecutor();
+        logger.info("CommandExecutor initialized for {} system, charset: {} (virtual thread pool)",
                 IS_WINDOWS ? "Windows" : "Linux/Unix", OUTPUT_CHARSET);
     }
 
-    /**
-     * Check if the current OS is Windows.
-     */
     public boolean isWindows() {
         return IS_WINDOWS;
     }
 
-    /**
-     * Get the OS name.
-     */
     public String getOsName() {
         return System.getProperty("os.name");
     }
 
-    /**
-     * Get the default timeout in seconds.
-     */
-    public long getDefaultTimeoutSeconds() {
-        return defaultTimeoutSeconds;
-    }
-
-    /**
-     * Get the maximum allowed timeout in seconds.
-     */
-    public long getMaxTimeoutSeconds() {
-        return maxTimeoutSeconds;
-    }
-
-    /**
-     * Execute a command with default timeout.
-     */
-    public CommandResult execute(String command) {
+    public AgentExecuteCommandResponse execute(String command) {
         return execute(command, defaultTimeoutSeconds);
     }
 
-    /**
-     * Execute a command with specified timeout.
-     */
-    public CommandResult execute(String command, long timeoutSeconds) {
+    public AgentExecuteCommandResponse execute(String command, long timeoutSeconds) {
         if (command == null || command.trim().isEmpty()) {
-            return new CommandResult(-1, "", "Command cannot be empty");
+            return createErrorResponse(-1, null, "Command cannot be empty");
         }
 
-        // Validate timeout
         if (timeoutSeconds <= 0) {
             timeoutSeconds = defaultTimeoutSeconds;
         }
@@ -90,97 +69,169 @@ public class CommandExecutor {
         logger.info("Executing command: {}, timeout: {}s", command, timeoutSeconds);
 
         try {
-            return executeWithCommonsExec(command, timeoutSeconds);
+            return executeInternal(command, timeoutSeconds);
         } catch (Exception e) {
             logger.error("Command execution failed: {}", command, e);
-            return new CommandResult(-1, "", "Command execution failed: " + e.getMessage());
+            return createErrorResponse(-1, null, "Command execution failed: " + e.getMessage());
         }
     }
 
-    private CommandResult executeWithCommonsExec(String command, long timeoutSeconds) {
-        // Build command line based on OS
-        CommandLine cmdLine;
+    private AgentExecuteCommandResponse createErrorResponse(int exitCode, String output, String error) {
+        AgentExecuteCommandResponse response = new AgentExecuteCommandResponse();
+        response.setSuccess(false);
+        response.setExitCode(exitCode);
+        response.setOutput(output);
+        response.setError(error);
+        return response;
+    }
+
+    private AgentExecuteCommandResponse createSuccessResponse(int exitCode, String output) {
+        AgentExecuteCommandResponse response = new AgentExecuteCommandResponse();
+        response.setSuccess(true);
+        response.setExitCode(exitCode);
+        response.setOutput(output);
+        response.setError(null);
+        return response;
+    }
+
+    private AgentExecuteCommandResponse executeInternal(String command, long timeoutSeconds) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder();
         if (IS_WINDOWS) {
-            cmdLine = new CommandLine("cmd.exe");
-            cmdLine.addArgument("/c");
-            cmdLine.addArgument(command, false);
+            pb.command("cmd.exe", "/c", command);
         } else {
-            cmdLine = new CommandLine("/bin/sh");
-            cmdLine.addArgument("-c");
-            cmdLine.addArgument(command, false);
+            pb.command("/bin/sh", "-c", command);
         }
+        pb.redirectErrorStream(false);
 
-        // Set up output streams
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        PumpStreamHandler streamHandler = new PumpStreamHandler(stdout, stderr);
+        final Process process = pb.start();
+        logger.info("Command {} Process started at pid [{}]", command, process.pid());
 
-        // Create executor with timeout watchdog
-        DefaultExecutor executor = DefaultExecutor.builder().get();
-        executor.setStreamHandler(streamHandler);
-
-        // Set up watchdog for timeout
-        long timeoutMillis = timeoutSeconds * 1000;
-        ExecuteWatchdog watchdog = ExecuteWatchdog.builder()
-                .setTimeout(java.time.Duration.ofMillis(timeoutMillis))
-                .get();
-        executor.setWatchdog(watchdog);
-
-        // Allow any exit value (we'll check it ourselves)
-        executor.setExitValues(null);
-
+        boolean finished;
         try {
-            int exitCode = executor.execute(cmdLine);
+            finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            killProcessTree(process);
+            return createErrorResponse(-3, null, "Command execution interrupted");
+        }
 
-            String output = stdout.toString(OUTPUT_CHARSET).trim();
-            String error = stderr.toString(OUTPUT_CHARSET).trim();
-
-            logger.info("Command completed with exit code: {}", exitCode);
-
-            if (exitCode == 0) {
-                return new CommandResult(exitCode, output, null);
-            } else {
-                String errorMessage = error.isEmpty() ? "Command exited with code " + exitCode : error;
-                return new CommandResult(exitCode, output, errorMessage);
-            }
-
-        } catch (ExecuteException e) {
-            // Check if this was caused by timeout
-            if (watchdog.killedProcess()) {
+        if (!finished) {
+            virtualThreadPool.submit(() -> {
                 logger.warn("Command execution timed out after {}s: {}", timeoutSeconds, command);
-                return new CommandResult(-1, stdout.toString(OUTPUT_CHARSET).trim(),
-                        "Command execution timed out after " + timeoutSeconds + " seconds");
+                killProcessTree(process);
+            });
+            return createErrorResponse(-999, null,
+                    "Command execution timed out after " + timeoutSeconds + " seconds");
+        }
+
+        StringBuilder stdoutBuilder = new StringBuilder();
+        StringBuilder stderrBuilder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream(), OUTPUT_CHARSET))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stdoutBuilder.append(line).append("\n");
             }
-
-            String output = stdout.toString(OUTPUT_CHARSET).trim();
-            String error = stderr.toString(OUTPUT_CHARSET).trim();
-            int exitCode = e.getExitValue();
-
-            logger.warn("Command execution failed with exit code {}: {}", exitCode, command);
-            return new CommandResult(exitCode, output,
-                    error.isEmpty() ? "Command exited with code " + exitCode : error);
-
         } catch (IOException e) {
-            logger.error("Failed to execute command: {}", command, e);
-            return new CommandResult(-1, "", "Failed to execute command: " + e.getMessage());
+            logger.debug("stdout stream closed: {}", e.getMessage());
+        }
+
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getErrorStream(), OUTPUT_CHARSET))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stderrBuilder.append(line).append("\n");
+            }
+        } catch (IOException e) {
+            logger.debug("stderr stream closed: {}", e.getMessage());
+        }
+
+        int exitCode = process.exitValue();
+        String stdout = stdoutBuilder.toString().trim();
+        String stderr = stderrBuilder.toString().trim();
+
+        closeProcessStreams(process);
+
+        if (exitCode == 0) {
+            return createSuccessResponse(exitCode, stdout);
+        } else {
+            String errorMsg = stderr.isEmpty() ? "Command exited with code " + exitCode : stderr;
+            return createErrorResponse(exitCode, stdout, errorMsg);
         }
     }
 
-    /**
-     * Shutdown the executor (cleanup resources if any).
-     */
+    private void closeProcessStreams(Process process) {
+        try {
+            InputStream stdout = process.getInputStream();
+            InputStream stderr = process.getErrorStream();
+            OutputStream stdin = process.getOutputStream();
+
+            if (stdout != null) stdout.close();
+            if (stderr != null) stderr.close();
+            if (stdin != null) stdin.close();
+        } catch (IOException e) {
+            logger.error("Error closing process streams: {}", e.getMessage());
+        }
+    }
+
+    private void killProcessTree(Process process) {
+        if (process == null || !process.isAlive()) {
+            return;
+        }
+
+        long pid = process.pid();
+        logger.info("ready to Kill process tree with pid [{}]", pid);
+
+        if (IS_WINDOWS) {
+            try {
+                new ProcessBuilder("taskkill", "/F", "/T", "/PID", String.valueOf(pid))
+                        .redirectErrorStream(true)
+                        .start()
+                        .waitFor(2, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                logger.warn("taskkill failed: {}, using destroyForcibly", e.getMessage());
+                process.destroyForcibly();
+            }
+        } else {
+            try {
+                new ProcessBuilder("kill", "-TERM", "-" + pid)
+                        .redirectErrorStream(true)
+                        .start()
+                        .waitFor(100, TimeUnit.MILLISECONDS);
+
+                if (process.isAlive()) {
+                    new ProcessBuilder("kill", "-0", "-" + pid)
+                            .redirectErrorStream(true)
+                            .start()
+                            .waitFor(50, TimeUnit.MILLISECONDS);
+
+                    new ProcessBuilder("kill", "-9", "-" + pid)
+                            .redirectErrorStream(true)
+                            .start()
+                            .waitFor(100, TimeUnit.MILLISECONDS);
+                }
+            } catch (Exception e) {
+                logger.warn("kill process group failed: {}, using destroyForcibly", e.getMessage());
+            } finally {
+                if (process.isAlive()) {
+                    process.destroyForcibly();
+                }
+            }
+        }
+
+        logger.info("Kill process tree with pid [{}] done, process isAlive: {}", pid, process.isAlive());
+    }
+
     public void shutdown() {
-        // Apache Commons Exec doesn't require explicit shutdown
-        // but we keep this method for consistency
-        logger.info("CommandExecutor shutdown");
-    }
-
-    /**
-     * Command execution result.
-     */
-    public record CommandResult(int exitCode, String output, String error) {
-        public boolean isSuccess() {
-            return exitCode == 0 && error == null;
+        try {
+            virtualThreadPool.shutdown();
+            if (!virtualThreadPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                virtualThreadPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            virtualThreadPool.shutdownNow();
+            Thread.currentThread().interrupt();
         }
+        logger.info("CommandExecutor shutdown");
     }
 }

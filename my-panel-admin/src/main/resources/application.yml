@@ -13,7 +13,7 @@ app:
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
   # 运行模式: cluster (redis) / standalone (memory)
-  mode: standalone
+  mode: cluster
   # 上传路径
   importPath: ${app.profile}/import
   # 下载路径

@@ -1,6 +1,7 @@
 package com.cq.panel.admin.server.repository.domain;
 
 import com.cq.panel.admin.server.annotation.Excel;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,8 +18,7 @@ import java.util.Set;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class SysRole extends BaseEntity
-{
+public class SysRole extends BaseEntity {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -74,14 +74,17 @@ public class SysRole extends BaseEntity
 
     /**
      * 是否为超级管理员角色
+     * 
      * @return 是否为超级管理员角色
      */
+    @JsonIgnore
     public boolean isAdmin() {
         return isAdmin(this.roleId);
     }
 
     /**
      * 判断角色ID是否为超级管理员
+     * 
      * @param roleId 角色ID
      * @return 结果
      */
@@ -91,6 +94,7 @@ public class SysRole extends BaseEntity
 
     /**
      * 带角色ID的构造器
+     * 
      * @param roleId 角色ID
      */
     public SysRole(Long roleId) {

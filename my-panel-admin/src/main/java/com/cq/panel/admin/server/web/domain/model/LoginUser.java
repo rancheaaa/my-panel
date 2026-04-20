@@ -81,6 +81,7 @@ public class LoginUser implements Serializable
         return user.getPassword();
     }
 
+    @JsonIgnore
     public String getUsername()
     {
         return user.getUserName();

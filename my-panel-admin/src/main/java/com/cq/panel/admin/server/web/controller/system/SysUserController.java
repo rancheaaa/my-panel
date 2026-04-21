@@ -7,7 +7,7 @@ import com.cq.panel.admin.server.repository.domain.SysRole;
 import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.common.enums.BusinessType;
-import com.cq.panel.admin.server.common.utils.SecurityUtils;
+import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.service.ISysDeptService;
@@ -33,6 +33,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.apache.commons.lang3.ArrayUtils;
 import com.cq.panel.authlite.annotation.RequirePermission;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -105,7 +106,7 @@ public class SysUserController extends BaseController
         ExcelUtil<SysUser> util = new ExcelUtil<>(SysUser.class);
         List<SysUser> userList = util.importExcel(file.getInputStream());
         String operName = getUsername();
-        return Result.success(userService.importUser(userList, updateSupport, operName));
+        return Result.success("导入数据成功", userService.importUser(userList, updateSupport, operName));
     }
 
     /**
@@ -167,7 +168,9 @@ public class SysUserController extends BaseController
             return Result.error("新增用户'" + user.getUserName() + "'失败，邮箱账号已存在");
         }
         user.setCreateBy(getUsername());
-        user.setPassword(SecurityUtils.encryptPassword(user.getPassword()));
+        String salt = StringUtils.isEmpty(dto.getSalt()) ? Md5PasswordEncoder.generateSalt() : dto.getSalt();
+        user.setSalt(salt);
+        user.setPassword(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
         userService.insertUser(user);
         return Result.success();
     }
@@ -232,9 +235,12 @@ public class SysUserController extends BaseController
         SysUser user = userConverter.toEntity(dto);
         userService.checkUserAllowed(user);
         userService.checkUserDataScope(user.getUserId());
-        user.setPassword(SecurityUtils.encryptPassword(user.getPassword()));
+        user.setPassword(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
         user.setUpdateBy(getUsername());
-        userService.resetPwd(user);
+        final int count = userService.resetPwd(user);
+        if (count == 0) {
+            return Result.error("重置密码失败");
+        }
         return Result.success();
     }
 

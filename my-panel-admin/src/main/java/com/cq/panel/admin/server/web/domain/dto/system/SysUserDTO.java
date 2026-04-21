@@ -39,6 +39,9 @@ public class SysUserDTO {
     @Schema(description = "密码", example = "123456")
     private String password;
 
+    @Schema(description = "密码盐值", example = "1234567890123456")
+    private String salt;
+
     @Schema(description = "帐号状态（0正常 1停用）", example = "0")
     private String status;
 

@@ -51,3 +51,14 @@ export function getRouters() {
     method: 'get',
   });
 }
+
+/**
+ * 获取密码盐值
+ */
+export function getSalt(username) {
+  return request({
+    url: '/getSalt',
+    method: 'get',
+    params: { username },
+  });
+}

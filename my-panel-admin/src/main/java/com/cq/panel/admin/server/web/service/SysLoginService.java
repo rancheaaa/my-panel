@@ -112,7 +112,7 @@ public class SysLoginService
     /**
      * 登录前置校验
      * @param username 用户名
-     * @param password 用户密码
+     * @param password 用户密码（已加密）
      */
     public void loginPreCheck(String username, String password)
     {
@@ -121,13 +121,6 @@ public class SysLoginService
         {
             AsyncManager.me().execute(AsyncFactory.recordLoginInfo(username, Constants.LOGIN_FAIL, MessageUtils.message("not.null")));
             throw new UserNotExistsException();
-        }
-        // 密码如果不在指定范围内 错误
-        if (password.length() < UserConstants.PASSWORD_MIN_LENGTH
-                || password.length() > UserConstants.PASSWORD_MAX_LENGTH)
-        {
-            AsyncManager.me().execute(AsyncFactory.recordLoginInfo(username, Constants.LOGIN_FAIL, MessageUtils.message("user.password.not.match")));
-            throw new UserPasswordNotMatchException();
         }
         // 用户名不在指定范围内 错误
         if (username.length() < UserConstants.USERNAME_MIN_LENGTH

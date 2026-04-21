@@ -284,9 +284,9 @@ INSERT IGNORE INTO `sys_role_menu` VALUES (2, 1),
        (2, 1037),
        (2, 1038);
 
-INSERT IGNORE INTO `sys_user` VALUES (1, 103, 'admin', 'sa', '00', 'sa666@163.com', '15888888888', '0', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', '2026-02-13 10:07:13.628', 'admin', '2026-02-07 14:13:09.0', '', '2026-02-13 10:07:13.639739', '管理员'),
-       (2, 105, 'guest', 'guest', '00', 'guest@qq.com', '15666666666', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:25:59.0', '游客'),
-       (100, 109, 'cq', 'cq', '00', '1111@qq.com', '18325567876', '0', '', '$2a$10$I2yU3XQi/00Dea2MTx9DReoLAJ.2cS.Seao30cd9y2CQMYjBG4ja2', '0', '0', '127.0.0.1', '2026-02-07 18:47:01.0', 'admin', '2026-02-07 14:29:00.0', 'admin', '2026-02-07 18:47:00.0', '测试员');
+INSERT IGNORE INTO `sys_user` VALUES (1, 103, 'admin', 'sa', '00', 'sa666@163.com', '15888888888', '0', '', '$2a$10$03UwhgRkyPnWAMis07hfBOWNFc7dR/FtLKdIs7KGu8BII7NgCm2hu', '1234567890123456', '0', '0', '127.0.0.1', '2026-02-13 10:07:13.628', 'admin', '2026-02-07 14:13:09.0', '', '2026-02-13 10:07:13.639739', '管理员'),
+       (2, 105, 'guest', 'guest', '00', 'guest@qq.com', '15666666666', '1', '', '$2a$10$LJ7O8BLAaQY.7ZKK1E0IHeFvamrXuj1gBvRmNhHouT.QNHVotoXRG', '1234567890123456', '0', '0', '127.0.0.1', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:25:59.0', '游客'),
+       (100, 109, 'cq', 'cq', '00', '1111@qq.com', '18325567876', '0', '', '$2a$10$isvwbPSI65fXE3bHE5JgM.zFoKP../YtFw0.XwqxAUb5.ZvqaKWR.', '1234567890123456', '0', '0', '127.0.0.1', '2026-02-07 18:47:01.0', 'admin', '2026-02-07 14:29:00.0', 'admin', '2026-02-07 18:47:00.0', '测试员');
 
 INSERT IGNORE INTO `sys_user_post` VALUES (1, 1),
        (2, 2),

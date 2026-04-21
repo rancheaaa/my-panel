@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Tabs, Form, Input, Button, Radio, Upload, message, List, Divider } from 'antd';
 import { UserOutlined, PhoneOutlined, MailOutlined, SafetyOutlined, CalendarOutlined, ClusterOutlined } from '@ant-design/icons';
 import { getUserProfile, updateUserProfile, updateUserPwd } from '../../../../api/user';
+import { getSalt } from '../../../login/api';
+import { encryptPassword } from '../../../../utils/crypto';
 import './index.scss';
 
 const Profile = () => {
@@ -60,7 +62,17 @@ const Profile = () => {
         }
         try {
             message.loading({ content: '正在保存...', key: 'updatePwd' });
-            const res = await updateUserPwd(values.oldPassword, values.newPassword);
+            const username = userInfo.userName;
+            let salt = userInfo.salt || '';
+            try {
+                const saltRes = await getSalt(username);
+                salt = saltRes.data || '';
+            } catch (e) {
+                console.error("Failed to get salt", e);
+            }
+            const encryptedOldPwd = encryptPassword(values.oldPassword, salt);
+            const encryptedNewPwd = encryptPassword(values.newPassword, salt);
+            const res = await updateUserPwd(encryptedOldPwd, encryptedNewPwd, salt);
             if (res.code === 200) {
                  message.success({ content: '修改成功', key: 'updatePwd' });
                  pwdForm.resetFields();

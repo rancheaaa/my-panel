@@ -80,16 +80,12 @@ spring:
   # 激活 profile: 根据 app.mode 自动选择 (standalone 或 cluster)
   profiles:
     active: ${app.mode}
-  # 模板引擎
-  thymeleaf:
-    mode: HTML
-    encoding: UTF-8
-    check-template-location: false
   sql:
     init:
       schema-locations: classpath:sql/schema.sql,classpath:sql/quartz.sql
       data-locations: classpath:sql/data.sql
-      mode: always
+      # always never
+      mode: ${SPRING_SQL_INIT_MODE:never}
       encoding: UTF-8
 
   # 资源信息

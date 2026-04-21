@@ -1,6 +1,7 @@
 package com.cq.panel.admin.server.web.domain.vo.base;
 
 import com.cq.panel.admin.server.common.constant.HttpStatus;
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -10,6 +11,7 @@ import java.io.Serializable;
  */
 public record Result<T>(int code, String msg, T data) implements Serializable
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**
@@ -25,7 +27,7 @@ public record Result<T>(int code, String msg, T data) implements Serializable
      */
     public static <T> Result<T> success()
     {
-        return Result.success("操作成功");
+        return Result.success("操作成功", null);
     }
 
     /**
@@ -34,14 +36,6 @@ public record Result<T>(int code, String msg, T data) implements Serializable
     public static <T> Result<T> success(T data)
     {
         return Result.success("操作成功", data);
-    }
-
-    /**
-     * 返回成功消息
-     */
-    public static <T> Result<T> success(String msg)
-    {
-        return Result.success(msg, null);
     }
 
     /**

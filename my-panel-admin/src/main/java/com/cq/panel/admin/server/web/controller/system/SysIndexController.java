@@ -31,7 +31,7 @@ public class SysIndexController
     @RequestMapping("/")
     public Result<String> index()
     {
-        return Result.success(StringUtils.format("欢迎使用{}后台管理框架，当前版本：v{}，请通过前端地址访问。", cqConfig.getName(), cqConfig.getVersion()));
+        return Result.success(StringUtils.format("欢迎使用{}后台管理框架，当前版本：v{}，请通过前端地址访问。", cqConfig.getName(), cqConfig.getVersion()), null);
     }
 }
 

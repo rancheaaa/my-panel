@@ -24,7 +24,6 @@ public class LoginDTO {
      */
     @Schema(description = "用户密码", requiredMode = Schema.RequiredMode.REQUIRED, example = "123456")
     @NotBlank(message = "密码不能为空")
-    @Size(min = 5, max = 20, message = "密码长度必须在5到20个字符之间")
     private String password;
 
     /**

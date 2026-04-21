@@ -373,12 +373,13 @@ public class SysUserServiceImpl implements ISysUserService
      * 
      * @param userName 用户名
      * @param password 密码
+     * @param salt 盐值
      * @return 结果
      */
     @Override
-    public int resetUserPwd(String userName, String password)
+    public int resetUserPwd(String userName, String password, String salt)
     {
-        return userMapper.resetUserPwd(userName, password);
+        return userMapper.resetUserPwd(userName, password, salt);
     }
 
     /**

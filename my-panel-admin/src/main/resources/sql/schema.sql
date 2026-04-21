@@ -311,6 +311,7 @@ CREATE TABLE IF NOT EXISTS `sys_user`
     `sex`         char(1)      DEFAULT '0' COMMENT '用户性别（0男 1女 2未知）',
     `avatar`      varchar(100) DEFAULT '' COMMENT '头像地址',
     `password`    varchar(100) DEFAULT '' COMMENT '密码',
+    `salt`        varchar(50) NOT NULL DEFAULT '1234567890123456' COMMENT '盐值',
     `status`      char(1)      DEFAULT '0' COMMENT '帐号状态（0正常 1停用）',
     `del_flag`    char(1)      DEFAULT '0' COMMENT '删除标志（0代表存在 2代表删除）',
     `login_ip`    varchar(128) DEFAULT '' COMMENT '最后登录IP',

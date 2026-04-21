@@ -72,6 +72,7 @@ public class SecurityConfig
         ignore.add("/login");
         ignore.add("/register");
         ignore.add("/captchaImage");
+        ignore.add("/getSalt");
         ignore.add("/logout");
         ignore.add("/actuator/**");
         ignore.add("/admin/server/**");

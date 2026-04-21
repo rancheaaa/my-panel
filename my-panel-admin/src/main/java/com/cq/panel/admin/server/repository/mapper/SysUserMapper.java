@@ -81,9 +81,10 @@ public interface SysUserMapper
      * 
      * @param userName 用户名
      * @param password 密码
+     * @param salt 盐值
      * @return 结果
      */
-    public int resetUserPwd(@Param("userName") String userName, @Param("password") String password);
+    public int resetUserPwd(@Param("userName") String userName, @Param("password") String password, @Param("salt") String salt);
 
     /**
      * 通过用户ID删除用户

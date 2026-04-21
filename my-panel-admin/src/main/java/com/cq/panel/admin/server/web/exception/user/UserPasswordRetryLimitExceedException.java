@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.web.exception.user;
 
+import java.io.Serial;
+
 /**
  * 用户错误最大次数异常类
  * 
@@ -7,6 +9,7 @@ package com.cq.panel.admin.server.web.exception.user;
  */
 public class UserPasswordRetryLimitExceedException extends UserException
 {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public UserPasswordRetryLimitExceedException(int retryLimitCount, int lockTime)

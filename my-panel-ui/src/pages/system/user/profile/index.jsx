@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Tabs, Form, Input, Button, Radio, Upload, message, List, Divider } from 'antd';
 import { UserOutlined, PhoneOutlined, MailOutlined, SafetyOutlined, CalendarOutlined, ClusterOutlined } from '@ant-design/icons';
-import { getUserProfile, updateUserProfile, updateUserPwd } from '../../../../api/user';
-import { getSalt } from '../../../login/api';
-import { encryptPassword } from '../../../../utils/crypto';
+import { getUserProfile, updateUserProfile, updateUserPwd } from '@/api/user';
+import { getSalt } from '@/api/auth';
+import { encryptPassword } from '@/utils/crypto';
 import './index.scss';
 
 const Profile = () => {

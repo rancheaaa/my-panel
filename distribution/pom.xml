@@ -25,6 +25,11 @@
             <groupId>com.cq</groupId>
             <artifactId>agent</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>cli-tools</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

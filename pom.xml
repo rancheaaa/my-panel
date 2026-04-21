@@ -68,6 +68,11 @@
         <dependencies>
             <dependency>
                 <groupId>com.cq</groupId>
+                <artifactId>cli-tools</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cq</groupId>
                 <artifactId>agent</artifactId>
                 <version>${revision}</version>
             </dependency>
@@ -352,6 +357,7 @@
         <module>agent</module>
         <module>my-panel-proxy</module>
         <module>my-panel-common</module>
+        <module>cli-tools</module>
     </modules>
     <packaging>pom</packaging>
 

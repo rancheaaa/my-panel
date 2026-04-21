@@ -85,7 +85,7 @@ spring:
       schema-locations: classpath:sql/schema.sql,classpath:sql/quartz.sql
       data-locations: classpath:sql/data.sql
       # always never
-      mode: ${SPRING_SQL_INIT_MODE:never}
+      mode: ${SPRING_SQL_INIT_MODE:always}
       encoding: UTF-8
 
   # 资源信息

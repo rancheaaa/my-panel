@@ -36,6 +36,15 @@
                 <include>com.cq:agent</include>
             </includes>
         </dependencySet>
+
+        <dependencySet>
+            <useProjectArtifact>false</useProjectArtifact>
+            <outputDirectory>tools/libs</outputDirectory>
+            <scope>runtime</scope>
+            <includes>
+                <include>com.cq:cli-tools</include>
+            </includes>
+        </dependencySet>
     </dependencySets>
 
     <fileSets>

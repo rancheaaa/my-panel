@@ -121,5 +121,16 @@ mvn clean package -DskipTests
 - 仅操作 Nginx 服务：`./my-panel-admin.sh nginx start`
 - 同时操作所有服务：`./my-panel-admin.sh start`
 
+### 默认账号密码
+系统初始化了以下三个测试账号：
+
+| 用户名 | 原始密码 | 说明 |
+|--------|----------|------|
+| admin | admin123 | 超级管理员，拥有所有权限 |
+| guest | guest123 | 来宾账号，仅有查看权限 |
+| cq | cq123456 | 普通账号，默认角色权限 |
+
+> **注意**：首次登录后请及时修改密码。密码采用双重加密传输（前端 MD5+Salt，后端 BCrypt）。
+
 ## 许可证
 [Apache License 2.0](LICENSE)

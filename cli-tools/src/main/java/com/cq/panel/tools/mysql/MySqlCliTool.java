@@ -1,22 +1,36 @@
 package com.cq.panel.tools.mysql;
 
+import com.cq.panel.common.utils.SystemEnvUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import org.yaml.snakeyaml.Yaml;
-
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.sql.*;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+@SuppressWarnings("all")
 @Command(name = "mysql-tool", mixinStandardHelpOptions = true, version = "mysql-tool 1.0",
         description = "MySQL command line tool for connection checking and SQL execution")
 public class MySqlCliTool implements Callable<Integer> {
 
-    private static final String CONFIG_PATH = "config/application-cluster.yml";
+    private static volatile String CONFIG_PATH;
+
+    static {
+        try {
+            final File file = new File(MySqlCliTool.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            String absolutePath = file.getAbsolutePath();
+            String rootPath = Paths.get(absolutePath).getParent().getParent().getParent().normalize().toAbsolutePath().toString();
+            CONFIG_PATH = Paths.get(rootPath, "config", "application-cluster.yml").toString();
+        } catch (URISyntaxException e) {
+            CONFIG_PATH = Paths.get(SystemEnvUtils.getProjectRootPath(), "config", "application-cluster.yml").toString();
+        }
+    }
 
     @Option(names = {"-c", "--check"}, description = "Check MySQL connection and port availability")
     private boolean checkConnection;
@@ -60,7 +74,7 @@ public class MySqlCliTool implements Callable<Integer> {
         }
 
         if (checkConnection) {
-            return checkConnection(host, port) ? 0 : 1;
+            return checkConnection(host, port);
         } else if (executeSql != null) {
             return executeSql(url, username, password, executeSql) ? 0 : 1;
         } else if (sqlFile != null) {
@@ -71,7 +85,7 @@ public class MySqlCliTool implements Callable<Integer> {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings("all")
     private Map<String, Object> loadConfig() throws IOException {
         File configFile = new File(CONFIG_PATH);
         if (!configFile.exists()) {
@@ -129,7 +143,7 @@ public class MySqlCliTool implements Callable<Integer> {
                 "&autoReconnect=true&serverTimezone=Asia/Shanghai";
     }
 
-    private boolean checkConnection(String host, int port) {
+    private int checkConnection(String host, int port) {
         System.out.println("Checking MySQL connection...");
         System.out.println("Host: " + host);
         System.out.println("Port: " + port);
@@ -137,11 +151,33 @@ public class MySqlCliTool implements Callable<Integer> {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress(host, port), 5000);
             System.out.println("SUCCESS: Port " + port + " is open and reachable");
-            return true;
+            return 0;
+        } catch (java.net.ConnectException e) {
+            String message = e.getMessage();
+            if (message != null && message.toLowerCase().contains("connection refused")) {
+                System.err.println("FAILED: Connection refused - Port " + port + " on host " + host + " is not accepting connections");
+                System.err.println("Possible cause: MySQL service may not be running or port is blocked by firewall");
+            } else {
+                System.err.println("FAILED: Cannot connect to " + host + ":" + port);
+                System.err.println("Error: " + message);
+            }
+            return 1;
+        } catch (java.net.SocketTimeoutException e) {
+            System.err.println("FAILED: Connection to " + host + ":" + port + " timed out");
+            System.err.println("Possible cause: Firewall may be blocking the connection or network latency is too high");
+            return 1;
+        } catch (java.net.NoRouteToHostException e) {
+            System.err.println("FAILED: No route to host " + host);
+            System.err.println("Possible cause: Network is unreachable or host IP address is incorrect");
+            return 1;
+        } catch (java.net.UnknownHostException e) {
+            System.err.println("FAILED: Unknown host " + host);
+            System.err.println("Possible cause: Host name cannot be resolved - check your DNS configuration");
+            return 1;
         } catch (IOException e) {
             System.err.println("FAILED: Cannot connect to " + host + ":" + port);
             System.err.println("Error: " + e.getMessage());
-            return false;
+            return 1;
         }
     }
 

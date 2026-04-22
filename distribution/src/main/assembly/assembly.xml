@@ -36,18 +36,27 @@
                 <include>com.cq:agent</include>
             </includes>
         </dependencySet>
-
-        <dependencySet>
-            <useProjectArtifact>false</useProjectArtifact>
-            <outputDirectory>tools/libs</outputDirectory>
-            <scope>runtime</scope>
-            <includes>
-                <include>com.cq:cli-tools</include>
-            </includes>
-        </dependencySet>
     </dependencySets>
 
     <fileSets>
+        <!-- CLI tools standalone JARs -->
+        <fileSet>
+            <directory>../cli-tools/target</directory>
+            <outputDirectory>tools/libs</outputDirectory>
+            <includes>
+                <include>cli-tools-*-mysql-standalone.jar</include>
+                <include>cli-tools-*-redis-standalone.jar</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>../cli-tools</directory>
+            <outputDirectory>tools/libs</outputDirectory>
+            <includes>
+                <include>README.md</include>
+            </includes>
+        </fileSet>
+
         <!-- bin -->
         <fileSet>
             <directory>${project.basedir}/bin</directory>

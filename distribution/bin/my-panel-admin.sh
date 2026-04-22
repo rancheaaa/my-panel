@@ -50,6 +50,9 @@ if [ ! -d "$ROOT_DIR/nginx" ] && [ -d "$(dirname "$ROOT_DIR")/nginx" ]; then
     ROOT_DIR=$(dirname "$ROOT_DIR")
 fi
 
+# export env variable
+export ROOT_DIR
+
 # Try to get Nginx port from config
 NGINX_PORT=8888
 if [ -f "$ROOT_DIR/config/application.yml" ]; then

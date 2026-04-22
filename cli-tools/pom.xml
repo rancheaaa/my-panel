@@ -20,19 +20,21 @@
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.2</version>
         </dependency>
 
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
-            <version>5.1.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
-            <version>8.4.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>my-panel-common</artifactId>
         </dependency>
     </dependencies>
 
@@ -66,12 +68,14 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.cq.panel.tools.mysql.MySqlCliTool</mainClass>
                                 </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <artifactSet>
                                 <includes>
                                     <include>info.picocli:picocli</include>
                                     <include>org.yaml:snakeyaml</include>
                                     <include>com.mysql:mysql-connector-j</include>
+                                    <include>com.cq:my-panel-common</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -81,6 +85,10 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/*.MF</exclude>
+                                        <exclude>META-INF/ALIAS.MF</exclude>
+                                        <exclude>**/module-info.class</exclude>
+                                        <exclude>**/META-INF/versions/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
@@ -99,6 +107,7 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>com.cq.panel.tools.redis.RedisCliTool</mainClass>
                                 </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <artifactSet>
                                 <includes>
@@ -106,6 +115,7 @@
                                     <include>org.yaml:snakeyaml</include>
                                     <include>redis.clients:jedis</include>
                                     <include>org.apache.commons:commons-pool2</include>
+                                    <include>com.cq:my-panel-common</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -115,6 +125,10 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/*.MF</exclude>
+                                        <exclude>META-INF/ALIAS.MF</exclude>
+                                        <exclude>**/module-info.class</exclude>
+                                        <exclude>**/META-INF/versions/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

@@ -353,11 +353,11 @@
     <modules>
         <module>my-panel-auth-lite</module>
         <module>my-panel-admin</module>
-        <module>distribution</module>
         <module>agent</module>
         <module>my-panel-proxy</module>
         <module>my-panel-common</module>
         <module>cli-tools</module>
+        <module>distribution</module>
     </modules>
     <packaging>pom</packaging>
 

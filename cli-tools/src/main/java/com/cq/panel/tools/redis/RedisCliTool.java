@@ -1,20 +1,17 @@
 package com.cq.panel.tools.redis;
 
+import com.alibaba.excel.EasyExcel;
 import com.cq.panel.common.utils.SystemEnvUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import org.yaml.snakeyaml.Yaml;
 import redis.clients.jedis.Jedis;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URISyntaxException;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 
 @SuppressWarnings("all")
@@ -29,9 +26,9 @@ public class RedisCliTool implements Callable<Integer> {
             final File file = new File(RedisCliTool.class.getProtectionDomain().getCodeSource().getLocation().toURI());
             String absolutePath = file.getAbsolutePath();
             String rootPath = Paths.get(absolutePath).getParent().getParent().getParent().normalize().toAbsolutePath().toString();
-            CONFIG_PATH = Paths.get(rootPath, "config", "application-cluster.yml").toString();
+            CONFIG_PATH = Paths.get(rootPath, "config", "common.properties").toString();
         } catch (URISyntaxException e) {
-            CONFIG_PATH = Paths.get(SystemEnvUtils.getProjectRootPath(), "config", "application-cluster.yml").toString();
+            CONFIG_PATH = Paths.get(SystemEnvUtils.getProjectRootPath(), "config", "common.properties").toString();
         }
     }
 
@@ -43,6 +40,12 @@ public class RedisCliTool implements Callable<Integer> {
 
     @Option(names = {"-f", "--file"}, paramLabel = "<FILE>", description = "Execute Redis commands from file (one command per line)")
     private String commandFile;
+
+    @Option(names = {"-o", "--output"}, paramLabel = "<DIR>", description = "Output directory for results (default: current directory)")
+    private String outputDir;
+
+    @Option(names = {"-t", "--type"}, paramLabel = "<TYPE>", description = "Output file type: txt, xls, xlsx (default: txt)")
+    private String outputType = "txt";
 
     @Option(names = {"-H", "--host"}, paramLabel = "<HOST>", description = "Redis host (override config)")
     private String hostOverride;
@@ -63,61 +66,54 @@ public class RedisCliTool implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
-        Map<String, Object> config = loadConfig();
-        Map<String, Object> redisConfig = extractRedisConfig(config);
+        Properties config = loadConfig();
 
-        String host = hostOverride != null ? hostOverride : extractHost(redisConfig);
-        int port = portOverride != null ? portOverride : extractPort(redisConfig);
-        String password = passwordOverride != null ? passwordOverride : extractPassword(redisConfig);
-        int database = databaseOverride != null ? databaseOverride : extractDatabase(redisConfig);
+        String host = hostOverride != null ? hostOverride : extractHost(config);
+        int port = portOverride != null ? portOverride : extractPort(config);
+        String password = passwordOverride != null ? passwordOverride : extractPassword(config);
+        int database = databaseOverride != null ? databaseOverride : extractDatabase(config);
 
         if (checkConnection) {
             return checkConnection(host, port);
         } else if (executeCommand != null) {
             return executeCommand(host, port, password, database, executeCommand) ? 0 : 1;
         } else if (commandFile != null) {
-            return executeCommandFile(host, port, password, database, commandFile) ? 0 : 1;
+            return executeCommandFile(host, port, password, database, commandFile, outputDir, outputType) ? 0 : 1;
         } else {
             System.out.println("No action specified. Use --help for usage information.");
             return 1;
         }
     }
 
-    @SuppressWarnings("all")
-    private Map<String, Object> loadConfig() throws IOException {
+    private Properties loadConfig() throws IOException {
         File configFile = new File(CONFIG_PATH);
         if (!configFile.exists()) {
             throw new FileNotFoundException("Config file not found: " + CONFIG_PATH);
         }
 
-        Yaml yaml = new Yaml();
+        Properties props = new Properties();
         try (InputStream inputStream = new FileInputStream(configFile)) {
-            return yaml.load(inputStream);
+            props.load(inputStream);
         }
+        return props;
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> extractRedisConfig(Map<String, Object> config) {
-        Map<String, Object> spring = (Map<String, Object>) config.get("spring");
-        Map<String, Object> data = (Map<String, Object>) spring.get("data");
-        return (Map<String, Object>) data.get("redis");
+    private String extractHost(Properties config) {
+        return config.getProperty("common.redis.host", "localhost");
     }
 
-    private String extractHost(Map<String, Object> redisConfig) {
-        return (String) redisConfig.get("host");
+    private int extractPort(Properties config) {
+        String port = config.getProperty("common.redis.port", "6379");
+        return Integer.parseInt(port);
     }
 
-    private int extractPort(Map<String, Object> redisConfig) {
-        return Integer.parseInt(redisConfig.get("port").toString());
+    private String extractPassword(Properties config) {
+        return config.getProperty("common.redis.password", "");
     }
 
-    private String extractPassword(Map<String, Object> redisConfig) {
-        Object password = redisConfig.get("password");
-        return password != null ? password.toString() : null;
-    }
-
-    private int extractDatabase(Map<String, Object> redisConfig) {
-        return Integer.parseInt(redisConfig.get("database").toString());
+    private int extractDatabase(Properties config) {
+        String database = config.getProperty("common.redis.database", "0");
+        return Integer.parseInt(database);
     }
 
     private int checkConnection(String host, int port) {
@@ -178,6 +174,21 @@ public class RedisCliTool implements Callable<Integer> {
             System.out.println("Command executed successfully");
             return true;
 
+        } catch (IllegalArgumentException e) {
+            System.err.println("ERROR: " + e.getMessage());
+            System.out.println("\nSupported Redis commands:");
+            System.out.println("  String:  GET, SET, INCR, DECR");
+            System.out.println("  Hash:    HGET, HSET, HGETALL");
+            System.out.println("  List:    LPUSH, RPUSH, LPOP, RPOP, LRANGE");
+            System.out.println("  Set:     SADD, SMEMBERS");
+            System.out.println("  ZSet:    ZADD, ZRANGE");
+            System.out.println("  Key:     DEL, EXISTS, EXPIRE, TTL, KEYS");
+            System.out.println("  Server:  PING, INFO, DBSIZE, FLUSHDB, FLUSHALL");
+            System.out.println("\nExample usage:");
+            System.out.println("  redis-tool -e \"GET mykey\"");
+            System.out.println("  redis-tool -e \"SET mykey HelloWorld\"");
+            System.out.println("  redis-tool -e \"HGETALL user:1000\"");
+            return false;
         } catch (Exception e) {
             System.err.println("Command execution failed: " + e.getMessage());
             return false;
@@ -263,14 +274,27 @@ public class RedisCliTool implements Callable<Integer> {
         }
     }
 
-    private boolean executeCommandFile(String host, int port, String password, int database, String filePath) {
+    private boolean executeCommandFile(String host, int port, String password, int database, String filePath, String outputDir, String outputType) {
         File file = new File(filePath);
         if (!file.exists()) {
             System.err.println("Command file not found: " + filePath);
             return false;
         }
 
+        String outputDirPath = outputDir != null ? outputDir.trim() : ".";
+        File outputDirFile = new File(outputDirPath);
+        if (!outputDirFile.exists()) {
+            outputDirFile.mkdirs();
+        }
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        String outputFile = new File(outputDirPath, "redis_output_" + timestamp + "." + outputType).getAbsolutePath();
+
         System.out.println("Executing Redis commands from file: " + filePath);
+        System.out.println("Output file: " + outputFile);
+        System.out.println("Output type: " + outputType);
+
+        List<String[]> allResults = new ArrayList<>();
+        List<String> commands = new ArrayList<>();
 
         try (Jedis jedis = new Jedis(host, port);
              BufferedReader reader = new BufferedReader(new FileReader(file))) {
@@ -296,16 +320,24 @@ public class RedisCliTool implements Callable<Integer> {
                     String[] args = new String[parts.length - 1];
                     System.arraycopy(parts, 1, args, 0, parts.length - 1);
 
+                    commands.add(line);
                     Object result = executeRedisCommand(jedis, cmd, args);
-                    System.out.println("Line " + lineCount + ": " + formatResult(result));
+                    allResults.add(new String[]{formatResult(result)});
                     executedCount++;
+                } catch (IllegalArgumentException e) {
+                    commands.add(line + " [ERROR]");
+                    allResults.add(new String[]{"ERROR: " + e.getMessage()});
                 } catch (Exception e) {
-                    System.err.println("Error executing command at line " + lineCount + ": " + e.getMessage());
+                    commands.add(line + " [ERROR]");
+                    allResults.add(new String[]{"ERROR: " + e.getMessage()});
                 }
 
                 lineCount++;
             }
 
+            writeRedisOutput(commands, allResults, outputFile, outputType);
+
+            System.out.println("Results written to: " + outputFile);
             System.out.println("Successfully executed " + executedCount + " commands");
             return true;
 
@@ -315,13 +347,98 @@ public class RedisCliTool implements Callable<Integer> {
         }
     }
 
+    private void writeRedisOutput(List<String> commands, List<String[]> results, String outputFile, String outputType) throws IOException {
+        switch (outputType.toLowerCase()) {
+            case "xls", "xlsx" -> writeRedisExcel(commands, results, outputFile, outputType);
+            default -> writeRedisTxt(commands, results, outputFile);
+        }
+    }
+
+    private void writeRedisTxt(List<String> commands, List<String[]> results, String outputFile) throws IOException {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(outputFile))) {
+            writer.println("================================================================================");
+            writer.println("                              Redis Command Results");
+            writer.println("================================================================================");
+            writer.println();
+
+            for (int i = 0; i < commands.size(); i++) {
+                writer.println("--------------------------------------------------------------------------------");
+                writer.println("[ Command #" + (i + 1) + " ]");
+                writer.println("Command: " + commands.get(i));
+                writer.println("Result: " + (results.get(i).length > 0 ? results.get(i)[0] : "(nil)"));
+                writer.println();
+            }
+
+            writer.println("================================================================================");
+            writer.println("Total commands: " + commands.size());
+        }
+    }
+
+    private void writeRedisExcel(List<String> commands, List<String[]> results, String outputFile, String type) {
+        List<List<String>> excelData = new ArrayList<>();
+
+        List<String> header = new ArrayList<>();
+        header.add("Command #");
+        header.add("Command");
+        header.add("Result");
+        excelData.add(header);
+
+        for (int i = 0; i < commands.size(); i++) {
+            List<String> row = new ArrayList<>();
+            row.add(String.valueOf(i + 1));
+            row.add(commands.get(i));
+            row.add(results.get(i).length > 0 ? results.get(i)[0] : "(nil)");
+            excelData.add(row);
+        }
+
+        List<List<String>> head = new ArrayList<>();
+        for (String h : header) {
+            List<String> col = new ArrayList<>();
+            col.add(h);
+            head.add(col);
+        }
+
+        EasyExcel.write(outputFile)
+                .head(head)
+                .excelType("xls".equals(type) ?
+                        com.alibaba.excel.support.ExcelTypeEnum.XLS :
+                        com.alibaba.excel.support.ExcelTypeEnum.XLSX)
+                .sheet("Redis Results")
+                .doWrite(() -> excelData);
+    }
+
     private String formatResult(Object result) {
         if (result == null) {
             return "(nil)";
-        } else if (result instanceof java.util.Set || result instanceof java.util.List || result instanceof java.util.Map) {
-            return result.toString();
-        } else {
-            return result.toString();
+        } else if (result instanceof Set) {
+            Set<?> set = (Set<?>) result;
+            if (set.isEmpty()) return "(empty set)";
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            for (Object item : set) {
+                sb.append(i++).append(") ").append(item);
+                if (i < set.size()) sb.append(", ");
+            }
+            return sb.toString();
+        } else if (result instanceof List) {
+            List<?> list = (List<?>) result;
+            if (list.isEmpty()) return "(empty list)";
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            for (Object item : list) {
+                sb.append(i++).append(") ").append(item);
+                if (i < list.size()) sb.append(", ");
+            }
+            return sb.toString();
+        } else if (result instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) result;
+            if (map.isEmpty()) return "(empty map)";
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                sb.append(entry.getKey()).append(": ").append(entry.getValue()).append(", ");
+            }
+            return sb.toString();
         }
+        return result.toString();
     }
 }

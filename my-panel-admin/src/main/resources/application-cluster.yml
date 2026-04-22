@@ -10,9 +10,9 @@ spring:
 #                username: root
 #                password: 123456
             master:
-                url: jdbc:mysql://172.19.200.130:3306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&serverTimezone=Asia/Shanghai
-                username: root
-                password: '!Cq199606'
+                url: ${common.datasource.url:jdbc:mysql://172.19.200.130:3306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&serverTimezone=Asia/Shanghai}
+                username: ${common.datasource.username:root}
+                password: ${common.datasource.password:!Cq199606}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
@@ -68,13 +68,13 @@ spring:
         redis:
             # 地址
 #            host: 192.168.0.202
-            host: localhost
+            host: ${common.redis.host:localhost}
             # 端口，默认为6379
-            port: 6379
+            port: ${common.redis.port:6379}
             # 数据库索引
-            database: 0
+            database: ${common.redis.database:0}
             # 密码
-            password:
+            password: ${common.redis.password:}
             # 连接超时时间
             timeout: 10s
             lettuce:

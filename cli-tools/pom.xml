@@ -33,8 +33,66 @@
         </dependency>
 
         <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>easyexcel</artifactId>
+            <version>4.0.3</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.xmlbeans</groupId>
+                    <artifactId>xmlbeans</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.poi</groupId>
+                    <artifactId>poi-ooxml</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.poi</groupId>
+                    <artifactId>poi-ooxml-lite</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.xmlbeans</groupId>
+            <artifactId>xmlbeans</artifactId>
+            <version>5.1.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.16</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-to-slf4j</artifactId>
+            <version>2.23.1</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.cq</groupId>
             <artifactId>my-panel-common</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.poi</groupId>
+                    <artifactId>poi-ooxml</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.poi</groupId>
+                    <artifactId>poi-ooxml-lite</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.xmlbeans</groupId>
+                    <artifactId>xmlbeans</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
@@ -70,14 +128,6 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
-                            <artifactSet>
-                                <includes>
-                                    <include>info.picocli:picocli</include>
-                                    <include>org.yaml:snakeyaml</include>
-                                    <include>com.mysql:mysql-connector-j</include>
-                                    <include>com.cq:my-panel-common</include>
-                                </includes>
-                            </artifactSet>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -87,6 +137,11 @@
                                         <exclude>META-INF/*.RSA</exclude>
                                         <exclude>META-INF/*.MF</exclude>
                                         <exclude>META-INF/ALIAS.MF</exclude>
+                                        <exclude>META-INF/NOTICE.*</exclude>
+                                        <exclude>META-INF/DEPENDENCIES</exclude>
+                                        <exclude>META-INF/LICENSE</exclude>
+                                        <exclude>META-INF/NOTICE</exclude>
+                                        <exclude>META-INF/LICENSE.*</exclude>
                                         <exclude>**/module-info.class</exclude>
                                         <exclude>**/META-INF/versions/**</exclude>
                                     </excludes>
@@ -109,15 +164,6 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
-                            <artifactSet>
-                                <includes>
-                                    <include>info.picocli:picocli</include>
-                                    <include>org.yaml:snakeyaml</include>
-                                    <include>redis.clients:jedis</include>
-                                    <include>org.apache.commons:commons-pool2</include>
-                                    <include>com.cq:my-panel-common</include>
-                                </includes>
-                            </artifactSet>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -129,6 +175,11 @@
                                         <exclude>META-INF/ALIAS.MF</exclude>
                                         <exclude>**/module-info.class</exclude>
                                         <exclude>**/META-INF/versions/**</exclude>
+                                        <exclude>META-INF/NOTICE.*</exclude>
+                                        <exclude>META-INF/DEPENDENCIES</exclude>
+                                        <exclude>META-INF/LICENSE</exclude>
+                                        <exclude>META-INF/NOTICE</exclude>
+                                        <exclude>META-INF/LICENSE.*</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

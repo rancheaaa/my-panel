@@ -80,6 +80,9 @@ spring:
   # 激活 profile: 根据 app.mode 自动选择 (standalone 或 cluster)
   profiles:
     active: ${app.mode}
+  config:
+    import:
+      - optional:/tmp/my-panel/admin/common.properties
   sql:
     init:
       schema-locations: classpath:sql/schema.sql,classpath:sql/quartz.sql

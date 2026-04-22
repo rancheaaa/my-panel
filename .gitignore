@@ -53,3 +53,5 @@ jdk-21-*.tar.gz
 jdk-21-*.zip
 nginx-*.tar.gz
 nginx-*.zip
+
+dependency-reduced-pom.xml

@@ -85,7 +85,7 @@
             <includes>
                 <include>application*.yml</include>
                 <include>logback*.xml</include>
-                <include>*.properties</include>
+                <include>common.properties</include>
                 <include>banner.txt</include>
             </includes>
         </fileSet>

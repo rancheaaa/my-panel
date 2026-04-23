@@ -346,7 +346,7 @@ install() {
     fi
 
     if [ "$TARGET" = "app" ] || [ "$TARGET" = "all" ]; then
-        success "Found JAR: $APP_JAR_PATH"
+        success "Found Admin JAR: $APP_JAR_PATH"
     fi
     
     if [ "$TARGET" = "proxy" ] || [ "$TARGET" = "all" ]; then
@@ -354,6 +354,14 @@ install() {
             success "Found Proxy JAR: $PROXY_JAR_PATH"
         else
             warn "Proxy JAR not found. Proxy service will not be available."
+        fi
+    fi
+
+    if [ "$TARGET" = "agent" ] || [ "$TARGET" = "all" ]; then
+        if [ -n "$AGENT_JAR_PATH" ]; then
+            success "Found Agent JAR: $AGENT_JAR_PATH"
+        else
+            warn "Agent JAR not found. Agent service will not be available."
         fi
     fi
     
@@ -549,7 +557,7 @@ do_start_app() {
     MAX_WAIT=120
     COUNT=0
     SUCCESS=0
-    MIN_ALIVE_TIME=30
+    MIN_ALIVE_TIME=60
 
     while [ $COUNT -lt $MAX_WAIT ]; do
         # Check if process is still running
@@ -614,7 +622,7 @@ do_start_proxy() {
     MAX_WAIT=120
     COUNT=0
     SUCCESS=0
-    MIN_ALIVE_TIME=30
+    MIN_ALIVE_TIME=60
 
     while [ $COUNT -lt $MAX_WAIT ]; do
         # Check if process is still running
@@ -679,7 +687,7 @@ do_start_agent() {
     MAX_WAIT=120
     COUNT=0
     SUCCESS=0
-    MIN_ALIVE_TIME=30
+    MIN_ALIVE_TIME=60
 
     while [ $COUNT -lt $MAX_WAIT ]; do
         # Check if process is still running
@@ -1123,11 +1131,11 @@ status() {
             status_line "$APP_NAME" "${GREEN}RUNNING (PID: $PID)${NC}"
 
             # Show listening ports
-            if command -v lsof >/dev/null 2>&1; then
-                PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -n | uniq | xargs)
+            if command -v netstat >/dev/null 2>&1; then
+                PORTS=$(netstat -tlpn 2>/dev/null | grep -w $PID | awk '{print $4}' | awk -F: '{print $NF}' | sort -nu | xargs)
                 info "Listening ports: $PORTS"
-            elif command -v netstat >/dev/null 2>&1; then
-                PORTS=$(netstat -tlpn 2>/dev/null | grep $PID | awk "{print $4}" | awk -F: "{print $NF}" | sort -n | uniq | xargs)
+            elif command -v lsof >/dev/null 2>&1; then
+                PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -nu | xargs)
                 info "Listening ports: $PORTS"
             fi
         else
@@ -1147,13 +1155,13 @@ status() {
                     echo "    - Instance (PID: $PID)"
                     
                     # Show listening ports for each instance
-                    if command -v lsof >/dev/null 2>&1; then
-                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -n | uniq | xargs)
+                    if command -v netstat >/dev/null 2>&1; then
+                        PORTS=$(netstat -tlpn 2>/dev/null | grep -w $PID | awk '{print $4}' | awk -F: '{print $NF}' | sort -nu | xargs)
                         if [ -n "$PORTS" ]; then
                             echo "      Listening ports: $PORTS"
                         fi
-                    elif command -v netstat >/dev/null 2>&1; then
-                        PORTS=$(netstat -tlpn 2>/dev/null | grep $PID | awk "{print $4}" | awk -F: "{print $NF}" | sort -n | uniq | xargs)
+                    elif command -v lsof >/dev/null 2>&1; then
+                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -nu | xargs)
                         if [ -n "$PORTS" ]; then
                             echo "      Listening ports: $PORTS"
                         fi
@@ -1177,13 +1185,13 @@ status() {
                 for PID in "${PIDS[@]}"; do
                     echo "    - Instance (PID: $PID)"
 
-                    if command -v lsof >/dev/null 2>&1; then
-                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -n | uniq | xargs)
+                    if command -v netstat >/dev/null 2>&1; then
+                        PORTS=$(netstat -tlpn 2>/dev/null | grep -w $PID | awk '{print $4}' | awk -F: '{print $NF}' | sort -nu | xargs)
                         if [ -n "$PORTS" ]; then
                             echo "      Listening ports: $PORTS"
                         fi
-                    elif command -v netstat >/dev/null 2>&1; then
-                        PORTS=$(netstat -tlpn 2>/dev/null | grep $PID | awk "{print $4}" | awk -F: "{print $NF}" | sort -n | uniq | xargs)
+                    elif command -v lsof >/dev/null 2>&1; then
+                        PORTS=$(lsof -Pan -p $PID -i tcp -sTCP:LISTEN | awk "NR>1 {print $9}" | cut -d: -f2 | sort -nu | xargs)
                         if [ -n "$PORTS" ]; then
                             echo "      Listening ports: $PORTS"
                         fi
@@ -1196,6 +1204,8 @@ status() {
             status_line "$AGENT_NAME" "${YELLOW}NOT AVAILABLE (JAR not found)${NC}"
         fi
     fi
+
+    printf "\n"
 
     # Check Nginx
     if [ "$TARGET" = "nginx" ] || [ "$TARGET" = "all" ]; then

@@ -2,10 +2,10 @@
 spring:
   datasource:
     # 多进程访问
-    url: jdbc:h2:file:/tmp/my-panel/admin/data/h2.db;MODE=MySQL;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;INIT=CREATE ALIAS IF NOT EXISTS FIND_IN_SET FOR "com.cq.panel.admin.server.common.utils.StringUtils.findInSet"
+    url: jdbc:h2:file:${ROOT_DIR:/tmp/my-panel/admin}/data/h2.db;MODE=MySQL;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;INIT=CREATE ALIAS IF NOT EXISTS FIND_IN_SET FOR "com.cq.panel.admin.server.common.utils.StringUtils.findInSet"
 
     # 单进程访问
-    # url: jdbc:h2:file:/tmp/my-panel/admin/data/h2.db;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE ALIAS IF NOT EXISTS FIND_IN_SET FOR "com.cq.panel.admin.server.common.utils.StringUtils.findInSet"
+    # url: jdbc:h2:file:${ROOT_DIR:/tmp/my-panel/admin}/data/h2.db;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;INIT=CREATE ALIAS IF NOT EXISTS FIND_IN_SET FOR "com.cq.panel.admin.server.common.utils.StringUtils.findInSet"
     driver-class-name: org.h2.Driver
     username: sa
     password:

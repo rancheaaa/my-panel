@@ -300,11 +300,14 @@ exit /b 1
         )
     )
 
-    if /i "%TARGET%"=="app" echo %SUCCESS_PREFIX% Found JAR: %APP_JAR_PATH%
-    if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found JAR: %APP_JAR_PATH%
+    if /i "%TARGET%"=="app" echo %SUCCESS_PREFIX% Found Admin JAR: %APP_JAR_PATH%
+    if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found Admin JAR: %APP_JAR_PATH%
     
     if /i "%TARGET%"=="proxy" echo %SUCCESS_PREFIX% Found Proxy JAR: %PROXY_JAR_PATH%
     if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found Proxy JAR: %PROXY_JAR_PATH%
+
+    if /i "%TARGET%"=="agent" echo %SUCCESS_PREFIX% Found Agent JAR: %AGENT_JAR_PATH%
+    if /i "%TARGET%"=="all" echo %SUCCESS_PREFIX% Found Agent JAR: %AGENT_JAR_PATH%
     
     :: Replace /tmp/my-panel/admin paths with ROOT_DIR in config files
     echo %INFO_PREFIX% Updating configuration paths...
@@ -387,7 +390,7 @@ exit /b 1
     set "MAX_WAIT=120"
     set "COUNT=0"
     set "SUCCESS=0"
-    set "MIN_ALIVE_TIME=30"
+    set "MIN_ALIVE_TIME=60"
 
 :check_app_loop
     set "LISTENING=0"
@@ -459,7 +462,7 @@ exit /b 1
         set "MAX_WAIT=120"
         set "COUNT=0"
         set "SUCCESS=0"
-        set "MIN_ALIVE_TIME=30"
+        set "MIN_ALIVE_TIME=60"
 
 :check_proxy_loop
         set "LISTENING=0"
@@ -530,7 +533,7 @@ exit /b 1
         set "MAX_WAIT=120"
         set "COUNT=0"
         set "SUCCESS=0"
-        set "MIN_ALIVE_TIME=30"
+        set "MIN_ALIVE_TIME=60"
 
 :check_agent_loop
         set "LISTENING=0"
@@ -939,15 +942,14 @@ exit /b 1
             echo   Instances:
             for %%p in (!PROXY_PIDS!) do (
                 echo     - PID: %%p
-                :: Try to get listening ports for each instance
-                netstat -ano | findstr "LISTENING" | findstr " %%p$") >nul
-                if !errorlevel! == 0 (
-                    echo       Listening ports: 
-                    for /f "tokens=2" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr " %%p$" ^| findstr "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*:"') do (
-                        for /f "tokens=2 delims=:" %%b in ("%%a") do (
-                            echo         - %%b
-                        )
+                set "PORT_LIST="
+                for /f "tokens=2" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr " %%p " ^| findstr ":[0-9]*"') do (
+                    for /f "tokens=2 delims=:" %%b in ("%%a") do (
+                        set "PORT_LIST=!PORT_LIST! %%b"
                     )
+                )
+                if defined PORT_LIST (
+                    echo       Listening ports:!PORT_LIST!
                 )
             )
         ) else (
@@ -987,14 +989,14 @@ exit /b 1
             echo   Instances:
             for %%p in (!AGENT_PIDS!) do (
                 echo     - PID: %%p
-                netstat -ano | findstr "LISTENING" | findstr " %%p$") >nul
-                if !errorlevel! == 0 (
-                    echo       Listening ports:
-                    for /f "tokens=2" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr " %%p$" ^| findstr "[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*:"') do (
-                        for /f "tokens=2 delims=:" %%b in ("%%a") do (
-                            echo         - %%b
-                        )
+                set "PORT_LIST="
+                for /f "tokens=2" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr " %%p " ^| findstr ":[0-9]*"') do (
+                    for /f "tokens=2 delims=:" %%b in ("%%a") do (
+                        set "PORT_LIST=!PORT_LIST! %%b"
                     )
+                )
+                if defined PORT_LIST (
+                    echo       Listening ports:!PORT_LIST!
                 )
             )
         ) else (

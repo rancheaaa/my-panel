@@ -7,7 +7,7 @@ app:
   # 版权年份
   copyrightYear: 2026
   # 文件路径 示例（ Windows配置D:/uploadPath，Linux配置 /home/uploadPath）
-  profile: /tmp/my-panel/admin/uploadPath
+  profile: ${ROOT_DIR:/tmp/my-panel/admin}/uploadPath
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -48,7 +48,7 @@ server:
 # 日志配置
 logging:
   file:
-    path: /tmp/my-panel/admin/logs/admin
+    path: ${ROOT_DIR:/tmp/my-panel/admin}/logs/admin
   level:
     com.cq.panel.admin.server: debug
     org.springframework: warn
@@ -82,7 +82,7 @@ spring:
     active: ${app.mode}
   config:
     import:
-      - optional:/tmp/my-panel/admin/config/common.properties
+      - optional:${ROOT_DIR:/tmp/my-panel/admin}/config/common.properties
   sql:
     init:
       schema-locations: classpath:sql/schema.sql,classpath:sql/quartz.sql

@@ -35,10 +35,12 @@ public class AdminPortListener {
             final File initFile = Paths.get(appRootPath, ".init.txt").toAbsolutePath().toFile();
             if (!initFile.exists()) {
                 final boolean result = initFile.createNewFile();
-                logger.info("创建初始化文件.init.txt :[{}]", result ? "成功" : "失败");
+                logger.info("第一次初始化程序数据库，创建初始化标志完成文件.init.txt :[{}]", result ? "成功" : "失败");
+            } else {
+                logger.info("初始化标志完成文件.init.txt 已存在，数据库已初始化成功");
             }
         } catch (IOException e) {
-            logger.error("创建初始化文件失败", e);
+            logger.error("创建初始化标志完成文件.init.txt 失败", e);
         }
     }
 }

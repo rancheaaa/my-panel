@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.DefaultedRedisConnection;
@@ -29,6 +31,8 @@ import java.util.*;
 @RequestMapping("/monitor/cache")
 public class CacheController
 {
+    private static final Logger logger = LoggerFactory.getLogger(CacheController.class);
+
     private final RedisTemplate<String, String> redisTemplate;
 
     private final CacheService cacheService;
@@ -100,41 +104,58 @@ public class CacheController
     {
         List<SysCacheVO> list = new ArrayList<>();
         for (SysCache cache : caches) {
-            list.add(new SysCacheVO(cache.getCacheName(), cache.getRemark()));
+            final SysCacheVO sysCacheVO = new SysCacheVO(cache.getCacheName(), cache.getRemark());
+            sysCacheVO.setCacheKey(cache.getCacheKey());
+            sysCacheVO.setRemark(cache.getRemark());
+            sysCacheVO.setCacheName(cache.getCacheName());
+            list.add(sysCacheVO);
         }
         return Result.success(list);
     }
 
     @RequirePermission("monitor:cache:list")
-    @Operation(summary = "获取缓存键名列表", description = "根据缓存名称获取键名列表")
-    @GetMapping("/getKeys/{cacheName}")
-    public Result<List<SysCacheVO>> getCacheKeys(@Parameter(description = "缓存名称", required = true) @PathVariable String cacheName)
+    @Operation(summary = "获取缓存键名列表", description = "根据缓存键名获取匹配的键名列表")
+    @GetMapping("/getKeys")
+    public Result<List<SysCacheVO>> getCacheKeys(@Parameter(description = "缓存键名", required = true) @RequestParam String cacheKey)
     {
-        Collection<String> cacheKeys = cacheService.keys(cacheName + "*");
-        List<SysCacheVO> list = new ArrayList<>();
-        if (StringUtils.isNotEmpty(cacheKeys))
-        {
-            for (String cacheKey : cacheKeys)
+        try {
+            String pattern = cacheKey.endsWith("*") ? cacheKey : cacheKey + "*";
+            logger.info("cacheKey: [{}], pattern: [{}]", cacheKey, pattern);
+            Collection<String> cacheKeys = cacheService.keys(pattern);
+            logger.info("Found {} keys for pattern: {}", cacheKeys != null ? cacheKeys.size() : 0, pattern);
+            List<SysCacheVO> list = new ArrayList<>();
+            if (cacheKeys != null && StringUtils.isNotEmpty(cacheKeys))
             {
-                SysCacheVO sysCache = new SysCacheVO(cacheName, cacheKey, "");
-                sysCache.setCacheKey(cacheKey);
-                sysCache.setTtl(String.valueOf(cacheService.getExpire(cacheKey)));
-                list.add(sysCache);
+                for (String key : cacheKeys)
+                {
+                    SysCacheVO sysCache = new SysCacheVO(cacheKey, key, "");
+                    sysCache.setCacheKey(key);
+                    sysCache.setTtl(String.valueOf(cacheService.getExpire(key)));
+                    list.add(sysCache);
+                }
             }
+            return Result.success(list);
+        } catch (Exception e) {
+            logger.error("获取缓存键名失败", e);
+            return Result.error("获取缓存键名失败: " + e.getMessage());
         }
-        return Result.success(list);
     }
 
     @RequirePermission("monitor:cache:list")
-    @Operation(summary = "获取缓存内容", description = "根据缓存名称和键名获取缓存内容")
-    @GetMapping("/getValue/{cacheName}/{cacheKey}")
-    public Result<SysCacheVO> getCacheValue(@Parameter(description = "缓存名称", required = true) @PathVariable String cacheName, 
-                                            @Parameter(description = "缓存键名", required = true) @PathVariable String cacheKey)
+    @Operation(summary = "获取缓存内容", description = "根据缓存键名获取缓存内容")
+    @GetMapping("/getValue")
+    public Result<SysCacheVO> getCacheValue(@Parameter(description = "缓存键名", required = true) @RequestParam String cacheKey)
     {
-        Object cacheValue = cacheService.get(cacheKey);
-        SysCacheVO sysCache = new SysCacheVO(cacheName, cacheKey, cacheValue == null ? "" : cacheValue.toString());
-        sysCache.setTtl(String.valueOf(cacheService.getExpire(cacheKey)));
-        return Result.success(sysCache);
+        try {
+            logger.info("cacheKey: [{}]", cacheKey);
+            Object cacheValue = cacheService.get(cacheKey);
+            SysCacheVO sysCache = new SysCacheVO("", cacheKey, cacheValue == null ? "" : cacheValue.toString());
+            sysCache.setTtl(String.valueOf(cacheService.getExpire(cacheKey)));
+            return Result.success(sysCache);
+        } catch (Exception e) {
+            logger.error("获取缓存内容失败", e);
+            return Result.error("获取缓存内容失败: " + e.getMessage());
+        }
     }
 
     @RequirePermission("monitor:cache:list")
@@ -142,7 +163,7 @@ public class CacheController
     @DeleteMapping("/clearCacheName/{cacheName}")
     public Result<Void> clearCacheName(@Parameter(description = "缓存名称", required = true) @PathVariable String cacheName)
     {
-        Collection<String> keys = cacheService.keys(cacheName + "*");
+        Collection<String> keys = cacheService.keys(cacheName + ":*");
         cacheService.delete(keys);
         return Result.success();
     }

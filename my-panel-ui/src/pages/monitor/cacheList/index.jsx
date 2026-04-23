@@ -47,15 +47,15 @@ const CacheList = () => {
     }
   };
 
-  const fetchCacheKeys = async (name, isRefresh = false) => {
+  const fetchCacheKeys = async (cacheKey, isRefresh = false) => {
     setLoadingKeys(true);
-    setCurrentCacheName(name);
+    setCurrentCacheName(cacheKey);
     if (!isRefresh) {
       setCacheKeys([]); // Clear previous keys
       setCacheValueData({ cacheName: '', cacheKey: '', cacheValue: '', ttl: '' }); // Clear content
     }
     try {
-      const res = await listCacheKey(name);
+      const res = await listCacheKey(cacheKey);
       if (res.code === 200) {
         setCacheKeys(res.data);
       }
@@ -66,12 +66,12 @@ const CacheList = () => {
     }
   };
 
-  const handleClearCacheName = async (name) => {
+  const handleClearCacheName = async (cacheKey) => {
       try {
-          await clearCacheName(name);
+          await clearCacheName(cacheKey);
           message.success('清理成功');
           fetchCacheNames();
-          if (currentCacheName === name) {
+          if (currentCacheName === cacheKey) {
               setCacheKeys([]);
               setCurrentCacheName('');
               setCacheValueData({ cacheName: '', cacheKey: '', cacheValue: '', ttl: '' });
@@ -112,7 +112,7 @@ const CacheList = () => {
       const key = record.cacheKey;
       const ttl = record.ttl;
       try {
-          const res = await getCacheValue(currentCacheName, key);
+          const res = await getCacheValue(key);
           if (res.code === 200) {
               let formattedValue = res.data.cacheValue;
               try {
@@ -144,8 +144,7 @@ const CacheList = () => {
                   // Keep as is
               }
               setCacheValueData({ 
-                  ...res.data,
-                  cacheName: currentCacheName, 
+                  cacheName: record.cacheName,
                   cacheKey: key, 
                   cacheValue: formattedValue !== undefined && formattedValue !== null ? formattedValue : '', 
                   ttl: (res.data.ttl !== undefined && res.data.ttl !== null && res.data.ttl !== '') ? res.data.ttl : ttl 
@@ -174,9 +173,9 @@ const CacheList = () => {
   };
 
 
-  const filteredCacheNames = cacheNames.filter(item => 
-      item.cacheName.toLowerCase().includes(nameFilter.toLowerCase()) || 
-      (item.remark && item.remark.toLowerCase().includes(nameFilter.toLowerCase()))
+  const filteredCacheNames = cacheNames.filter(item =>
+      (item.cacheKey && item.cacheKey.toLowerCase().includes(nameFilter.toLowerCase())) ||
+      (item.cacheName && item.cacheName.toLowerCase().includes(nameFilter.toLowerCase()))
   );
 
   const filteredCacheKeys = cacheKeys.filter(item => 
@@ -185,8 +184,8 @@ const CacheList = () => {
 
   const columnsName = [
     { title: '序号', render: (text, record, index) => index + 1, width: 60, align: 'center' },
+    { title: '缓存键名前缀', dataIndex: 'cacheKey', key: 'cacheKey', width: 200, ellipsis: true },
     { title: '缓存名称', dataIndex: 'cacheName', key: 'cacheName', width: 150, ellipsis: true },
-    { title: '备注', dataIndex: 'remark', key: 'remark', width: 150, ellipsis: true },
     {
       title: '操作',
       key: 'action',
@@ -194,7 +193,7 @@ const CacheList = () => {
       align: 'center',
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" icon={<DeleteOutlined />} danger onClick={(e) => { e.stopPropagation(); handleClearCacheName(record.cacheName); }} />
+        <Button type="link" icon={<DeleteOutlined />} danger onClick={(e) => { e.stopPropagation(); handleClearCacheName(record.cacheKey); }} />
       ),
     },
   ];
@@ -242,8 +241,8 @@ const CacheList = () => {
               loading={loadingNames}
               pagination={false}
               onRow={(record) => ({
-                onClick: () => fetchCacheKeys(record.cacheName),
-                style: { cursor: 'pointer', backgroundColor: currentCacheName === record.cacheName ? '#e6f7ff' : '' }
+                onClick: () => fetchCacheKeys(record.cacheKey),
+                style: { cursor: 'pointer', backgroundColor: currentCacheName === record.cacheKey ? '#e6f7ff' : '' }
               })}
               scroll={{ x: 420, y: 'calc(100vh - 280px)' }}
               size="small"

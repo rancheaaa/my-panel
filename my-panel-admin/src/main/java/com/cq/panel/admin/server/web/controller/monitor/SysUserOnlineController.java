@@ -52,7 +52,7 @@ public class SysUserOnlineController extends BaseController
     @GetMapping("/list")
     public Result<PageVO<SysUserOnlineVO>> list(@Parameter(description = "查询条件") SysUserOnlineQueryDTO query)
     {
-        Collection<String> keys = cacheService.keys(CacheConstants.LOGIN_TOKEN_KEY + "*");
+        Collection<String> keys = cacheService.keys(CacheConstants.LOGIN_TOKEN_KEY + ":*");
         List<SysUserOnline> userOnlineList = new ArrayList<>();
         for (String key : keys)
         {
@@ -95,7 +95,7 @@ public class SysUserOnlineController extends BaseController
     @DeleteMapping("/{tokenId}")
     public Result<Void> forceLogout(@Parameter(description = "会话编号", required = true) @PathVariable String tokenId)
     {
-        cacheService.delete(CacheConstants.LOGIN_TOKEN_KEY + tokenId);
+        cacheService.delete(CacheConstants.LOGIN_TOKEN_KEY + ":" + tokenId);
         return Result.success();
     }
 }

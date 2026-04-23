@@ -238,6 +238,6 @@ public class DictUtils
      */
     public static String getCacheKey(String configKey)
     {
-        return CacheConstants.SYS_DICT_KEY + configKey;
+        return CacheConstants.SYS_DICT_KEY + ":" + configKey;
     }
 }

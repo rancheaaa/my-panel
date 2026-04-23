@@ -38,7 +38,7 @@ public class SysPasswordService
      */
     private String getCacheKey(String username)
     {
-        return CacheConstants.PWD_ERR_CNT_KEY + username;
+        return CacheConstants.PWD_ERR_CNT_KEY + ":" + username;
     }
 
     public void validate(SysUser user)

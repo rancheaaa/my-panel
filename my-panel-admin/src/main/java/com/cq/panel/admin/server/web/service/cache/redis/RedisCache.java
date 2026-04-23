@@ -1,14 +1,12 @@
 package com.cq.panel.admin.server.web.service.cache.redis;
 
 import com.cq.panel.admin.server.web.service.cache.CacheService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
-
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -22,8 +20,11 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(name = "app.mode", havingValue = "cluster")
 public class RedisCache implements CacheService
 {
-    @Autowired
-    public RedisTemplate redisTemplate;
+    public final RedisTemplate redisTemplate;
+
+    public RedisCache(RedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
     /**
      * 缓存基本的对象，Integer、String、实体类等
@@ -111,7 +112,7 @@ public class RedisCache implements CacheService
     /**
      * 删除单个对象
      *
-     * @param key
+     * @param key 缓存键值
      */
     public boolean delete(final String key)
     {
@@ -122,7 +123,7 @@ public class RedisCache implements CacheService
      * 删除集合对象
      *
      * @param collection 多个对象
-     * @return
+     * @return true=删除成功；false=删除失败
      */
     public boolean delete(final Collection collection)
     {
@@ -163,10 +164,8 @@ public class RedisCache implements CacheService
     public <T> BoundSetOperations<String, T> setSet(final String key, final Set<T> dataSet)
     {
         BoundSetOperations<String, T> setOperation = redisTemplate.boundSetOps(key);
-        Iterator<T> it = dataSet.iterator();
-        while (it.hasNext())
-        {
-            setOperation.add(it.next());
+        for (T t : dataSet) {
+            setOperation.add(t);
         }
         return setOperation;
     }
@@ -174,8 +173,8 @@ public class RedisCache implements CacheService
     /**
      * 获得缓存的set
      *
-     * @param key
-     * @return
+     * @param key 缓存键值
+     * @return 缓存键值对应的数据
      */
     public <T> Set<T> getSet(final String key)
     {
@@ -185,8 +184,8 @@ public class RedisCache implements CacheService
     /**
      * 缓存Map
      *
-     * @param key
-     * @param dataMap
+     * @param key 缓存键值
+     * @param dataMap 缓存的数据
      */
     public <T> void setMap(final String key, final Map<String, T> dataMap)
     {
@@ -198,8 +197,8 @@ public class RedisCache implements CacheService
     /**
      * 获得缓存的Map
      *
-     * @param key
-     * @return
+     * @param key 缓存键值
+     * @return 缓存键值对应的数据
      */
     public <T> Map<String, T> getMap(final String key)
     {
@@ -209,7 +208,7 @@ public class RedisCache implements CacheService
     /**
      * 往Hash中存入数据
      *
-     * @param key Redis键
+     * @param key 缓存键值
      * @param hKey Hash键
      * @param value 值
      */

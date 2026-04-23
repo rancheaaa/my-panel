@@ -189,7 +189,7 @@ public class SysConfigServiceImpl implements ISysConfigService
     @Override
     public void clearConfigCache()
     {
-        Collection<String> keys = cacheService.keys(CacheConstants.SYS_CONFIG_KEY + "*");
+        Collection<String> keys = cacheService.keys(CacheConstants.SYS_CONFIG_KEY + ":*");
         cacheService.delete(keys);
     }
 
@@ -229,6 +229,6 @@ public class SysConfigServiceImpl implements ISysConfigService
      */
     private String getCacheKey(String configKey)
     {
-        return CacheConstants.SYS_CONFIG_KEY + configKey;
+        return CacheConstants.SYS_CONFIG_KEY + ":" + configKey;
     }
 }

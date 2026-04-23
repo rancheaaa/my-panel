@@ -230,6 +230,6 @@ public class TokenService
 
     private String getTokenKey(String uuid)
     {
-        return CacheConstants.LOGIN_TOKEN_KEY + uuid;
+        return CacheConstants.LOGIN_TOKEN_KEY + ":" + uuid;
     }
 }

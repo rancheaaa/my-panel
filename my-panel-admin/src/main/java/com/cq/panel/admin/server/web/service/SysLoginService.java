@@ -93,7 +93,7 @@ public class SysLoginService
         boolean captchaEnabled = configService.selectCaptchaEnabled();
         if (captchaEnabled)
         {
-            String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");
+            String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + ":" + StringUtils.nvl(uuid, "");
             String captcha = cacheService.get(verifyKey);
             if (captcha == null)
             {

@@ -62,7 +62,7 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
         String submitKey = StringUtils.trimToEmpty(request.getHeader(header));
 
         // 唯一标识（指定key + url + 消息头）
-        String cacheRepeatKey = CacheConstants.REPEAT_SUBMIT_KEY + url + submitKey;
+        String cacheRepeatKey = CacheConstants.REPEAT_SUBMIT_KEY + ":" + url + submitKey;
 
         Object sessionObj = cacheService.get(cacheRepeatKey);
         if (sessionObj != null)

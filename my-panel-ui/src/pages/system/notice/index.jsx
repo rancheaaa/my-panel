@@ -70,7 +70,7 @@ const Notice = () => {
         title: '操作',
         key: 'action',
         align: 'center',
-        width: getWidth('action', 160),
+        width: getWidth('action', 250),
         fixed: 'right',
         render: (_, record) => (
           <Space size="middle">

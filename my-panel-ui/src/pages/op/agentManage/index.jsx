@@ -409,7 +409,7 @@ const AgentManage = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 300,
+      width: 400,
       fixed: 'right',
       render: (_, record) => (
         <Space size="middle">

@@ -206,7 +206,7 @@ const DictData = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 160,
+      width: 200,
       fixed: 'right',
       render: (_, record) => (
         <Space size="middle">

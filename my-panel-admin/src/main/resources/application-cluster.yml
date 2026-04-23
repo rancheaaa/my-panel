@@ -12,7 +12,7 @@ spring:
             master:
                 url: ${common.datasource.url:jdbc:mysql://172.19.200.130:3306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&serverTimezone=Asia/Shanghai}
                 username: ${common.datasource.username:root}
-                password: ${common.datasource.password:!Cq199606}
+                password: ${common.datasource.password:123456}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭

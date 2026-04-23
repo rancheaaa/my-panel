@@ -9,7 +9,13 @@ public class SystemEnvUtils {
 
     public static final String PROJECT_ROOT_PATH_KEY = "ROOT_DIR";
 
+    public static final String SPRING_SQL_INIT_MODE = "SPRING_SQL_INIT_MODE";
+
     public static String getProjectRootPath() {
         return System.getenv(PROJECT_ROOT_PATH_KEY);
+    }
+
+    public static String getSpringSqlInitMode() {
+        return System.getenv(SPRING_SQL_INIT_MODE);
     }
 }

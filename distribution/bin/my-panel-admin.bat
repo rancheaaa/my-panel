@@ -21,6 +21,9 @@ set "AGENT_JAR_PATTERN=agent*.jar"
 set "AGENT_WINDOW_TITLE=MyPanelAgentServer"
 set "BIN_DIR=%~dp0"
 set "ROOT_DIR=%BIN_DIR%.."
+if exist "%ROOT_DIR%\.init.txt" (
+    set "SPRING_SQL_INIT_MODE=never"
+)
 set "NGINX_PORT=8888"
 if exist "%ROOT_DIR%\config\application.yml" (
     for /f "tokens=2 delims=: " %%i in ('findstr /r /c:"^[ ]*nginx-port:" "%ROOT_DIR%\config\application.yml"') do (

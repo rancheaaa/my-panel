@@ -50,6 +50,10 @@ if [ ! -d "$ROOT_DIR/nginx" ] && [ -d "$(dirname "$ROOT_DIR")/nginx" ]; then
     ROOT_DIR=$(dirname "$ROOT_DIR")
 fi
 
+if [ -f "$ROOT_DIR/.init.txt" ]; then
+    export SPRING_SQL_INIT_MODE=never
+fi
+
 # export env variable
 export ROOT_DIR
 

@@ -82,7 +82,7 @@ spring:
     active: ${app.mode}
   config:
     import:
-      - optional:/tmp/my-panel/admin/common.properties
+      - optional:/tmp/my-panel/admin/config/common.properties
   sql:
     init:
       schema-locations: classpath:sql/schema.sql,classpath:sql/quartz.sql

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.MonitorAlertRuleMapper">
+
+    <resultMap id="MonitorAlertRuleResult" type="com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule">
+        <id property="id" column="id"/>
+        <result property="ruleName" column="rule_name"/>
+        <result property="metricCategory" column="metric_category"/>
+        <result property="metricName" column="metric_name"/>
+        <result property="metricScope" column="metric_scope"/>
+        <result property="operator" column="operator"/>
+        <result property="thresholdValue" column="threshold_value"/>
+        <result property="durationSeconds" column="duration_seconds"/>
+        <result property="severity" column="severity"/>
+        <result property="enabled" column="enabled"/>
+        <result property="description" column="description"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="MonitorAlertRuleResult">
+        select *
+        from monitor_alert_rule
+        order by id desc
+    </select>
+
+    <select id="selectEnabledRules" resultMap="MonitorAlertRuleResult">
+        select *
+        from monitor_alert_rule
+        where enabled = '1'
+        order by id asc
+    </select>
+
+    <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule" useGeneratedKeys="true" keyProperty="id">
+        insert into monitor_alert_rule
+        (rule_name, metric_category, metric_name, metric_scope, operator, threshold_value, duration_seconds, severity, enabled, description, create_by, create_time, update_by, update_time)
+        values
+        (#{ruleName}, #{metricCategory}, #{metricName}, #{metricScope}, #{operator}, #{thresholdValue}, #{durationSeconds}, #{severity}, #{enabled}, #{description}, #{createBy}, now(), #{updateBy}, now())
+    </insert>
+
+    <update id="update" parameterType="com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule">
+        update monitor_alert_rule
+        <set>
+            <if test="ruleName != null">rule_name = #{ruleName},</if>
+            <if test="metricCategory != null">metric_category = #{metricCategory},</if>
+            <if test="metricName != null">metric_name = #{metricName},</if>
+            <if test="metricScope != null">metric_scope = #{metricScope},</if>
+            <if test="operator != null">operator = #{operator},</if>
+            <if test="thresholdValue != null">threshold_value = #{thresholdValue},</if>
+            <if test="durationSeconds != null">duration_seconds = #{durationSeconds},</if>
+            <if test="severity != null">severity = #{severity},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = now()
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        delete from monitor_alert_rule where id = #{id}
+    </delete>
+</mapper>

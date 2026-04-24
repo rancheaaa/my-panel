@@ -620,3 +620,66 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_version_data` (
     KEY `idx_version_id9` (`version_id`),
     KEY `idx_data_type9` (`data_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本数据表';
+
+-- ----------------------------
+-- 7. 服务监控大屏 - 历史指标与告警
+-- ----------------------------
+
+CREATE TABLE IF NOT EXISTS `monitor_metric_sample` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `metric_category` varchar(64) NOT NULL COMMENT '指标分类：heap/gc/thread/cpu/system_load/db_pool',
+    `metric_name` varchar(128) NOT NULL COMMENT '指标名称',
+    `metric_scope` varchar(128) DEFAULT '' COMMENT '指标作用域：young/old/eden/survivor/poolName/gcName等',
+    `metric_value` double NOT NULL COMMENT '指标值',
+    `metric_unit` varchar(32) DEFAULT '' COMMENT '指标单位：bytes/ms/count/percent等',
+    `tag_json` varchar(1000) DEFAULT NULL COMMENT '扩展标签JSON',
+    `sample_time` datetime NOT NULL COMMENT '采样时间',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_mms_time` (`sample_time`),
+    KEY `idx_mms_category_name_time` (`metric_category`, `metric_name`, `sample_time`),
+    KEY `idx_mms_scope_time` (`metric_scope`, `sample_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控指标采样明细';
+
+CREATE TABLE IF NOT EXISTS `monitor_alert_rule` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '规则ID',
+    `rule_name` varchar(128) NOT NULL COMMENT '规则名称',
+    `metric_category` varchar(64) NOT NULL COMMENT '指标分类',
+    `metric_name` varchar(128) NOT NULL COMMENT '指标名称',
+    `metric_scope` varchar(128) DEFAULT '' COMMENT '指标作用域',
+    `operator` varchar(16) NOT NULL COMMENT '比较符：GT/GTE/LT/LTE/EQ/NE',
+    `threshold_value` double NOT NULL COMMENT '阈值',
+    `duration_seconds` int(11) NOT NULL DEFAULT 0 COMMENT '持续时长（秒）',
+    `severity` varchar(16) NOT NULL DEFAULT 'warning' COMMENT '级别：warning/critical',
+    `enabled` char(1) NOT NULL DEFAULT '1' COMMENT '启用状态（1启用 0禁用）',
+    `description` varchar(500) DEFAULT '' COMMENT '规则描述',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_mar_enabled` (`enabled`),
+    KEY `idx_mar_metric` (`metric_category`, `metric_name`, `metric_scope`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控告警规则';
+
+CREATE TABLE IF NOT EXISTS `monitor_alert_event` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '事件ID',
+    `rule_id` bigint(20) NOT NULL COMMENT '规则ID',
+    `rule_name` varchar(128) NOT NULL COMMENT '规则名称',
+    `metric_category` varchar(64) NOT NULL COMMENT '指标分类',
+    `metric_name` varchar(128) NOT NULL COMMENT '指标名称',
+    `metric_scope` varchar(128) DEFAULT '' COMMENT '指标作用域',
+    `severity` varchar(16) NOT NULL COMMENT '告警级别',
+    `observed_value` double NOT NULL COMMENT '触发时指标值',
+    `threshold_value` double NOT NULL COMMENT '触发阈值',
+    `trigger_time` datetime NOT NULL COMMENT '触发时间',
+    `status` varchar(16) NOT NULL DEFAULT 'open' COMMENT '状态：open/closed',
+    `detail` varchar(1000) DEFAULT '' COMMENT '告警详情',
+    PRIMARY KEY (`id`),
+    KEY `idx_mae_trigger_time` (`trigger_time`),
+    KEY `idx_mae_metric` (`metric_category`, `metric_name`, `metric_scope`),
+    KEY `idx_mae_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控告警事件';
+
+-- 分区建议（MySQL生产环境可启用，H2无需启用）：
+-- ALTER TABLE monitor_metric_sample PARTITION BY RANGE (TO_DAYS(sample_time)) (...)

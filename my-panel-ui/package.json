@@ -22,6 +22,7 @@
     "axios": "^1.13.4",
     "dayjs": "^1.11.19",
     "driver.js": "^1.4.0",
+    "echarts": "^6.0.0",
     "framer-motion": "^12.33.0",
     "js-md5": "^0.8.3",
     "mockjs": "^1.1.0",

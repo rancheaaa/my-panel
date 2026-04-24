@@ -5,7 +5,10 @@ INSERT IGNORE INTO `sys_config` VALUES (1, '主框架页-默认皮肤样式名�
        (5, '账号自助-是否开启用户注册功能', 'sys.account.registerUser', 'false', 'Y', 'admin', '2026-02-07 14:13:10.0', '', NULL, '是否开启注册用户功能（true开启，false关闭）'),
        (6, '用户登录-黑名单列表', 'sys.login.blackIPList', '', 'Y', 'admin', '2026-02-07 14:13:10.0', '', NULL, '设置登录IP黑名单限制，多个匹配项以;分隔，支持匹配（*通配、网段）'),
        (7, '系统监控-是否显示Swagger文档', 'sys.monitor.showSwagger', 'false', 'Y', 'admin', '2026-02-12 14:13:10.0', '', NULL, '是否在服务监控页面显示Swagger文档按钮（true显示，false隐藏）'),
-       (8, '系统监控-是否显示Actuator监控', 'sys.monitor.showActuator', 'false', 'Y', 'admin', '2026-02-12 14:13:10.0', '', NULL, '是否在服务监控页面显示Actuator监控按钮（true显示，false隐藏）');
+       (8, '系统监控-是否显示Actuator监控', 'sys.monitor.showActuator', 'false', 'Y', 'admin', '2026-02-12 14:13:10.0', '', NULL, '是否在服务监控页面显示Actuator监控按钮（true显示，false隐藏）'),
+       (9, '系统监控-采集间隔毫秒', 'sys.monitor.collectIntervalMs', '10000', 'Y', 'admin', NOW(), '', NULL, '服务监控采集间隔，默认10000毫秒'),
+       (10, '系统监控-历史保留天数', 'sys.monitor.retentionDays', '7', 'Y', 'admin', NOW(), '', NULL, '监控历史数据保留天数，默认7天'),
+       (11, '系统监控-查询最大点数', 'sys.monitor.maxPoints', '2000', 'Y', 'admin', NOW(), '', NULL, '单次趋势查询最多返回点数');
 
 INSERT IGNORE INTO `sys_dept` VALUES (100, 0, '0', '总部', 0, '刘邦', '15888888888', 'liubang@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:18:01.0'),
        (101, 100, '0,100', '深圳总公司', 1, '若依', '15888888888', 'ry@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', '', NULL),
@@ -18,6 +21,12 @@ INSERT IGNORE INTO `sys_dept` VALUES (100, 0, '0', '总部', 0, '刘邦', '15888
        (108, 102, '0,100,102', '市场部门', 1, '若依', '15888888888', 'ry@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', '', NULL),
        (109, 102, '0,100,102', '财务部门', 2, '若依', '15888888888', 'ry@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', '', NULL),
        (200, 100, '0,100', '上海分公司', 5, NULL, NULL, NULL, '0', '0', 'admin', '2026-02-07 18:18:26.0', '', NULL);
+
+INSERT IGNORE INTO `monitor_alert_rule` (`id`, `rule_name`, `metric_category`, `metric_name`, `metric_scope`, `operator`, `threshold_value`, `duration_seconds`, `severity`, `enabled`, `description`, `create_by`, `create_time`, `update_by`, `update_time`)
+VALUES
+       (1, 'CPU使用率过高', 'cpu', 'cpu_usage_pct', '', 'GT', 85, 60, 'warning', '1', 'CPU使用率超过85%持续60秒触发告警', 'admin', NOW(), 'admin', NOW()),
+       (2, '堆内存使用率过高', 'heap', 'heap_usage_pct', '', 'GT', 90, 60, 'critical', '1', '堆内存使用率超过90%持续60秒触发告警', 'admin', NOW(), 'admin', NOW()),
+       (3, '连接池等待连接过多', 'db_pool', 'pool_pending_threads', '', 'GT', 10, 30, 'warning', '1', '连接池等待线程超过10持续30秒触发告警', 'admin', NOW(), 'admin', NOW());
 
 INSERT IGNORE INTO `sys_dict_data` VALUES
        (1, 1, '男', '0', 'sys_user_sex', '', '', 'Y', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '性别男'),

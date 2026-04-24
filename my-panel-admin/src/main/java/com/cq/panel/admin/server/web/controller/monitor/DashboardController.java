@@ -1,16 +1,17 @@
 package com.cq.panel.admin.server.web.controller.monitor;
 
-import com.cq.panel.admin.server.repository.service.IServerService;
+import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent;
+import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule;
+import com.cq.panel.admin.server.repository.service.IMonitorDashboardService;
+import com.cq.panel.admin.server.web.domain.dto.monitor.MetricTrendQueryDTO;
+import com.cq.panel.admin.server.web.domain.dto.monitor.MonitorAlertRuleSaveDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
-import com.cq.panel.admin.server.web.domain.vo.monitor.ServerVO;
+import com.cq.panel.authlite.annotation.RequirePermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.cq.panel.authlite.annotation.RequirePermission;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -23,61 +24,68 @@ import java.util.Map;
 @RequestMapping("/monitor/dashboard")
 public class DashboardController
 {
-    private final IServerService serverService;
+    private final IMonitorDashboardService monitorDashboardService;
 
-    public DashboardController(IServerService serverService) {
-        this.serverService = serverService;
+    public DashboardController(IMonitorDashboardService monitorDashboardService) {
+        this.monitorDashboardService = monitorDashboardService;
     }
 
     @RequirePermission("monitor:server:list")
-    @Operation(summary = "获取服务监控大屏数据", description = "获取服务监控大屏的实时监控数据")
+    @Operation(summary = "获取服务监控大屏数据(兼容接口)", description = "获取服务监控大屏的实时监控数据，兼容历史接口")
     @GetMapping("/data")
     public Result<Map<String, Object>> getDashboardData() throws Exception
     {
-        ServerVO serverInfo = serverService.getServerInfo();
-        Map<String, Object> result = new HashMap<>();
+        return Result.success(monitorDashboardService.collectSnapshotAndPersist());
+    }
 
-        Map<String, Object> basicStats = new HashMap<>();
-        basicStats.put("cpuUsage", serverInfo.getCpu().getUsed());
-        basicStats.put("cpuCore", serverInfo.getCpu().getCpuNum());
-        basicStats.put("memUsage", serverInfo.getMem().getUsage());
-        basicStats.put("memTotal", serverInfo.getMem().getTotal());
-        basicStats.put("memUsed", serverInfo.getMem().getUsed());
-        basicStats.put("jvmUsage", serverInfo.getJvm().getUsage());
-        basicStats.put("jvmTotal", serverInfo.getJvm().getTotal());
-        basicStats.put("jvmUsed", serverInfo.getJvm().getUsed());
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "获取监控大屏总览", description = "返回最近采样时间的完整指标总览和告警概览")
+    @GetMapping("/overview")
+    public Result<Map<String, Object>> getOverview()
+    {
+        return Result.success(monitorDashboardService.getDashboardOverview());
+    }
 
-        Map<String, Object> serviceStatus = new HashMap<>();
-        serviceStatus.put("serverName", serverInfo.getSys().getComputerName());
-        serviceStatus.put("serverIp", serverInfo.getSys().getComputerIp());
-        serviceStatus.put("osName", serverInfo.getSys().getOsName());
-        serviceStatus.put("osArch", serverInfo.getSys().getOsArch());
-        serviceStatus.put("jvmName", serverInfo.getJvm().getName());
-        serviceStatus.put("jvmVersion", serverInfo.getJvm().getVersion());
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "获取监控指标趋势", description = "支持按分类、指标名、时间范围和粒度查询趋势")
+    @PostMapping("/trend")
+    public Result<Map<String, Object>> getTrend(@RequestBody MetricTrendQueryDTO queryDTO)
+    {
+        return Result.success(monitorDashboardService.getTrend(queryDTO));
+    }
 
-        Map<String, Object> healthStatus = new HashMap<>();
-        double cpuUsage = serverInfo.getCpu().getUsed();
-        double memUsage = serverInfo.getMem().getUsage();
-        double jvmUsage = serverInfo.getJvm().getUsage();
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "获取告警规则列表")
+    @GetMapping("/alert/rules")
+    public Result<List<MonitorAlertRule>> listAlertRules()
+    {
+        return Result.success(monitorDashboardService.listAlertRules());
+    }
 
-        if (cpuUsage > 90 || memUsage > 90 || jvmUsage > 90) {
-            healthStatus.put("status", "critical");
-            healthStatus.put("level", 3);
-        } else if (cpuUsage > 70 || memUsage > 80 || jvmUsage > 80) {
-            healthStatus.put("status", "warning");
-            healthStatus.put("level", 2);
-        } else {
-            healthStatus.put("status", "normal");
-            healthStatus.put("level", 1);
-        }
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "新增或更新告警规则")
+    @PostMapping("/alert/rule")
+    public Result<Void> saveAlertRule(@RequestBody MonitorAlertRuleSaveDTO dto)
+    {
+        monitorDashboardService.saveAlertRule(dto, "system");
+        return Result.success();
+    }
 
-        result.put("basicStats", basicStats);
-        result.put("serviceStatus", serviceStatus);
-        result.put("healthStatus", healthStatus);
-        result.put("diskInfo", serverInfo.getSysFiles());
-        result.put("cpuHistory", serverInfo.getCpu());
-        result.put("memHistory", serverInfo.getMem());
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "删除告警规则")
+    @DeleteMapping("/alert/rule/{id}")
+    public Result<Void> deleteAlertRule(@PathVariable("id") Long id)
+    {
+        monitorDashboardService.deleteAlertRule(id);
+        return Result.success();
+    }
 
-        return Result.success(result);
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "获取告警事件")
+    @GetMapping("/alert/events")
+    public Result<List<MonitorAlertEvent>> listAlertEvents(@RequestParam(value = "range", required = false, defaultValue = "1h") String range,
+                                                           @RequestParam(value = "limit", required = false, defaultValue = "200") Integer limit)
+    {
+        return Result.success(monitorDashboardService.listAlertEvents(range, limit));
     }
 }

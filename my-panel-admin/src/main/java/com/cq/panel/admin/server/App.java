@@ -3,6 +3,7 @@ package com.cq.panel.admin.server;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import de.codecentric.boot.admin.server.config.EnableAdminServer;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 启动程序
@@ -10,6 +11,7 @@ import de.codecentric.boot.admin.server.config.EnableAdminServer;
  * @author cq
  */
 @EnableAdminServer
+@EnableScheduling
 @SpringBootApplication(scanBasePackages = { "com.cq.panel.admin.server", "com.cq.panel.authlite" })
 public class App
 {

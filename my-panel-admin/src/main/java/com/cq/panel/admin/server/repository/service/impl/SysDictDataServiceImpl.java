@@ -38,6 +38,12 @@ public class SysDictDataServiceImpl implements ISysDictDataService
         return dictDataMapper.selectDictDataList(dictData);
     }
 
+    @Override
+    public List<SysDictData> selectDictDataByType(String dictType)
+    {
+        return dictDataMapper.selectDictDataByType(dictType);
+    }
+
     /**
      * 根据字典类型和字典键值查询字典数据信息
      * 

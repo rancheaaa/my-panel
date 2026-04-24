@@ -193,7 +193,9 @@ const CacheList = () => {
       align: 'center',
       fixed: 'right',
       render: (_, record) => (
-        <Button type="link" icon={<DeleteOutlined />} danger onClick={(e) => { e.stopPropagation(); handleClearCacheName(record.cacheKey); }} />
+        <Popconfirm title="确定要删除此缓存吗？" onConfirm={(e) => { e.stopPropagation(); handleClearCacheName(record.cacheKey); }} okText="确定" cancelText="取消">
+          <Button type="link" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
       ),
     },
   ];
@@ -208,7 +210,9 @@ const CacheList = () => {
         align: 'center',
         fixed: 'right',
         render: (_, record) => (
-          <Button type="link" icon={<DeleteOutlined />} danger onClick={(e) => { e.stopPropagation(); handleClearCacheKey(record.cacheKey); }} />
+          <Popconfirm title="确定要删除此缓存键吗？" onConfirm={(e) => { e.stopPropagation(); handleClearCacheKey(record.cacheKey); }} okText="确定" cancelText="取消">
+            <Button type="link" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
         ),
       },
   ];

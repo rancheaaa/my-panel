@@ -5,7 +5,8 @@ import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.monitor.CacheInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysCacheVO;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.repository.domain.SysCache;
+import com.cq.panel.admin.server.repository.domain.SysDictData;
+import com.cq.panel.admin.server.repository.service.ISysDictDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,7 +24,7 @@ import java.util.*;
 
 /**
  * 缓存监控
- * 
+ *
  * @author cq
  */
 @Tag(name = "缓存监控", description = "Redis缓存监控相关接口")
@@ -37,23 +38,17 @@ public class CacheController
 
     private final CacheService cacheService;
 
+    private final ISysDictDataService dictDataService;
+
     @Value("${app.mode:cluster}")
     private String appMode;
 
-    private final static List<SysCache> caches = new ArrayList<>();
-    {
-        caches.add(new SysCache(CacheConstants.LOGIN_TOKEN_KEY, "用户信息"));
-        caches.add(new SysCache(CacheConstants.SYS_CONFIG_KEY, "配置信息"));
-        caches.add(new SysCache(CacheConstants.SYS_DICT_KEY, "数据字典"));
-        caches.add(new SysCache(CacheConstants.CAPTCHA_CODE_KEY, "验证码"));
-        caches.add(new SysCache(CacheConstants.REPEAT_SUBMIT_KEY, "防重提交"));
-        caches.add(new SysCache(CacheConstants.RATE_LIMIT_KEY, "限流处理"));
-        caches.add(new SysCache(CacheConstants.PWD_ERR_CNT_KEY, "密码错误次数"));
-    }
-
-    public CacheController(@Autowired(required = false) RedisTemplate<String, String> redisTemplate, CacheService cacheService) {
+    public CacheController(@Autowired(required = false) RedisTemplate<String, String> redisTemplate,
+                          CacheService cacheService,
+                          ISysDictDataService dictDataService) {
         this.redisTemplate = redisTemplate;
         this.cacheService = cacheService;
+        this.dictDataService = dictDataService;
     }
 
     @SuppressWarnings("deprecation")
@@ -103,12 +98,15 @@ public class CacheController
     public Result<List<SysCacheVO>> cache()
     {
         List<SysCacheVO> list = new ArrayList<>();
-        for (SysCache cache : caches) {
-            final SysCacheVO sysCacheVO = new SysCacheVO(cache.getCacheName(), cache.getRemark());
-            sysCacheVO.setCacheKey(cache.getCacheKey());
-            sysCacheVO.setRemark(cache.getRemark());
-            sysCacheVO.setCacheName(cache.getCacheName());
-            list.add(sysCacheVO);
+        List<SysDictData> dictDataList = dictDataService.selectDictDataByType("sys_cache_key");
+        if (dictDataList != null) {
+            for (SysDictData dictData : dictDataList) {
+                final SysCacheVO sysCacheVO = new SysCacheVO();
+                sysCacheVO.setCacheKey(dictData.getDictValue());
+                sysCacheVO.setCacheName(dictData.getDictLabel());
+                sysCacheVO.setRemark(dictData.getRemark());
+                list.add(sysCacheVO);
+            }
         }
         return Result.success(list);
     }

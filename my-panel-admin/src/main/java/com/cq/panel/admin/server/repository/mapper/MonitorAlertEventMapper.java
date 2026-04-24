@@ -12,4 +12,6 @@ public interface MonitorAlertEventMapper {
     List<MonitorAlertEvent> selectByTimeRange(@Param("beginTime") Date beginTime,
                                               @Param("endTime") Date endTime,
                                               @Param("limit") Integer limit);
+
+    int updateStatus(@Param("id") Long id, @Param("status") String status);
 }

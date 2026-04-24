@@ -4,12 +4,13 @@
     radial-gradient(circle at 100% 0%, rgba(13, 202, 240, 0.15), transparent 40%),
     #f5f8ff;
   min-height: calc(100vh - 120px);
-  padding: 4px;
+  padding: 12px;
 
   .dashboard-toolbar-card,
   .summary-card,
   .metric-chart-card,
   .alert-table-card,
+  .alert-rule-card,
   .hint-card {
     border: 1px solid rgba(59, 130, 246, 0.16);
     box-shadow: 0 8px 26px rgba(15, 23, 42, 0.08);
@@ -75,26 +76,163 @@
     background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
     overflow: hidden;
     position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    min-height: 130px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    &:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.15) !important;
+
+      &::before {
+        opacity: 1;
+      }
+
+      .summary-icon {
+        transform: scale(1.15);
+        animation: summaryBounce 0.6s ease;
+      }
+    }
+
+    .ant-card-body {
+      padding: 24px !important;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      box-sizing: border-box;
+    }
   }
 
-  .summary-card::after {
-    content: '';
-    position: absolute;
-    inset: auto -20px -20px auto;
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(22, 119, 255, 0.15), transparent 70%);
+  .summary-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
   }
 
-  .summary-card .ant-statistic-title {
-    color: #475569;
+  .summary-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: white;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: inherit;
+      opacity: 0.3;
+      animation: summaryPulse 2s ease-in-out infinite;
+    }
+  }
+
+  @keyframes summaryPulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.08); opacity: 0.6; }
+  }
+
+  @keyframes summaryBounce {
+    0%, 20%, 50%, 80%, 100% { transform: scale(1.15) translateY(0); }
+    40% { transform: scale(1.15) translateY(-4px); }
+    60% { transform: scale(1.15) translateY(-2px); }
+  }
+
+  .summary-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .summary-label {
     font-size: 13px;
+    color: #6b7280;
+    font-weight: 500;
+    margin-bottom: 4px;
   }
 
-  .summary-card .ant-statistic-content {
-    color: #0f172a;
+  .summary-value {
+    font-size: 24px;
     font-weight: 700;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    letter-spacing: -0.5px;
+  }
+
+  .summary-progress {
+    .ant-progress-inner {
+      background: #f1f5f9;
+      border-radius: 3px;
+    }
+
+    .ant-progress-bg {
+      border-radius: 3px;
+      transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 50%, transparent 100%);
+        animation: shimmerEffect 2s ease-in-out infinite;
+      }
+    }
+  }
+
+  @keyframes shimmerEffect {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  // Individual card themes
+  .cpu-summary-card .summary-icon {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+  }
+
+  .core-summary-card .summary-icon {
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
+  }
+
+  .heap-summary-card .summary-icon {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+  }
+
+  .thread-summary-card .summary-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+  }
+
+  .load-summary-card .summary-icon {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.35);
+  }
+
+  .gc-summary-card .summary-icon {
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
   }
 
   .metric-chart-card {
@@ -140,7 +278,13 @@
 }
 
 @media (max-width: 1200px) {
-  .monitor-dashboard-page .summary-card .ant-statistic-content {
-    font-size: 22px;
+  .monitor-dashboard-page .summary-value {
+    font-size: 20px;
+  }
+
+  .monitor-dashboard-page .summary-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
   }
 }

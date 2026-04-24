@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 import oshi.software.os.OperatingSystem;
+import oshi.software.os.OSProcess;
 import javax.sql.DataSource;
 import java.lang.management.ClassLoadingMXBean;
 import java.lang.management.GarbageCollectorMXBean;
@@ -41,6 +42,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -71,10 +73,10 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     private volatile Date lastSampleTime;
 
     public MonitorDashboardServiceImpl(MonitorMetricMapper monitorMetricMapper,
-                                       MonitorAlertRuleMapper monitorAlertRuleMapper,
-                                       MonitorAlertEventMapper monitorAlertEventMapper,
-                                       ISysConfigService sysConfigService,
-                                       ApplicationContext applicationContext) {
+            MonitorAlertRuleMapper monitorAlertRuleMapper,
+            MonitorAlertEventMapper monitorAlertEventMapper,
+            ISysConfigService sysConfigService,
+            ApplicationContext applicationContext) {
         this.monitorMetricMapper = monitorMetricMapper;
         this.monitorAlertRuleMapper = monitorAlertRuleMapper;
         this.monitorAlertEventMapper = monitorAlertEventMapper;
@@ -90,6 +92,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
         // 任何单项采集失败都只记日志，不影响其他采集逻辑。
         safeCollect(() -> collectHeap(samples, latestValueMap, now), "heap");
+        safeCollect(() -> collectProcessMemory(samples, latestValueMap, now), "process_memory");
         safeCollect(() -> collectGc(samples, latestValueMap, now), "gc");
         safeCollect(() -> collectThread(samples, latestValueMap, now), "thread");
         safeCollect(() -> collectCpuAndLoad(samples, latestValueMap, now), "cpu/load");
@@ -132,8 +135,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                 category, queryDTO.getMetricNames(), beginTime, endTime, limit);
 
         Map<String, List<MonitorMetricSample>> seriesGroup = rawSamples.stream()
-                .collect(Collectors.groupingBy(item ->
-                        item.getMetricName() + "|" + nvl(item.getMetricScope()) + "|" + nvl(item.getMetricUnit()) + "|" + nvl(item.getTagJson())));
+                .collect(Collectors.groupingBy(item -> item.getMetricName() + "|" + nvl(item.getMetricScope()) + "|"
+                        + nvl(item.getMetricUnit()) + "|" + nvl(item.getTagJson())));
 
         List<Map<String, Object>> series = new LinkedList<>();
         for (Map.Entry<String, List<MonitorMetricSample>> entry : seriesGroup.entrySet()) {
@@ -217,32 +220,79 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         return monitorMetricMapper.deleteBefore(cutoff);
     }
 
+    @Override
+    public void updateAlertEventStatus(Long id, String status) {
+        monitorAlertEventMapper.updateStatus(id, status);
+    }
+
     private void collectHeap(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
         MemoryUsage heapUsage = memoryMXBean.getHeapMemoryUsage();
         addSample(samples, latestValueMap, now, "heap", "heap_heap_used_bytes", "", heapUsage.getUsed(), "bytes", null);
-        addSample(samples, latestValueMap, now, "heap", "heap_committed_bytes", "", heapUsage.getCommitted(), "bytes", null);
+        addSample(samples, latestValueMap, now, "heap", "heap_committed_bytes", "", heapUsage.getCommitted(), "bytes",
+                null);
         addSample(samples, latestValueMap, now, "heap", "heap_max_bytes", "", heapUsage.getMax(), "bytes", null);
         if (heapUsage.getMax() > 0) {
-            addSample(samples, latestValueMap, now, "heap", "heap_usage_pct", "", heapUsage.getUsed() * 100D / heapUsage.getMax(), "percent", null);
+            addSample(samples, latestValueMap, now, "heap", "heap_usage_pct", "",
+                    heapUsage.getUsed() * 100D / heapUsage.getMax(), "percent", null);
         }
 
-        MemoryUsage nonHeapUsage = memoryMXBean.getNonHeapMemoryUsage();
-        addSample(samples, latestValueMap, now, "heap", "heap_non_heap_used_bytes", "", nonHeapUsage.getUsed(), "bytes", null);
-        addSample(samples, latestValueMap, now, "heap", "heap_non_heap_committed_bytes", "", nonHeapUsage.getCommitted(), "bytes", null);
-
+        long youngUsed = 0L, youngCommitted = 0L, youngMax = 0L;
         for (MemoryPoolMXBean poolMXBean : memoryPoolMXBeans) {
             MemoryUsage usage = poolMXBean.getUsage();
             if (usage == null) {
                 continue;
             }
             String scope = classifyPoolScope(poolMXBean.getName());
-            String tag = "{\"pool\":\"" + escape(poolMXBean.getName()) + "\"}";
-            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", scope, usage.getUsed(), "bytes", tag);
-            addSample(samples, latestValueMap, now, "heap", "pool_committed_bytes", scope, usage.getCommitted(), "bytes", tag);
-            if (usage.getMax() > 0) {
-                addSample(samples, latestValueMap, now, "heap", "pool_max_bytes", scope, usage.getMax(), "bytes", tag);
-                addSample(samples, latestValueMap, now, "heap", "pool_usage_pct", scope, usage.getUsed() * 100D / usage.getMax(), "percent", tag);
+            if ("code".equals(scope) || "general".equals(scope)) {
+                continue;
             }
+            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", scope, usage.getUsed(), "bytes", null);
+            addSample(samples, latestValueMap, now, "heap", "pool_committed_bytes", scope, usage.getCommitted(),
+                    "bytes", null);
+            if (usage.getMax() > 0) {
+                addSample(samples, latestValueMap, now, "heap", "pool_usage_pct", scope,
+                        usage.getUsed() * 100D / usage.getMax(), "percent", null);
+            }
+            if ("eden".equals(scope) || "survivor".equals(scope)) {
+                youngUsed += usage.getUsed();
+                youngCommitted += usage.getCommitted();
+                youngMax += usage.getMax();
+            }
+        }
+        if (youngUsed > 0 || youngCommitted > 0) {
+            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", "young", youngUsed, "bytes", null);
+            addSample(samples, latestValueMap, now, "heap", "pool_committed_bytes", "young", youngCommitted, "bytes",
+                    null);
+            long denom = Math.max(youngMax, youngCommitted);
+            if (denom > 0) {
+                addSample(samples, latestValueMap, now, "heap", "pool_usage_pct", "young",
+                        youngUsed * 100D / denom, "percent", null);
+            }
+        }
+    }
+
+    private void collectProcessMemory(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+        try {
+            int pid = systemInfo.getOperatingSystem().getProcessId();
+            OSProcess currentProcess = systemInfo.getOperatingSystem().getProcess(pid);
+            long processRss = currentProcess.getResidentSetSize();
+            addSample(samples, latestValueMap, now, "process_memory", "process_rss_bytes", "", processRss, "bytes",
+                    null);
+        } catch (Exception e) {
+            log.warn("collect process memory failed: {}", e.getMessage());
+        }
+
+        long totalPhysical = osMXBean.getTotalMemorySize();
+        long freePhysical = osMXBean.getFreeMemorySize();
+        if (totalPhysical > 0) {
+            addSample(samples, latestValueMap, now, "process_memory", "os_total_memory_bytes", "", totalPhysical,
+                    "bytes", null);
+            addSample(samples, latestValueMap, now, "process_memory", "os_available_memory_bytes", "",
+                    freePhysical, "bytes", null);
+            addSample(samples, latestValueMap, now, "process_memory", "os_used_pct", "",
+                    (totalPhysical - freePhysical) * 100D / totalPhysical, "percent", null);
+            addSample(samples, latestValueMap, now, "process_memory", "os_available_pct", "",
+                    freePhysical * 100D / totalPhysical, "percent", null);
         }
     }
 
@@ -306,7 +356,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                             ",\"threadName\":\"" + escape(thread.getName()) +
                             "\",\"state\":\"" + thread.getState() +
                             "\",\"virtual\":" + thread.isVirtual() + "}";
-                    addSample(samples, latestValueMap, now, "thread", "thread_info", thread.getState().name().toLowerCase(Locale.ROOT), thread.threadId(), "id", tag);
+                    addSample(samples, latestValueMap, now, "thread", "thread_info",
+                            thread.getState().name().toLowerCase(Locale.ROOT), thread.threadId(), "id", tag);
                 });
     }
 
@@ -316,30 +367,47 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         long[] prev = previousCpuTicks;
         previousCpuTicks = currentTicks;
 
-        addSample(samples, latestValueMap, now, "cpu", "cpu_cores", "", processor.getLogicalProcessorCount(), "count", null);
-        addSample(samples, latestValueMap, now, "cpu", "cpu_usage_pct", "", osMXBean.getCpuLoad() * 100D, "percent", null);
-        addSample(samples, latestValueMap, now, "cpu", "cpu_process_usage_pct", "", osMXBean.getProcessCpuLoad() * 100D, "percent", null);
-        addSample(samples, latestValueMap, now, "cpu", "cpu_process_time_ns", "", osMXBean.getProcessCpuTime(), "ns", null);
+        addSample(samples, latestValueMap, now, "cpu", "cpu_cores", "", processor.getLogicalProcessorCount(), "count",
+                null);
+        addSample(samples, latestValueMap, now, "cpu", "cpu_usage_pct", "", osMXBean.getCpuLoad() * 100D, "percent",
+                null);
+        addSample(samples, latestValueMap, now, "cpu", "cpu_process_usage_pct", "", osMXBean.getProcessCpuLoad() * 100D,
+                "percent", null);
+        addSample(samples, latestValueMap, now, "cpu", "cpu_process_time_ns", "", osMXBean.getProcessCpuTime(), "ns",
+                null);
 
         if (prev != null && prev.length == currentTicks.length) {
-            long user = currentTicks[CentralProcessor.TickType.USER.getIndex()] - prev[CentralProcessor.TickType.USER.getIndex()];
-            long sys = currentTicks[CentralProcessor.TickType.SYSTEM.getIndex()] - prev[CentralProcessor.TickType.SYSTEM.getIndex()];
-            long idle = currentTicks[CentralProcessor.TickType.IDLE.getIndex()] - prev[CentralProcessor.TickType.IDLE.getIndex()];
+            long user = currentTicks[CentralProcessor.TickType.USER.getIndex()]
+                    - prev[CentralProcessor.TickType.USER.getIndex()];
+            long sys = currentTicks[CentralProcessor.TickType.SYSTEM.getIndex()]
+                    - prev[CentralProcessor.TickType.SYSTEM.getIndex()];
+            long idle = currentTicks[CentralProcessor.TickType.IDLE.getIndex()]
+                    - prev[CentralProcessor.TickType.IDLE.getIndex()];
             long total = Math.max(1, user + sys + idle);
-            addSample(samples, latestValueMap, now, "cpu", "cpu_user_time_pct", "", user * 100D / total, "percent", null);
-            addSample(samples, latestValueMap, now, "cpu", "cpu_system_time_pct", "", sys * 100D / total, "percent", null);
-            addSample(samples, latestValueMap, now, "cpu", "cpu_idle_time_pct", "", idle * 100D / total, "percent", null);
+            addSample(samples, latestValueMap, now, "cpu", "cpu_user_time_pct", "", user * 100D / total, "percent",
+                    null);
+            addSample(samples, latestValueMap, now, "cpu", "cpu_system_time_pct", "", sys * 100D / total, "percent",
+                    null);
+            addSample(samples, latestValueMap, now, "cpu", "cpu_idle_time_pct", "", idle * 100D / total, "percent",
+                    null);
         }
 
         OperatingSystem os = systemInfo.getOperatingSystem();
         double[] loadAvg = processor.getSystemLoadAverage(3);
-        addSample(samples, latestValueMap, now, "system_load", "load_avg_1m", "", loadAvg.length > 0 ? safeNonNegative(loadAvg[0]) : 0D, "value", null);
-        addSample(samples, latestValueMap, now, "system_load", "load_avg_5m", "", loadAvg.length > 1 ? safeNonNegative(loadAvg[1]) : 0D, "value", null);
-        addSample(samples, latestValueMap, now, "system_load", "load_avg_15m", "", loadAvg.length > 2 ? safeNonNegative(loadAvg[2]) : 0D, "value", null);
-        addSample(samples, latestValueMap, now, "system_load", "os_process_count", "", os.getProcessCount(), "count", null);
-        addSample(samples, latestValueMap, now, "system_load", "os_thread_count", "", os.getThreadCount(), "count", null);
-        addSample(samples, latestValueMap, now, "system_load", "run_queue_length", "", threadMXBean.getThreadCount(), "count", null);
-        addSample(samples, latestValueMap, now, "system_load", "blocked_process_count", "", threadMXBean.getThreadInfo(threadMXBean.getAllThreadIds()).length, "count", null);
+        addSample(samples, latestValueMap, now, "system_load", "load_avg_1m", "",
+                loadAvg.length > 0 ? safeNonNegative(loadAvg[0]) : 0D, "value", null);
+        addSample(samples, latestValueMap, now, "system_load", "load_avg_5m", "",
+                loadAvg.length > 1 ? safeNonNegative(loadAvg[1]) : 0D, "value", null);
+        addSample(samples, latestValueMap, now, "system_load", "load_avg_15m", "",
+                loadAvg.length > 2 ? safeNonNegative(loadAvg[2]) : 0D, "value", null);
+        addSample(samples, latestValueMap, now, "system_load", "os_process_count", "", os.getProcessCount(), "count",
+                null);
+        addSample(samples, latestValueMap, now, "system_load", "os_thread_count", "", os.getThreadCount(), "count",
+                null);
+        addSample(samples, latestValueMap, now, "system_load", "run_queue_length", "", threadMXBean.getThreadCount(),
+                "count", null);
+        addSample(samples, latestValueMap, now, "system_load", "blocked_process_count", "",
+                threadMXBean.getThreadInfo(threadMXBean.getAllThreadIds()).length, "count", null);
     }
 
     private void collectDbPool(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
@@ -348,24 +416,37 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             if (!(entry.getValue() instanceof DruidDataSource druidDataSource)) {
                 continue;
             }
-            String poolName = StringUtils.isEmpty(druidDataSource.getName()) ? entry.getKey() : druidDataSource.getName();
+            String poolName = StringUtils.isEmpty(druidDataSource.getName()) ? entry.getKey()
+                    : druidDataSource.getName();
             String tag = "{\"pool\":\"" + escape(poolName) + "\"}";
-            addSample(samples, latestValueMap, now, "db_pool", "pool_active_connections", poolName, druidDataSource.getActiveCount(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_max_active", poolName, druidDataSource.getMaxActive(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_min_idle", poolName, druidDataSource.getMinIdle(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_idle_connections", poolName, druidDataSource.getPoolingCount(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_pending_threads", poolName, druidDataSource.getNotEmptyWaitThreadCount(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_create_count_total", poolName, druidDataSource.getCreateCount(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_close_count_total", poolName, druidDataSource.getCloseCount(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_connect_error_count_total", poolName, druidDataSource.getConnectErrorCount(), "count", tag);
-            addSample(samples, latestValueMap, now, "db_pool", "pool_wait_millis_avg", poolName, druidDataSource.getNotEmptyWaitMillis(), "ms", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_active_connections", poolName,
+                    druidDataSource.getActiveCount(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_max_active", poolName,
+                    druidDataSource.getMaxActive(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_min_idle", poolName, druidDataSource.getMinIdle(),
+                    "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_idle_connections", poolName,
+                    druidDataSource.getPoolingCount(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_pending_threads", poolName,
+                    druidDataSource.getNotEmptyWaitThreadCount(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_create_count_total", poolName,
+                    druidDataSource.getCreateCount(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_close_count_total", poolName,
+                    druidDataSource.getCloseCount(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_connect_error_count_total", poolName,
+                    druidDataSource.getConnectErrorCount(), "count", tag);
+            addSample(samples, latestValueMap, now, "db_pool", "pool_wait_millis_avg", poolName,
+                    druidDataSource.getNotEmptyWaitMillis(), "ms", tag);
         }
     }
 
     private void collectClassLoading(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
-        addSample(samples, latestValueMap, now, "class_loading", "class_loaded_count", "", classLoadingMXBean.getLoadedClassCount(), "count", null);
-        addSample(samples, latestValueMap, now, "class_loading", "class_total_loaded", "", classLoadingMXBean.getTotalLoadedClassCount(), "count", null);
-        addSample(samples, latestValueMap, now, "class_loading", "class_unloaded_count", "", classLoadingMXBean.getUnloadedClassCount(), "count", null);
+        addSample(samples, latestValueMap, now, "class_loading", "class_loaded_count", "",
+                classLoadingMXBean.getLoadedClassCount(), "count", null);
+        addSample(samples, latestValueMap, now, "class_loading", "class_total_loaded", "",
+                classLoadingMXBean.getTotalLoadedClassCount(), "count", null);
+        addSample(samples, latestValueMap, now, "class_loading", "class_unloaded_count", "",
+                classLoadingMXBean.getUnloadedClassCount(), "count", null);
     }
 
     private void evaluateAlertRules(Map<String, Double> latestValueMap, Date now) {
@@ -391,7 +472,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             }
 
             Instant lastAlert = ruleLastAlertTime.get(rule.getId());
-            if (lastAlert != null && Duration.between(lastAlert, nowInstant).getSeconds() < Math.max(10, requiredSeconds)) {
+            if (lastAlert != null
+                    && Duration.between(lastAlert, nowInstant).getSeconds() < Math.max(10, requiredSeconds)) {
                 continue;
             }
 
@@ -402,11 +484,12 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             event.setMetricName(rule.getMetricName());
             event.setMetricScope(nvl(rule.getMetricScope()));
             event.setSeverity(rule.getSeverity());
-            event.setObservedValue(currentValue);
+            event.setObservedValue(round2(currentValue));
             event.setThresholdValue(rule.getThresholdValue());
             event.setTriggerTime(now);
             event.setStatus("open");
-            event.setDetail("metric=" + key + ", current=" + currentValue + ", threshold=" + rule.getThresholdValue() + ", operator=" + rule.getOperator());
+            event.setDetail("metric=" + key + ", current=" + currentValue + ", threshold=" + rule.getThresholdValue()
+                    + ", operator=" + rule.getOperator());
             monitorAlertEventMapper.insert(event);
             ruleLastAlertTime.put(rule.getId(), nowInstant);
         }
@@ -418,8 +501,13 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         basicStats.put("cpuCore", latestValueMap.getOrDefault(buildMetricKey("cpu", "cpu_cores", ""), 0D));
         basicStats.put("heapUsage", latestValueMap.getOrDefault(buildMetricKey("heap", "heap_usage_pct", ""), 0D));
         basicStats.put("threadTotal", latestValueMap.getOrDefault(buildMetricKey("thread", "thread_total", ""), 0D));
-        basicStats.put("virtualThreadTotal", latestValueMap.getOrDefault(buildMetricKey("thread", "thread_virtual_total", ""), 0D));
+        basicStats.put("virtualThreadTotal",
+                latestValueMap.getOrDefault(buildMetricKey("thread", "thread_virtual_total", ""), 0D));
         basicStats.put("load1m", latestValueMap.getOrDefault(buildMetricKey("system_load", "load_avg_1m", ""), 0D));
+        basicStats.put("gcCollector", simplifyGcCollectorName(
+                garbageCollectorMXBeans.stream()
+                        .map(GarbageCollectorMXBean::getName)
+                        .toList()));
 
         Map<String, Object> result = new HashMap<>();
         result.put("sampleTime", now);
@@ -430,7 +518,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
     private Map<String, Object> queryLatestByCategories(Date sampleTime) {
         Map<String, Object> map = new LinkedHashMap<>();
-        for (String category : List.of("heap", "gc", "thread", "cpu", "system_load", "db_pool", "class_loading")) {
+        for (String category : List.of("heap", "process_memory", "gc", "thread", "cpu", "system_load", "db_pool",
+                "class_loading")) {
             List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, sampleTime);
             map.put(category, metrics);
         }
@@ -439,29 +528,32 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
     private Map<String, Object> buildAlertSummary() {
         List<MonitorAlertEvent> recent = listAlertEvents("1h", 200);
-        long critical = recent.stream().filter(it -> "critical".equalsIgnoreCase(it.getSeverity())).count();
-        long warning = recent.stream().filter(it -> "warning".equalsIgnoreCase(it.getSeverity())).count();
+        List<MonitorAlertEvent> pendingEvents = recent.stream()
+                .filter(it -> "open".equalsIgnoreCase(it.getStatus()))
+                .toList();
+        long critical = pendingEvents.stream().filter(it -> "critical".equalsIgnoreCase(it.getSeverity())).count();
+        long warning = pendingEvents.stream().filter(it -> "warning".equalsIgnoreCase(it.getSeverity())).count();
         Map<String, Object> summary = new HashMap<>();
         summary.put("critical", critical);
         summary.put("warning", warning);
-        summary.put("total", recent.size());
+        summary.put("total", pendingEvents.size());
         return summary;
     }
 
     private void addSample(List<MonitorMetricSample> samples,
-                           Map<String, Double> latestValueMap,
-                           Date sampleTime,
-                           String category,
-                           String name,
-                           String scope,
-                           double value,
-                           String unit,
-                           String tagJson) {
+            Map<String, Double> latestValueMap,
+            Date sampleTime,
+            String category,
+            String name,
+            String scope,
+            double value,
+            String unit,
+            String tagJson) {
         MonitorMetricSample sample = new MonitorMetricSample();
         sample.setMetricCategory(category);
         sample.setMetricName(name);
         sample.setMetricScope(nvl(scope));
-        sample.setMetricValue(value);
+        sample.setMetricValue(round2(value));
         sample.setMetricUnit(nvl(unit));
         sample.setTagJson(tagJson);
         sample.setSampleTime(sampleTime);
@@ -490,7 +582,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                     one.setMetricUnit(first.getMetricUnit());
                     one.setTagJson(first.getTagJson());
                     one.setSampleTime(new Date(entry.getKey()));
-                    one.setMetricValue(avg);
+                    one.setMetricValue(round2(avg));
                     return one;
                 })
                 .sorted(Comparator.comparing(MonitorMetricSample::getSampleTime))
@@ -569,23 +661,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         }
     }
 
-    private String classifyPoolScope(String poolName) {
-        String lower = poolName.toLowerCase(Locale.ROOT);
-        if (lower.contains("eden")) {
-            return "eden";
-        }
-        if (lower.contains("survivor")) {
-            return "survivor";
-        }
-        if (lower.contains("old") || lower.contains("tenured")) {
-            return "old";
-        }
-        if (lower.contains("young")) {
-            return "young";
-        }
-        return "general";
-    }
-
     private String classifyGcScope(String gcName) {
         String lower = gcName.toLowerCase(Locale.ROOT);
         if (lower.contains("young") || lower.contains("scavenge")) {
@@ -593,6 +668,23 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         }
         if (lower.contains("old") || lower.contains("mark")) {
             return "old";
+        }
+        return "general";
+    }
+
+    private String classifyPoolScope(String poolName) {
+        String lower = poolName.toLowerCase(Locale.ROOT);
+        if (lower.contains("eden")) {
+            return "eden";
+        }
+        if (lower.contains("survivor") || lower.contains("s0") || lower.contains("s1")) {
+            return "survivor";
+        }
+        if (lower.contains("old") || lower.contains("tenured")) {
+            return "old";
+        }
+        if (lower.contains("metaspace")) {
+            return "metaspace";
         }
         return "general";
     }
@@ -611,6 +703,37 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
     private String nvl(String value) {
         return value == null ? "" : value;
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private String simplifyGcCollectorName(List<String> gcNames) {
+        if (gcNames == null || gcNames.isEmpty()) {
+            return "Unknown";
+        }
+        Set<String> uniqueNames = new LinkedHashSet<>(gcNames);
+        Set<String> simplified = new LinkedHashSet<>();
+        for (String name : uniqueNames) {
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (lower.contains("g1")) {
+                simplified.add("G1");
+            } else if (lower.contains("zgc")) {
+                simplified.add("ZGC");
+            } else if (lower.contains("shenandoah")) {
+                simplified.add("Shenandoah");
+            } else if (lower.contains("concurrentmarksweep") || lower.contains("parnew")) {
+                simplified.add("CMS");
+            } else if (lower.contains("ps scavenge") || lower.contains("ps marksweep")) {
+                simplified.add("Parallel");
+            } else if (lower.equals("copy") || lower.equals("marksweepcompact")) {
+                simplified.add("Serial");
+            } else {
+                simplified.add(name);
+            }
+        }
+        return String.join(", ", simplified);
     }
 
     private String escape(String text) {

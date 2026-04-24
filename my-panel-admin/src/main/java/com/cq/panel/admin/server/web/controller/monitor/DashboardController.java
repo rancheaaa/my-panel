@@ -88,4 +88,14 @@ public class DashboardController
     {
         return Result.success(monitorDashboardService.listAlertEvents(range, limit));
     }
+
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "更新告警事件状态")
+    @PutMapping("/alert/event/{id}/status")
+    public Result<Void> updateAlertEventStatus(@PathVariable("id") Long id,
+                                               @RequestParam("status") String status)
+    {
+        monitorDashboardService.updateAlertEventStatus(id, status);
+        return Result.success();
+    }
 }

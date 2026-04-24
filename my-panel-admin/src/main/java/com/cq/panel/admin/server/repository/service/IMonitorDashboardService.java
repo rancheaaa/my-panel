@@ -23,5 +23,7 @@ public interface IMonitorDashboardService {
 
     List<MonitorAlertEvent> listAlertEvents(String range, Integer limit);
 
+    void updateAlertEventStatus(Long id, String status);
+
     int cleanupHistory();
 }

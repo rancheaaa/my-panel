@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.task;
+package com.cq.panel.admin.server.schedule;
 
 import com.cq.panel.admin.server.repository.service.IMonitorDashboardService;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;

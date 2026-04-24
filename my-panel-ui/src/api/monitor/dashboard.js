@@ -51,3 +51,11 @@ export function getAlertEvents(params) {
     params
   });
 }
+
+export function updateAlertEventStatus(id, status) {
+  return request({
+    url: `/monitor/dashboard/alert/event/${id}/status`,
+    method: 'put',
+    params: { status }
+  });
+}

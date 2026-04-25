@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Row, Col, DatePicker, Descriptions } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Row, Col, DatePicker, Descriptions, Pagination } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, HistoryOutlined, EyeOutlined, UpOutlined, DownOutlined, DownloadOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import {
@@ -9,6 +9,7 @@ import {
   delCommandHistory,
   exportCommandHistory
 } from '../../../api/agent';
+import './CommandHistory.scss';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -279,21 +280,21 @@ const CommandHistory = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <div className="command-history-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
-          <Row gutter={[24, 16]}>
-            <Col span={8}>
+          <Row gutter={[12, 12]}>
+            <Col span={4}>
               <Form.Item name="agentId" label="Agent ID">
                 <Input placeholder="请输入Agent节点ID" allowClear />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={4}>
               <Form.Item name="agentName" label="节点名称">
                 <Input placeholder="请输入Agent节点名称" allowClear />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={4}>
               <Form.Item name="agentIp" label="Agent IP">
                 <Input placeholder="请输入Agent IP" allowClear />
               </Form.Item>
@@ -301,7 +302,7 @@ const CommandHistory = () => {
 
             {expand && (
               <>
-                  <Col span={8}>
+                  <Col span={4}>
                       <Form.Item name="commandStatus" label="执行状态">
                           <Select placeholder="请选择状态" allowClear>
                               <Option value={0}>成功</Option>
@@ -311,7 +312,7 @@ const CommandHistory = () => {
                           </Select>
                       </Form.Item>
                   </Col>
-                <Col span={8}>
+                <Col span={6}>
                   <Form.Item name="dateRange" label="时间范围">
                     <RangePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: '100%' }} />
                   </Form.Item>
@@ -337,7 +338,7 @@ const CommandHistory = () => {
       </Card>
 
       <Card bordered={false} className="table-card">
-        <div className="table-toolbar" style={{ marginBottom: 16 }}>
+        <div className="table-toolbar">
           <Space size="middle">
             <Button
               danger
@@ -360,35 +361,39 @@ const CommandHistory = () => {
           </Space>
         </div>
 
-        <Table
-          rowSelection={{
-            selectedRowKeys,
-            onChange: (keys) => setSelectedRowKeys(keys),
-          }}
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          loading={loading}
-          rowKey="id"
-          size={tableSize}
-          scroll={{ x: 1400 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
+        <div className="command-history-table-container">
+          <Table
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+            }}
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            loading={loading}
+            rowKey="id"
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 670px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

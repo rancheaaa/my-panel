@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Tag, Tooltip, Modal, message, Popconfirm, Row, Col, Switch, Tree, TreeSelect, DatePicker, Dropdown } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Tag, Tooltip, Modal, message, Popconfirm, Row, Col, Switch, Tree, TreeSelect, DatePicker, Dropdown, Pagination } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -476,7 +476,7 @@ const User = () => {
   }));
 
   return (
-    <div className="app-container">
+    <div className="user-page-container">
       <Row gutter={16} style={{ height: '100%' }}>
         <Col span={4} style={{ height: '100%' }}>
             <Card bordered={false} className="dept-card" style={{ height: '100%', overflow: 'auto' }}>
@@ -490,7 +490,7 @@ const User = () => {
             </Card>
         </Col>
         <Col span={20} style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+            <Card bordered={false} className="search-card" style={{ flexShrink: 0 }}>
                 <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
                     <Row gutter={[24, 16]}>
                         <Col span={6}>
@@ -536,7 +536,7 @@ const User = () => {
                 </Form>
             </Card>
 
-            <Card bordered={false} className="table-card">
+            <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
                 <div className="table-toolbar">
                 <Space size="middle">
                     <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
@@ -585,32 +585,36 @@ const User = () => {
                 </Space>
                 </div>
 
-                <Table
-                rowSelection={rowSelection}
-                components={{
-                  header: {
-                    cell: ResizableTitle,
-                  },
-                }}
-                columns={resizableColumns}
-                dataSource={data}
-                rowKey="userId"
-                loading={loading}
-                size={tableSize}
-                scroll={{ x: 1200 }}
-                pagination={{
-                    current: queryParams.pageNum,
-                    pageSize: queryParams.pageSize,
-                    total: total,
-                    showTotal: (total, range) => `共 ${total} 条`,
-                    onChange: (page, pageSize) => {
-                        setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
+                <div className="user-table-container">
+                  <Table
+                  rowSelection={rowSelection}
+                  components={{
+                    header: {
+                      cell: ResizableTitle,
                     },
-                    position: ['bottomRight'],
-                    showSizeChanger: true,
-                    pageSizeOptions: ['10', '20', '50', '100']
-                }}
-                />
+                  }}
+                  columns={resizableColumns}
+                  dataSource={data}
+                  rowKey="userId"
+                  loading={loading}
+                  size={tableSize}
+                  scroll={{ x: 'max-content', y: 'calc(100vh - 600px)' }}
+                  pagination={false}
+                  />
+                  <div className="fixed-pagination-bar">
+                    <Pagination
+                      current={queryParams.pageNum}
+                      pageSize={queryParams.pageSize}
+                      total={total}
+                      showTotal={(t) => `共 ${t} 条`}
+                      onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+                      showSizeChanger
+                      pageSizeOptions={['10', '20', '50', '100']}
+                      showQuickJumper
+                      size="default"
+                    />
+                  </div>
+                </div>
             </Card>
         </Col>
       </Row>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber, Dropdown, Row, Col } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, InputNumber, Dropdown, Row, Col, Pagination } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, PoweroffOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, PlayCircleOutlined, ConsoleSqlOutlined, HistoryOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { 
@@ -15,6 +15,7 @@ import {
 } from '../../../api/agent';
 import { getDicts } from '../../../api/dict/data';
 import { listType } from '../../../api/dict/type';
+import './AgentManage.scss';
 
 const { Option } = Select;
 
@@ -463,8 +464,8 @@ const AgentManage = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <div className="agent-manage-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
           <Row gutter={[24, 16]}>
             <Col span={6}>
@@ -542,8 +543,8 @@ const AgentManage = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
-        <div className="table-toolbar" style={{ marginBottom: 16 }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar">
           <Space size="middle">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
             <Button 
@@ -591,35 +592,39 @@ const AgentManage = () => {
           </Space>
         </div>
 
-        <Table
-          rowSelection={{
-            selectedRowKeys,
-            onChange: (keys) => setSelectedRowKeys(keys),
-          }}
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          loading={loading}
-          rowKey="id"
-          size={tableSize}
-          scroll={{ x: 1400 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
+        <div className="agent-manage-table-container">
+          <Table
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+            }}
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            loading={loading}
+            rowKey="id"
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 650px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Popconfirm, Tag, Tooltip, Dropdown } from 'antd';
+import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Popconfirm, Tag, Tooltip, Dropdown, Pagination } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, UnlockOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, delLogininfor, cleanLogininfor, unlockLogininfor, exportLogininfor } from '../../../api/monitor/logininfor';
 import request from '../../../utils/request';
+import './Logininfor.scss';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -33,8 +34,11 @@ const Logininfor = () => {
   
   useEffect(() => {
     fetchDicts();
-    fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [queryParams]);
 
   const fetchDicts = async () => {
     try {
@@ -67,7 +71,6 @@ const Logininfor = () => {
 
   const handleSearch = () => {
     setQueryParams({ ...queryParams, pageNum: 1 });
-    fetchData();
   };
 
   const handleReset = () => {
@@ -79,7 +82,6 @@ const Logininfor = () => {
       status: undefined,
     });
     setDateRange([]);
-    fetchData();
   };
 
   const handleDelete = async (infoIds) => {
@@ -192,8 +194,8 @@ const Logininfor = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card">
+    <div className="logininfor-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
@@ -263,7 +265,7 @@ const Logininfor = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
         <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
             <Space>
                 <Popconfirm 
@@ -308,35 +310,39 @@ const Logininfor = () => {
             </Space>
         </Row>
 
-        <Table
-          rowKey="infoId"
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          loading={loading}
-          size={tableSize}
-          scroll={{ x: 1290 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-                setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
-        />
+        <div className="logininfor-table-container">
+          <Table
+            rowKey="infoId"
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            loading={loading}
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: setSelectedRowKeys,
+            }}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
     </div>
   );

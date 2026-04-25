@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Modal, Popconfirm, Tag, Descriptions, Tooltip, Dropdown } from 'antd';
+import { Card, Table, Form, Input, Select, Button, DatePicker, Space, Row, Col, message, Modal, Popconfirm, Tag, Descriptions, Tooltip, Dropdown, Pagination } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ClearOutlined, DownloadOutlined, EyeOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, delOperlog, cleanOperlog, exportOperlog } from '../../../api/monitor/operlog';
 import request from '../../../utils/request';
+import './Operlog.scss';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -36,8 +37,11 @@ const Operlog = () => {
 
   useEffect(() => {
     fetchDicts();
-    fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [queryParams]);
 
   const fetchDicts = async () => {
     // Mock fetching dicts
@@ -74,7 +78,6 @@ const Operlog = () => {
 
   const handleSearch = () => {
     setQueryParams({ ...queryParams, pageNum: 1 });
-    fetchData();
   };
 
   const handleReset = () => {
@@ -87,7 +90,6 @@ const Operlog = () => {
       status: undefined,
     });
     setDateRange([]);
-    fetchData();
   };
 
   const handleDelete = async (operIds) => {
@@ -204,8 +206,8 @@ const Operlog = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card">
+    <div className="operlog-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
@@ -291,7 +293,7 @@ const Operlog = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
         <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
             <Space>
                 <Popconfirm 
@@ -336,35 +338,39 @@ const Operlog = () => {
             </Space>
         </Row>
 
-        <Table
-          rowKey="operId"
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          loading={loading}
-          size={tableSize}
-          scroll={{ x: 1200 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-                setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
-        />
+        <div className="operlog-table-container">
+          <Table
+            rowKey="operId"
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            loading={loading}
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 630px)' }}
+            pagination={false}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: setSelectedRowKeys,
+            }}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

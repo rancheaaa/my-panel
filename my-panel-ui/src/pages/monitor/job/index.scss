@@ -1,4 +1,273 @@
 /* 定时任务页面样式 */
 .monitor-job {
-  /* 可以在这里添加少量的页面特定样式，但应尽量复用全局样式 */
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  .job-page-container {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    gap: 16px !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+
+    > .search-card {
+      flex-shrink: 0 !important;
+      height: 80px;
+
+      .ant-card-body {
+        height: 100%;
+        overflow: hidden;
+      }
+    }
+
+    > .job-card {
+      flex: 1 !important;
+      min-height: 0 !important;
+      margin-bottom: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+      
+      > .ant-card-body {
+        padding: 16px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        gap: 0 !important;
+      }
+    }
+  }
+}
+
+/* 工具栏 - 固定不动 */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+/* 表格容器 - 唯一可纵向滚动的容器 */
+.job-table-container {
+  flex: 1;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  
+  /* 固定定位的分页栏 */
+  .fixed-pagination-bar {
+    flex-shrink: 0;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+/* 固定定位的分页栏 - 像Copyright一样固定不动 */
+.fixed-pagination-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 0 0 0;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+  
+  /* 分页组件样式 */
+  .ant-pagination {
+    margin: 0;
+    
+    .ant-pagination-total-text {
+      color: #666;
+      font-size: 13px;
+    }
+    
+    .ant-pagination-item {
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        border-color: #1890ff;
+        color: #1890ff;
+        transform: translateY(-1px);
+      }
+      
+      &-active {
+        background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+        border-color: transparent;
+        
+        a {
+          color: #fff;
+          font-weight: 500;
+        }
+      }
+    }
+    
+    .ant-pagination-prev,
+    .ant-pagination-next {
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      
+      &:hover:not(.ant-pagination-disabled) {
+        border-color: #1890ff;
+        color: #1890ff;
+        transform: translateY(-1px);
+      }
+    }
+    
+    .ant-pagination-options {
+      .ant-pagination-options-quick-jumper {
+        margin-left: 8px;
+        
+        input {
+          border-radius: 6px;
+          width: 48px;
+          text-align: center;
+          transition: all 0.2s ease;
+          
+          &:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
+          }
+        }
+      }
+      
+      .ant-select-selector {
+        border-radius: 6px !important;
+      }
+    }
+  }
+}
+
+/* 调度日志 Modal 内的特殊样式 */
+.job-log-modal .ant-modal-body {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+  padding: 0;
+}
+
+.job-log-modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.job-log-fixed-area {
+  flex-shrink: 0;
+  background: #fff;
+  z-index: 5;
+}
+
+.job-log-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  
+  .job-log-table-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    
+    /* 自定义纵向滚动条样式 */
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #c0c0c0 0%, #a8a8a8 100%);
+      border-radius: 4px;
+      border: 2px solid #f5f5f5;
+      background-clip: padding-box;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: linear-gradient(180deg, #a0a0a0 0%, #888 100%);
+        border-color: #e8e8e8;
+      }
+
+      &:active {
+        background: linear-gradient(180deg, #808080 0%, #666 100%);
+        cursor: grabbing;
+      }
+    }
+    
+    /* 禁止表格内部产生纵向滚动条 */
+    .ant-table,
+    .ant-table-container,
+    .ant-spin-nested-loading,
+    .ant-spin-container {
+      overflow: visible !important;
+      max-height: none !important;
+    }
+
+    .ant-table-body {
+      overflow-y: visible !important;
+      overflow-x: auto !important;
+    }
+
+    .ant-table-header {
+      overflow-x: auto !important;
+      overflow-y: visible !important;
+    }
+  }
+  
+  .fixed-pagination-bar {
+    flex-shrink: 0;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+
+/* 响应式适配 */
+@media screen and (max-width: 768px) {
+  .fixed-pagination-bar {
+    padding: 10px 0 0 0;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    
+    .ant-pagination {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .fixed-pagination-bar {
+    .ant-pagination-options {
+      display: none;
+    }
+  }
 }

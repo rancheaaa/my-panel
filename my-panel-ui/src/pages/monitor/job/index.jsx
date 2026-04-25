@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker, Divider, AutoComplete } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, message, Popconfirm, Tag, Switch, Modal, Radio, Row, Col, Descriptions, Tabs, InputNumber, Tooltip, Dropdown, DatePicker, Divider, AutoComplete, Pagination } from 'antd';
 import zhCN from 'antd/es/locale/zh_CN';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, PlusOutlined, EditOutlined, PlayCircleOutlined, EyeOutlined, FileTextOutlined, ExportOutlined, SettingOutlined, ColumnHeightOutlined, DownOutlined, UpOutlined, DownloadOutlined, MinusCircleOutlined, PlusCircleOutlined } from '@ant-design/icons';
 import { listJob, getJob, addJob, updateJob, delJob, changeJobStatus, runJob, exportJob, getJobGroups, scanMethods, validateMethod } from '../../../api/monitor/job';
@@ -488,143 +488,157 @@ const JobLog = ({ visible, onCancel, jobName: defaultJobName, jobGroup: defaultJ
         footer={null}
         destroyOnClose
         style={{ top: 20 }}
+        className="job-log-modal"
+        bodyStyle={{ padding: 0 }}
       >
-        <div className="table-search" style={{ marginBottom: 16 }}>
-          <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
-            <Row gutter={[24, 16]} style={{ width: '100%' }}>
-              <Col span={6}>
-                <Form.Item name="jobName" label="任务名称">
-                  <Input placeholder="请输入任务名称" allowClear />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="jobGroup" label="任务组名">
-                   <AutoComplete
-                      placeholder="请选择或输入任务组名"
-                      allowClear
-                      options={jobGroupOptions}
-                      onSearch={handleJobGroupSearch}
-                      filterOption={false}
-                   />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="status" label="执行状态">
-                   <Select placeholder="请选择" allowClear>
-                      {sysCommonStatus.map(dict => (
-                          <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
-                      ))}
-                   </Select>
-                </Form.Item>
-              </Col>
-              {expand && (
-                <>
+        <div className="job-log-modal-content">
+          <div className="job-log-fixed-area">
+            <div className="table-search" style={{ padding: '16px 16px 0 16px', marginBottom: 0 }}>
+              <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
+                <Row gutter={[24, 16]} style={{ width: '100%' }}>
                   <Col span={6}>
-                    <Form.Item name="startTimeRange" label="开始时间">
-                       <DatePicker.RangePicker 
-                         style={{ width: '100%' }} 
-                         showTime 
-                         format="YYYY-MM-DD HH:mm:ss"
-                         locale={zhCN}
-                         placeholder={['开始时间起', '开始时间止']}
+                    <Form.Item name="jobName" label="任务名称">
+                      <Input placeholder="请输入任务名称" allowClear />
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item name="jobGroup" label="任务组名">
+                       <AutoComplete
+                          placeholder="请选择或输入任务组名"
+                          allowClear
+                          options={jobGroupOptions}
+                          onSearch={handleJobGroupSearch}
+                          filterOption={false}
                        />
                     </Form.Item>
                   </Col>
                   <Col span={6}>
-                    <Form.Item name="endTimeRange" label="结束时间">
-                       <DatePicker.RangePicker 
-                         style={{ width: '100%' }} 
-                         showTime 
-                         format="YYYY-MM-DD HH:mm:ss"
-                         locale={zhCN}
-                         placeholder={['结束时间起', '结束时间止']}
-                       />
+                    <Form.Item name="status" label="执行状态">
+                       <Select placeholder="请选择" allowClear>
+                          {sysCommonStatus.map(dict => (
+                              <Option key={dict.dictValue} value={dict.dictValue}>{dict.dictLabel}</Option>
+                          ))}
+                       </Select>
                     </Form.Item>
                   </Col>
-                </>
-              )}
-              <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
-                <Space>
-                  <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-                  <Button 
-                      type="link" 
-                      onClick={() => setExpand(!expand)}
-                      icon={expand ? <UpOutlined /> : <DownOutlined />}
-                  >
-                    {expand ? '收起' : '展开'}
-                  </Button>
-                </Space>
-              </Col>
-            </Row>
-          </Form>
-        </div>
-  
-        <div className="table-toolbar">
-          <Space size="large">
-            <Popconfirm
-               title="确定删除选中日志吗？"
-               onConfirm={() => handleDelete(selectedRowKeys)}
-               disabled={selectedRowKeys.length === 0}
-            >
-               <Button danger icon={<DeleteOutlined />} disabled={selectedRowKeys.length === 0}>删除</Button>
-            </Popconfirm>
-            <Popconfirm
-               title="确定清空所有调度日志吗？"
-               onConfirm={handleClean}
-            >
-               <Button danger icon={<DeleteOutlined />}>清空</Button>
-            </Popconfirm>
-            <Button icon={<DownloadOutlined />} onClick={handleExport}>导出</Button>
-          </Space>
-          <div style={{ flex: 1 }}></div>
-          <Space size="large">
-            <Tooltip title="刷新">
-               <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
-            </Tooltip>
-            <Tooltip title="密度">
-                <Dropdown
-                  menu={{
-                    items: [
-                      { key: 'large', label: '默认' },
-                      { key: 'middle', label: '中等' },
-                      { key: 'small', label: '紧凑' },
-                    ],
-                    onClick: ({ key }) => setTableSize(key),
-                    selectedKeys: [tableSize],
-                  }}
-                  trigger={['click']}
+                  {expand && (
+                    <>
+                      <Col span={6}>
+                        <Form.Item name="startTimeRange" label="开始时间">
+                           <DatePicker.RangePicker 
+                             style={{ width: '100%' }} 
+                             showTime 
+                             format="YYYY-MM-DD HH:mm:ss"
+                             locale={zhCN}
+                             placeholder={['开始时间起', '开始时间止']}
+                           />
+                        </Form.Item>
+                      </Col>
+                      <Col span={6}>
+                        <Form.Item name="endTimeRange" label="结束时间">
+                           <DatePicker.RangePicker 
+                             style={{ width: '100%' }} 
+                             showTime 
+                             format="YYYY-MM-DD HH:mm:ss"
+                             locale={zhCN}
+                             placeholder={['结束时间起', '结束时间止']}
+                           />
+                        </Form.Item>
+                      </Col>
+                    </>
+                  )}
+                  <Col span={24} style={{ textAlign: 'right', marginTop: '8px' }}>
+                    <Space>
+                      <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                      <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                      <Button 
+                          type="link" 
+                          onClick={() => setExpand(!expand)}
+                          icon={expand ? <UpOutlined /> : <DownOutlined />}
+                      >
+                        {expand ? '收起' : '展开'}
+                      </Button>
+                    </Space>
+                  </Col>
+                </Row>
+              </Form>
+            </div>
+      
+            <div className="table-toolbar">
+              <Space size="large">
+                <Popconfirm
+                   title="确定删除选中日志吗？"
+                   onConfirm={() => handleDelete(selectedRowKeys)}
+                   disabled={selectedRowKeys.length === 0}
                 >
-                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
-                </Dropdown>
-            </Tooltip>
-          </Space>
+                   <Button danger icon={<DeleteOutlined />} disabled={selectedRowKeys.length === 0}>删除</Button>
+                </Popconfirm>
+                <Popconfirm
+                   title="确定清空所有调度日志吗？"
+                   onConfirm={handleClean}
+                >
+                   <Button danger icon={<DeleteOutlined />}>清空</Button>
+                </Popconfirm>
+                <Button icon={<DownloadOutlined />} onClick={handleExport}>导出</Button>
+              </Space>
+              <div style={{ flex: 1 }}></div>
+              <Space size="large">
+                <Tooltip title="刷新">
+                   <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
+                </Tooltip>
+                <Tooltip title="密度">
+                    <Dropdown
+                      menu={{
+                        items: [
+                          { key: 'large', label: '默认' },
+                          { key: 'middle', label: '中等' },
+                          { key: 'small', label: '紧凑' },
+                        ],
+                        onClick: ({ key }) => setTableSize(key),
+                        selectedKeys: [tableSize],
+                      }}
+                      trigger={['click']}
+                    >
+                      <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                    </Dropdown>
+                </Tooltip>
+              </Space>
+            </div>
+          </div>
+      
+          <div className="job-log-table-wrapper">
+            <div className="job-log-table-scroll">
+              <Table
+                columns={columns}
+                dataSource={data}
+                rowKey="jobLogId"
+                loading={loading}
+                size={tableSize}
+                scroll={{ x: 1060 }}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: setSelectedRowKeys
+                }}
+                pagination={false}
+              />
+            </div>
+            <div className="fixed-pagination-bar">
+              <Pagination
+                current={queryParams.pageNum}
+                pageSize={queryParams.pageSize}
+                total={total}
+                showTotal={(t) => `共 ${t} 条`}
+                onChange={(page, pageSize) => {
+                  setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
+                }}
+                showSizeChanger
+                pageSizeOptions={['10', '20', '50', '100']}
+                showQuickJumper
+                size="default"
+              />
+            </div>
+          </div>
         </div>
-  
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="jobLogId"
-          loading={loading}
-          size={tableSize}
-          scroll={{ x: 1060 }}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys
-          }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-                setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
         
         <Modal
             title="调度日志详情"
@@ -1228,8 +1242,9 @@ const Job = () => {
   })), [columns]);
 
   return (
-    <div className="app-container">
-      <Card bordered={false} style={{ marginBottom: 16 }}>
+    <div className="monitor-job">
+      <div className="job-page-container">
+      <Card bordered={false} className="search-card">
         <Form form={searchForm} layout="inline" onFinish={(v) => setQueryParams({ ...queryParams, ...v, pageNum: 1 })}>
           <Form.Item name="jobId" label="任务编号"><Input placeholder="请输入任务编号" allowClear /></Form.Item>
           <Form.Item name="jobName" label="任务名称"><Input placeholder="请输入" allowClear /></Form.Item>
@@ -1259,7 +1274,7 @@ const Job = () => {
         </Form>
       </Card>
 
-      <Card bordered={false}>
+      <Card bordered={false} className="job-card">
         <div className="table-toolbar">
           <Space size="large">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
@@ -1291,30 +1306,36 @@ const Job = () => {
           </Space>
         </div>
 
-        <Table 
-          dataSource={data} 
-          columns={resizableColumns} 
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          rowKey="jobId" 
-          loading={loading} 
-          size={tableSize} 
-          scroll={{ x: 'max-content' }}
-          rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }} 
-          pagination={{ 
-            current: queryParams.pageNum, 
-            pageSize: queryParams.pageSize, 
-            total, 
-            showTotal: (total, range) => `共 ${total} 条`, 
-            onChange: (pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize }),
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }} 
-        />
+        <div className="job-table-container">
+          <Table
+            dataSource={data}
+            columns={resizableColumns}
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            rowKey="jobId"
+            loading={loading}
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 500px)' }}
+            rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal title={title} open={open} onOk={submitForm} onCancel={() => setOpen(false)} width={700} centered destroyOnClose>
@@ -1658,6 +1679,7 @@ const Job = () => {
               <Descriptions.Item label="备注" span={2}>{currentJob.remark}</Descriptions.Item>
           </Descriptions>
       </Modal>
+    </div>
     </div>
   );
 };

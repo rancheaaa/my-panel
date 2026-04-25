@@ -55,8 +55,9 @@ public class SysDictDataController extends BaseController
         startPage();
         SysDictData dictData = dictDataConverter.toEntity(query);
         List<SysDictData> list = dictDataService.selectDictDataList(dictData);
+        PageInfo<SysDictData> pageInfo = new PageInfo<>(list);
         List<SysDictDataVO> voList = dictDataConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo<>(voList).getPages()));
+        return Result.success(new PageVO<>(voList, pageInfo.getTotal()));
     }
 
     @Operation(summary = "导出字典数据", description = "导出符合条件的字典数据")

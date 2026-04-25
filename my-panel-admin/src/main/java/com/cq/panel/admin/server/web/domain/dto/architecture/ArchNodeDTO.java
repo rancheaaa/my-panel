@@ -1,5 +1,6 @@
 package com.cq.panel.admin.server.web.domain.dto.architecture;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -15,6 +16,10 @@ import java.math.BigDecimal;
 public class ArchNodeDTO {
     @Schema(description = "节点ID")
     private Long id;
+
+    @Schema(description = "前端临时ID（用于保存时映射）")
+    @JsonIgnore
+    private String frontId;
 
     @Schema(description = "所属架构图ID")
     @NotNull(message = "所属架构图ID不能为空")

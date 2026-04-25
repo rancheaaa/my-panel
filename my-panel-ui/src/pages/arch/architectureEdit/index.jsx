@@ -571,7 +571,7 @@ const EditableEdge = React.memo(({
 // 自定义节点组件
 const CustomNode = React.memo(({ id, data, selected, dragging, setNodes: setNodesProp, customNodeTypes = [] }) => {
   const nodeRef = useRef(null);
-  const { setNodes: rfSetNodes, getEdges } = useReactFlow();
+  const { setNodes: rfSetNodes, getEdges, getViewport } = useReactFlow();
   const setNodes = setNodesProp || rfSetNodes;
   const [keepAspectRatio, setKeepAspectRatio] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
@@ -1377,11 +1377,37 @@ const ArchitectureFlow = () => {
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { getViewport, setViewport } = useReactFlow();
   
   const [defaultNodes, setDefaultNodes] = useState([]);
   const [defaultEdges, setDefaultEdges] = useState([]);
   const savedSignatureRef = React.useRef('');
   const initializeDefaultArchitectureRef = React.useRef(null);
+  const prevViewportRef = React.useRef({ x: 0, y: 0, zoom: 1 });
+  const canvasSaveTimerRef = React.useRef(null);
+  const [initialViewport, setInitialViewport] = useState(null);
+
+  const saveCanvasConfig = useCallback((viewport) => {
+    if (!diagramId || !viewport || !architectureName) return;
+    
+    if (canvasSaveTimerRef.current) {
+      clearTimeout(canvasSaveTimerRef.current);
+    }
+    
+    canvasSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const config = JSON.stringify({
+          zoom: viewport.zoom,
+          x: viewport.x,
+          y: viewport.y
+        });
+        await updateDiagram({ id: diagramId, diagramName: architectureName, canvasConfig: config });
+        console.log('[画布配置已保存]', { 缩放比: (viewport.zoom * 100).toFixed(1) + '%', 位置: `(${viewport.x.toFixed(0)}, ${viewport.y.toFixed(0)})` });
+      } catch (e) {
+        console.error('保存画布配置失败', e);
+      }
+    }, 500);
+  }, [diagramId, architectureName]);
 
   // 首次进入自动引导
   useEffect(() => {
@@ -1498,10 +1524,18 @@ const ArchitectureFlow = () => {
     try {
       // 1. 获取架构图基本信息
       let nextDiagramName = architectureName;
+      let savedCanvasConfig = null;
       const diagRes = await getDiagram(id);
       if (diagRes.code === 200) {
         nextDiagramName = diagRes.data.diagramName;
         setArchitectureName(nextDiagramName);
+        if (diagRes.data.canvasConfig) {
+          try {
+            savedCanvasConfig = JSON.parse(diagRes.data.canvasConfig);
+          } catch (e) {
+            console.warn('解析画布配置失败', e);
+          }
+        }
       }
 
       // 2. 获取架构图节点和连线数据
@@ -1612,6 +1646,19 @@ const ArchitectureFlow = () => {
         setDefaultNodes(formattedNodes);
         setDefaultEdges(formattedEdges);
         savedSignatureRef.current = buildDiagramSignature(nextDiagramName, formattedNodes, formattedEdges);
+
+        if (savedCanvasConfig) {
+          const vp = {
+            x: savedCanvasConfig.x ?? 0,
+            y: savedCanvasConfig.y ?? 0,
+            zoom: savedCanvasConfig.zoom ?? 1
+          };
+          setInitialViewport(vp);
+          prevViewportRef.current = { ...vp };
+          console.log('[画布配置已恢复]', savedCanvasConfig);
+        } else {
+          setInitialViewport(null);
+        }
       } else {
         // 如果数据为空，则初始化默认架构
         initializeDefaultArchitectureRef.current?.('默认架构');
@@ -3709,6 +3756,31 @@ const ArchitectureFlow = () => {
           onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
           onPaneClick={onPaneClick}
+          onMove={() => {
+            const vp = getViewport();
+            const prev = prevViewportRef.current;
+            const isZooming = Math.abs(vp.zoom - prev.zoom) > 0.0001;
+            
+            if (isZooming) {
+              console.log(`[缩放中] ${(vp.zoom * 100).toFixed(1)}%`);
+              saveCanvasConfig(vp);
+            }
+          }}
+          onMoveEnd={() => {
+            const vp = getViewport();
+            console.log('[画布状态更新]', {
+              缩放比: (vp.zoom * 100).toFixed(1) + '%',
+              位置X: vp.x.toFixed(1),
+              位置Y: vp.y.toFixed(1)
+            });
+            
+            prevViewportRef.current = { ...vp };
+            saveCanvasConfig(vp);
+          }}
+          onViewportChange={(viewport) => {
+            console.log('[视口变化] 缩放:', (viewport.zoom * 100).toFixed(1) + '%', '位置:', `(${viewport.x.toFixed(0)}, ${viewport.y.toFixed(0)})`);
+            saveCanvasConfig(viewport);
+          }}
           onConnect={onConnect}
           onConnectStart={onConnectStart}
           onConnectEnd={onConnectEnd}
@@ -3718,7 +3790,7 @@ const ArchitectureFlow = () => {
           onReconnectEnd={onReconnectEnd}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          fitView
+          defaultViewport={initialViewport || { x: 0, y: 0, zoom: 1 }}
           nodesDraggable={true}
           nodesConnectable={true}
           edgesUpdatable={true}

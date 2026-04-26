@@ -114,13 +114,47 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     }
 
     @Override
-    public Map<String, Object> getDashboardOverview() {
+    public Map<String, Object> getDashboardOverview(String serviceId) {
+        Map<String, Object> categories = queryLatestByCategories(serviceId);
+        Map<String, Object> basicStats = buildBasicStatsFromCategories(categories);
         Date sampleTime = Optional.ofNullable(lastSampleTime).orElseGet(Date::new);
         Map<String, Object> overview = new HashMap<>();
         overview.put("sampleTime", sampleTime);
-        overview.put("categories", queryLatestByCategories(sampleTime));
+        overview.put("categories", categories);
+        overview.put("basicStats", basicStats);
         overview.put("alertSummary", buildAlertSummary());
         return overview;
+    }
+
+    private Map<String, Object> buildBasicStatsFromCategories(Map<String, Object> categories) {
+        Map<String, Object> basicStats = new HashMap<>();
+        basicStats.put("processRss", findMetricValue(categories, "process_memory", "process_rss_bytes", ""));
+        basicStats.put("cpuUsage", findMetricValue(categories, "cpu", "cpu_usage_pct", ""));
+        basicStats.put("cpuCore", findMetricValue(categories, "cpu", "cpu_cores", ""));
+        basicStats.put("heapUsage", findMetricValue(categories, "heap", "heap_usage_pct", ""));
+        basicStats.put("threadTotal", findMetricValue(categories, "thread", "thread_total", ""));
+        basicStats.put("virtualThreadTotal", findMetricValue(categories, "thread", "thread_virtual_total", ""));
+        basicStats.put("load1m", findMetricValue(categories, "system_load", "load_avg_1m", ""));
+        basicStats.put("gcCollector", simplifyGcCollectorName(
+                garbageCollectorMXBeans.stream()
+                        .map(GarbageCollectorMXBean::getName)
+                        .toList()));
+        return basicStats;
+    }
+
+    @SuppressWarnings("unchecked")
+    private double findMetricValue(Map<String, Object> categories, String category, String metricName, String scope) {
+        List<MonitorMetricSample> metrics = (List<MonitorMetricSample>) categories.get(category);
+        if (metrics == null || metrics.isEmpty()) {
+            return 0D;
+        }
+        String key = buildMetricKey(category, metricName, scope);
+        return metrics.stream()
+                .filter(m -> key
+                        .equals(buildMetricKey(m.getMetricCategory(), m.getMetricName(), nvl(m.getMetricScope()))))
+                .map(MonitorMetricSample::getMetricValue)
+                .findFirst()
+                .orElse(0D);
     }
 
     @Override
@@ -551,11 +585,11 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         return result;
     }
 
-    private Map<String, Object> queryLatestByCategories(Date sampleTime) {
+    private Map<String, Object> queryLatestByCategories(String serviceId) {
         Map<String, Object> map = new LinkedHashMap<>();
         for (String category : List.of("heap", "process_memory", "gc", "thread", "cpu", "system_load", "db_pool",
                 "class_loading")) {
-            List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, sampleTime, null);
+            List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, serviceId);
             map.put(category, metrics);
         }
         return map;

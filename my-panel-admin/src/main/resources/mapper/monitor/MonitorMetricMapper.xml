@@ -55,7 +55,13 @@
                service_id, service_ip_port, sample_time, create_time
         from monitor_metric_sample
         where metric_category = #{category}
-          and sample_time = #{sampleTime}
+          and sample_time = (
+              select max(sample_time) from monitor_metric_sample
+              where metric_category = #{category}
+              <if test="serviceId != null and serviceId != ''">
+                  and service_id = #{serviceId}
+              </if>
+          )
         <if test="serviceId != null and serviceId != ''">
             and service_id = #{serviceId}
         </if>

@@ -34,10 +34,10 @@ public class DashboardController {
     }
 
     @RequirePermission("monitor:server:list")
-    @Operation(summary = "获取监控大屏总览", description = "返回最近采样时间的完整指标总览和告警概览")
+    @Operation(summary = "获取监控大屏总览", description = "返回最近采样时间的完整指标总览和告警概览，支持按服务实例过滤")
     @GetMapping("/overview")
-    public Result<Map<String, Object>> getOverview() {
-        return Result.success(monitorDashboardService.getDashboardOverview());
+    public Result<Map<String, Object>> getOverview(@RequestParam(required = false) String serviceId) {
+        return Result.success(monitorDashboardService.getDashboardOverview(serviceId));
     }
 
     @RequirePermission("monitor:server:list")

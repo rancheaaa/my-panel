@@ -7,10 +7,11 @@ export function getDashboardData() {
 	});
 }
 
-export function getDashboardOverview() {
+export function getDashboardOverview(serviceId) {
 	return request({
 		url: "/monitor/dashboard/overview",
 		method: "get",
+		params: serviceId ? { serviceId } : {},
 	});
 }
 

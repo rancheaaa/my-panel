@@ -18,7 +18,6 @@ public interface MonitorMetricMapper {
             @Param("limit") Integer limit);
 
     List<MonitorMetricSample> selectLatestByCategory(@Param("category") String category,
-            @Param("sampleTime") Date sampleTime,
             @Param("serviceId") String serviceId);
 
     List<Map<String, String>> selectDistinctServiceInstances();

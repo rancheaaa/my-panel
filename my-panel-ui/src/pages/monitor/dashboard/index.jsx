@@ -27,7 +27,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons';
 import {
-  getDashboardData,
+  getDashboardOverview,
   getDashboardTrend,
   getServiceInstances
 } from '../../../api/monitor/dashboard';
@@ -445,7 +445,7 @@ const ServiceDashboard = () => {
     setCurrentTimeRange({ beginTime: begin.getTime(), endTime: end.getTime() });
     try {
       const [overviewRes, trendRes] = await Promise.all([
-        getDashboardData(),
+        getDashboardOverview(selectedServiceId || undefined),
         getDashboardTrend({
           category: activeCategory,
           metricNames: CATEGORY_METRICS[activeCategory],
@@ -651,7 +651,8 @@ const ServiceDashboard = () => {
                   style={{ width: 280, marginLeft: 6 }}
                   onChange={(value) => {
                     setSelectedInstance(value);
-                    setSelectedServiceId(value.split('@')[0]);
+                    setSelectedServiceId(value ? value.split('@')[0] : '');
+                    doFetch();
                   }}
                   options={serviceInstances.map(instance => ({
                     value: `${instance.serviceId}@${instance.serviceIpPort}`,
@@ -661,6 +662,7 @@ const ServiceDashboard = () => {
                   onClear={() => {
                     setSelectedInstance('');
                     setSelectedServiceId('');
+                    doFetch();
                   }}
                 />
               </div>

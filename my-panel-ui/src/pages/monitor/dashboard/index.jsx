@@ -443,16 +443,19 @@ const ServiceDashboard = () => {
     const begin = new Date(end.getTime() - parseRangeToMillis(range));
     const granularity = getGranularityByRange(range);
     setCurrentTimeRange({ beginTime: begin.getTime(), endTime: end.getTime() });
+    const instanceServiceId = selectedInstance ? selectedInstance.split('@')[0] : (selectedServiceId || undefined);
+    const instanceIpPort = selectedInstance ? selectedInstance.split('@')[1] : undefined;
     try {
       const [overviewRes, trendRes] = await Promise.all([
-        getDashboardOverview(selectedServiceId || undefined),
+        getDashboardOverview(instanceServiceId, instanceIpPort),
         getDashboardTrend({
           category: activeCategory,
           metricNames: CATEGORY_METRICS[activeCategory],
           granularity,
           beginTime: begin,
           endTime: end,
-          serviceId: selectedServiceId || undefined
+          serviceId: instanceServiceId,
+          serviceIpPort: instanceIpPort
         })
       ]);
 

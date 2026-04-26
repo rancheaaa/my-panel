@@ -7,11 +7,14 @@ export function getDashboardData() {
 	});
 }
 
-export function getDashboardOverview(serviceId) {
+export function getDashboardOverview(serviceId, serviceIpPort) {
+	const params = {};
+	if (serviceId) params.serviceId = serviceId;
+	if (serviceIpPort) params.serviceIpPort = serviceIpPort;
 	return request({
 		url: "/monitor/dashboard/overview",
 		method: "get",
-		params: serviceId ? { serviceId } : {},
+		params,
 	});
 }
 

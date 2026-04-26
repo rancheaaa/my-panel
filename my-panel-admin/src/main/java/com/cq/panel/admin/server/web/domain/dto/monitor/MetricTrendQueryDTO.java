@@ -27,6 +27,9 @@ public class MetricTrendQueryDTO {
     @Schema(description = "服务实例ID")
     private String serviceId;
 
+    @Schema(description = "服务实例IP端口，与serviceId组合精确定位唯一实例")
+    private String serviceIpPort;
+
     @Schema(description = "限制返回点数", example = "2000")
     private Integer limit;
 }

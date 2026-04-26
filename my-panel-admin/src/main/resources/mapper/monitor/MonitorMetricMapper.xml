@@ -38,6 +38,9 @@
         <if test="serviceId != null and serviceId != ''">
             and service_id = #{serviceId}
         </if>
+        <if test="serviceIpPort != null and serviceIpPort != ''">
+            and service_ip_port = #{serviceIpPort}
+        </if>
         <if test="metricNames != null and metricNames.size() > 0">
             and metric_name in
             <foreach collection="metricNames" item="metricName" open="(" close=")" separator=",">
@@ -60,10 +63,16 @@
               where metric_category = #{category}
               <if test="serviceId != null and serviceId != ''">
                   and service_id = #{serviceId}
+                  <if test="serviceIpPort != null and serviceIpPort != ''">
+                      and service_ip_port = #{serviceIpPort}
+                  </if>
               </if>
           )
         <if test="serviceId != null and serviceId != ''">
             and service_id = #{serviceId}
+            <if test="serviceIpPort != null and serviceIpPort != ''">
+                and service_ip_port = #{serviceIpPort}
+            </if>
         </if>
     </select>
 

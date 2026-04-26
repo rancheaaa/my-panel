@@ -11,7 +11,7 @@ import java.util.Map;
 public interface IMonitorDashboardService {
     Map<String, Object> collectSnapshotAndPersist();
 
-    Map<String, Object> getDashboardOverview(String serviceId);
+    Map<String, Object> getDashboardOverview(String serviceId, String serviceIpPort);
 
     Map<String, Object> getTrend(MetricTrendQueryDTO queryDTO);
 

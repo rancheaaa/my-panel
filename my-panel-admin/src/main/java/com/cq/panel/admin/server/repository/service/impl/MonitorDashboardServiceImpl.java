@@ -114,8 +114,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     }
 
     @Override
-    public Map<String, Object> getDashboardOverview(String serviceId) {
-        Map<String, Object> categories = queryLatestByCategories(serviceId);
+    public Map<String, Object> getDashboardOverview(String serviceId, String serviceIpPort) {
+        Map<String, Object> categories = queryLatestByCategories(serviceId, serviceIpPort);
         Map<String, Object> basicStats = buildBasicStatsFromCategories(categories);
         Date sampleTime = Optional.ofNullable(lastSampleTime).orElseGet(Date::new);
         Map<String, Object> overview = new HashMap<>();
@@ -171,7 +171,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         int limit = queryDTO.getLimit() == null ? configMaxPoints : Math.min(queryDTO.getLimit(), configMaxPoints);
 
         List<MonitorMetricSample> rawSamples = monitorMetricMapper.selectByTimeRange(
-                category, queryDTO.getMetricNames(), beginTime, endTime, queryDTO.getServiceId(), limit);
+                category, queryDTO.getMetricNames(), beginTime, endTime,
+                queryDTO.getServiceId(), queryDTO.getServiceIpPort(), limit);
 
         Map<String, List<MonitorMetricSample>> seriesGroup = rawSamples.stream()
                 .collect(Collectors.groupingBy(item -> item.getMetricName() + "|" + nvl(item.getMetricScope()) + "|"
@@ -585,11 +586,12 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         return result;
     }
 
-    private Map<String, Object> queryLatestByCategories(String serviceId) {
+    private Map<String, Object> queryLatestByCategories(String serviceId, String serviceIpPort) {
         Map<String, Object> map = new LinkedHashMap<>();
         for (String category : List.of("heap", "process_memory", "gc", "thread", "cpu", "system_load", "db_pool",
                 "class_loading")) {
-            List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, serviceId);
+            List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, serviceId,
+                    serviceIpPort);
             map.put(category, metrics);
         }
         return map;

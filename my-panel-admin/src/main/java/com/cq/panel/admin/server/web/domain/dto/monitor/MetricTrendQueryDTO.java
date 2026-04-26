@@ -24,6 +24,9 @@ public class MetricTrendQueryDTO {
     @Schema(description = "结束时间")
     private Instant endTime;
 
+    @Schema(description = "服务实例ID")
+    private String serviceId;
+
     @Schema(description = "限制返回点数", example = "2000")
     private Integer limit;
 }

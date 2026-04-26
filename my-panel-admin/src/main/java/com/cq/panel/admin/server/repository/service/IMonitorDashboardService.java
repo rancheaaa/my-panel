@@ -15,6 +15,8 @@ public interface IMonitorDashboardService {
 
     Map<String, Object> getTrend(MetricTrendQueryDTO queryDTO);
 
+    List<Map<String, String>> listServiceInstances();
+
     List<MonitorAlertRule> listAlertRules();
 
     void saveAlertRule(MonitorAlertRuleSaveDTO dto, String operator);

@@ -6,10 +6,6 @@ import {
   Card,
   Col,
   Empty,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
   Progress,
   Radio,
   Row,
@@ -18,14 +14,10 @@ import {
   Spin,
   Statistic,
   Switch,
-  Table,
   Tag,
   notification
 } from 'antd';
 import {
-  DeleteOutlined,
-  EditOutlined,
-  PlusOutlined,
   ReloadOutlined,
   ExperimentOutlined,
   ApiOutlined,
@@ -35,13 +27,9 @@ import {
   SettingOutlined
 } from '@ant-design/icons';
 import {
-  getAlertEvents,
-  getAlertRules,
   getDashboardData,
   getDashboardTrend,
-  deleteAlertRule,
-  saveAlertRule,
-  updateAlertEventStatus
+  getServiceInstances
 } from '../../../api/monitor/dashboard';
 import './index.scss';
 
@@ -154,12 +142,6 @@ const BYTES_METRICS = [
   'process_rss_bytes', 'os_total_memory_bytes', 'os_available_memory_bytes'
 ];
 
-const ALERT_EVENT_STATUS = [
-  { label: '待处理', value: 'open', color: 'red' },
-  { label: '已解决', value: 'resolved', color: 'green' },
-  { label: '忽略', value: 'ignored', color: 'default' }
-];
-
 const BYTES_UNITS = [
   { label: 'B', value: 1 },
   { label: 'KB', value: 1024 },
@@ -185,14 +167,16 @@ const parseRangeToMillis = (range) => {
 };
 
 const getGranularityByRange = (range) => {
-  if (range === '1m' || range === '5m' || range === '15m') return '1m';
+  if (range === '1m') return '10s';
+  if (range === '5m') return '30s';
+  if (range === '15m') return '1m';
   if (range === '1h') return '5m';
   if (range === '6h') return '15m';
   if (range === '1d') return '1h';
   return '1d';
 };
 
-const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 0, bytesUnit = 1, onBytesUnitChange, metricName }) => {
+const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 0, bytesUnit = 1, onBytesUnitChange, metricName, timeRange }) => {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const isBytesMetric = BYTES_METRICS.includes(metricName);
@@ -211,6 +195,27 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
       }
       return `${Number(value).toFixed(2)}${displayUnit ? ` ${displayUnit}` : ''}`;
     };
+    
+    let xAxisMin = null;
+    let xAxisMax = null;
+    if (series && series.length > 0) {
+      const allPoints = series.flatMap(s => s.points || []);
+      if (allPoints.length > 0) {
+        const timestamps = allPoints.map(p => {
+          if (typeof p.time === 'string') return new Date(p.time.replace(' ', 'T')).getTime();
+          if (p.time instanceof Date) return p.time.getTime();
+          return Number(p.time);
+        }).filter(t => !isNaN(t));
+        if (timestamps.length > 0) {
+          xAxisMin = Math.min(...timestamps);
+          xAxisMax = Math.max(...timestamps);
+        }
+      }
+    }
+    
+    const rangeMs = (timeRange?.endTime && timeRange?.beginTime) ? (timeRange.endTime - timeRange.beginTime) : 0;
+    const padding = rangeMs * 0.02;
+    
     const option = {
       backgroundColor: 'transparent',
       tooltip: {
@@ -228,9 +233,26 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
       grid: { left: 56, right: isBytesMetric ? 100 : 30, top: 44, bottom: 64 },
       xAxis: {
         type: 'time',
+        min: xAxisMin ? xAxisMin - padding : null,
+        max: xAxisMax ? xAxisMax + padding : null,
         axisLine: { lineStyle: { color: '#94a3b8' } },
         splitLine: { show: false },
-        axisLabel: { color: '#64748b' }
+        axisLabel: { 
+          color: '#64748b',
+          formatter: (value) => {
+            const date = new Date(value);
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            if (timeRange && timeRange.endTime && timeRange.beginTime) {
+              const rangeMs = timeRange.endTime - timeRange.beginTime;
+              if (rangeMs <= 5 * 60 * 1000) {
+                return `${hours}:${minutes}:${seconds}`;
+              }
+            }
+            return `${hours}:${minutes}`;
+          }
+        }
       },
       yAxis: {
         type: 'value',
@@ -248,7 +270,15 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
         }
       },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none', zoomOnMouseWheel: true, moveOnMouseMove: true },
+        { 
+          type: 'inside', 
+          xAxisIndex: 0, 
+          filterMode: 'none', 
+          zoomOnMouseWheel: true, 
+          moveOnMouseMove: true,
+          start: 0,
+          end: 100
+        },
         {
           type: 'slider',
           xAxisIndex: 0,
@@ -257,15 +287,30 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
           height: 20,
           borderColor: 'rgba(148, 163, 184, 0.2)',
           backgroundColor: 'rgba(148, 163, 184, 0.08)',
-          fillerColor: 'rgba(22, 119, 255, 0.24)'
+          fillerColor: 'rgba(22, 119, 255, 0.24)',
+          start: 0,
+          end: 100
         }
       ],
       series: series.map((item, index) => {
         const color = CHART_COLORS[(chartIndex + index) % CHART_COLORS.length] || baseColor;
         const processedData = (item.points || []).map((point) => {
           const scaledValue = isBytesMetric ? point.value / bytesUnit : point.value;
-          return [point.time, scaledValue];
-        });
+          let timestamp;
+          if (typeof point.time === 'string') {
+            const timeStr = point.time.replace(' ', 'T');
+            timestamp = new Date(timeStr).getTime();
+            if (isNaN(timestamp)) {
+              console.warn('[Dashboard] 无法解析时间:', point.time);
+              timestamp = Date.now();
+            }
+          } else if (point.time instanceof Date) {
+            timestamp = point.time.getTime();
+          } else {
+            timestamp = Number(point.time) || Date.now();
+          }
+          return [timestamp, scaledValue];
+        }).sort((a, b) => a[0] - b[0]);
         return {
           type: 'line',
           name: item.metricScope ? (SCOPE_LABEL[item.metricScope] || item.metricScope) + ' - ' + (METRIC_META[item.metricName]?.name || item.metricName) : (METRIC_META[item.metricName]?.name || item.tagName || '总览'),
@@ -289,7 +334,7 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
     const onResize = () => chart.resize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [series, bytesUnit]);
+  }, [series, bytesUnit, timeRange]);
 
   useEffect(() => () => {
     if (chartRef.current) {
@@ -369,13 +414,27 @@ const ServiceDashboard = () => {
   const [activeCategory, setActiveCategory] = useState('heap');
   const [overview, setOverview] = useState(null);
   const [trendMap, setTrendMap] = useState({});
-  const [alertEvents, setAlertEvents] = useState([]);
   const [bytesUnit, setBytesUnit] = useState(1024 * 1024);
-  const [alertRules, setAlertRules] = useState([]);
-  const [ruleModalOpen, setRuleModalOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState(null);
-  const [notifiedEventIds, setNotifiedEventIds] = useState(new Set());
-  const [form] = Form.useForm();
+  const [currentTimeRange, setCurrentTimeRange] = useState({ beginTime: null, endTime: null });
+  const [serviceInstances, setServiceInstances] = useState([]);
+  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [selectedInstance, setSelectedInstance] = useState('');
+
+  const fetchServiceInstances = async () => {
+    try {
+      const res = await getServiceInstances();
+      if (res.code === 200 && res.data && res.data.length > 0) {
+        setServiceInstances(res.data);
+        if (!selectedInstance && res.data.length > 0) {
+          const firstInstance = res.data[0];
+          setSelectedServiceId(firstInstance.serviceId);
+          setSelectedInstance(`${firstInstance.serviceId}@${firstInstance.serviceIpPort}`);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch service instances:', e);
+    }
+  };
 
   const doFetch = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -383,57 +442,42 @@ const ServiceDashboard = () => {
     const end = new Date();
     const begin = new Date(end.getTime() - parseRangeToMillis(range));
     const granularity = getGranularityByRange(range);
+    setCurrentTimeRange({ beginTime: begin.getTime(), endTime: end.getTime() });
     try {
-      const [overviewRes, alertRes, trendRes] = await Promise.all([
+      const [overviewRes, trendRes] = await Promise.all([
         getDashboardData(),
-        getAlertEvents({ range: '24h', limit: 200 }),
         getDashboardTrend({
           category: activeCategory,
           metricNames: CATEGORY_METRICS[activeCategory],
           granularity,
           beginTime: begin,
-          endTime: end
+          endTime: end,
+          serviceId: selectedServiceId || undefined
         })
       ]);
 
       if (overviewRes.code === 200) {
         setOverview(overviewRes.data || {});
       }
-      if (alertRes.code === 200) {
-        const events = alertRes.data || [];
-        setAlertEvents(events);
-
-        const pendingStatuses = ['open', '待处理', 'pending'];
-        const newPendingEvents = events.filter(event =>
-          !notifiedEventIds.has(event.id) && pendingStatuses.includes((event.status || '').toLowerCase())
-        );
-
-        if (newPendingEvents.length > 0) {
-          newPendingEvents.forEach(event => {
-            const isCritical = event.severity === 'critical';
-            notification[isCritical ? 'error' : 'warning']({
-              message: `${isCritical ? '严重告警' : '警告'}: ${event.ruleName}`,
-              description: `指标: ${event.metricName} | 当前值: ${event.observedValue} | 阈值: ${event.thresholdValue}`,
-              duration: 10,
-              placement: 'topRight'
-            });
-          });
-
-          const MAX_NOTIFIED_IDS = 1000;
-          setNotifiedEventIds(prev => {
-            const updated = new Set([...prev, ...newPendingEvents.map(e => e.id)]);
-            if (updated.size > MAX_NOTIFIED_IDS) {
-              const arr = Array.from(updated);
-              return new Set(arr.slice(arr.length - MAX_NOTIFIED_IDS));
-            }
-            return updated;
-          });
-        }
-      }
 
       setTrendMap({
         [activeCategory]: trendRes?.code === 200 ? (trendRes.data?.series || []) : []
       });
+      
+      if (trendRes?.code === 200 && trendRes.data) {
+        console.log('[Dashboard] 趋势数据查询结果:', {
+          category: trendRes.data.category,
+          beginTime: trendRes.data.beginTime,
+          endTime: trendRes.data.endTime,
+          seriesCount: trendRes.data.series?.length || 0,
+          sampleSeries: trendRes.data.series?.[0] ? {
+            metricName: trendRes.data.series[0].metricName,
+            pointsCount: trendRes.data.series[0].points?.length || 0,
+            firstPoint: trendRes.data.series[0].points?.[0],
+            lastPoint: trendRes.data.series[0].points?.[trendRes.data.series[0].points?.length - 1]
+          } : null
+        });
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -443,123 +487,27 @@ const ServiceDashboard = () => {
   };
 
   useEffect(() => {
+    fetchServiceInstances();
     doFetch();
-    fetchAlertRules();
     if (!autoRefresh) {
       return undefined;
     }
     const timer = setInterval(() => doFetch(true), refreshInterval);
     return () => clearInterval(timer);
-  }, [range, activeCategory, autoRefresh, refreshInterval]);
-
-  const fetchAlertRules = async () => {
-    try {
-      const res = await getAlertRules();
-      if (res.code === 200) {
-        setAlertRules(res.data || []);
-      }
-    } catch (e) {
-      console.error('Failed to fetch alert rules:', e);
-    }
-  };
-
-  const handleAddRule = () => {
-    setEditingRule(null);
-    form.resetFields();
-    setRuleModalOpen(true);
-  };
-
-  const handleEditRule = (record) => {
-    setEditingRule(record);
-    form.setFieldsValue({
-      ruleName: record.ruleName,
-      metricCategory: record.metricCategory,
-      metricName: record.metricName,
-      metricScope: record.metricScope || '',
-      operator: record.operator,
-      thresholdValue: record.thresholdValue,
-      durationSeconds: record.durationSeconds,
-      severity: record.severity,
-      enabled: record.enabled === '1',
-      description: record.description || ''
-    });
-    setRuleModalOpen(true);
-  };
-
-  const handleDeleteRule = async (id) => {
-    Modal.confirm({
-      title: '确认删除',
-      content: '确定要删除这条报警规则吗？',
-      okText: '确定',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await deleteAlertRule(id);
-          notification.success({ message: '删除成功' });
-          fetchAlertRules();
-        } catch (e) {
-          notification.error({ message: '删除失败', description: e.message });
-        }
-      }
-    });
-  };
-
-  const handleSaveRule = async () => {
-    try {
-      const values = await form.validateFields();
-      const data = {
-        ...values,
-        enabled: values.enabled ? '1' : '0'
-      };
-      if (editingRule) {
-        data.id = editingRule.id;
-      }
-      await saveAlertRule(data);
-      notification.success({ message: editingRule ? '更新成功' : '创建成功' });
-      setRuleModalOpen(false);
-      fetchAlertRules();
-    } catch (e) {
-      if (e.errorFields) {
-        return;
-      }
-      notification.error({ message: '保存失败', description: e.message });
-    }
-  };
-
-  const handleUpdateEventStatus = async (id, status) => {
-    try {
-      await updateAlertEventStatus(id, status);
-      setAlertEvents(prev => prev.map(event =>
-        event.id === id ? { ...event, status } : event
-      ));
-      notification.success({ message: '状态更新成功' });
-      doFetch(true);
-    } catch (e) {
-      notification.error({ message: '状态更新失败', description: e.message });
-    }
-  };
+  }, [range, activeCategory, autoRefresh, refreshInterval, selectedInstance]);
 
   const stats = overview?.basicStats || {};
   const alertSummary = overview?.alertSummary || {};
 
   const summaryCards = [
     {
-      title: 'CPU使用率',
-      value: Number(stats.cpuUsage || 0).toFixed(2),
-      suffix: '%',
-      percent: Math.min(Number(stats.cpuUsage || 0), 100),
+      title: '进程内存占用',
+      value: (Number(stats.processRss || 0) / (1024 * 1024)).toFixed(2),
+      suffix: 'MB',
+      percent: Math.min(Number(stats.processRss || 0) / (1024 * 1024 * 1024) * 100, 100),
       icon: <ExperimentOutlined />,
       color: '#6366f1',
-      cardClass: 'cpu-summary-card'
-    },
-    {
-      title: 'CPU核心数',
-      value: Number(stats.cpuCore || 0).toString(),
-      suffix: '',
-      percent: 0,
-      icon: <ApiOutlined />,
-      color: '#8b5cf6',
-      cardClass: 'core-summary-card'
+      cardClass: 'rss-summary-card'
     },
     {
       title: '堆使用率',
@@ -569,6 +517,15 @@ const ServiceDashboard = () => {
       icon: <DatabaseOutlined />,
       color: '#10b981',
       cardClass: 'heap-summary-card'
+    },
+    {
+      title: 'CPU使用率',
+      value: Number(stats.cpuUsage || 0).toFixed(2),
+      suffix: '%',
+      percent: Math.min(Number(stats.cpuUsage || 0), 100),
+      icon: <ApiOutlined />,
+      color: '#8b5cf6',
+      cardClass: 'cpu-summary-card'
     },
     {
       title: '线程总数',
@@ -610,18 +567,19 @@ const ServiceDashboard = () => {
       }
       const isPoolBytes = metricName === 'pool_used_bytes' || metricName === 'pool_committed_bytes';
       const isHeapBytes = metricName === 'heap_heap_used_bytes' || metricName === 'heap_committed_bytes';
+      let chartKey;
       if (isPoolBytes) {
-        var chartKey = `${activeCategory}|pool_bytes|${scope}`;
+        chartKey = `${activeCategory}|pool_bytes|${scope}`;
         if (!grouped[chartKey]) {
           grouped[chartKey] = { key: chartKey, category: activeCategory, categoryLabel: CATEGORY_LABEL[activeCategory] || activeCategory, metricName, title: (SCOPE_LABEL[scope] || scope) + ' - 分区内存', unit: 'bytes', series: [] };
         }
       } else if (isHeapBytes) {
-        var chartKey = `${activeCategory}|heap_bytes`;
+        chartKey = `${activeCategory}|heap_bytes`;
         if (!grouped[chartKey]) {
           grouped[chartKey] = { key: chartKey, category: activeCategory, categoryLabel: CATEGORY_LABEL[activeCategory] || activeCategory, metricName, title: '堆内存使用', unit: 'bytes', series: [] };
         }
       } else {
-        var chartKey = `${activeCategory}|${metricName}|${scope}`;
+        chartKey = `${activeCategory}|${metricName}|${scope}`;
         if (!grouped[chartKey]) {
           const meta = METRIC_META[metricName] || {};
           const scopeLabel = scope ? (SCOPE_LABEL[scope] || scope) + ' - ' : '';
@@ -644,95 +602,6 @@ const ServiceDashboard = () => {
       return ORDER.indexOf(aKey) - ORDER.indexOf(bKey);
     });
   }, [activeCategory, trendMap]);
-
-  const ruleColumns = useMemo(() => ([
-    { title: '规则名称', dataIndex: 'ruleName', key: 'ruleName', width: 160 },
-    {
-      title: '指标分类',
-      dataIndex: 'metricCategory',
-      key: 'metricCategory',
-      width: 100,
-      render: (value) => CATEGORY_LABEL[value] || value
-    },
-    { title: '指标名称', dataIndex: 'metricName', key: 'metricName', width: 180,
-      render: (value, record) => {
-        const meta = METRIC_META[value];
-        return meta ? meta.name : value;
-      }
-    },
-    { title: '作用域', dataIndex: 'metricScope', key: 'metricScope', width: 100,
-      render: (value) => value ? (SCOPE_LABEL[value] || value) : '-'
-    },
-    { title: '操作符', dataIndex: 'operator', key: 'operator', width: 80 },
-    { title: '阈值', dataIndex: 'thresholdValue', key: 'thresholdValue', width: 100 },
-    { title: '持续时间(秒)', dataIndex: 'durationSeconds', key: 'durationSeconds', width: 120 },
-    {
-      title: '严重级别',
-      dataIndex: 'severity',
-      key: 'severity',
-      width: 100,
-      render: (value) => value === 'critical' ? <Tag color="red">严重</Tag> : <Tag color="gold">警告</Tag>
-    },
-    {
-      title: '状态',
-      dataIndex: 'enabled',
-      key: 'enabled',
-      width: 80,
-      render: (value) => value === '1' ? <Tag color="green">启用</Tag> : <Tag color="default">禁用</Tag>
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 150,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditRule(record)}>
-            编辑
-          </Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteRule(record.id)}>
-            删除
-          </Button>
-        </Space>
-      )
-    }
-  ]), []);
-
-  const alertColumns = useMemo(() => ([
-    { title: '时间', dataIndex: 'triggerTime', key: 'triggerTime', width: 180 },
-    {
-      title: '级别',
-      dataIndex: 'severity',
-      key: 'severity',
-      width: 90,
-      render: (value) => value === 'critical' ? <Tag color="red">critical</Tag> : <Tag color="gold">warning</Tag>
-    },
-    { title: '规则', dataIndex: 'ruleName', key: 'ruleName', width: 180 },
-    { title: '指标', dataIndex: 'metricName', key: 'metricName', width: 160 },
-    { title: '当前值', dataIndex: 'observedValue', key: 'observedValue', width: 120 },
-    { title: '阈值', dataIndex: 'thresholdValue', key: 'thresholdValue', width: 120 },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (value, record) => (
-        <Select
-          size="small"
-          value={value || 'open'}
-          style={{ width: 100 }}
-          onChange={(newStatus) => handleUpdateEventStatus(record.id, newStatus)}
-        >
-          {ALERT_EVENT_STATUS.map(item => (
-            <Select.Option key={item.value} value={item.value}>
-              <Tag color={item.color} style={{ marginRight: 4 }}>{item.label}</Tag>
-            </Select.Option>
-          ))}
-        </Select>
-      )
-    },
-    { title: '详情', dataIndex: 'detail', key: 'detail' }
-  ]), []);
 
   if (loading) {
     return <Spin style={{ width: '100%', marginTop: 100 }} />;
@@ -773,6 +642,29 @@ const ServiceDashboard = () => {
                 onChange={setRefreshInterval}
               />
             </div>
+            {serviceInstances.length > 0 && (
+              <div className="toolbar-item-group" style={{ marginRight: 8 }}>
+                <span className="toolbar-item-label">服务实例</span>
+                <Select
+                  value={selectedInstance}
+                  className="dashboard-select dashboard-select-single"
+                  style={{ width: 280, marginLeft: 6 }}
+                  onChange={(value) => {
+                    setSelectedInstance(value);
+                    setSelectedServiceId(value.split('@')[0]);
+                  }}
+                  options={serviceInstances.map(instance => ({
+                    value: `${instance.serviceId}@${instance.serviceIpPort}`,
+                    label: `${instance.serviceId} @ ${instance.serviceIpPort}`
+                  }))}
+                  allowClear
+                  onClear={() => {
+                    setSelectedInstance('');
+                    setSelectedServiceId('');
+                  }}
+                />
+              </div>
+            )}
             <Radio.Group
               value={activeCategory}
               onChange={(e) => setActiveCategory(e.target.value)}
@@ -842,178 +734,12 @@ const ServiceDashboard = () => {
               bytesUnit={bytesUnit}
               onBytesUnitChange={setBytesUnit}
               metricName={chart.metricName}
+              timeRange={currentTimeRange}
             />
           </Col>
         ))}
       </Row>
 
-      <Card
-        className="alert-rule-card"
-        title="报警规则管理"
-        style={{ marginTop: 24, marginBottom: 24 }}
-        extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRule}>
-            新增规则
-          </Button>
-        }
-      >
-        <Table
-          rowKey="id"
-          columns={ruleColumns}
-          dataSource={alertRules}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 1400 }}
-          locale={{ emptyText: <Empty description="暂无报警规则，点击上方按钮新增" /> }}
-        />
-      </Card>
-
-      <Modal
-        title={editingRule ? '编辑报警规则' : '新增报警规则'}
-        open={ruleModalOpen}
-        onOk={handleSaveRule}
-        onCancel={() => setRuleModalOpen(false)}
-        width={700}
-        destroyOnClose
-        okText="保存"
-        cancelText="取消"
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{
-            enabled: true,
-            durationSeconds: 60,
-            severity: 'warning'
-          }}
-        >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="规则名称"
-                name="ruleName"
-                rules={[{ required: true, message: '请输入规则名称' }]}
-              >
-                <Input placeholder="例如：堆内存使用率过高" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="指标分类"
-                name="metricCategory"
-                rules={[{ required: true, message: '请选择指标分类' }]}
-              >
-                <Select placeholder="请选择指标分类">
-                  {Object.keys(CATEGORY_METRICS).map(key => (
-                    <Select.Option key={key} value={key}>{CATEGORY_LABEL[key]}</Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="指标名称"
-                name="metricName"
-                rules={[{ required: true, message: '请输入指标名称' }]}
-              >
-                <Input placeholder="例如：heap_usage_pct" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="作用域"
-                name="metricScope"
-              >
-                <Input placeholder="可选，例如：young、old、eden等" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                label="操作符"
-                name="operator"
-                rules={[{ required: true, message: '请选择操作符' }]}
-              >
-                <Select placeholder="请选择操作符">
-                  <Select.Option value="gt">大于 (&gt;)</Select.Option>
-                  <Select.Option value="gte">大于等于 (≥)</Select.Option>
-                  <Select.Option value="lt">小于 (&lt;)</Select.Option>
-                  <Select.Option value="lte">小于等于 (≤)</Select.Option>
-                  <Select.Option value="eq">等于 (=)</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="阈值"
-                name="thresholdValue"
-                rules={[{ required: true, message: '请输入阈值' }]}
-              >
-                <InputNumber style={{ width: '100%' }} placeholder="阈值数值" min={0} step={0.1} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="持续时间(秒)"
-                name="durationSeconds"
-                rules={[{ required: true, message: '请输入持续时间' }]}
-              >
-                <InputNumber style={{ width: '100%' }} min={10} max={3600} step={10} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                label="严重级别"
-                name="severity"
-                rules={[{ required: true, message: '请选择严重级别' }]}
-              >
-                <Select placeholder="请选择严重级别">
-                  <Select.Option value="warning">警告</Select.Option>
-                  <Select.Option value="critical">严重</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="启用状态"
-                name="enabled"
-                valuePropName="checked"
-              >
-                <Switch checkedChildren="启用" unCheckedChildren="禁用" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item
-            label="描述"
-            name="description"
-          >
-            <Input.TextArea rows={3} placeholder="规则描述信息（可选）" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Card className="alert-table-card" title="告警事件" style={{ marginTop: 24, marginBottom: 24 }}>
-        <Table
-          rowKey="id"
-          columns={alertColumns}
-          dataSource={alertEvents}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 1300 }}
-        />
-      </Card>
-
-      <Card className="hint-card" title="展示能力说明" style={{ marginTop: 24 }}>
-        <div className="hint-list">
-          <span>1. 当前已按“一个指标一个图表”展示趋势，便于快速对比定位。</span>
-          <span>2. 图表支持缩放、平移、悬浮提示，支持多时间粒度与指标类型筛选。</span>
-          <span>3. 采集间隔默认10秒，可通过参数 `sys.monitor.collectIntervalMs` 调整。</span>
-          <span>4. 历史保留默认7天，可通过参数 `sys.monitor.retentionDays` 调整。</span>
-        </div>
-      </Card>
     </div>
   );
 };

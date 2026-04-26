@@ -633,12 +633,15 @@ CREATE TABLE IF NOT EXISTS `monitor_metric_sample` (
     `metric_value` double NOT NULL COMMENT '指标值',
     `metric_unit` varchar(32) DEFAULT '' COMMENT '指标单位：bytes/ms/count/percent等',
     `tag_json` varchar(1000) DEFAULT NULL COMMENT '扩展标签JSON',
+    `service_id` varchar(64) DEFAULT '' COMMENT '服务实例ID',
+    `service_ip_port` varchar(128) DEFAULT '' COMMENT '服务IP和端口，格式：IP:PORT',
     `sample_time` datetime NOT NULL COMMENT '采样时间',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
     KEY `idx_mms_time` (`sample_time`),
     KEY `idx_mms_category_name_time` (`metric_category`, `metric_name`, `sample_time`),
-    KEY `idx_mms_scope_time` (`metric_scope`, `sample_time`)
+    KEY `idx_mms_scope_time` (`metric_scope`, `sample_time`),
+    KEY `idx_mms_service` (`service_id`, `sample_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控指标采样明细';
 
 CREATE TABLE IF NOT EXISTS `monitor_alert_rule` (

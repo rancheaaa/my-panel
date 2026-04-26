@@ -13,6 +13,8 @@ public class MonitorMetricSample {
     private Double metricValue;
     private String metricUnit;
     private String tagJson;
+    private String serviceId;
+    private String serviceIpPort;
     private Date sampleTime;
     private Date createTime;
 }

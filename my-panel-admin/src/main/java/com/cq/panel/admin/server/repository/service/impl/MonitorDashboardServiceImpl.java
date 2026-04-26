@@ -21,6 +21,7 @@ import oshi.hardware.CentralProcessor;
 import oshi.software.os.OperatingSystem;
 import oshi.software.os.OSProcess;
 import javax.sql.DataSource;
+import java.net.InetAddress;
 import java.lang.management.ClassLoadingMXBean;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
@@ -90,14 +91,18 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         List<MonitorMetricSample> samples = new ArrayList<>();
         Map<String, Double> latestValueMap = new HashMap<>();
 
+        String serviceId = resolveServiceId();
+        String serviceIpPort = resolveServiceIpPort();
+
         // 任何单项采集失败都只记日志，不影响其他采集逻辑。
-        safeCollect(() -> collectHeap(samples, latestValueMap, now), "heap");
-        safeCollect(() -> collectProcessMemory(samples, latestValueMap, now), "process_memory");
-        safeCollect(() -> collectGc(samples, latestValueMap, now), "gc");
-        safeCollect(() -> collectThread(samples, latestValueMap, now), "thread");
-        safeCollect(() -> collectCpuAndLoad(samples, latestValueMap, now), "cpu/load");
-        safeCollect(() -> collectDbPool(samples, latestValueMap, now), "db_pool");
-        safeCollect(() -> collectClassLoading(samples, latestValueMap, now), "class_loading");
+        safeCollect(() -> collectHeap(samples, latestValueMap, now, serviceId, serviceIpPort), "heap");
+        safeCollect(() -> collectProcessMemory(samples, latestValueMap, now, serviceId, serviceIpPort),
+                "process_memory");
+        safeCollect(() -> collectGc(samples, latestValueMap, now, serviceId, serviceIpPort), "gc");
+        safeCollect(() -> collectThread(samples, latestValueMap, now, serviceId, serviceIpPort), "thread");
+        safeCollect(() -> collectCpuAndLoad(samples, latestValueMap, now, serviceId, serviceIpPort), "cpu/load");
+        safeCollect(() -> collectDbPool(samples, latestValueMap, now, serviceId, serviceIpPort), "db_pool");
+        safeCollect(() -> collectClassLoading(samples, latestValueMap, now, serviceId, serviceIpPort), "class_loading");
 
         if (!samples.isEmpty()) {
             monitorMetricMapper.batchInsert(samples);
@@ -132,7 +137,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         int limit = queryDTO.getLimit() == null ? configMaxPoints : Math.min(queryDTO.getLimit(), configMaxPoints);
 
         List<MonitorMetricSample> rawSamples = monitorMetricMapper.selectByTimeRange(
-                category, queryDTO.getMetricNames(), beginTime, endTime, limit);
+                category, queryDTO.getMetricNames(), beginTime, endTime, queryDTO.getServiceId(), limit);
 
         Map<String, List<MonitorMetricSample>> seriesGroup = rawSamples.stream()
                 .collect(Collectors.groupingBy(item -> item.getMetricName() + "|" + nvl(item.getMetricScope()) + "|"
@@ -143,6 +148,9 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             List<MonitorMetricSample> aggregated = aggregateByBucket(entry.getValue(), bucketMillis);
             if (aggregated.isEmpty()) {
                 continue;
+            }
+            if (aggregated.size() > configMaxPoints) {
+                aggregated = aggregated.subList(aggregated.size() - configMaxPoints, aggregated.size());
             }
             MonitorMetricSample first = aggregated.getFirst();
             Map<String, Object> oneSeries = new LinkedHashMap<>();
@@ -225,15 +233,18 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         monitorAlertEventMapper.updateStatus(id, status);
     }
 
-    private void collectHeap(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectHeap(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         MemoryUsage heapUsage = memoryMXBean.getHeapMemoryUsage();
-        addSample(samples, latestValueMap, now, "heap", "heap_heap_used_bytes", "", heapUsage.getUsed(), "bytes", null);
+        addSample(samples, latestValueMap, now, "heap", "heap_heap_used_bytes", "", heapUsage.getUsed(), "bytes", null,
+                serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "heap", "heap_committed_bytes", "", heapUsage.getCommitted(), "bytes",
-                null);
-        addSample(samples, latestValueMap, now, "heap", "heap_max_bytes", "", heapUsage.getMax(), "bytes", null);
+                null, serviceId, serviceIpPort);
+        addSample(samples, latestValueMap, now, "heap", "heap_max_bytes", "", heapUsage.getMax(), "bytes", null,
+                serviceId, serviceIpPort);
         if (heapUsage.getMax() > 0) {
             addSample(samples, latestValueMap, now, "heap", "heap_usage_pct", "",
-                    heapUsage.getUsed() * 100D / heapUsage.getMax(), "percent", null);
+                    heapUsage.getUsed() * 100D / heapUsage.getMax(), "percent", null, serviceId, serviceIpPort);
         }
 
         long youngUsed = 0L, youngCommitted = 0L, youngMax = 0L;
@@ -246,12 +257,13 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             if ("code".equals(scope) || "general".equals(scope)) {
                 continue;
             }
-            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", scope, usage.getUsed(), "bytes", null);
+            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", scope, usage.getUsed(), "bytes", null,
+                    serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "heap", "pool_committed_bytes", scope, usage.getCommitted(),
-                    "bytes", null);
+                    "bytes", null, serviceId, serviceIpPort);
             if (usage.getMax() > 0) {
                 addSample(samples, latestValueMap, now, "heap", "pool_usage_pct", scope,
-                        usage.getUsed() * 100D / usage.getMax(), "percent", null);
+                        usage.getUsed() * 100D / usage.getMax(), "percent", null, serviceId, serviceIpPort);
             }
             if ("eden".equals(scope) || "survivor".equals(scope)) {
                 youngUsed += usage.getUsed();
@@ -260,24 +272,26 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             }
         }
         if (youngUsed > 0 || youngCommitted > 0) {
-            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", "young", youngUsed, "bytes", null);
+            addSample(samples, latestValueMap, now, "heap", "pool_used_bytes", "young", youngUsed, "bytes", null,
+                    serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "heap", "pool_committed_bytes", "young", youngCommitted, "bytes",
-                    null);
+                    null, serviceId, serviceIpPort);
             long denom = Math.max(youngMax, youngCommitted);
             if (denom > 0) {
                 addSample(samples, latestValueMap, now, "heap", "pool_usage_pct", "young",
-                        youngUsed * 100D / denom, "percent", null);
+                        youngUsed * 100D / denom, "percent", null, serviceId, serviceIpPort);
             }
         }
     }
 
-    private void collectProcessMemory(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectProcessMemory(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         try {
             int pid = systemInfo.getOperatingSystem().getProcessId();
             OSProcess currentProcess = systemInfo.getOperatingSystem().getProcess(pid);
             long processRss = currentProcess.getResidentSetSize();
             addSample(samples, latestValueMap, now, "process_memory", "process_rss_bytes", "", processRss, "bytes",
-                    null);
+                    null, serviceId, serviceIpPort);
         } catch (Exception e) {
             log.warn("collect process memory failed: {}", e.getMessage());
         }
@@ -286,17 +300,18 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         long freePhysical = osMXBean.getFreeMemorySize();
         if (totalPhysical > 0) {
             addSample(samples, latestValueMap, now, "process_memory", "os_total_memory_bytes", "", totalPhysical,
-                    "bytes", null);
+                    "bytes", null, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "process_memory", "os_available_memory_bytes", "",
-                    freePhysical, "bytes", null);
+                    freePhysical, "bytes", null, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "process_memory", "os_used_pct", "",
-                    (totalPhysical - freePhysical) * 100D / totalPhysical, "percent", null);
+                    (totalPhysical - freePhysical) * 100D / totalPhysical, "percent", null, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "process_memory", "os_available_pct", "",
-                    freePhysical * 100D / totalPhysical, "percent", null);
+                    freePhysical * 100D / totalPhysical, "percent", null, serviceId, serviceIpPort);
         }
     }
 
-    private void collectGc(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectGc(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         for (GarbageCollectorMXBean gcBean : garbageCollectorMXBeans) {
             long count = Math.max(0L, gcBean.getCollectionCount());
             long timeMs = Math.max(0L, gcBean.getCollectionTime());
@@ -306,14 +321,19 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             long maxObserved = Math.max(gcMaxPauseMillis.getOrDefault(gcBean.getName(), 0L), Math.round(avg));
             gcMaxPauseMillis.put(gcBean.getName(), maxObserved);
 
-            addSample(samples, latestValueMap, now, "gc", "gc_count_total", scope, count, "count", tag);
-            addSample(samples, latestValueMap, now, "gc", "gc_time_total_ms", scope, timeMs, "ms", tag);
-            addSample(samples, latestValueMap, now, "gc", "gc_avg_pause_ms", scope, avg, "ms", tag);
-            addSample(samples, latestValueMap, now, "gc", "gc_max_pause_ms", scope, maxObserved, "ms", tag);
+            addSample(samples, latestValueMap, now, "gc", "gc_count_total", scope, count, "count", tag, serviceId,
+                    serviceIpPort);
+            addSample(samples, latestValueMap, now, "gc", "gc_time_total_ms", scope, timeMs, "ms", tag, serviceId,
+                    serviceIpPort);
+            addSample(samples, latestValueMap, now, "gc", "gc_avg_pause_ms", scope, avg, "ms", tag, serviceId,
+                    serviceIpPort);
+            addSample(samples, latestValueMap, now, "gc", "gc_max_pause_ms", scope, maxObserved, "ms", tag, serviceId,
+                    serviceIpPort);
         }
     }
 
-    private void collectThread(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectThread(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         ThreadInfo[] infos = threadMXBean.dumpAllThreads(false, false);
         int blocked = 0;
         int waiting = 0;
@@ -339,14 +359,22 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         long virtualCount = allThreads.stream().filter(Thread::isVirtual).count();
         long platformCount = allThreads.size() - virtualCount;
 
-        addSample(samples, latestValueMap, now, "thread", "thread_total", "", infos.length, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_platform_total", "", platformCount, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_virtual_total", "", virtualCount, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_blocked", "", blocked, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_waiting", "", waiting, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_runnable", "", runnable, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_timed_waiting", "", timedWaiting, "count", null);
-        addSample(samples, latestValueMap, now, "thread", "thread_terminated", "", terminated, "count", null);
+        addSample(samples, latestValueMap, now, "thread", "thread_total", "", infos.length, "count", null, serviceId,
+                serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_platform_total", "", platformCount, "count", null,
+                serviceId, serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_virtual_total", "", virtualCount, "count", null,
+                serviceId, serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_blocked", "", blocked, "count", null, serviceId,
+                serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_waiting", "", waiting, "count", null, serviceId,
+                serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_runnable", "", runnable, "count", null, serviceId,
+                serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_timed_waiting", "", timedWaiting, "count", null,
+                serviceId, serviceIpPort);
+        addSample(samples, latestValueMap, now, "thread", "thread_terminated", "", terminated, "count", null, serviceId,
+                serviceIpPort);
 
         allThreads.stream()
                 .sorted(Comparator.comparing(Thread::getName))
@@ -357,24 +385,26 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                             "\",\"state\":\"" + thread.getState() +
                             "\",\"virtual\":" + thread.isVirtual() + "}";
                     addSample(samples, latestValueMap, now, "thread", "thread_info",
-                            thread.getState().name().toLowerCase(Locale.ROOT), thread.threadId(), "id", tag);
+                            thread.getState().name().toLowerCase(Locale.ROOT), thread.threadId(), "id", tag, serviceId,
+                            serviceIpPort);
                 });
     }
 
-    private void collectCpuAndLoad(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectCpuAndLoad(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         CentralProcessor processor = systemInfo.getHardware().getProcessor();
         long[] currentTicks = processor.getSystemCpuLoadTicks();
         long[] prev = previousCpuTicks;
         previousCpuTicks = currentTicks;
 
         addSample(samples, latestValueMap, now, "cpu", "cpu_cores", "", processor.getLogicalProcessorCount(), "count",
-                null);
+                null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "cpu", "cpu_usage_pct", "", osMXBean.getCpuLoad() * 100D, "percent",
-                null);
+                null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "cpu", "cpu_process_usage_pct", "", osMXBean.getProcessCpuLoad() * 100D,
-                "percent", null);
+                "percent", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "cpu", "cpu_process_time_ns", "", osMXBean.getProcessCpuTime(), "ns",
-                null);
+                null, serviceId, serviceIpPort);
 
         if (prev != null && prev.length == currentTicks.length) {
             long user = currentTicks[CentralProcessor.TickType.USER.getIndex()]
@@ -385,32 +415,34 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                     - prev[CentralProcessor.TickType.IDLE.getIndex()];
             long total = Math.max(1, user + sys + idle);
             addSample(samples, latestValueMap, now, "cpu", "cpu_user_time_pct", "", user * 100D / total, "percent",
-                    null);
+                    null, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "cpu", "cpu_system_time_pct", "", sys * 100D / total, "percent",
-                    null);
+                    null, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "cpu", "cpu_idle_time_pct", "", idle * 100D / total, "percent",
-                    null);
+                    null, serviceId, serviceIpPort);
         }
 
         OperatingSystem os = systemInfo.getOperatingSystem();
         double[] loadAvg = processor.getSystemLoadAverage(3);
         addSample(samples, latestValueMap, now, "system_load", "load_avg_1m", "",
-                loadAvg.length > 0 ? safeNonNegative(loadAvg[0]) : 0D, "value", null);
+                loadAvg.length > 0 ? safeNonNegative(loadAvg[0]) : 0D, "value", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "system_load", "load_avg_5m", "",
-                loadAvg.length > 1 ? safeNonNegative(loadAvg[1]) : 0D, "value", null);
+                loadAvg.length > 1 ? safeNonNegative(loadAvg[1]) : 0D, "value", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "system_load", "load_avg_15m", "",
-                loadAvg.length > 2 ? safeNonNegative(loadAvg[2]) : 0D, "value", null);
+                loadAvg.length > 2 ? safeNonNegative(loadAvg[2]) : 0D, "value", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "system_load", "os_process_count", "", os.getProcessCount(), "count",
-                null);
+                null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "system_load", "os_thread_count", "", os.getThreadCount(), "count",
-                null);
+                null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "system_load", "run_queue_length", "", threadMXBean.getThreadCount(),
-                "count", null);
+                "count", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "system_load", "blocked_process_count", "",
-                threadMXBean.getThreadInfo(threadMXBean.getAllThreadIds()).length, "count", null);
+                threadMXBean.getThreadInfo(threadMXBean.getAllThreadIds()).length, "count", null, serviceId,
+                serviceIpPort);
     }
 
-    private void collectDbPool(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectDbPool(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         Map<String, DataSource> dsMap = applicationContext.getBeansOfType(DataSource.class);
         for (Map.Entry<String, DataSource> entry : dsMap.entrySet()) {
             if (!(entry.getValue() instanceof DruidDataSource druidDataSource)) {
@@ -420,33 +452,34 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                     : druidDataSource.getName();
             String tag = "{\"pool\":\"" + escape(poolName) + "\"}";
             addSample(samples, latestValueMap, now, "db_pool", "pool_active_connections", poolName,
-                    druidDataSource.getActiveCount(), "count", tag);
+                    druidDataSource.getActiveCount(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_max_active", poolName,
-                    druidDataSource.getMaxActive(), "count", tag);
+                    druidDataSource.getMaxActive(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_min_idle", poolName, druidDataSource.getMinIdle(),
-                    "count", tag);
+                    "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_idle_connections", poolName,
-                    druidDataSource.getPoolingCount(), "count", tag);
+                    druidDataSource.getPoolingCount(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_pending_threads", poolName,
-                    druidDataSource.getNotEmptyWaitThreadCount(), "count", tag);
+                    druidDataSource.getNotEmptyWaitThreadCount(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_create_count_total", poolName,
-                    druidDataSource.getCreateCount(), "count", tag);
+                    druidDataSource.getCreateCount(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_close_count_total", poolName,
-                    druidDataSource.getCloseCount(), "count", tag);
+                    druidDataSource.getCloseCount(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_connect_error_count_total", poolName,
-                    druidDataSource.getConnectErrorCount(), "count", tag);
+                    druidDataSource.getConnectErrorCount(), "count", tag, serviceId, serviceIpPort);
             addSample(samples, latestValueMap, now, "db_pool", "pool_wait_millis_avg", poolName,
-                    druidDataSource.getNotEmptyWaitMillis(), "ms", tag);
+                    druidDataSource.getNotEmptyWaitMillis(), "ms", tag, serviceId, serviceIpPort);
         }
     }
 
-    private void collectClassLoading(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now) {
+    private void collectClassLoading(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
+            String serviceId, String serviceIpPort) {
         addSample(samples, latestValueMap, now, "class_loading", "class_loaded_count", "",
-                classLoadingMXBean.getLoadedClassCount(), "count", null);
+                classLoadingMXBean.getLoadedClassCount(), "count", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "class_loading", "class_total_loaded", "",
-                classLoadingMXBean.getTotalLoadedClassCount(), "count", null);
+                classLoadingMXBean.getTotalLoadedClassCount(), "count", null, serviceId, serviceIpPort);
         addSample(samples, latestValueMap, now, "class_loading", "class_unloaded_count", "",
-                classLoadingMXBean.getUnloadedClassCount(), "count", null);
+                classLoadingMXBean.getUnloadedClassCount(), "count", null, serviceId, serviceIpPort);
     }
 
     private void evaluateAlertRules(Map<String, Double> latestValueMap, Date now) {
@@ -497,6 +530,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
     private Map<String, Object> buildOverviewFromCurrent(Map<String, Double> latestValueMap, Date now) {
         Map<String, Object> basicStats = new HashMap<>();
+        basicStats.put("processRss", latestValueMap.getOrDefault(
+                buildMetricKey("process_memory", "process_rss_bytes", ""), 0D));
         basicStats.put("cpuUsage", latestValueMap.getOrDefault(buildMetricKey("cpu", "cpu_usage_pct", ""), 0D));
         basicStats.put("cpuCore", latestValueMap.getOrDefault(buildMetricKey("cpu", "cpu_cores", ""), 0D));
         basicStats.put("heapUsage", latestValueMap.getOrDefault(buildMetricKey("heap", "heap_usage_pct", ""), 0D));
@@ -520,10 +555,15 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         Map<String, Object> map = new LinkedHashMap<>();
         for (String category : List.of("heap", "process_memory", "gc", "thread", "cpu", "system_load", "db_pool",
                 "class_loading")) {
-            List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, sampleTime);
+            List<MonitorMetricSample> metrics = monitorMetricMapper.selectLatestByCategory(category, sampleTime, null);
             map.put(category, metrics);
         }
         return map;
+    }
+
+    @Override
+    public List<Map<String, String>> listServiceInstances() {
+        return monitorMetricMapper.selectDistinctServiceInstances();
     }
 
     private Map<String, Object> buildAlertSummary() {
@@ -548,7 +588,9 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             String scope,
             double value,
             String unit,
-            String tagJson) {
+            String tagJson,
+            String serviceId,
+            String serviceIpPort) {
         MonitorMetricSample sample = new MonitorMetricSample();
         sample.setMetricCategory(category);
         sample.setMetricName(name);
@@ -556,9 +598,40 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         sample.setMetricValue(round2(value));
         sample.setMetricUnit(nvl(unit));
         sample.setTagJson(tagJson);
+        sample.setServiceId(serviceId);
+        sample.setServiceIpPort(serviceIpPort);
         sample.setSampleTime(sampleTime);
         samples.add(sample);
         latestValueMap.put(buildMetricKey(category, name, nvl(scope)), value);
+    }
+
+    private String resolveServiceId() {
+        String serviceId = applicationContext.getEnvironment().getProperty("spring.application.name");
+        if (StringUtils.isEmpty(serviceId)) {
+            serviceId = sysConfigService.selectConfigByKey("sys.monitor.serviceId");
+        }
+        if (StringUtils.isEmpty(serviceId)) {
+            try {
+                InetAddress localHost = InetAddress.getLocalHost();
+                String hostname = localHost.getHostName();
+                int pid = systemInfo.getOperatingSystem().getProcessId();
+                serviceId = hostname + "-" + pid;
+            } catch (Exception e) {
+                serviceId = "unknown-" + System.currentTimeMillis();
+            }
+        }
+        return serviceId;
+    }
+
+    private String resolveServiceIpPort() {
+        try {
+            InetAddress localHost = InetAddress.getLocalHost();
+            String hostAddress = localHost.getHostAddress();
+            int port = applicationContext.getEnvironment().getProperty("server.port", Integer.class, 8080);
+            return hostAddress + ":" + port;
+        } catch (Exception e) {
+            return "127.0.0.1:8080";
+        }
     }
 
     private List<MonitorMetricSample> aggregateByBucket(List<MonitorMetricSample> source, long bucketMillis) {
@@ -610,10 +683,11 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             return Duration.ofMinutes(1).toMillis();
         }
         String text = granularity.toLowerCase(Locale.ROOT).trim();
-        if (text.matches("\\d+[mhd]")) {
+        if (text.matches("\\d+[smhd]")) {
             long n = Long.parseLong(text.substring(0, text.length() - 1));
             char unit = text.charAt(text.length() - 1);
             return switch (unit) {
+                case 's' -> Duration.ofSeconds(n).toMillis();
                 case 'm' -> Duration.ofMinutes(n).toMillis();
                 case 'h' -> Duration.ofHours(n).toMillis();
                 case 'd' -> Duration.ofDays(n).toMillis();
@@ -621,6 +695,8 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             };
         }
         return switch (text) {
+            case "10s" -> Duration.ofSeconds(10).toMillis();
+            case "30s" -> Duration.ofSeconds(30).toMillis();
             case "1m" -> Duration.ofMinutes(1).toMillis();
             case "5m" -> Duration.ofMinutes(5).toMillis();
             case "15m" -> Duration.ofMinutes(15).toMillis();

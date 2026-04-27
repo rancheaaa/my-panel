@@ -74,6 +74,23 @@ const Server = () => {
     const PIE_COLORS = ['#1677ff', '#13c2c2', '#722ed1', '#eb2f96', '#fa8c16', '#2f54eb', '#52c41a', '#f5222d'];
     const option = {
       backgroundColor: 'transparent',
+      title: {
+        text: `${processMemory.rssMb} MB`,
+        subtext: 'RES',
+        left: '38%',
+        top: '46%',
+        textAlign: 'center',
+        textStyle: {
+          fontSize: 24,
+          fontWeight: 'bold',
+          color: '#1e293b'
+        },
+        subtextStyle: {
+          fontSize: 13,
+          color: '#94a3b8',
+          fontWeight: 600
+        }
+      },
       tooltip: {
         trigger: 'item',
         backgroundColor: 'rgba(17, 24, 39, 0.92)',
@@ -376,7 +393,7 @@ const Server = () => {
               title={
                 <div className="card-header-content">
                   <div className="card-icon"><DatabaseOutlined /></div>
-                  <span>进程内存分布 (RSS: {processMemory?.rssMb || '-'} MB)</span>
+                  <span>进程内存分布 (RES: {processMemory?.rssMb || '-'} MB)</span>
                 </div>
               }
               hoverable

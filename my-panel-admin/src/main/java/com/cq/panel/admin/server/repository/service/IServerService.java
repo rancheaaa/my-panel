@@ -1,5 +1,6 @@
 package com.cq.panel.admin.server.repository.service;
 
+import com.cq.panel.admin.server.web.domain.vo.monitor.ProcessMemoryVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.ServerVO;
 
 /**
@@ -14,5 +15,12 @@ public interface IServerService {
      * @return 服务器信息
      */
     ServerVO getServerInfo() throws Exception;
+
+    /**
+     * 获取进程内存分布信息
+     *
+     * @return 进程内存分布
+     */
+    ProcessMemoryVO getProcessMemoryInfo();
 }
 

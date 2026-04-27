@@ -38,7 +38,7 @@ set "DATA_DIR=%ROOT_DIR%\data"
 :: JDK & Nginx Package Names (for easy modification)
 set "JDK_PKG_NAME=jdk-21-windows.zip"
 set "NGINX_PKG_NAME=nginx-1.24.0.zip"
-set "JAVA_OPTS=-Xms512m -Xmx1024m -XX:+UseG1GC"
+set "JAVA_OPTS=-Xms512m -Xmx2048m -Xss1m -XX:+UseG1GC -XX:NativeMemoryTracking=summary"
 set "WINDOW_TITLE=MyPanelAdminServer"
 set "PROXY_WINDOW_TITLE=MyPanelProxyServer"
 

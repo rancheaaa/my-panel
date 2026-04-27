@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, Row, Col, Table, Skeleton, Button, Space, Typography, Progress } from 'antd';
-import { getServer } from '../../../api/monitor/server';
+import * as echarts from 'echarts';
+import { getServer, getProcessMemoryDistribution } from '../../../api/monitor/server';
 import { getConfigKey } from '../../../api/config';
 import {
   HddOutlined,
@@ -19,17 +20,21 @@ const { Title, Paragraph } = Typography;
 
 const Server = () => {
   const [server, setServer] = useState({});
+  const [processMemory, setProcessMemory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showSwagger, setShowSwagger] = useState(false);
   const [showActuator, setShowActuator] = useState(false);
+  const memoryPieRef = useRef(null);
+  const memoryChartRef = useRef(null);
 
   const fetchData = async () => {
     try {
-      const [serverRes, swaggerRes, actuatorRes] = await Promise.all([
+      const [serverRes, swaggerRes, actuatorRes, memoryRes] = await Promise.all([
         getServer(),
         getConfigKey('sys.monitor.showSwagger'),
-        getConfigKey('sys.monitor.showActuator')
+        getConfigKey('sys.monitor.showActuator'),
+        getProcessMemoryDistribution()
       ]);
 
       if (serverRes.code === 200) {
@@ -41,6 +46,9 @@ const Server = () => {
       if (actuatorRes.code === 200) {
         setShowActuator(actuatorRes.data?.configValue === 'true');
       }
+      if (memoryRes.code === 200 && memoryRes.data) {
+        setProcessMemory(memoryRes.data);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -51,6 +59,89 @@ const Server = () => {
 
   useEffect(() => {
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (!memoryPieRef.current || !processMemory?.regions) return;
+    if (!memoryChartRef.current) {
+      memoryChartRef.current = echarts.init(memoryPieRef.current);
+    }
+    const chart = memoryChartRef.current;
+    const pieData = processMemory.regions.map((r, index) => ({
+      name: r.name,
+      value: r.bytes
+    }));
+    const PIE_COLORS = ['#1677ff', '#13c2c2', '#722ed1', '#eb2f96', '#fa8c16', '#2f54eb', '#52c41a', '#f5222d'];
+    const option = {
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(17, 24, 39, 0.92)',
+        borderColor: 'rgba(59, 130, 246, 0.4)',
+        textStyle: { color: '#dbeafe' },
+        formatter: (params) => {
+          const region = processMemory.regions.find(r => r.name === params.name);
+          return `<strong>${params.name}</strong><br/>` +
+            `占用: ${region?.mb || 0} MB<br/>` +
+            `占比: ${params.percent}%`;
+        }
+      },
+      legend: {
+        orient: 'vertical',
+        right: '5%',
+        top: 'center',
+        textStyle: { color: '#4b5563', fontSize: 13 },
+        formatter: (name) => {
+          const region = processMemory.regions.find(r => r.name === name);
+          return `${name}  ${region?.percent || 0}%`;
+        }
+      },
+      series: [
+        {
+          name: '内存分布',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          center: ['38%', '50%'],
+          avoidLabelOverlap: true,
+          itemStyle: {
+            borderRadius: 8,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: '#1e293b',
+              formatter: () => `${processMemory.rssMb} MB`
+            }
+          },
+          labelLine: { show: false },
+          data: pieData.map((item, i) => ({
+            ...item,
+            itemStyle: { color: PIE_COLORS[i % PIE_COLORS.length] }
+          }))
+        }
+      ]
+    };
+    chart.setOption(option, true);
+    const onResize = () => chart.resize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [processMemory]);
+
+  useEffect(() => {
+    return () => {
+      if (memoryChartRef.current) {
+        memoryChartRef.current.dispose();
+        memoryChartRef.current = null;
+      }
+    };
   }, []);
 
   const handleRefresh = () => {
@@ -276,8 +367,72 @@ const Server = () => {
               </div>
             </Card>
           </Col>
+        </Row>
 
-          <Col xs={24} md={12}>
+        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
+          <Col span={24}>
+            <Card
+              className="monitor-card memory-pie-card"
+              title={
+                <div className="card-header-content">
+                  <div className="card-icon"><DatabaseOutlined /></div>
+                  <span>进程内存分布 (RSS: {processMemory?.rssMb || '-'} MB)</span>
+                </div>
+              }
+              hoverable
+            >
+              {processMemory?.regions ? (
+                <>
+                  <div ref={memoryPieRef} style={{ height: 360 }} />
+                  {processMemory.kernelResource && processMemory.kernelResource.totalKernelBytes > 0 && (
+                    <div className="kernel-resource-detail">
+                      <div className="kernel-detail-title">内核资源明细</div>
+                      <div className="kernel-detail-grid">
+                        <div className="kernel-detail-item">
+                          <span className="kd-label">文件描述符/句柄</span>
+                          <span className="kd-value">{processMemory.kernelResource.openFileDescriptors} 个</span>
+                          <span className="kd-size">{processMemory.kernelResource.fileDescriptorMb} MB</span>
+                        </div>
+                        <div className="kernel-detail-item">
+                          <span className="kd-label">Socket缓冲区</span>
+                          <span className="kd-value">{processMemory.kernelResource.socketCount} 个</span>
+                          <span className="kd-size">{processMemory.kernelResource.socketBufferMb} MB</span>
+                        </div>
+                        <div className="kernel-detail-item">
+                          <span className="kd-label">内存映射文件</span>
+                          <span className="kd-value">{processMemory.kernelResource.mappedFileCount} 个</span>
+                          <span className="kd-size">{processMemory.kernelResource.mappedFileMb} MB</span>
+                        </div>
+                        <div className="kernel-detail-item">
+                          <span className="kd-label">共享内存</span>
+                          <span className="kd-value">-</span>
+                          <span className="kd-size">{processMemory.kernelResource.sharedMemoryMb} MB</span>
+                        </div>
+                        <div className="kernel-detail-item">
+                          <span className="kd-label">页表占用</span>
+                          <span className="kd-value">-</span>
+                          <span className="kd-size">{processMemory.kernelResource.pageTableMb} MB</span>
+                        </div>
+                        <div className="kernel-detail-item kernel-detail-total">
+                          <span className="kd-label">内核资源合计</span>
+                          <span className="kd-value"></span>
+                          <span className="kd-size kd-total-size">{processMemory.kernelResource.totalKernelMb} MB</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999' }}>
+                  暂无数据
+                </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
+          <Col span={24}>
             <Card
               className="monitor-card info-card"
               title={

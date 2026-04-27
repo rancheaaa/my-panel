@@ -78,7 +78,7 @@ NGINX_DIR="$ROOT_DIR/nginx"
 NGINX_PID_FILE="$ROOT_DIR/nginx.pid"
 
 # JVM Options
-JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC"
+JAVA_OPTS="-Xms512m -Xmx2048m -Xss1m -XX:+UseG1GC -XX:NativeMemoryTracking=summary"
 
 # --- Find JARs ---
 APP_JAR_PATH=""

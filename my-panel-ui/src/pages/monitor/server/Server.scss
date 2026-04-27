@@ -244,6 +244,96 @@
   }
 }
 
+.memory-pie-card {
+  .card-icon {
+    background: linear-gradient(135deg, #722ed1 0%, #531dab 100%);
+    box-shadow: 0 8px 24px rgba(114, 46, 209, 0.3);
+  }
+
+  .ant-card-head-title {
+    color: #722ed1 !important;
+  }
+}
+
+.kernel-resource-detail {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(114, 46, 209, 0.12);
+
+  .kernel-detail-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #722ed1;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .kernel-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .kernel-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(114, 46, 209, 0.04);
+    border: 1px solid rgba(114, 46, 209, 0.08);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(114, 46, 209, 0.08);
+      border-color: rgba(114, 46, 209, 0.18);
+    }
+
+    &.kernel-detail-total {
+      grid-column: -1 / 1;
+      background: linear-gradient(135deg, rgba(114, 46, 209, 0.08), rgba(114, 46, 209, 0.04));
+      border-color: rgba(114, 46, 209, 0.2);
+
+      .kd-label {
+        font-weight: 700 !important;
+        color: #722ed1 !important;
+      }
+
+      .kd-total-size {
+        font-weight: 700 !important;
+        color: #722ed1 !important;
+        font-size: 14px !important;
+      }
+    }
+
+    .kd-label {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 500;
+      white-space: nowrap;
+      min-width: 90px;
+    }
+
+    .kd-value {
+      font-size: 13px;
+      color: #334155;
+      font-weight: 600;
+      min-width: 60px;
+    }
+
+    .kd-size {
+      font-size: 13px;
+      color: #722ed1;
+      font-weight: 600;
+      margin-left: auto;
+    }
+  }
+}
+
 .disk-card {
   .card-icon {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);

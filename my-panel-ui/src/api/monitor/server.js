@@ -7,3 +7,11 @@ export function getServer() {
     method: 'get'
   });
 }
+
+// 获取进程内存分布
+export function getProcessMemoryDistribution() {
+  return request({
+    url: '/monitor/server/memory-distribution',
+    method: 'get'
+  });
+}

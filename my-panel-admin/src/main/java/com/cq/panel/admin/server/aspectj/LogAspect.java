@@ -11,7 +11,7 @@ import com.cq.panel.admin.server.filter.PropertyPreExcludeFilter;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.repository.domain.SysOperLog;
@@ -95,7 +95,7 @@ public class LogAspect
             SysOperLog operLog = new SysOperLog();
             operLog.setStatus(BusinessStatus.SUCCESS.ordinal());
             // 请求的地址
-            String ip = IpUtils.getIpAddr();
+            String ip = MyIpUtils.getIpAddr();
             operLog.setOperIp(ip);
             operLog.setOperUrl(StringUtils.substring(ServletUtils.getRequest().getRequestURI(), 0, 255));
             operLog.setOperName(loginUser.getUsername());

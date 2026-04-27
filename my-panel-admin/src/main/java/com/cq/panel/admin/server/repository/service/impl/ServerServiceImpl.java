@@ -1,9 +1,11 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import com.cq.panel.admin.server.common.utils.Arith;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.repository.service.IServerService;
 import com.cq.panel.admin.server.web.domain.vo.monitor.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
@@ -14,8 +16,9 @@ import oshi.software.os.FileSystem;
 import oshi.software.os.OSFileStore;
 import oshi.software.os.OperatingSystem;
 import oshi.util.Util;
-
+import java.lang.management.ManagementFactory;
 import java.net.UnknownHostException;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 
@@ -28,6 +31,9 @@ import java.util.Properties;
 public class ServerServiceImpl implements IServerService {
 
     private static final int OSHI_WAIT_SECOND = 1000;
+
+    @Value("${server.port}")
+    private int port;
 
     @Override
     public ServerVO getServerInfo() throws Exception {
@@ -88,8 +94,8 @@ public class ServerServiceImpl implements IServerService {
      */
     private void setSysInfo(SysVO sys) {
         Properties props = System.getProperties();
-        sys.setComputerName(IpUtils.getHostName());
-        sys.setComputerIp(IpUtils.getHostIp());
+        sys.setComputerName(MyIpUtils.getHostName());
+        sys.setComputerIp(MyIpUtils.getHostIp() + ":" + port);
         sys.setOsName(props.getProperty("os.name"));
         sys.setOsArch(props.getProperty("os.arch"));
         sys.setUserDir(props.getProperty("user.dir"));
@@ -100,11 +106,24 @@ public class ServerServiceImpl implements IServerService {
      */
     private void setJvmInfo(JvmVO jvm) throws UnknownHostException {
         Properties props = System.getProperties();
-        jvm.setTotal(Runtime.getRuntime().totalMemory());
-        jvm.setMax(Runtime.getRuntime().maxMemory());
-        jvm.setFree(Runtime.getRuntime().freeMemory());
+        Runtime runtime = Runtime.getRuntime();
+        long totalMemory = runtime.totalMemory();
+        long freeMemory = runtime.freeMemory();
+        long maxMemory = runtime.maxMemory();
+        long usedMemory = totalMemory - freeMemory;
+
+        jvm.setTotal(Arith.div(totalMemory, (1024 * 1024), 2));
+        jvm.setMax(Arith.div(maxMemory, (1024 * 1024), 2));
+        jvm.setFree(Arith.div(freeMemory, (1024 * 1024), 2));
+        jvm.setUsed(Arith.div(usedMemory, (1024 * 1024), 2));
+        jvm.setUsage(Arith.mul(Arith.div(usedMemory, totalMemory, 4), 100));
         jvm.setVersion(props.getProperty("java.version"));
         jvm.setHome(props.getProperty("java.home"));
+        jvm.setName(ManagementFactory.getRuntimeMXBean().getVmName());
+        jvm.setPid(ProcessHandle.current().pid());
+        jvm.setStartTime(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, DateUtils.getServerStartDate()));
+        jvm.setRunTime(DateUtils.timeDistance(new Date(), DateUtils.getServerStartDate()));
+        jvm.setInputArgs(ManagementFactory.getRuntimeMXBean().getInputArguments().toString());
     }
 
     /**

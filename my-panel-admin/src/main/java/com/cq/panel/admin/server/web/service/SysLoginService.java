@@ -11,7 +11,7 @@ import com.cq.panel.admin.server.web.exception.user.*;
 import com.cq.panel.admin.server.common.utils.DateUtils;
 import com.cq.panel.admin.server.common.utils.MessageUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.context.AuthenticationContextHolder;
@@ -131,7 +131,7 @@ public class SysLoginService
         }
         // IP黑名单校验
         String blackStr = configService.selectConfigByKey("sys.login.blackIPList");
-        if (IpUtils.isMatchedIp(blackStr, IpUtils.getIpAddr()))
+        if (MyIpUtils.isMatchedIp(blackStr, MyIpUtils.getIpAddr()))
         {
             AsyncManager.me().execute(AsyncFactory.recordLoginInfo(username, Constants.LOGIN_FAIL, MessageUtils.message("login.blocked")));
             throw new BlackListException();
@@ -147,7 +147,7 @@ public class SysLoginService
     {
         SysUser sysUser = new SysUser();
         sysUser.setUserId(userId);
-        sysUser.setLoginIp(IpUtils.getIpAddr());
+        sysUser.setLoginIp(MyIpUtils.getIpAddr());
         sysUser.setLoginDate(DateUtils.getNowDate());
         userService.updateUserProfile(sysUser);
     }

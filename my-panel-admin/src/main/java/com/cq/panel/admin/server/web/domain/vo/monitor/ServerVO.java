@@ -27,46 +27,6 @@ public class ServerVO {
     private SysVO sys = new SysVO();
 
     @Schema(description = "磁盘相关信息")
-    private List<SysFileVO> sysFiles = new LinkedList<SysFileVO>();
-
-    public CpuVO getCpu() {
-        return cpu;
-    }
-
-    public void setCpu(CpuVO cpu) {
-        this.cpu = cpu;
-    }
-
-    public MemVO getMem() {
-        return mem;
-    }
-
-    public void setMem(MemVO mem) {
-        this.mem = mem;
-    }
-
-    public JvmVO getJvm() {
-        return jvm;
-    }
-
-    public void setJvm(JvmVO jvm) {
-        this.jvm = jvm;
-    }
-
-    public SysVO getSys() {
-        return sys;
-    }
-
-    public void setSys(SysVO sys) {
-        this.sys = sys;
-    }
-
-    public List<SysFileVO> getSysFiles() {
-        return sysFiles;
-    }
-
-    public void setSysFiles(List<SysFileVO> sysFiles) {
-        this.sysFiles = sysFiles;
-    }
+    private List<SysFileVO> sysFiles = new LinkedList<>();
 }
 

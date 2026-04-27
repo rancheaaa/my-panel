@@ -7,7 +7,7 @@ import com.cq.panel.admin.server.common.utils.LogUtils;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.common.utils.ip.AddressUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysLoginInfo;
 import com.cq.panel.admin.server.repository.domain.SysOperLog;
@@ -39,7 +39,7 @@ public class AsyncFactory
                                             final Object... args)
     {
         final UserAgent userAgent = UserAgent.parseUserAgentString(ServletUtils.getRequest().getHeader("User-Agent"));
-        final String ip = IpUtils.getIpAddr();
+        final String ip = MyIpUtils.getIpAddr();
         return new TimerTask()
         {
             @Override

@@ -215,7 +215,28 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
     
     const rangeMs = (timeRange?.endTime && timeRange?.beginTime) ? (timeRange.endTime - timeRange.beginTime) : 0;
     const padding = rangeMs * 0.02;
-    
+
+    let yAxisInterval = null;
+    if (series && series.length > 0 && !isBytesMetric) {
+      const allValues = series.flatMap(s => (s.points || []).map(p => p.value));
+      if (allValues.length > 0) {
+        const maxVal = Math.max(...allValues);
+        const minVal = Math.min(...allValues);
+        const dataRange = maxVal - minVal;
+        if (dataRange > 0) {
+          const rawInterval = dataRange / 7;
+          const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)));
+          const normalized = rawInterval / magnitude;
+          let niceInterval;
+          if (normalized <= 1) niceInterval = 1;
+          else if (normalized <= 2) niceInterval = 2;
+          else if (normalized <= 5) niceInterval = 5;
+          else niceInterval = 10;
+          yAxisInterval = niceInterval * magnitude;
+        }
+      }
+    }
+
     const option = {
       backgroundColor: 'transparent',
       tooltip: {
@@ -257,6 +278,7 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
       yAxis: {
         type: 'value',
         scale: true,
+        interval: yAxisInterval,
         axisLine: { lineStyle: { color: '#94a3b8' } },
         splitLine: { lineStyle: { color: 'rgba(148, 163, 184, 0.25)', type: 'dashed' } },
         axisLabel: {
@@ -265,7 +287,14 @@ const EChartLineCard = ({ title, unit, categoryLabel, series = [], chartIndex = 
             if (isBytesMetric) {
               return `${Number(value).toFixed(2)} ${displayUnit}`;
             }
-            return `${Number(value).toFixed(0)}${displayUnit ? ` ${displayUnit}` : ''}`;
+            const absValue = Math.abs(value);
+            let decimals = 0;
+            if (absValue < 1) {
+              decimals = 2;
+            } else if (absValue < 10) {
+              decimals = 1;
+            }
+            return `${Number(value).toFixed(decimals)}${displayUnit ? ` ${displayUnit}` : ''}`;
           }
         }
       },
@@ -613,45 +642,44 @@ const ServiceDashboard = () => {
   return (
     <div className="app-container monitor-dashboard-page">
       <Card className="dashboard-toolbar-card" style={{ marginBottom: 24, padding: '20px 24px' }}>
-        <Space wrap size="large" style={{ justifyContent: 'space-between', width: '100%' }}>
-          <Space wrap size="large">
-            <div className="toolbar-item-group" style={{ marginRight: 8 }}>
+        <div className="toolbar-row">
+          <Space wrap size="large" style={{ width: '100%', justifyContent: 'flex-start' }}>
+            <div className="toolbar-item-group">
               <span className="toolbar-item-label required">时间范围</span>
               <Select
                 value={range}
                 options={TIME_RANGE_OPTIONS}
                 className="dashboard-select dashboard-select-single"
-                style={{ width: 140, marginLeft: 6 }}
+                style={{ width: 150 }}
                 onChange={setRange}
               />
             </div>
-            <div className="toolbar-item-group" style={{ marginRight: 16 }}>
+            <div className="toolbar-item-group">
               <span className="toolbar-item-label">自动刷新</span>
               <Switch
                 checked={autoRefresh}
                 onChange={setAutoRefresh}
                 className="toolbar-refresh-switch"
-                style={{ marginLeft: 6 }}
               />
             </div>
-            <div className="toolbar-item-group" style={{ marginRight: 8 }}>
+            <div className="toolbar-item-group">
               <span className="toolbar-item-label">刷新间隔</span>
               <Select
                 value={refreshInterval}
                 options={REFRESH_INTERVAL_OPTIONS}
                 className="dashboard-select dashboard-select-single"
-                style={{ width: 140, marginLeft: 6 }}
+                style={{ width: 150 }}
                 disabled={!autoRefresh}
                 onChange={setRefreshInterval}
               />
             </div>
             {serviceInstances.length > 0 && (
-              <div className="toolbar-item-group" style={{ marginRight: 8 }}>
+              <div className="toolbar-item-group">
                 <span className="toolbar-item-label">服务实例</span>
                 <Select
                   value={selectedInstance}
                   className="dashboard-select dashboard-select-single"
-                  style={{ width: 280, marginLeft: 6 }}
+                  style={{ width: 300 }}
                   onChange={(value) => {
                     setSelectedInstance(value);
                     setSelectedServiceId(value ? value.split('@')[0] : '');
@@ -670,25 +698,33 @@ const ServiceDashboard = () => {
                 />
               </div>
             )}
-            <Radio.Group
-              value={activeCategory}
-              onChange={(e) => setActiveCategory(e.target.value)}
-              optionType="button"
-              buttonStyle="solid"
-              size="middle"
-              style={{ marginLeft: 12 }}
+            <Button
+              icon={<ReloadOutlined spin={refreshing} />}
+              onClick={() => doFetch(true)}
+              loading={refreshing}
+              className="toolbar-refresh-btn"
+              style={{ minWidth: 100 }}
             >
-              {Object.keys(CATEGORY_METRICS).map((key) => (
-                <Radio.Button key={key} value={key}>
-                  {CATEGORY_LABEL[key] || key}
-                </Radio.Button>
-              ))}
-            </Radio.Group>
+              刷新
+            </Button>
           </Space>
-          <a onClick={() => doFetch(true)}>
-            <ReloadOutlined spin={refreshing} /> 刷新
-          </a>
-        </Space>
+        </div>
+        <div className="category-tabs-row">
+          <Radio.Group
+            value={activeCategory}
+            onChange={(e) => setActiveCategory(e.target.value)}
+            optionType="button"
+            buttonStyle="solid"
+            size="large"
+            className="category-radio-group"
+          >
+            {Object.keys(CATEGORY_METRICS).map((key) => (
+              <Radio.Button key={key} value={key}>
+                {CATEGORY_LABEL[key] || key}
+              </Radio.Button>
+            ))}
+          </Radio.Group>
+        </div>
       </Card>
 
       <Row gutter={[24, 0]}>

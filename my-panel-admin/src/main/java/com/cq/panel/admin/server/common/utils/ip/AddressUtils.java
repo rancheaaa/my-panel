@@ -28,7 +28,7 @@ public class AddressUtils
     public static String getRealAddressByIP(String ip)
     {
         // 内网不查询
-        if (IpUtils.internalIp(ip))
+        if (MyIpUtils.internalIp(ip))
         {
             return "内网IP";
         }

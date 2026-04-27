@@ -2,8 +2,10 @@ package com.cq.panel.admin.server.common.utils.ip;
 
 import com.cq.panel.admin.server.common.utils.ServletUtils;
 import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.common.utils.IpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 
 /**
@@ -11,14 +13,14 @@ import java.net.UnknownHostException;
  * 
  * @author cq
  */
-public class IpUtils
+public class MyIpUtils
 {
     public final static String REGX_0_255 = "(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)";
     // 匹配 ip
     public final static String REGX_IP = "((" + REGX_0_255 + "\\.){3}" + REGX_0_255 + ")";
     public final static String REGX_IP_WILDCARD = "(((\\*\\.){3}\\*)|(" + REGX_0_255 + "(\\.\\*){3})|(" + REGX_0_255 + "\\." + REGX_0_255 + ")(\\.\\*){2}" + "|((" + REGX_0_255 + "\\.){3}\\*))";
     // 匹配网段
-    public final static String REGX_IP_SEG = "(" + REGX_IP + "\\-" + REGX_IP + ")";
+    public final static String REGX_IP_SEG = "(" + REGX_IP + "-" + REGX_IP + ")";
 
     /**
      * 获取客户端IP
@@ -43,24 +45,24 @@ public class IpUtils
             return "unknown";
         }
         String ip = request.getHeader("x-forwarded-for");
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip))
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip))
         {
             ip = request.getHeader("Proxy-Client-IP");
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip))
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip))
         {
             ip = request.getHeader("X-Forwarded-For");
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip))
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip))
         {
             ip = request.getHeader("WL-Proxy-Client-IP");
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip))
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip))
         {
             ip = request.getHeader("X-Real-IP");
         }
 
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip))
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip))
         {
             ip = request.getRemoteAddr();
         }
@@ -113,10 +115,8 @@ public class IpUtils
                     return true;
                 }
             case SECTION_5:
-                switch (b1)
-                {
-                    case SECTION_6:
-                        return true;
+                if (b1 == SECTION_6) {
+                    return true;
                 }
             default:
                 return false;
@@ -131,7 +131,7 @@ public class IpUtils
      */
     public static byte[] textToNumericFormatV4(String text)
     {
-        if (text.length() == 0)
+        if (text.isEmpty())
         {
             return null;
         }
@@ -220,10 +220,10 @@ public class IpUtils
     {
         try
         {
-            return InetAddress.getLocalHost().getHostAddress();
+            return IpUtils.getLocalHost();
         }
-        catch (UnknownHostException e)
-        {
+        catch (SocketException | UnknownHostException e) {
+            //
         }
         return "127.0.0.1";
     }
@@ -241,6 +241,7 @@ public class IpUtils
         }
         catch (UnknownHostException e)
         {
+            //
         }
         return "未知";
     }
@@ -259,7 +260,7 @@ public class IpUtils
             final String[] ips = ip.trim().split(",");
             for (String subIp : ips)
             {
-                if (false == isUnknown(subIp))
+                if (!isUnknown(subIp))
                 {
                     ip = subIp;
                     break;

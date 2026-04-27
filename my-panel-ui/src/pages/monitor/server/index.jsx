@@ -154,29 +154,35 @@ const Server = () => {
               }
               hoverable
             >
-              <div className="metric-item">
-                <span className="metric-label">核心数</span>
-                <span className="metric-value">{cpu?.cpuNum}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">用户使用率</span>
-                <span className={`metric-value ${cpu?.used > 80 ? 'warning' : 'success'}`}>{cpu?.used}%</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">系统使用率</span>
-                <span className={`metric-value ${cpu?.sys > 80 ? 'warning' : 'success'}`}>{cpu?.sys}%</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">当前空闲率</span>
-                <span className="metric-value success">{cpu?.free}%</span>
-              </div>
-              <div className="progress-section">
-                <Progress
-                  percent={parseInt(cpu?.used)}
-                  strokeColor="#6366f1"
-                  strokeWidth={10}
-                  className="progress-bar"
-                />
+              <div className="metric-content">
+                <div className="metric-list">
+                  <div className="metric-item">
+                    <span className="metric-label">核心数</span>
+                    <span className="metric-value">{cpu?.cpuNum}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">用户使用率</span>
+                    <span className={`metric-value ${cpu?.used > 80 ? 'warning' : 'success'}`}>{cpu?.used}%</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">系统使用率</span>
+                    <span className={`metric-value ${cpu?.sys > 80 ? 'warning' : 'success'}`}>{cpu?.sys}%</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">当前空闲率</span>
+                    <span className="metric-value success">{cpu?.free}%</span>
+                  </div>
+                </div>
+                <div className="metric-ring">
+                  <Progress
+                    type="circle"
+                    percent={parseInt(cpu?.used)}
+                    strokeColor="#6366f1"
+                    strokeWidth={8}
+                    width={120}
+                    format={(percent) => `${percent}%`}
+                  />
+                </div>
               </div>
             </Card>
           </Col>
@@ -187,39 +193,91 @@ const Server = () => {
               title={
                 <div className="card-header-content">
                   <div className="card-icon"><DatabaseOutlined /></div>
-                  <span>内存使用情况</span>
+                  <span>系统内存使用情况</span>
                 </div>
               }
               hoverable
             >
-              <div className="metric-item">
-                <span className="metric-label">总内存</span>
-                <span className="metric-value">{mem?.total}GB</span>
+              <div className="metric-content">
+                <div className="metric-list">
+                  <div className="metric-item">
+                    <span className="metric-label">总内存</span>
+                    <span className="metric-value">{mem?.total}GB</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">已用内存</span>
+                    <span className="metric-value">{mem?.used}GB</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">剩余内存</span>
+                    <span className="metric-value success">{mem?.free}GB</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">使用率</span>
+                    <span className={`metric-value ${mem?.usage > 80 ? 'warning' : 'success'}`}>{mem?.usage}%</span>
+                  </div>
+                </div>
+                <div className="metric-ring">
+                  <Progress
+                    type="circle"
+                    percent={parseInt(mem?.usage)}
+                    strokeColor="#10b981"
+                    strokeWidth={8}
+                    width={120}
+                    format={(percent) => `${percent}%`}
+                  />
+                </div>
               </div>
-              <div className="metric-item">
-                <span className="metric-label">已用内存</span>
-                <span className="metric-value">{mem?.used}GB</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">剩余内存</span>
-                <span className="metric-value success">{mem?.free}GB</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">使用率</span>
-                <span className={`metric-value ${mem?.usage > 80 ? 'warning' : 'success'}`}>{mem?.usage}%</span>
-              </div>
-              <div className="progress-section">
-                <Progress
-                  percent={parseInt(mem?.usage)}
-                  strokeColor="#10b981"
-                  strokeWidth={10}
-                  className="progress-bar"
-                />
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
+          <Col xs={24} md={12}>
+            <Card
+              className="monitor-card jvm-memory-card"
+              title={
+                <div className="card-header-content">
+                  <div className="card-icon"><CodeOutlined /></div>
+                  <span>JVM 堆内存使用情况</span>
+                </div>
+              }
+              hoverable
+            >
+              <div className="metric-content">
+                <div className="metric-list">
+                  <div className="metric-item">
+                    <span className="metric-label">堆已提交内存</span>
+                    <span className="metric-value">{jvm?.total}MB</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">堆已使用内存</span>
+                    <span className="metric-value">{jvm?.used}MB</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">堆空闲内存</span>
+                    <span className="metric-value success">{jvm?.free}MB</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">堆内存使用率</span>
+                    <span className={`metric-value ${jvm?.usage > 80 ? 'warning' : 'success'}`}>{jvm?.usage}%</span>
+                  </div>
+                </div>
+                <div className="metric-ring">
+                  <Progress
+                    type="circle"
+                    percent={parseInt(jvm?.usage)}
+                    strokeColor="#f59e0b"
+                    strokeWidth={8}
+                    width={120}
+                    format={(percent) => `${percent}%`}
+                  />
+                </div>
               </div>
             </Card>
           </Col>
 
-          <Col span={24}>
+          <Col xs={24} md={12}>
             <Card
               className="monitor-card info-card"
               title={
@@ -254,7 +312,9 @@ const Server = () => {
               </div>
             </Card>
           </Col>
+        </Row>
 
+        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
           <Col span={24}>
             <Card
               className="monitor-card jvm-card"
@@ -276,6 +336,10 @@ const Server = () => {
                   <div className="info-value">{jvm?.version}</div>
                 </div>
                 <div className="info-item">
+                  <div className="info-label">进程ID</div>
+                  <div className="info-value">{jvm?.pid}</div>
+                </div>
+                <div className="info-item">
                   <div className="info-label">启动时间</div>
                   <div className="info-value">{jvm?.startTime}</div>
                 </div>
@@ -284,21 +348,19 @@ const Server = () => {
                   <div className="info-value">{jvm?.runTime}</div>
                 </div>
                 <div className="info-item">
-                  <div className="info-label">安装路径</div>
+                  <div className="info-label">jdk安装路径</div>
                   <div className="info-value">{jvm?.home}</div>
                 </div>
-                <div className="info-item">
-                  <div className="info-label">项目路径</div>
-                  <div className="info-value">{sys?.userDir}</div>
-                </div>
-                <div className="info-item">
-                  <div className="info-label">运行参数</div>
-                  <div className="info-value">{jvm?.inputArgs}</div>
-                </div>
+              </div>
+              <div className="info-item-full">
+                <div className="info-label">运行参数</div>
+                <div className="info-value">{jvm?.inputArgs}</div>
               </div>
             </Card>
           </Col>
+        </Row>
 
+        <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
           <Col span={24}>
              <Card
                className="monitor-card disk-card"

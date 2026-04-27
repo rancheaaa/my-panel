@@ -8,7 +8,7 @@ import com.cq.panel.admin.server.annotation.RateLimiter;
 import com.cq.panel.admin.server.common.enums.LimitType;
 import com.cq.panel.admin.server.web.exception.ServiceException;
 import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -81,7 +81,7 @@ public class RateLimiterAspect
         StringBuffer stringBuffer = new StringBuffer(rateLimiter.key());
         if (rateLimiter.limitType() == LimitType.IP)
         {
-            stringBuffer.append(IpUtils.getIpAddr()).append("-");
+            stringBuffer.append(MyIpUtils.getIpAddr()).append("-");
         }
         MethodSignature signature = (MethodSignature) point.getSignature();
         Method method = signature.getMethod();

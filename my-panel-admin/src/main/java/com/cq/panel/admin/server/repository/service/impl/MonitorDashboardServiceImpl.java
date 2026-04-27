@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.repository.service.impl;
 
 import com.alibaba.druid.pool.DruidDataSource;
 import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.common.utils.IpUtils;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorMetricSample;
@@ -659,14 +660,36 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         return serviceId;
     }
 
+    private volatile String cachedServiceIpPort = null;
+
     private String resolveServiceIpPort() {
+        if (cachedServiceIpPort != null) {
+            return cachedServiceIpPort;
+        }
+        synchronized (this) {
+            if (cachedServiceIpPort != null) {
+                return cachedServiceIpPort;
+            }
+            try {
+                String hostAddress = getLocalIpAddress();
+                int port = applicationContext.getEnvironment().getProperty("server.port", Integer.class, 8080);
+                cachedServiceIpPort = hostAddress + ":" + port;
+                log.info("Resolved service IP:Port = {}", cachedServiceIpPort);
+                return cachedServiceIpPort;
+            } catch (Exception e) {
+                log.warn("Failed to resolve service IP, using default 127.0.0.1:8080", e);
+                cachedServiceIpPort = "127.0.0.1:8080";
+                return cachedServiceIpPort;
+            }
+        }
+    }
+
+    private String getLocalIpAddress() {
         try {
-            InetAddress localHost = InetAddress.getLocalHost();
-            String hostAddress = localHost.getHostAddress();
-            int port = applicationContext.getEnvironment().getProperty("server.port", Integer.class, 8080);
-            return hostAddress + ":" + port;
+            return IpUtils.getLocalHost();
         } catch (Exception e) {
-            return "127.0.0.1:8080";
+            log.warn("Failed to get local IP via IpUtils, using 127.0.0.1", e);
+            return "127.0.0.1";
         }
     }
 

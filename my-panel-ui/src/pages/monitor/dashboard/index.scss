@@ -20,6 +20,97 @@
 
   .dashboard-toolbar-card {
     background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(242, 247, 255, 0.95));
+
+    .toolbar-row {
+      margin-bottom: 20px;
+
+      .ant-space {
+        gap: 24px !important;
+      }
+    }
+
+    .toolbar-item-group {
+      display: flex;
+      align-items: center;
+      margin-right: 8px;
+
+      .toolbar-item-label {
+        font-size: 14px;
+        color: #475569;
+        font-weight: 500;
+        margin-right: 8px;
+
+        &.required::after {
+          content: '*';
+          color: #ef4444;
+          margin-left: 2px;
+        }
+      }
+    }
+
+    .toolbar-refresh-btn {
+      height: 40px;
+      border-radius: 12px;
+      font-weight: 600;
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      background: linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+      transition: all 0.25s ease;
+
+      &:hover {
+        border-color: rgba(37, 99, 235, 0.6);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(30, 64, 175, 0.12);
+      }
+    }
+
+    .category-tabs-row {
+      width: 100%;
+
+      .category-radio-group {
+        width: 100%;
+        display: flex;
+
+        .ant-radio-button-wrapper {
+          flex: 1;
+          text-align: center;
+          height: 48px;
+          line-height: 46px;
+          font-size: 15px;
+          font-weight: 600;
+          border-radius: 0;
+          border: 1px solid rgba(59, 130, 246, 0.28);
+          background: linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
+          box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+          transition: all 0.25s ease;
+
+          &:first-child {
+            border-radius: 12px 0 0 12px;
+          }
+
+          &:last-child {
+            border-radius: 0 12px 12px 0;
+          }
+
+          &:hover {
+            color: #2563eb;
+            border-color: rgba(37, 99, 235, 0.6);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), 0 6px 16px rgba(30, 64, 175, 0.12);
+          }
+
+          &.ant-radio-button-wrapper-checked {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            border-color: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+            z-index: 1;
+
+            &::before {
+              display: none;
+            }
+          }
+        }
+      }
+    }
   }
 
   .dashboard-select .ant-select-selector {
@@ -205,12 +296,12 @@
   }
 
   // Individual card themes
-  .cpu-summary-card .summary-icon {
+  .rss-summary-card .summary-icon {
     background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
     box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
   }
 
-  .core-summary-card .summary-icon {
+  .cpu-summary-card .summary-icon {
     background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
     box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
   }

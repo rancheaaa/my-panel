@@ -10,7 +10,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.io.Serial;
 import java.util.Date;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 import jakarta.validation.constraints.NotNull;
 
@@ -114,7 +114,7 @@ public class SysJob extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     public Date getNextValidTime()
     {
-        if (StringUtils.isNotEmpty(cronExpression))
+        if (MyStringUtils.isNotEmpty(cronExpression))
         {
             return CronUtils.getNextExecution(cronExpression);
         }

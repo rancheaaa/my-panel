@@ -7,7 +7,6 @@ import com.cq.panel.admin.server.repository.service.ISysDictTypeService;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -53,9 +52,9 @@ public class DictUtils
      */
     public static String getDictLabel(String dictType, String dictValue)
     {
-        if (StringUtils.isEmpty(dictValue))
+        if (MyStringUtils.isEmpty(dictValue))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
         return getDictLabel(dictType, dictValue, SEPARATOR);
     }
@@ -69,9 +68,9 @@ public class DictUtils
      */
     public static String getDictValue(String dictType, String dictLabel)
     {
-        if (StringUtils.isEmpty(dictLabel))
+        if (MyStringUtils.isEmpty(dictLabel))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
         return getDictValue(dictType, dictLabel, SEPARATOR);
     }
@@ -88,11 +87,11 @@ public class DictUtils
     {
         StringBuilder propertyString = new StringBuilder();
         List<SysDictData> datas = getDictCache(dictType);
-        if (StringUtils.isNull(datas))
+        if (MyStringUtils.isNull(datas))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
-        if (StringUtils.containsAny(separator, dictValue))
+        if (MyStringUtils.containsAny(separator, dictValue))
         {
             for (SysDictData dict : datas)
             {
@@ -116,7 +115,7 @@ public class DictUtils
                 }
             }
         }
-        return StringUtils.stripEnd(propertyString.toString(), separator);
+        return MyStringUtils.stripEnd(propertyString.toString(), separator);
     }
 
     /**
@@ -131,11 +130,11 @@ public class DictUtils
     {
         StringBuilder propertyString = new StringBuilder();
         List<SysDictData> datas = getDictCache(dictType);
-        if (StringUtils.isNull(datas))
+        if (MyStringUtils.isNull(datas))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
-        if (StringUtils.containsAny(separator, dictLabel))
+        if (MyStringUtils.containsAny(separator, dictLabel))
         {
             for (SysDictData dict : datas)
             {
@@ -159,7 +158,7 @@ public class DictUtils
                 }
             }
         }
-        return StringUtils.stripEnd(propertyString.toString(), separator);
+        return MyStringUtils.stripEnd(propertyString.toString(), separator);
     }
 
     /**
@@ -172,15 +171,15 @@ public class DictUtils
     {
         StringBuilder propertyString = new StringBuilder();
         List<SysDictData> datas = getDictCache(dictType);
-        if (StringUtils.isNull(datas))
+        if (MyStringUtils.isNull(datas))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
         for (SysDictData dict : datas)
         {
             propertyString.append(dict.getDictValue()).append(SEPARATOR);
         }
-        return StringUtils.stripEnd(propertyString.toString(), SEPARATOR);
+        return MyStringUtils.stripEnd(propertyString.toString(), SEPARATOR);
     }
 
     /**
@@ -193,15 +192,15 @@ public class DictUtils
     {
         StringBuilder propertyString = new StringBuilder();
         List<SysDictData> datas = getDictCache(dictType);
-        if (StringUtils.isNull(datas))
+        if (MyStringUtils.isNull(datas))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
         for (SysDictData dict : datas)
         {
             propertyString.append(dict.getDictLabel()).append(SEPARATOR);
         }
-        return StringUtils.stripEnd(propertyString.toString(), SEPARATOR);
+        return MyStringUtils.stripEnd(propertyString.toString(), SEPARATOR);
     }
 
     /**

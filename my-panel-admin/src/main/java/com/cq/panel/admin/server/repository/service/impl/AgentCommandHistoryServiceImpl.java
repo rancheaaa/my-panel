@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.List;
 import org.springframework.stereotype.Service;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.repository.mapper.AgentCommandHistoryMapper;
 import com.cq.panel.admin.server.repository.domain.AgentCommandHistory;
 import com.cq.panel.admin.server.repository.service.IAgentCommandHistoryService;
@@ -29,7 +29,7 @@ public class AgentCommandHistoryServiceImpl implements IAgentCommandHistoryServi
     @Override
     public int insert(AgentCommandHistory record) {
         if (record.getCreateTime() == null) {
-            record.setCreateTime(DateUtils.getNowDate());
+            record.setCreateTime(MyDateUtils.getNowDate());
         }
         return agentCommandHistoryMapper.insert(record);
     }

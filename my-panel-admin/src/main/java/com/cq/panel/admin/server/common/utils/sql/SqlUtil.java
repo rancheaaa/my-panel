@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.sql;
 
 import com.cq.panel.admin.server.web.exception.UtilException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * sql操作工具类
@@ -30,11 +30,11 @@ public class SqlUtil
      */
     public static String escapeOrderBySql(String value)
     {
-        if (StringUtils.isNotEmpty(value) && !isValidOrderBySql(value))
+        if (MyStringUtils.isNotEmpty(value) && !isValidOrderBySql(value))
         {
             throw new UtilException("参数不符合规范，不能进行查询");
         }
-        if (StringUtils.length(value) > ORDER_BY_MAX_LENGTH)
+        if (MyStringUtils.length(value) > ORDER_BY_MAX_LENGTH)
         {
             throw new UtilException("参数已超过最大限制，不能进行查询");
         }
@@ -54,14 +54,14 @@ public class SqlUtil
      */
     public static void filterKeyword(String value)
     {
-        if (StringUtils.isEmpty(value))
+        if (MyStringUtils.isEmpty(value))
         {
             return;
         }
-        String[] sqlKeywords = StringUtils.split(SQL_REGEX, "\\|");
+        String[] sqlKeywords = MyStringUtils.split(SQL_REGEX, "\\|");
         for (String sqlKeyword : sqlKeywords)
         {
-            if (StringUtils.indexOfIgnoreCase(value, sqlKeyword) > -1)
+            if (MyStringUtils.indexOfIgnoreCase(value, sqlKeyword) > -1)
             {
                 throw new UtilException("参数存在SQL注入风险");
             }

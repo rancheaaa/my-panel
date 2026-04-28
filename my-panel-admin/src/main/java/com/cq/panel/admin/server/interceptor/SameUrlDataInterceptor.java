@@ -7,10 +7,9 @@ import com.cq.panel.admin.server.annotation.RepeatSubmit;
 import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
 import com.cq.panel.admin.server.filter.RepeatedlyRequestWrapper;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.http.HttpHelper;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.cq.panel.admin.server.common.utils.JsonUtils;
@@ -32,26 +31,28 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
     @Value("${token.header}")
     private String header;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
+
+    public SameUrlDataInterceptor(CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
 
     @SuppressWarnings("unchecked")
     @Override
     public boolean isRepeatSubmit(HttpServletRequest request, RepeatSubmit annotation)
     {
         String nowParams = "";
-        if (request instanceof RepeatedlyRequestWrapper)
+        if (request instanceof RepeatedlyRequestWrapper repeatedlyRequest)
         {
-            RepeatedlyRequestWrapper repeatedlyRequest = (RepeatedlyRequestWrapper) request;
             nowParams = HttpHelper.getBodyString(repeatedlyRequest);
         }
 
         // body参数为空，获取Parameter的数据
-        if (StringUtils.isEmpty(nowParams))
+        if (MyStringUtils.isEmpty(nowParams))
         {
             nowParams = JsonUtils.toJSONString(request.getParameterMap());
         }
-        Map<String, Object> nowDataMap = new HashMap<String, Object>();
+        Map<String, Object> nowDataMap = new HashMap<>();
         nowDataMap.put(REPEAT_PARAMS, nowParams);
         nowDataMap.put(REPEAT_TIME, System.currentTimeMillis());
 
@@ -59,7 +60,7 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
         String url = request.getRequestURI();
 
         // 唯一值（没有消息头则使用请求地址）
-        String submitKey = StringUtils.trimToEmpty(request.getHeader(header));
+        String submitKey = MyStringUtils.trimToEmpty(request.getHeader(header));
 
         // 唯一标识（指定key + url + 消息头）
         String cacheRepeatKey = CacheConstants.REPEAT_SUBMIT_KEY + ":" + url + submitKey;
@@ -77,7 +78,7 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
                 }
             }
         }
-        Map<String, Object> cacheMap = new HashMap<String, Object>();
+        Map<String, Object> cacheMap = new HashMap<>();
         cacheMap.put(url, nowDataMap);
         cacheService.set(cacheRepeatKey, cacheMap, annotation.interval(), TimeUnit.MILLISECONDS);
         return false;
@@ -100,10 +101,6 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
     {
         long time1 = (Long) nowMap.get(REPEAT_TIME);
         long time2 = (Long) preMap.get(REPEAT_TIME);
-        if ((time1 - time2) < interval)
-        {
-            return true;
-        }
-        return false;
+        return (time1 - time2) < interval;
     }
 }

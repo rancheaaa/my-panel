@@ -10,8 +10,7 @@ import com.cq.panel.admin.server.web.exception.user.CaptchaException;
 import com.cq.panel.admin.server.web.exception.user.CaptchaExpireException;
 import com.cq.panel.admin.server.common.utils.MessageUtils;
 import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
-import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
@@ -56,11 +55,11 @@ public class SysRegisterService
             validateCaptcha(username, registerDTO.getCode(), registerDTO.getUuid());
         }
 
-        if (StringUtils.isEmpty(username))
+        if (MyStringUtils.isEmpty(username))
         {
             msg = "用户名不能为空";
         }
-        else if (StringUtils.isEmpty(password))
+        else if (MyStringUtils.isEmpty(password))
         {
             msg = "用户密码不能为空";
         }
@@ -82,7 +81,7 @@ public class SysRegisterService
         {
             sysUser.setNickName(username);
             String salt = registerDTO.getSalt();
-            if (StringUtils.isEmpty(salt)) {
+            if (MyStringUtils.isEmpty(salt)) {
                 salt = Md5PasswordEncoder.generateSalt();
             }
             String md5WithSalt = Md5PasswordEncoder.encryptPassword(password, salt);
@@ -111,7 +110,7 @@ public class SysRegisterService
     @SuppressWarnings("all")
     public void validateCaptcha(String username, String code, String uuid)
     {
-        String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");
+        String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + MyStringUtils.nvl(uuid, "");
         String captcha = cacheService.get(verifyKey);
         cacheService.delete(verifyKey);
         if (captcha == null)

@@ -8,7 +8,7 @@ import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.ip.AddressUtils;
 import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.common.utils.uuid.IdUtils;
@@ -68,7 +68,7 @@ public class TokenService
 
     public LoginUser getLoginUser(String token)
     {
-        if (StringUtils.isEmpty(token))
+        if (MyStringUtils.isEmpty(token))
         {
             return null;
         }
@@ -91,7 +91,7 @@ public class TokenService
      */
     public void setLoginUser(LoginUser loginUser)
     {
-        if (StringUtils.isNotNull(loginUser) && StringUtils.isNotEmpty(loginUser.getToken()))
+        if (MyStringUtils.isNotNull(loginUser) && MyStringUtils.isNotEmpty(loginUser.getToken()))
         {
             refreshToken(loginUser);
         }
@@ -102,7 +102,7 @@ public class TokenService
      */
     public void delLoginUser(String token)
     {
-        if (StringUtils.isNotEmpty(token))
+        if (MyStringUtils.isNotEmpty(token))
         {
             String userKey = getTokenKey(token);
             cacheService.delete(userKey);
@@ -221,7 +221,7 @@ public class TokenService
     public String getToken(HttpServletRequest request)
     {
         String token = request.getHeader(header);
-        if (StringUtils.isNotEmpty(token) && token.startsWith(Constants.TOKEN_PREFIX))
+        if (MyStringUtils.isNotEmpty(token) && token.startsWith(Constants.TOKEN_PREFIX))
         {
             token = token.replace(Constants.TOKEN_PREFIX, "");
         }

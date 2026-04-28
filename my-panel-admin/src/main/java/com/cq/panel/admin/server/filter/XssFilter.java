@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.filter;
 
 import com.cq.panel.admin.server.common.enums.HttpMethod;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,7 +25,7 @@ public class XssFilter implements Filter
     public void init(FilterConfig filterConfig) throws ServletException
     {
         String tempExcludes = filterConfig.getInitParameter("excludes");
-        if (StringUtils.isNotEmpty(tempExcludes))
+        if (MyStringUtils.isNotEmpty(tempExcludes))
         {
             String[] urls = tempExcludes.split(",");
             for (String url : urls)
@@ -59,7 +59,7 @@ public class XssFilter implements Filter
         {
             return true;
         }
-        return StringUtils.matches(url, excludes);
+        return MyStringUtils.matches(url, excludes);
     }
 
     @Override

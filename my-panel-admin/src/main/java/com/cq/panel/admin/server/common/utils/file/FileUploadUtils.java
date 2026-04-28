@@ -7,8 +7,8 @@ import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.exception.file.FileNameLengthLimitExceededException;
 import com.cq.panel.admin.server.web.exception.file.FileSizeLimitExceededException;
 import com.cq.panel.admin.server.web.exception.file.InvalidExtensionException;
-import com.cq.panel.admin.server.common.utils.DateUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.uuid.Seq;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -124,7 +124,7 @@ public class FileUploadUtils
      */
     public static final String extractFilename(MultipartFile file)
     {
-        return StringUtils.format("{}/{}_{}.{}", DateUtils.datePath(),
+        return MyStringUtils.format("{}/{}_{}.{}", MyDateUtils.datePath(),
                 FilenameUtils.getBaseName(file.getOriginalFilename()), Seq.getId(Seq.uploadSeqType), getExtension(file));
     }
 
@@ -145,7 +145,7 @@ public class FileUploadUtils
     public static final String getPathFileName(String uploadDir, String fileName) throws IOException
     {
         int dirLastIndex = defaultBaseDir.length() + 1;
-        String currentDir = StringUtils.substring(uploadDir, dirLastIndex);
+        String currentDir = MyStringUtils.substring(uploadDir, dirLastIndex);
         return Constants.RESOURCE_PREFIX + "/" + currentDir + "/" + fileName;
     }
 
@@ -225,7 +225,7 @@ public class FileUploadUtils
     public static final String getExtension(MultipartFile file)
     {
         String extension = FilenameUtils.getExtension(file.getOriginalFilename());
-        if (StringUtils.isEmpty(extension))
+        if (MyStringUtils.isEmpty(extension))
         {
             extension = MimeTypeUtils.getExtension(Objects.requireNonNull(file.getContentType()));
         }

@@ -5,7 +5,7 @@ import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.repository.domain.SysDictData;
 import com.cq.panel.admin.server.repository.domain.SysDictType;
 import com.cq.panel.admin.server.web.exception.ServiceException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.mapper.SysDictDataMapper;
 import com.cq.panel.admin.server.repository.mapper.SysDictTypeMapper;
 import com.cq.panel.admin.server.repository.service.ISysDictTypeService;
@@ -85,7 +85,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     public List<SysDictData> selectDictDataByType(String dictType)
     {
         List<SysDictData> dictData = dictDataMapper.selectDictDataByType(dictType);
-        if (StringUtils.isNotEmpty(dictData))
+        if (MyStringUtils.isNotEmpty(dictData))
         {
             return dictData;
         }
@@ -237,9 +237,9 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     @Override
     public boolean checkDictTypeUnique(SysDictType dict)
     {
-        long dictId = StringUtils.isNull(dict.getDictId()) ? -1L : dict.getDictId();
+        long dictId = MyStringUtils.isNull(dict.getDictId()) ? -1L : dict.getDictId();
         SysDictType dictType = dictTypeMapper.checkDictTypeUnique(dict.getDictType());
-        if (StringUtils.isNotNull(dictType) && dictType.getDictId() != dictId)
+        if (MyStringUtils.isNotNull(dictType) && dictType.getDictId() != dictId)
         {
             return UserConstants.NOT_UNIQUE;
         }

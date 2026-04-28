@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.quartz;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.common.loadbalancer.*;
@@ -72,7 +72,7 @@ public class JobInvokeUtil {
      */
     private static void invokeInternalMethod(SysJob sysJob) throws Exception {
         String methodNameFull = sysJob.getMethodName();
-        if (StringUtils.isEmpty(methodNameFull)) {
+        if (MyStringUtils.isEmpty(methodNameFull)) {
             throw new Exception("内置方法全限定名不能为空");
         }
 
@@ -94,7 +94,7 @@ public class JobInvokeUtil {
         Object bean;
         try {
             // 先尝试从 Spring 容器获取，如果失败则尝试反射实例化
-            String beanName = StringUtils.uncapitalize(className.substring(className.lastIndexOf(".") + 1));
+            String beanName = MyStringUtils.uncapitalize(className.substring(className.lastIndexOf(".") + 1));
             bean = SpringUtils.getBean(beanName);
         } catch (Exception e) {
             try {
@@ -122,20 +122,20 @@ public class JobInvokeUtil {
         HttpMethod httpMethod = HttpMethod.valueOf(methodStr.toUpperCase());
         HttpHeaders headers = new HttpHeaders();
 
-        if (StringUtils.isNotEmpty(headersJson)) {
+        if (MyStringUtils.isNotEmpty(headersJson)) {
             Map<String, String> headerMap = objectMapper.readValue(headersJson, new TypeReference<>() {
             });
             headerMap.forEach(headers::add);
         }
 
-        if (headers.getContentType() == null && StringUtils.isNotEmpty(body)) {
+        if (headers.getContentType() == null && MyStringUtils.isNotEmpty(body)) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
 
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
 
         String selectedUrl;
-        if (StringUtils.isNotEmpty(httpUrl) && httpUrl.contains(",")) {
+        if (MyStringUtils.isNotEmpty(httpUrl) && httpUrl.contains(",")) {
             String[] urls = httpUrl.split(",");
             LoadBalancerAlgorithm algorithm = LoadBalancerAlgorithm.fromName(loadBalanceStrategy);
             LoadBalancer loadBalancer = LoadBalancerFactory.createLoadBalancer(algorithm);
@@ -234,13 +234,13 @@ public class JobInvokeUtil {
         String scriptType = sysJob.getScriptType();
         String scriptContent = sysJob.getScriptContent();
 
-        if (StringUtils.isEmpty(scriptName)) {
+        if (MyStringUtils.isEmpty(scriptName)) {
             throw new Exception("脚本名称不能为空");
         }
-        if (StringUtils.isEmpty(scriptType)) {
+        if (MyStringUtils.isEmpty(scriptType)) {
             throw new Exception("脚本类型不能为空");
         }
-        if (StringUtils.isEmpty(scriptContent)) {
+        if (MyStringUtils.isEmpty(scriptContent)) {
             throw new Exception("脚本内容不能为空");
         }
 
@@ -357,7 +357,7 @@ public class JobInvokeUtil {
      * 替换占位符
      */
     private static String replacePlaceholders(String text, SysJob sysJob) {
-        if (StringUtils.isEmpty(text))
+        if (MyStringUtils.isEmpty(text))
             return text;
         return text.replace("{jobId}", String.valueOf(sysJob.getJobId()))
                 .replace("{jobName}", sysJob.getJobName())
@@ -374,7 +374,7 @@ public class JobInvokeUtil {
     private static void invokeMethod(Object bean, String methodName, List<Object[]> methodParams)
             throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
             InvocationTargetException {
-        if (StringUtils.isNotNull(methodParams) && !methodParams.isEmpty()) {
+        if (MyStringUtils.isNotNull(methodParams) && !methodParams.isEmpty()) {
             Class<?>[] paramTypes = getMethodParamsType(methodParams);
             Method method = findCompatibleMethod(bean.getClass(), methodName, paramTypes);
             Object[] paramValues = convertParams(methodParams, method.getParameterTypes());
@@ -472,7 +472,7 @@ public class JobInvokeUtil {
      * @return true是 false否
      */
     public static boolean isValidClassName(String invokeTarget) {
-        return StringUtils.countMatches(invokeTarget, ".") > 1;
+        return MyStringUtils.countMatches(invokeTarget, ".") > 1;
     }
 
     /**
@@ -482,8 +482,8 @@ public class JobInvokeUtil {
      * @return bean名称
      */
     public static String getBeanName(String invokeTarget) {
-        String beanName = StringUtils.substringBefore(invokeTarget, "(");
-        return StringUtils.substringBeforeLast(beanName, ".");
+        String beanName = MyStringUtils.substringBefore(invokeTarget, "(");
+        return MyStringUtils.substringBeforeLast(beanName, ".");
     }
 
     /**
@@ -493,8 +493,8 @@ public class JobInvokeUtil {
      * @return method方法
      */
     public static String getMethodName(String invokeTarget) {
-        String methodName = StringUtils.substringBefore(invokeTarget, "(");
-        return StringUtils.substringAfterLast(methodName, ".");
+        String methodName = MyStringUtils.substringBefore(invokeTarget, "(");
+        return MyStringUtils.substringAfterLast(methodName, ".");
     }
 
     /**
@@ -504,30 +504,30 @@ public class JobInvokeUtil {
      * @return method方法相关参数列表
      */
     public static List<Object[]> getMethodParams(String invokeTarget) {
-        String methodStr = StringUtils.substringBetween(invokeTarget, "(", ")");
-        if (StringUtils.isEmpty(methodStr)) {
+        String methodStr = MyStringUtils.substringBetween(invokeTarget, "(", ")");
+        if (MyStringUtils.isEmpty(methodStr)) {
             return null;
         }
         String[] methodParams = methodStr.split(",(?=([^\"']*[\"'][^\"']*[\"'])*[^\"']*$)");
         List<Object[]> clazz = new LinkedList<>();
         for (String methodParam : methodParams) {
-            String str = StringUtils.trimToEmpty(methodParam);
+            String str = MyStringUtils.trimToEmpty(methodParam);
             // String字符串类型，以'或"开头
             if (Strings.CS.startsWithAny(str, "'", "\"")) {
-                clazz.add(new Object[] { StringUtils.substring(str, 1, str.length() - 1), String.class });
+                clazz.add(new Object[] { MyStringUtils.substring(str, 1, str.length() - 1), String.class });
             }
             // boolean布尔类型，等于true或者false
             else if ("true".equalsIgnoreCase(str) || "false".equalsIgnoreCase(str)) {
                 clazz.add(new Object[] { Boolean.valueOf(str), Boolean.class });
             }
             // long长整形，以L结尾
-            else if (StringUtils.endsWith(str, "L")) {
-                clazz.add(new Object[] { Long.valueOf(StringUtils.substring(str, 0, str.length() - 1)), Long.class });
+            else if (MyStringUtils.endsWith(str, "L")) {
+                clazz.add(new Object[] { Long.valueOf(MyStringUtils.substring(str, 0, str.length() - 1)), Long.class });
             }
             // double浮点类型，以D结尾
-            else if (StringUtils.endsWith(str, "D")) {
+            else if (MyStringUtils.endsWith(str, "D")) {
                 clazz.add(
-                        new Object[] { Double.valueOf(StringUtils.substring(str, 0, str.length() - 1)), Double.class });
+                        new Object[] { Double.valueOf(MyStringUtils.substring(str, 0, str.length() - 1)), Double.class });
             }
             // 其他类型归类为整形
             else {

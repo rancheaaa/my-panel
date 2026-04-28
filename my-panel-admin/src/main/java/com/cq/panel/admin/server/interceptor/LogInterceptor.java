@@ -9,12 +9,12 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
 @Component
+@SuppressWarnings("all")
 public class LogInterceptor implements HandlerInterceptor
 {
     private static final Logger logger = LoggerFactory.getLogger(LogInterceptor.class);

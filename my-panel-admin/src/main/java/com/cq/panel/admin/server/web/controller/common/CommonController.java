@@ -5,7 +5,7 @@ import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.common.UploadVO;
 import com.cq.panel.admin.server.web.domain.vo.common.UploadsVO;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.file.FileUploadUtils;
 import com.cq.panel.admin.server.common.utils.file.FileUtils;
 import com.cq.panel.admin.server.config.ServerConfig;
@@ -63,7 +63,7 @@ public class CommonController {
                              HttpServletResponse response) {
         try {
             if (!FileUtils.checkAllowDownload(fileName)) {
-                throw new Exception(StringUtils.format("文件名称({})非法，不允许下载。 ", fileName));
+                throw new Exception(MyStringUtils.format("文件名称({})非法，不允许下载。 ", fileName));
             }
             String realFileName = System.currentTimeMillis() + fileName.substring(fileName.indexOf("_") + 1);
             String filePath = this.appConfig.getDownloadPath() + fileName;
@@ -120,10 +120,10 @@ public class CommonController {
                 originalFilenames.add(file.getOriginalFilename());
             }
             return Result.success(new UploadsVO(
-                    StringUtils.join(urls, FILE_DELIMiTER),
-                    StringUtils.join(fileNames, FILE_DELIMiTER),
-                    StringUtils.join(newFileNames, FILE_DELIMiTER),
-                    StringUtils.join(originalFilenames, FILE_DELIMiTER)
+                    MyStringUtils.join(urls, FILE_DELIMiTER),
+                    MyStringUtils.join(fileNames, FILE_DELIMiTER),
+                    MyStringUtils.join(newFileNames, FILE_DELIMiTER),
+                    MyStringUtils.join(originalFilenames, FILE_DELIMiTER)
             ));
         } catch (Exception e) {
             throw new ServiceException(e.getMessage());
@@ -138,14 +138,14 @@ public class CommonController {
     public void resourceDownload(@Parameter(description = "资源名称", required = true) @RequestParam String resource, HttpServletResponse response) {
         try {
             if (!FileUtils.checkAllowDownload(resource)) {
-                throw new Exception(StringUtils.format("资源文件({})非法，不允许下载。 ", resource));
+                throw new Exception(MyStringUtils.format("资源文件({})非法，不允许下载。 ", resource));
             }
             // 本地资源路径
             String localPath = this.appConfig.getProfile();
             // 数据库资源地址
-            String downloadPath = localPath + StringUtils.substringAfter(resource, Constants.RESOURCE_PREFIX);
+            String downloadPath = localPath + MyStringUtils.substringAfter(resource, Constants.RESOURCE_PREFIX);
             // 下载名称
-            String downloadName = StringUtils.substringAfterLast(downloadPath, "/");
+            String downloadName = MyStringUtils.substringAfterLast(downloadPath, "/");
             response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
             FileUtils.setAttachmentResponseHeader(response, downloadName);
             FileUtils.writeBytes(downloadPath, response.getOutputStream());

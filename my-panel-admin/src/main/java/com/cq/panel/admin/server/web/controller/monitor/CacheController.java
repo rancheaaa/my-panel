@@ -1,10 +1,9 @@
 package com.cq.panel.admin.server.web.controller.monitor;
 
-import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.monitor.CacheInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysCacheVO;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysDictData;
 import com.cq.panel.admin.server.repository.service.ISysDictDataService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -72,8 +71,8 @@ public class CacheController
                 commandStats.stringPropertyNames().forEach(key -> {
                     Map<String, String> data = new HashMap<>(2);
                     String property = commandStats.getProperty(key);
-                    data.put("name", StringUtils.removeStart(key, "cmdstat_"));
-                    data.put("value", StringUtils.substringBetween(property, "calls=", ",usec"));
+                    data.put("name", MyStringUtils.removeStart(key, "cmdstat_"));
+                    data.put("value", MyStringUtils.substringBetween(property, "calls=", ",usec"));
                     pieList.add(data);
                 });
             }
@@ -122,7 +121,7 @@ public class CacheController
             Collection<String> cacheKeys = cacheService.keys(pattern);
             logger.info("Found {} keys for pattern: {}", cacheKeys != null ? cacheKeys.size() : 0, pattern);
             List<SysCacheVO> list = new ArrayList<>();
-            if (cacheKeys != null && StringUtils.isNotEmpty(cacheKeys))
+            if (cacheKeys != null && MyStringUtils.isNotEmpty(cacheKeys))
             {
                 for (String key : cacheKeys)
                 {

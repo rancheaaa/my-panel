@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.page;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * 分页数据
@@ -26,11 +26,11 @@ public class PageDomain
 
     public String getOrderBy()
     {
-        if (StringUtils.isEmpty(orderByColumn))
+        if (MyStringUtils.isEmpty(orderByColumn))
         {
             return "";
         }
-        return StringUtils.toUnderScoreCase(orderByColumn) + " " + isAsc;
+        return MyStringUtils.toUnderScoreCase(orderByColumn) + " " + isAsc;
     }
 
     public Integer getPageNum()
@@ -70,7 +70,7 @@ public class PageDomain
 
     public void setIsAsc(String isAsc)
     {
-        if (StringUtils.isNotEmpty(isAsc))
+        if (MyStringUtils.isNotEmpty(isAsc))
         {
             // 兼容前端排序类型
             if ("ascending".equals(isAsc))
@@ -87,7 +87,7 @@ public class PageDomain
 
     public Boolean getReasonable()
     {
-        if (StringUtils.isNull(reasonable))
+        if (MyStringUtils.isNull(reasonable))
         {
             return Boolean.TRUE;
         }

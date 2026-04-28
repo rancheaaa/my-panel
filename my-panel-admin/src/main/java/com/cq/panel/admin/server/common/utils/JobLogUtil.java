@@ -62,8 +62,8 @@ public class JobLogUtil
             jobMessage.append("调用目标：").append(sysJob.getInvokeTarget() != null ? sysJob.getInvokeTarget() : "").append("\n");
         }
         jobMessage.append("Cron表达式：").append(sysJob.getCronExpression() != null ? sysJob.getCronExpression() : "").append("\n");
-        jobMessage.append("开始时间：").append(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, startTime)).append("\n");
-        jobMessage.append("结束时间：").append(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, endTime)).append("\n");
+        jobMessage.append("开始时间：").append(MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, startTime)).append("\n");
+        jobMessage.append("结束时间：").append(MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, endTime)).append("\n");
         jobMessage.append("执行耗时：").append(runMs).append("毫秒\n");
         jobMessage.append("执行状态：").append(e == null ? "成功" : "失败");
         
@@ -84,7 +84,7 @@ public class JobLogUtil
     {
         String triggerTypeName = "0".equals(triggerType) ? "定时触发" : "1".equals(triggerType) ? "手动触发" : "未知触发";
         logger.info("任务日志 - 任务名称: {}, 触发类型: {}, 开始时间: {}", 
-            sysJob.getJobName(), triggerTypeName, DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, startTime));
+            sysJob.getJobName(), triggerTypeName, MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, startTime));
         
         SysJobLog sysJobLog = new SysJobLog();
         sysJobLog.setJobName(sysJob.getJobName());
@@ -98,7 +98,7 @@ public class JobLogUtil
         if (e != null)
         {
             sysJobLog.setStatus(Constants.FAIL);
-            String errorMsg = StringUtils.substring(ExceptionUtil.getExceptionMessage(e), 0, 2000);
+            String errorMsg = MyStringUtils.substring(ExceptionUtil.getExceptionMessage(e), 0, 2000);
             sysJobLog.setExceptionInfo(errorMsg);
             logger.error("任务执行失败 - 任务名称: {}, 触发类型: {}, 异常信息: {}", 
                 sysJob.getJobName(), triggerTypeName, errorMsg);
@@ -107,7 +107,7 @@ public class JobLogUtil
         {
             sysJobLog.setStatus(Constants.SUCCESS);
             logger.info("任务执行成功 - 任务名称: {}, 触发类型: {}, 结束时间: {}", 
-                sysJob.getJobName(), triggerTypeName, DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, endTime));
+                sysJob.getJobName(), triggerTypeName, MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, endTime));
         }
 
         SpringUtils.getBean(ISysJobLogService.class).addJobLog(sysJobLog);

@@ -15,11 +15,11 @@ public class DesensitizedUtil
      */
     public static String password(String password)
     {
-        if (StringUtils.isBlank(password))
+        if (MyStringUtils.isBlank(password))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
-        return StringUtils.repeat('*', password.length());
+        return MyStringUtils.repeat('*', password.length());
     }
 
     /**
@@ -30,19 +30,19 @@ public class DesensitizedUtil
      */
     public static String carLicense(String carLicense)
     {
-        if (StringUtils.isBlank(carLicense))
+        if (MyStringUtils.isBlank(carLicense))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
         // 普通车牌
         if (carLicense.length() == 7)
         {
-            carLicense = StringUtils.hide(carLicense, 3, 6);
+            carLicense = MyStringUtils.hide(carLicense, 3, 6);
         }
         else if (carLicense.length() == 8)
         {
             // 新能源车牌
-            carLicense = StringUtils.hide(carLicense, 3, 7);
+            carLicense = MyStringUtils.hide(carLicense, 3, 7);
         }
         return carLicense;
     }

@@ -5,7 +5,7 @@ import java.util.TimerTask;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.utils.LogUtils;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.ip.AddressUtils;
 import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
@@ -68,7 +68,7 @@ public class AsyncFactory
                 logininfor.setMsg(message);
                 logininfor.setLoginTime(new Date());
                 // 日志状态
-                if (StringUtils.equalsAny(status, Constants.LOGIN_SUCCESS, Constants.LOGOUT, Constants.REGISTER))
+                if (MyStringUtils.equalsAny(status, Constants.LOGIN_SUCCESS, Constants.LOGOUT, Constants.REGISTER))
                 {
                     logininfor.setStatus(Constants.SUCCESS);
                 }

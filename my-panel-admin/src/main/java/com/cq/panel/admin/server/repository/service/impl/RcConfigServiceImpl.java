@@ -1,14 +1,14 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.cq.panel.admin.server.repository.mapper.RcConfigMapper;
 import com.cq.panel.admin.server.repository.domain.RcConfig;
 import com.cq.panel.admin.server.repository.service.IRcConfigService;
 import com.cq.panel.admin.server.common.constant.UserConstants;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.RcEnv;
 import com.cq.panel.admin.server.repository.domain.RcProject;
 import com.cq.panel.admin.server.repository.service.IRcEnvService;
@@ -67,7 +67,7 @@ public class RcConfigServiceImpl implements IRcConfigService
      * 判断是否为包名或类名部分
      */
     private boolean isPackageOrClassName(String part) {
-        if (StringUtils.isEmpty(part)) return false;
+        if (MyStringUtils.isEmpty(part)) return false;
         // 包含大写字母（类名特征）
         if (!part.equals(part.toLowerCase())) return true;
         // 包含数字（通常不是配置层级）
@@ -99,7 +99,7 @@ public class RcConfigServiceImpl implements IRcConfigService
         Map<String, Object> result = new LinkedHashMap<>();
         for (RcConfig config : list) {
             String key = config.getConfigKey();
-            if (StringUtils.isEmpty(key)) continue;
+            if (MyStringUtils.isEmpty(key)) continue;
             
             ConfigValueWithDesc value = new ConfigValueWithDesc(config.getConfigValue(), config.getConfigDesc());
             
@@ -175,7 +175,7 @@ public class RcConfigServiceImpl implements IRcConfigService
         } else if ("properties".equals(extension)) {
             StringBuilder sb = new StringBuilder();
             list.forEach(c -> {
-                if (StringUtils.isNotEmpty(c.getConfigDesc())) {
+                if (MyStringUtils.isNotEmpty(c.getConfigDesc())) {
                     sb.append("# ").append(c.getConfigDesc()).append("\n");
                 }
                 sb.append(c.getConfigKey()).append("=").append(c.getConfigValue()).append("\n");
@@ -184,7 +184,7 @@ public class RcConfigServiceImpl implements IRcConfigService
         } else {
             StringBuilder txtSb = new StringBuilder();
             list.forEach(c -> {
-                if (StringUtils.isNotEmpty(c.getConfigDesc())) {
+                if (MyStringUtils.isNotEmpty(c.getConfigDesc())) {
                     txtSb.append("# ").append(c.getConfigDesc()).append("\n");
                 }
                 txtSb.append(c.getConfigKey()).append(": ").append(c.getConfigValue()).append("\n");
@@ -210,7 +210,7 @@ public class RcConfigServiceImpl implements IRcConfigService
                 sb.append(space).append(key).append(":\n");
                 buildYaml(sb, (Map<String, Object>) value, indent + 1);
             } else if (value instanceof ConfigValueWithDesc cv) {
-                if (StringUtils.isNotEmpty(cv.getDesc())) {
+                if (MyStringUtils.isNotEmpty(cv.getDesc())) {
                     sb.append(space).append("# ").append(cv.getDesc()).append("\n");
                 }
                 sb.append(space).append(key).append(": ").append(cv.getValue()).append("\n");
@@ -263,7 +263,7 @@ public class RcConfigServiceImpl implements IRcConfigService
     @Override
     public int insertRcConfig(RcConfig rcConfig)
     {
-        rcConfig.setCreateTime(DateUtils.getNowDate());
+        rcConfig.setCreateTime(MyDateUtils.getNowDate());
         return rcConfigMapper.insertRcConfig(rcConfig);
     }
 
@@ -276,7 +276,7 @@ public class RcConfigServiceImpl implements IRcConfigService
     @Override
     public int updateRcConfig(RcConfig rcConfig)
     {
-        rcConfig.setUpdateTime(DateUtils.getNowDate());
+        rcConfig.setUpdateTime(MyDateUtils.getNowDate());
         return rcConfigMapper.updateRcConfig(rcConfig);
     }
 
@@ -313,9 +313,9 @@ public class RcConfigServiceImpl implements IRcConfigService
     @Override
     public boolean checkConfigKeyUnique(RcConfig rcConfig)
     {
-        Long id = StringUtils.isNull(rcConfig.getId()) ? -1L : rcConfig.getId();
+        Long id = MyStringUtils.isNull(rcConfig.getId()) ? -1L : rcConfig.getId();
         RcConfig info = rcConfigMapper.checkConfigKeyUnique(rcConfig.getEnvId(), rcConfig.getProjectId(), rcConfig.getConfigKey());
-        if (StringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
         {
             return UserConstants.NOT_UNIQUE;
         }
@@ -330,7 +330,7 @@ public class RcConfigServiceImpl implements IRcConfigService
     public void importConfig(Long envId, Long projectId, String content, String format, String operName)
     {
         log.info("Starting batch import: envId={}, projectId={}, format={}, operator={}", envId, projectId, format, operName);
-        if (StringUtils.isEmpty(content))
+        if (MyStringUtils.isEmpty(content))
         {
             return;
         }
@@ -400,7 +400,7 @@ public class RcConfigServiceImpl implements IRcConfigService
         rcConfig.setConfigValue(value);
         
         // 设置注释信息，如果注释为空则使用空字符串
-        if (StringUtils.isNotEmpty(comment)) {
+        if (MyStringUtils.isNotEmpty(comment)) {
             // 清理注释中的注释符号和换行符
             comment = comment.replace("#", "").replace("!", "");
             // 限制注释长度不超过200字符
@@ -408,7 +408,7 @@ public class RcConfigServiceImpl implements IRcConfigService
                 comment = comment.substring(0, 200);
             }
         }
-        rcConfig.setConfigDesc(StringUtils.isEmpty(comment) ? "" : comment);
+        rcConfig.setConfigDesc(MyStringUtils.isEmpty(comment) ? "" : comment);
 
         // 1: 批量导入
         rcConfig.setSource("1");

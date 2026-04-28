@@ -10,7 +10,7 @@ import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysDept;
 import com.cq.panel.admin.server.repository.service.ISysDeptService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,7 +63,7 @@ public class SysDeptController extends BaseController
     public Result<List<SysDeptVO>> excludeChild(@Parameter(description = "排除的部门ID", required = true) @PathVariable(value = "deptId", required = false) Long deptId)
     {
         List<SysDept> list = deptService.selectDeptList(new SysDept());
-        list.removeIf(d -> d.getDeptId().intValue() == deptId || ArrayUtils.contains(StringUtils.split(d.getAncestors(), ","), deptId + ""));
+        list.removeIf(d -> d.getDeptId().intValue() == deptId || ArrayUtils.contains(MyStringUtils.split(d.getAncestors(), ","), deptId + ""));
         return Result.success(deptConverter.toVOList(list));
     }
 
@@ -118,7 +118,7 @@ public class SysDeptController extends BaseController
         {
             return Result.error("修改部门'" + dept.getDeptName() + "'失败，上级部门不能是自己");
         }
-        else if (StringUtils.equals(UserConstants.DEPT_DISABLE, dept.getStatus()) && deptService.selectNormalChildrenDeptById(deptId) > 0)
+        else if (MyStringUtils.equals(UserConstants.DEPT_DISABLE, dept.getStatus()) && deptService.selectNormalChildrenDeptById(deptId) > 0)
         {
             return Result.error("该部门包含未停用的子部门！");
         }

@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.filter;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.html.EscapeUtil;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
@@ -56,7 +56,7 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
 
         // 为空，直接返回
         String json = IOUtils.toString(super.getInputStream(), "utf-8");
-        if (StringUtils.isEmpty(json))
+        if (MyStringUtils.isEmpty(json))
         {
             return super.getInputStream();
         }
@@ -105,6 +105,6 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
     public boolean isJsonRequest()
     {
         String header = super.getHeader(HttpHeaders.CONTENT_TYPE);
-        return StringUtils.startsWithIgnoreCase(header, MediaType.APPLICATION_JSON_VALUE);
+        return MyStringUtils.startsWithIgnoreCase(header, MediaType.APPLICATION_JSON_VALUE);
     }
 }

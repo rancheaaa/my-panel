@@ -1,14 +1,14 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.cq.panel.admin.server.repository.mapper.RcAccessTokenMapper;
 import com.cq.panel.admin.server.repository.domain.RcAccessToken;
 import com.cq.panel.admin.server.repository.service.IRcAccessTokenService;
 import com.cq.panel.admin.server.common.constant.UserConstants;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * AccessToken管理Service业务层处理
@@ -54,7 +54,7 @@ public class RcAccessTokenServiceImpl implements IRcAccessTokenService
     @Override
     public int insertRcAccessToken(RcAccessToken rcAccessToken)
     {
-        rcAccessToken.setCreateTime(DateUtils.getNowDate());
+        rcAccessToken.setCreateTime(MyDateUtils.getNowDate());
         return rcAccessTokenMapper.insertRcAccessToken(rcAccessToken);
     }
 
@@ -67,7 +67,7 @@ public class RcAccessTokenServiceImpl implements IRcAccessTokenService
     @Override
     public int updateRcAccessToken(RcAccessToken rcAccessToken)
     {
-        rcAccessToken.setUpdateTime(DateUtils.getNowDate());
+        rcAccessToken.setUpdateTime(MyDateUtils.getNowDate());
         return rcAccessTokenMapper.updateRcAccessToken(rcAccessToken);
     }
 
@@ -104,9 +104,9 @@ public class RcAccessTokenServiceImpl implements IRcAccessTokenService
     @Override
     public boolean checkTokenValueUnique(RcAccessToken rcAccessToken)
     {
-        Long id = StringUtils.isNull(rcAccessToken.getId()) ? -1L : rcAccessToken.getId();
+        Long id = MyStringUtils.isNull(rcAccessToken.getId()) ? -1L : rcAccessToken.getId();
         RcAccessToken info = rcAccessTokenMapper.checkTokenValueUnique(rcAccessToken.getTokenValue());
-        if (StringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
         {
             return UserConstants.NOT_UNIQUE;
         }

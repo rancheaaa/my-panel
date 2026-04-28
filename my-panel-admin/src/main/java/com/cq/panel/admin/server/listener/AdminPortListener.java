@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.listener;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.common.utils.SystemEnvUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +26,7 @@ public class AdminPortListener {
         logger.info("SPRING_SQL_INIT_MODE:[{}]", springSqlInitMode);
         logger.info("PROJECT_ROOT_PATH:[{}]", projectRootPath);
         logger.info("✅ my-panel-admin 实际启动端口:[{}]", realPort);
-        if (StringUtils.isEmpty(projectRootPath)) {
+        if (MyStringUtils.isEmpty(projectRootPath)) {
             return;
         }
         try {

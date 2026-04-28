@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.common.utils.http;
 
 
 import com.cq.panel.admin.server.common.constant.Constants;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.net.ssl.*;
@@ -31,7 +31,7 @@ public class HttpUtils
      */
     public static String sendGet(String url)
     {
-        return sendGet(url, StringUtils.EMPTY);
+        return sendGet(url, MyStringUtils.EMPTY);
     }
 
     /**
@@ -60,7 +60,7 @@ public class HttpUtils
         BufferedReader in = null;
         try
         {
-            String urlNameString = StringUtils.isNotBlank(param) ? url + "?" + param : url;
+            String urlNameString = MyStringUtils.isNotBlank(param) ? url + "?" + param : url;
             log.info("sendGet - {}", urlNameString);
             URL realUrl = new URL(urlNameString);
             URLConnection connection = realUrl.openConnection();

@@ -6,7 +6,7 @@ import java.util.Set;
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.repository.domain.SysRole;
 import com.cq.panel.admin.server.repository.domain.SysUser;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.service.ISysMenuService;
 import com.cq.panel.admin.server.repository.service.ISysRoleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,7 +70,7 @@ public class SysPermissionService
                 // 多角色设置permissions属性，以便数据权限匹配权限
                 for (SysRole role : roles)
                 {
-                    if (StringUtils.equals(role.getStatus(), UserConstants.ROLE_NORMAL))
+                    if (MyStringUtils.equals(role.getStatus(), UserConstants.ROLE_NORMAL))
                     {
                         Set<String> rolePerms = menuService.selectMenuPermsByRoleId(role.getRoleId());
                         role.setPermissions(rolePerms);

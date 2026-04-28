@@ -22,11 +22,10 @@ import com.cq.panel.admin.server.common.utils.JsonUtils;
 public abstract class RepeatSubmitInterceptor implements HandlerInterceptor
 {
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception
-    {
-        if (handler instanceof HandlerMethod)
+    @SuppressWarnings("all")
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        if (handler instanceof HandlerMethod handlerMethod)
         {
-            HandlerMethod handlerMethod = (HandlerMethod) handler;
             Method method = handlerMethod.getMethod();
             RepeatSubmit annotation = method.getAnnotation(RepeatSubmit.class);
             if (annotation != null)
@@ -40,12 +39,8 @@ public abstract class RepeatSubmitInterceptor implements HandlerInterceptor
                     return false;
                 }
             }
-            return true;
         }
-        else
-        {
-            return true;
-        }
+        return true;
     }
 
     /**

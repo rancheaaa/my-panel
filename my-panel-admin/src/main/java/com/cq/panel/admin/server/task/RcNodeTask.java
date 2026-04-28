@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.task;
 
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.repository.domain.RcNode;
 import com.cq.panel.admin.server.repository.mapper.RcNodeMapper;
 import org.slf4j.Logger;
@@ -32,7 +32,7 @@ public class RcNodeTask {
     public void scanOfflineNodes(Integer timeoutSeconds) {
         log.info("开始扫描超时节点，超时时间设置：{}秒", timeoutSeconds);
 
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         long timeoutMillis = timeoutSeconds * 1000L;
 
         List<RcNode> onlineNodes = rcNodeMapper.selectOnlineNodes();
@@ -55,7 +55,7 @@ public class RcNodeTask {
             if (timeDiff > timeoutMillis) {
                 log.info("节点 {}:{} 超时，最后刷新时间：{}，超时：{}秒",
                         node.getNodeIp(), node.getNodePort(),
-                        DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, lastRefreshTime),
+                        MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, lastRefreshTime),
                         timeDiff / 1000);
                 markNodeOffline(node);
                 offlineCount++;
@@ -76,7 +76,7 @@ public class RcNodeTask {
      */
     private void markNodeOffline(RcNode node) {
         node.setStatus("1");
-        node.setUpdateTime(DateUtils.getNowDate());
+        node.setUpdateTime(MyDateUtils.getNowDate());
         rcNodeMapper.updateRcNode(node);
     }
 }

@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.uuid;
 
-import com.cq.panel.admin.server.common.utils.DateUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -58,7 +58,7 @@ public class Seq
      */
     public static String getId(AtomicInteger atomicInt, int length)
     {
-        String result = DateUtils.dateTimeNow();
+        String result = MyDateUtils.dateTimeNow();
         result += machineCode;
         result += getSeq(atomicInt, length);
         return result;
@@ -81,6 +81,6 @@ public class Seq
             atomicInt.set(1);
         }
         // 转字符串，用0左补齐
-        return StringUtils.padl(value, length);
+        return MyStringUtils.padl(value, length);
     }
 }

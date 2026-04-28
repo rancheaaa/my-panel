@@ -7,7 +7,7 @@ import com.cq.panel.admin.server.web.service.cache.CacheService;
 import com.cq.panel.admin.server.web.domain.text.Convert;
 import com.cq.panel.admin.server.common.enums.DataSourceType;
 import com.cq.panel.admin.server.web.exception.ServiceException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysConfig;
 import com.cq.panel.admin.server.repository.mapper.SysConfigMapper;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
@@ -65,19 +65,19 @@ public class SysConfigServiceImpl implements ISysConfigService
     public String selectConfigByKey(String configKey)
     {
         String configValue = Convert.toStr(cacheService.get(getCacheKey(configKey)));
-        if (StringUtils.isNotEmpty(configValue))
+        if (MyStringUtils.isNotEmpty(configValue))
         {
             return configValue;
         }
         SysConfig config = new SysConfig();
         config.setConfigKey(configKey);
         SysConfig retConfig = configMapper.selectConfig(config);
-        if (StringUtils.isNotNull(retConfig))
+        if (MyStringUtils.isNotNull(retConfig))
         {
             cacheService.set(getCacheKey(configKey), retConfig.getConfigValue());
             return retConfig.getConfigValue();
         }
-        return StringUtils.EMPTY;
+        return MyStringUtils.EMPTY;
     }
 
     /**
@@ -89,7 +89,7 @@ public class SysConfigServiceImpl implements ISysConfigService
     public boolean selectCaptchaEnabled()
     {
         String captchaEnabled = selectConfigByKey("sys.account.captchaEnabled");
-        if (StringUtils.isEmpty(captchaEnabled))
+        if (MyStringUtils.isEmpty(captchaEnabled))
         {
             return true;
         }
@@ -137,7 +137,7 @@ public class SysConfigServiceImpl implements ISysConfigService
     {
         config.setUpdateTime(new java.util.Date());
         SysConfig temp = configMapper.selectConfigById(config.getConfigId());
-        if (!StringUtils.equals(temp.getConfigKey(), config.getConfigKey()))
+        if (!MyStringUtils.equals(temp.getConfigKey(), config.getConfigKey()))
         {
             cacheService.delete(getCacheKey(temp.getConfigKey()));
         }
@@ -161,7 +161,7 @@ public class SysConfigServiceImpl implements ISysConfigService
         for (Long configId : configIds)
         {
             SysConfig config = selectConfigById(configId);
-            if (StringUtils.equals(UserConstants.YES, config.getConfigType()))
+            if (MyStringUtils.equals(UserConstants.YES, config.getConfigType()))
             {
                 throw new ServiceException(String.format("内置参数【%1$s】不能删除 ", config.getConfigKey()));
             }
@@ -212,9 +212,9 @@ public class SysConfigServiceImpl implements ISysConfigService
     @Override
     public boolean checkConfigKeyUnique(SysConfig config)
     {
-        Long configId = StringUtils.isNull(config.getConfigId()) ? -1L : config.getConfigId();
+        Long configId = MyStringUtils.isNull(config.getConfigId()) ? -1L : config.getConfigId();
         SysConfig info = configMapper.checkConfigKeyUnique(config.getConfigKey());
-        if (StringUtils.isNotNull(info) && info.getConfigId().longValue() != configId.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getConfigId().longValue() != configId.longValue())
         {
             return UserConstants.NOT_UNIQUE;
         }

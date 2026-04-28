@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.web.exception.base;
 
 import com.cq.panel.admin.server.common.utils.MessageUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * 基础异常
@@ -64,7 +64,7 @@ public class BaseException extends RuntimeException
     public String getMessage()
     {
         String message = null;
-        if (!StringUtils.isEmpty(code))
+        if (!MyStringUtils.isEmpty(code))
         {
             message = MessageUtils.message(code, args);
         }

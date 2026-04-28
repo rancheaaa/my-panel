@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import com.cq.panel.admin.server.common.utils.Arith;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.repository.service.IServerService;
 import com.cq.panel.admin.server.web.domain.vo.monitor.*;
@@ -127,8 +127,8 @@ public class ServerServiceImpl implements IServerService {
         jvm.setHome(props.getProperty("java.home"));
         jvm.setName(ManagementFactory.getRuntimeMXBean().getVmName());
         jvm.setPid(ProcessHandle.current().pid());
-        jvm.setStartTime(DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, DateUtils.getServerStartDate()));
-        jvm.setRunTime(DateUtils.timeDistance(new Date(), DateUtils.getServerStartDate()));
+        jvm.setStartTime(MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, MyDateUtils.getServerStartDate()));
+        jvm.setRunTime(MyDateUtils.timeDistance(new Date(), MyDateUtils.getServerStartDate()));
         jvm.setInputArgs(ManagementFactory.getRuntimeMXBean().getInputArguments().toString());
     }
 

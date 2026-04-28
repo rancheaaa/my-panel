@@ -14,7 +14,7 @@ import com.cq.panel.admin.server.web.domain.vo.system.UserInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.system.RouterVo;
 import com.cq.panel.admin.server.web.converter.system.SysUserConverter;
 import com.cq.panel.admin.server.repository.service.ISysUserService;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.web.exception.ServiceException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,7 +60,7 @@ public class SysLoginController
     @Operation(summary = "获取密码盐值")
     @GetMapping("/getSalt")
     public Result<String> getSalt(String username) {
-        if (StringUtils.isEmpty(username)) {
+        if (MyStringUtils.isEmpty(username)) {
             throw new ServiceException("用户名不能为空");
         }
         SysUser user = userService.selectUserByUserName(username);

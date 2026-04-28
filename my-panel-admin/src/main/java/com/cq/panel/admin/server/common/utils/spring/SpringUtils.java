@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.common.utils.spring;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -141,7 +141,7 @@ public final class SpringUtils implements BeanFactoryPostProcessor, ApplicationC
     public static String getActiveProfile()
     {
         final String[] activeProfiles = getActiveProfiles();
-        return StringUtils.isNotEmpty(activeProfiles) ? activeProfiles[0] : null;
+        return MyStringUtils.isNotEmpty(activeProfiles) ? activeProfiles[0] : null;
     }
 
     /**

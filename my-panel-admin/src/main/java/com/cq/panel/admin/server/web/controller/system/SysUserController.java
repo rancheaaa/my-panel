@@ -8,7 +8,7 @@ import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.service.ISysDeptService;
 import com.cq.panel.admin.server.repository.service.ISysPostService;
@@ -133,7 +133,7 @@ public class SysUserController extends BaseController
         List<SysRole> roles = roleService.selectRoleAll();
         vo.setRoles(roleConverter.toVOList(SysUser.isAdmin(userId) ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList())));
         vo.setPosts(postService.selectPostAll()); // Pending SysPostVO
-        if (StringUtils.isNotNull(userId))
+        if (MyStringUtils.isNotNull(userId))
         {
             SysUser sysUser = userService.selectUserById(userId);
             vo.setUser(userConverter.toVO(sysUser));
@@ -159,16 +159,16 @@ public class SysUserController extends BaseController
         {
             return Result.error("新增用户'" + user.getUserName() + "'失败，登录账号已存在");
         }
-        else if (StringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user))
+        else if (MyStringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user))
         {
             return Result.error("新增用户'" + user.getUserName() + "'失败，手机号码已存在");
         }
-        else if (StringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user))
+        else if (MyStringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user))
         {
             return Result.error("新增用户'" + user.getUserName() + "'失败，邮箱账号已存在");
         }
         user.setCreateBy(getUsername());
-        String salt = StringUtils.isEmpty(dto.getSalt()) ? Md5PasswordEncoder.generateSalt() : dto.getSalt();
+        String salt = MyStringUtils.isEmpty(dto.getSalt()) ? Md5PasswordEncoder.generateSalt() : dto.getSalt();
         user.setSalt(salt);
         user.setPassword(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
         userService.insertUser(user);
@@ -193,11 +193,11 @@ public class SysUserController extends BaseController
         {
             return Result.error("修改用户'" + user.getUserName() + "'失败，登录账号已存在");
         }
-        else if (StringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user))
+        else if (MyStringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user))
         {
             return Result.error("修改用户'" + user.getUserName() + "'失败，手机号码已存在");
         }
-        else if (StringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user))
+        else if (MyStringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user))
         {
             return Result.error("修改用户'" + user.getUserName() + "'失败，邮箱账号已存在");
         }

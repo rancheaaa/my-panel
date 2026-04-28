@@ -1,9 +1,8 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
 import com.cq.panel.admin.server.repository.domain.ArchEdge;
 import com.cq.panel.admin.server.repository.domain.ArchNode;
 import com.cq.panel.admin.server.repository.service.IArchEdgeService;
@@ -78,9 +77,9 @@ public class ArchDiagramServiceImpl implements IArchDiagramService
     public int insertArchDiagram(ArchDiagram archDiagram)
     {
         archDiagram.setCreateBy(SecurityUtils.getUsername());
-        archDiagram.setCreateTime(DateUtils.getNowDate());
+        archDiagram.setCreateTime(MyDateUtils.getNowDate());
         archDiagram.setUpdateBy(SecurityUtils.getUsername());
-        archDiagram.setUpdateTime(DateUtils.getNowDate());
+        archDiagram.setUpdateTime(MyDateUtils.getNowDate());
         archDiagram.setStatus("0");
         archDiagram.setIsPublished("0");
         archDiagram.setDelFlag("0");
@@ -98,7 +97,7 @@ public class ArchDiagramServiceImpl implements IArchDiagramService
     public int updateArchDiagram(ArchDiagram archDiagram)
     {
         archDiagram.setUpdateBy(SecurityUtils.getUsername());
-        archDiagram.setUpdateTime(DateUtils.getNowDate());
+        archDiagram.setUpdateTime(MyDateUtils.getNowDate());
         return archDiagramMapper.updateArchDiagram(archDiagram);
     }
 
@@ -113,8 +112,8 @@ public class ArchDiagramServiceImpl implements IArchDiagramService
     public int publishArchDiagram(ArchDiagram archDiagram)
     {
         archDiagram.setUpdateBy(SecurityUtils.getUsername());
-        archDiagram.setUpdateTime(DateUtils.getNowDate());
-        archDiagram.setPublishedAt(DateUtils.getNowDate());
+        archDiagram.setUpdateTime(MyDateUtils.getNowDate());
+        archDiagram.setPublishedAt(MyDateUtils.getNowDate());
         return archDiagramMapper.publishArchDiagram(archDiagram);
     }
 

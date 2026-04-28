@@ -3,7 +3,7 @@ package com.cq.panel.admin.server.repository.service.impl;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.common.dto.agent.AgentExecuteCommandRequest;
 import com.cq.panel.common.dto.agent.AgentExecuteCommandResponse;
@@ -18,8 +18,6 @@ import com.cq.panel.admin.server.repository.service.IAgentCommandHistoryService;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Agent注册信息Service业务层处理
@@ -70,7 +68,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int insertAgentRegistry(AgentRegistry agentRegistry)
     {
-        agentRegistry.setCreateTime(DateUtils.getNowDate());
+        agentRegistry.setCreateTime(MyDateUtils.getNowDate());
         return agentRegistryMapper.insertAgentRegistry(agentRegistry);
     }
 
@@ -83,7 +81,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int updateAgentRegistry(AgentRegistry agentRegistry)
     {
-        agentRegistry.setUpdateTime(DateUtils.getNowDate());
+        agentRegistry.setUpdateTime(MyDateUtils.getNowDate());
         return agentRegistryMapper.updateAgentRegistry(agentRegistry);
     }
 
@@ -126,7 +124,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         query.setAgentPort(agentRegistry.getAgentPort());
         AgentRegistry existing = agentRegistryMapper.selectAgentRegistryByIpAndPort(query);
         
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         
         if (existing != null)
         {
@@ -172,8 +170,8 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             update.setAgentIp(agentIp);
             update.setAgentPort(agentPort);
             update.setNodeStatus(1);
-            update.setLastRefreshTime(DateUtils.getNowDate());
-            update.setUpdateTime(DateUtils.getNowDate());
+            update.setLastRefreshTime(MyDateUtils.getNowDate());
+            update.setUpdateTime(MyDateUtils.getNowDate());
             agentRegistryMapper.updateNodeStatusByIpAndPort(update);
             return true;
         }
@@ -189,7 +187,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int offlineTimeoutNodes(Integer timeoutSeconds)
     {
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         long timeoutMillis = timeoutSeconds * 1000L;
         
         List<AgentRegistry> onlineNodes = agentRegistryMapper.selectOnlineNodes();
@@ -205,7 +203,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             if (updateTime == null)
             {
                 node.setNodeStatus(0);
-                node.setUpdateTime(DateUtils.getNowDate());
+                node.setUpdateTime(MyDateUtils.getNowDate());
                 agentRegistryMapper.updateAgentRegistry(node);
                 offlineCount++;
                 continue;
@@ -215,7 +213,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             if (timeDiff > timeoutMillis)
             {
                 node.setNodeStatus(0);
-                node.setUpdateTime(DateUtils.getNowDate());
+                node.setUpdateTime(MyDateUtils.getNowDate());
                 agentRegistryMapper.updateAgentRegistry(node);
                 offlineCount++;
             }
@@ -259,7 +257,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         history.setAgentPort(agent.getAgentPort());
         history.setCommand(command);
         history.setCommandTimeout(timeout);
-        history.setSubmitTime(DateUtils.getNowDate());
+        history.setSubmitTime(MyDateUtils.getNowDate());
         history.setUserId(SecurityUtils.getUserId());
         history.setUserName(SecurityUtils.getUsername());
         try
@@ -270,12 +268,12 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             
             HttpEntity<AgentExecuteCommandRequest> requestEntity = new HttpEntity<>(requestBody, headers);
             
-            Date startTime = DateUtils.getNowDate();
+            Date startTime = MyDateUtils.getNowDate();
             history.setStartTime(startTime);
             
             ResponseEntity<String> response = restTemplate.postForEntity(agentUrl, requestEntity, String.class);
             
-            Date endTime = DateUtils.getNowDate();
+            Date endTime = MyDateUtils.getNowDate();
             long duration = endTime.getTime() - startTime.getTime();
             history.setEndTime(endTime);
             history.setExecuteTime(duration);
@@ -330,7 +328,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         {
             if (history.getEndTime() == null)
             {
-                history.setEndTime(DateUtils.getNowDate());
+                history.setEndTime(MyDateUtils.getNowDate());
                 if (history.getStartTime() != null)
                 {
                     history.setExecuteTime(history.getEndTime().getTime() - history.getStartTime().getTime());
@@ -352,7 +350,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         {
             if (history.getEndTime() == null)
             {
-                history.setEndTime(DateUtils.getNowDate());
+                history.setEndTime(MyDateUtils.getNowDate());
                 if (history.getStartTime() != null)
                 {
                     history.setExecuteTime(history.getEndTime().getTime() - history.getStartTime().getTime());

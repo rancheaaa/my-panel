@@ -11,10 +11,10 @@ import java.util.*;
  * 
  * @author cq
  */
-public class StringUtils extends org.apache.commons.lang3.StringUtils
+public class MyStringUtils extends org.apache.commons.lang3.StringUtils
 {
     /** 空字符串 */
-    private static final String NULLSTR = "";
+    private static final String NULL_STR = "";
 
     /** 下划线 */
     private static final char SEPARATOR = '_';
@@ -107,7 +107,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      */
     public static boolean isEmpty(String str)
     {
-        return isNull(str) || NULLSTR.equals(str.trim());
+        return isNull(str) || NULL_STR.equals(str.trim());
     }
 
     /**
@@ -174,12 +174,12 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
     {
         if (isEmpty(str))
         {
-            return NULLSTR;
+            return NULL_STR;
         }
         final int strLength = str.length();
         if (startInclude > strLength)
         {
-            return NULLSTR;
+            return NULL_STR;
         }
         if (endExclude > strLength)
         {
@@ -188,7 +188,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
         if (startInclude > endExclude)
         {
             // 如果起始位置大于结束位置，不替换
-            return NULLSTR;
+            return NULL_STR;
         }
         final char[] chars = new char[strLength];
         for (int i = 0; i < strLength; i++)
@@ -216,7 +216,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
     {
         if (str == null)
         {
-            return NULLSTR;
+            return NULL_STR;
         }
 
         if (start < 0)
@@ -230,7 +230,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
         }
         if (start > str.length())
         {
-            return NULLSTR;
+            return NULL_STR;
         }
 
         return str.substring(start);
@@ -248,7 +248,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
     {
         if (str == null)
         {
-            return NULLSTR;
+            return NULL_STR;
         }
 
         if (end < 0)
@@ -267,7 +267,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
 
         if (start > end)
         {
-            return NULLSTR;
+            return NULL_STR;
         }
 
         if (start < 0)
@@ -334,9 +334,9 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      * @param link 链接
      * @return 结果
      */
-    public static boolean ishttp(String link)
+    public static boolean isHttp(String link)
     {
-        return StringUtils.startsWithAny(link, Constants.HTTP, Constants.HTTPS);
+        return MyStringUtils.startsWithAny(link, Constants.HTTP, Constants.HTTPS);
     }
 
     /**
@@ -346,7 +346,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      * @param sep 分隔符
      * @return set集合
      */
-    public static final Set<String> str2Set(String str, String sep)
+    public static Set<String> str2Set(String str, String sep)
     {
         return new HashSet<String>(str2List(str, sep, true, false));
     }
@@ -360,23 +360,23 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      * @param trim 去掉首尾空白
      * @return list集合
      */
-    public static final List<String> str2List(String str, String sep, boolean filterBlank, boolean trim)
+    public static List<String> str2List(String str, String sep, boolean filterBlank, boolean trim)
     {
         List<String> list = new ArrayList<String>();
-        if (StringUtils.isEmpty(str))
+        if (MyStringUtils.isEmpty(str))
         {
             return list;
         }
 
         // 过滤空白字符串
-        if (filterBlank && StringUtils.isBlank(str))
+        if (filterBlank && MyStringUtils.isBlank(str))
         {
             return list;
         }
         String[] split = str.split(sep);
         for (String string : split)
         {
-            if (filterBlank && StringUtils.isBlank(string))
+            if (filterBlank && MyStringUtils.isBlank(string))
             {
                 continue;
             }
@@ -399,21 +399,14 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      */
     public static boolean containsAny(Collection<String> collection, String... array)
     {
-        if (isEmpty(collection) || isEmpty(array))
-        {
-            return false;
-        }
-        else
-        {
-            for (String str : array)
-            {
-                if (collection.contains(str))
-                {
+        if (!isEmpty(collection) && !isEmpty(array)) {
+            for (String str : array) {
+                if (collection.contains(str)) {
                     return true;
                 }
             }
-            return false;
         }
+        return false;
     }
 
     /**
@@ -431,7 +424,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
         }
         for (CharSequence testStr : searchCharSequences)
         {
-            if (containsIgnoreCase(cs, testStr))
+            if (contains(cs, testStr))
             {
                 return true;
             }
@@ -615,7 +608,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      * 
      * @param pattern 匹配规则
      * @param url 需要匹配的url
-     * @return
+     * @return 匹配成功返回true，否则false
      */
     public static boolean isMatch(String pattern, String url)
     {
@@ -636,7 +629,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      * @param size 字符串指定长度
      * @return 返回数字的字符串格式，该字符串为指定长度。
      */
-    public static final String padl(final Number num, final int size)
+    public static String padl(final Number num, final int size)
     {
         return padl(num.toString(), size, '0');
     }
@@ -649,7 +642,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
      * @param c 用于补齐的字符
      * @return 返回指定长度的字符串，由原字符串左补齐或截取得到。
      */
-    public static final String padl(final String s, final int size, final char c)
+    public static String padl(final String s, final int size, final char c)
     {
         final StringBuilder sb = new StringBuilder(size);
         if (s != null)
@@ -657,10 +650,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
             final int len = s.length();
             if (s.length() <= size)
             {
-                for (int i = size - len; i > 0; i--)
-                {
-                    sb.append(c);
-                }
+                sb.append(String.valueOf(c).repeat(size - len));
                 sb.append(s);
             }
             else
@@ -670,10 +660,7 @@ public class StringUtils extends org.apache.commons.lang3.StringUtils
         }
         else
         {
-            for (int i = size; i > 0; i--)
-            {
-                sb.append(c);
-            }
+            sb.append(String.valueOf(c).repeat(Math.max(0, size)));
         }
         return sb.toString();
     }

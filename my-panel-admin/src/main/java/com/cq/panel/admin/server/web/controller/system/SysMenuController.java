@@ -6,7 +6,7 @@ import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.web.domain.model.TreeSelect;
 import com.cq.panel.admin.server.repository.domain.SysMenu;
 import com.cq.panel.admin.server.common.enums.BusinessType;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.service.ISysMenuService;
 import com.cq.panel.admin.server.web.domain.dto.system.SysMenuDTO;
 import com.cq.panel.admin.server.web.domain.dto.system.SysMenuQueryDTO;
@@ -106,7 +106,7 @@ public class SysMenuController extends BaseController
         {
             return Result.error("新增菜单'" + menu.getMenuName() + "'失败，菜单名称已存在");
         }
-        else if (UserConstants.YES_FRAME.equals(menu.getIsFrame()) && !StringUtils.ishttp(menu.getPath()))
+        else if (UserConstants.YES_FRAME.equals(menu.getIsFrame()) && !MyStringUtils.isHttp(menu.getPath()))
         {
             return Result.error("新增菜单'" + menu.getMenuName() + "'失败，地址必须以http(s)://开头");
         }
@@ -129,7 +129,7 @@ public class SysMenuController extends BaseController
         {
             return Result.error("修改菜单'" + menu.getMenuName() + "'失败，菜单名称已存在");
         }
-        else if (UserConstants.YES_FRAME.equals(menu.getIsFrame()) && !StringUtils.ishttp(menu.getPath()))
+        else if (UserConstants.YES_FRAME.equals(menu.getIsFrame()) && !MyStringUtils.isHttp(menu.getPath()))
         {
             return Result.error("修改菜单'" + menu.getMenuName() + "'失败，地址必须以http(s)://开头");
         }

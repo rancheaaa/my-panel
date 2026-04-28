@@ -322,7 +322,7 @@ const Logininfor = () => {
             dataSource={data}
             loading={loading}
             size={tableSize}
-            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 600px)' }}
             pagination={false}
             rowSelection={{
               selectedRowKeys,

@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.ip;
 
 import com.cq.panel.admin.server.common.utils.ServletUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.common.utils.IpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.InetAddress;
@@ -90,7 +90,7 @@ public class MyIpUtils
      */
     private static boolean internalIp(byte[] addr)
     {
-        if (StringUtils.isNull(addr) || addr.length < 2)
+        if (MyStringUtils.isNull(addr) || addr.length < 2)
         {
             return true;
         }
@@ -267,7 +267,7 @@ public class MyIpUtils
                 }
             }
         }
-        return StringUtils.substring(ip, 0, 255);
+        return MyStringUtils.substring(ip, 0, 255);
     }
 
     /**
@@ -278,7 +278,7 @@ public class MyIpUtils
      */
     public static boolean isUnknown(String checkString)
     {
-        return StringUtils.isBlank(checkString) || "unknown".equalsIgnoreCase(checkString);
+        return MyStringUtils.isBlank(checkString) || "unknown".equalsIgnoreCase(checkString);
     }
 
     /**
@@ -286,7 +286,7 @@ public class MyIpUtils
      */
     public static boolean isIP(String ip)
     {
-        return StringUtils.isNotBlank(ip) && ip.matches(REGX_IP);
+        return MyStringUtils.isNotBlank(ip) && ip.matches(REGX_IP);
     }
 
     /**
@@ -294,7 +294,7 @@ public class MyIpUtils
      */
     public static boolean isIpWildCard(String ip)
     {
-        return StringUtils.isNotBlank(ip) && ip.matches(REGX_IP_WILDCARD);
+        return MyStringUtils.isNotBlank(ip) && ip.matches(REGX_IP_WILDCARD);
     }
 
     /**
@@ -321,7 +321,7 @@ public class MyIpUtils
      */
     public static boolean isIPSegment(String ipSeg)
     {
-        return StringUtils.isNotBlank(ipSeg) && ipSeg.matches(REGX_IP_SEG);
+        return MyStringUtils.isNotBlank(ipSeg) && ipSeg.matches(REGX_IP_SEG);
     }
 
     /**
@@ -358,7 +358,7 @@ public class MyIpUtils
      */
     public static boolean isMatchedIp(String filter, String ip)
     {
-        if (StringUtils.isEmpty(filter) || StringUtils.isEmpty(ip))
+        if (MyStringUtils.isEmpty(filter) || MyStringUtils.isEmpty(ip))
         {
             return false;
         }

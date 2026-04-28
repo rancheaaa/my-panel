@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import com.alibaba.druid.pool.DruidDataSource;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.common.utils.IpUtils;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule;
@@ -165,7 +165,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                 .orElseGet(() -> endInstant.minus(Duration.ofHours(1)));
         Date endTime = Date.from(endInstant);
         Date beginTime = Date.from(beginInstant);
-        String category = StringUtils.isEmpty(queryDTO.getCategory()) ? "cpu" : queryDTO.getCategory();
+        String category = MyStringUtils.isEmpty(queryDTO.getCategory()) ? "cpu" : queryDTO.getCategory();
         long bucketMillis = parseGranularityMillis(queryDTO.getGranularity());
 
         int configMaxPoints = parseIntConfig("sys.monitor.maxPoints", DEFAULT_MAX_POINTS);
@@ -226,11 +226,11 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         rule.setMetricCategory(dto.getMetricCategory());
         rule.setMetricName(dto.getMetricName());
         rule.setMetricScope(nvl(dto.getMetricScope()));
-        rule.setOperator(StringUtils.isEmpty(dto.getOperator()) ? "GT" : dto.getOperator());
+        rule.setOperator(MyStringUtils.isEmpty(dto.getOperator()) ? "GT" : dto.getOperator());
         rule.setThresholdValue(dto.getThresholdValue());
         rule.setDurationSeconds(Optional.ofNullable(dto.getDurationSeconds()).orElse(0));
-        rule.setSeverity(StringUtils.isEmpty(dto.getSeverity()) ? "warning" : dto.getSeverity());
-        rule.setEnabled(StringUtils.isEmpty(dto.getEnabled()) ? "1" : dto.getEnabled());
+        rule.setSeverity(MyStringUtils.isEmpty(dto.getSeverity()) ? "warning" : dto.getSeverity());
+        rule.setEnabled(MyStringUtils.isEmpty(dto.getEnabled()) ? "1" : dto.getEnabled());
         rule.setDescription(nvl(dto.getDescription()));
         rule.setUpdateBy(nvl(operator));
 
@@ -484,7 +484,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
             if (!(entry.getValue() instanceof DruidDataSource druidDataSource)) {
                 continue;
             }
-            String poolName = StringUtils.isEmpty(druidDataSource.getName()) ? entry.getKey()
+            String poolName = MyStringUtils.isEmpty(druidDataSource.getName()) ? entry.getKey()
                     : druidDataSource.getName();
             String tag = "{\"pool\":\"" + escape(poolName) + "\"}";
             addSample(samples, latestValueMap, now, "db_pool", "pool_active_connections", poolName,
@@ -644,10 +644,10 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
     private String resolveServiceId() {
         String serviceId = applicationContext.getEnvironment().getProperty("spring.application.name");
-        if (StringUtils.isEmpty(serviceId)) {
+        if (MyStringUtils.isEmpty(serviceId)) {
             serviceId = sysConfigService.selectConfigByKey("sys.monitor.serviceId");
         }
-        if (StringUtils.isEmpty(serviceId)) {
+        if (MyStringUtils.isEmpty(serviceId)) {
             try {
                 InetAddress localHost = InetAddress.getLocalHost();
                 String hostname = localHost.getHostName();
@@ -725,7 +725,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         if (value == null || threshold == null) {
             return false;
         }
-        String op = StringUtils.isEmpty(operator) ? "GT" : operator.toUpperCase(Locale.ROOT);
+        String op = MyStringUtils.isEmpty(operator) ? "GT" : operator.toUpperCase(Locale.ROOT);
         return switch (op) {
             case "GT" -> value > threshold;
             case "GTE" -> value >= threshold;
@@ -738,7 +738,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     }
 
     private long parseGranularityMillis(String granularity) {
-        if (StringUtils.isEmpty(granularity)) {
+        if (MyStringUtils.isEmpty(granularity)) {
             return Duration.ofMinutes(1).toMillis();
         }
         String text = granularity.toLowerCase(Locale.ROOT).trim();
@@ -767,7 +767,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     }
 
     private Duration parseGranularityDuration(String range) {
-        if (StringUtils.isEmpty(range)) {
+        if (MyStringUtils.isEmpty(range)) {
             return Duration.ofHours(1);
         }
         String text = range.toLowerCase(Locale.ROOT).trim();
@@ -787,7 +787,7 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     private int parseIntConfig(String configKey, int defaultValue) {
         try {
             String value = sysConfigService.selectConfigByKey(configKey);
-            if (StringUtils.isEmpty(value)) {
+            if (MyStringUtils.isEmpty(value)) {
                 return defaultValue;
             }
             return Integer.parseInt(value);

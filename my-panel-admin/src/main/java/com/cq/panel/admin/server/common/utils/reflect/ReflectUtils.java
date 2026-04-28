@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.reflect;
 
 import com.cq.panel.admin.server.web.domain.text.Convert;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -192,7 +192,7 @@ public class ReflectUtils
                     {
                         if (args[i] instanceof String)
                         {
-                            args[i] = DateUtils.parseDate(args[i]);
+                            args[i] = MyDateUtils.parseDate(args[i]);
                         }
                         else
                         {

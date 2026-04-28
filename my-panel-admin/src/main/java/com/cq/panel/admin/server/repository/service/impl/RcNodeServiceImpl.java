@@ -1,8 +1,8 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.cq.panel.admin.server.repository.mapper.RcNodeMapper;
@@ -53,13 +53,13 @@ public class RcNodeServiceImpl implements IRcNodeService
     @Override
     public int insertRcNode(RcNode rcNode)
     {
-        rcNode.setCreateTime(DateUtils.getNowDate());
+        rcNode.setCreateTime(MyDateUtils.getNowDate());
         rcNode.setStatus("0"); // 默认在线
         // 设置zone默认值
         if (rcNode.getZone() == null || rcNode.getZone().isEmpty()) {
             rcNode.setZone("default");
         }
-        rcNode.setLastRefreshTime(DateUtils.getNowDate());
+        rcNode.setLastRefreshTime(MyDateUtils.getNowDate());
         return rcNodeMapper.insertRcNode(rcNode);
     }
 
@@ -108,9 +108,9 @@ public class RcNodeServiceImpl implements IRcNodeService
     @Override
     public boolean checkNodeUnique(RcNode rcNode)
     {
-        Long id = StringUtils.isNull(rcNode.getId()) ? -1L : rcNode.getId();
+        Long id = MyStringUtils.isNull(rcNode.getId()) ? -1L : rcNode.getId();
         RcNode info = rcNodeMapper.checkNodeUnique(rcNode);
-        if (StringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
         {
             return false;
         }

@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.config;
 
 import com.cq.panel.admin.server.common.properties.PermitAllUrlProperties;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysRole;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.web.service.TokenService;
@@ -38,7 +38,7 @@ public class SecurityConfig
             {
                 for (SysRole role : loginUser.getUser().getRoles())
                 {
-                    if (role != null && StringUtils.isNotEmpty(role.getRoleKey()))
+                    if (role != null && MyStringUtils.isNotEmpty(role.getRoleKey()))
                     {
                         roles.add(role.getRoleKey());
                     }

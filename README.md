@@ -1,7 +1,7 @@
 # My-Panel
 
 ## 项目简介
-My-Panel 是一个基于 React 19 和 Spring Boot 3 的现代化前后端分离后台管理系统。本项目参考了 RuoYi 的架构设计，旨在提供高效、稳定、易用的开发框架。
+My-Panel 是一个基于 React 19 和 Spring Boot 4 的现代化前后端分离后台管理系统。本项目参考了 RuoYi 的架构设计，旨在提供高效、稳定、易用的开发框架。
 
 **核心特性：支持单机/集群双模式无缝切换。**
 - **单机模式 (Standalone)**: 零依赖启动，使用 H2 嵌入式数据库 + Caffeine 本地缓存，适合开发、演示及小规模部署。
@@ -13,27 +13,34 @@ My-Panel 是一个基于 React 19 和 Spring Boot 3 的现代化前后端分离�
 *   **开发框架**: React 19.2.0
 *   **构建工具**: Vite 7.2.4
 *   **UI 组件库**: Ant Design 6.2.2
+*   **图表库**: ECharts 6.0.0 + @ant-design/charts 2.2.8
 *   **路由管理**: React Router DOM 7.13.0
 *   **HTTP 客户端**: Axios 1.13.4
-*   **CSS 预处理**: Sass (SCSS)
-*   **日期处理**: Day.js
-*   **动画库**: Framer Motion
-*   **图标库**: @ant-design/icons
+*   **CSS 预处理**: Sass 1.97.3
+*   **日期处理**: Day.js 1.11.19
+*   **动画库**: Framer Motion 12.33.0
+*   **图标库**: @ant-design/icons 6.1.0
+*   **拖拽库**: @dnd-kit/core 6.3.1
+*   **代码编辑器**: Monaco Editor 0.55.1
+*   **其他工具**: nprogress, screenfull, driver.js, react-resizable
 
 ### 后端 (my-panel-admin)
 *   **开发语言**: Java 21
-*   **核心框架**: Spring Boot 3.5.10
+*   **核心框架**: Spring Boot 4.0.4
 *   **数据库**:
-    *   **Cluster**: MySQL 8.2.0 (生产环境推荐)
+    *   **Cluster**: MySQL 8.4.0 (生产环境推荐)
     *   **Standalone**: H2 Database (嵌入式，开发环境默认)
-*   **持久层框架**: MyBatis 3.0.3 + PageHelper
-*   **数据库连接池**: Druid 1.2.23
+*   **持久层框架**: MyBatis 4.0.1 + PageHelper 2.1.0
+*   **数据库连接池**: Druid 1.2.28
 *   **缓存中间件**:
     *   **Cluster**: Redis (分布式缓存)
-    *   **Standalone**: Caffeine (本地高性能缓存)
-*   **安全认证**: JWT (JSON Web Token) + Spring Security
-*   **API 文档**: SpringDoc (Swagger 3)
-*   **工具库**: FastJson2, POI, Oshi, UserAgentUtils
+    *   **Standalone**: Caffeine 3.2.0 (本地高性能缓存)
+*   **安全认证**: JWT + Spring Security + jBCrypt
+*   **API 文档**: SpringDoc 3.0.3 (OpenAPI 3)
+*   **对象映射**: MapStruct 1.5.5.Final
+*   **监控**: Spring Boot Admin 4.0.0-M2
+*   **工具库**: Oshi 6.6.3, POI 5.5.1, UserAgentUtils 1.21, Gson 2.11.0, HttpClient5 5.5, Netty 4.2.5.Final
+*   **测试框架**: JUnit 5.9.2 + Mockito 5.14.2
 
 ## 目录结构
 

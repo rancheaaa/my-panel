@@ -14,6 +14,7 @@ import org.springframework.data.redis.serializer.SerializationException;
  * 
  * @author cq
  */
+@SuppressWarnings("all")
 public class Jackson2JsonRedisSerializer<T> implements RedisSerializer<T>
 {
     public static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
@@ -48,7 +49,7 @@ public class Jackson2JsonRedisSerializer<T> implements RedisSerializer<T>
     @Override
     public T deserialize(byte[] bytes) throws SerializationException
     {
-        if (bytes.length <= 0)
+        if (bytes == null || bytes.length <= 0)
         {
             return null;
         }

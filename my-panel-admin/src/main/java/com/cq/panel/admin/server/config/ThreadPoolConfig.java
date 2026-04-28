@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.config;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
@@ -14,6 +16,8 @@ import org.springframework.core.task.TaskExecutor;
 public class ThreadPoolConfig
 {
     // 核心线程池大小
+    @Getter
+    @Setter
     private int corePoolSize = 50;
 
     @Bean(name = "threadPoolTaskExecutor")

@@ -58,8 +58,7 @@ public class DataScopeAspect
     public static final String DATA_SCOPE = "dataScope";
 
     @Before("@annotation(controllerDataScope)")
-    public void doBefore(JoinPoint point, DataScope controllerDataScope) throws Throwable
-    {
+    public void doBefore(JoinPoint point, DataScope controllerDataScope) {
         clearDataScope(point);
         handleDataScope(point, controllerDataScope);
     }
@@ -68,15 +67,12 @@ public class DataScopeAspect
     {
         // 获取当前的用户
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        if (MyStringUtils.isNotNull(loginUser))
+        SysUser currentUser = loginUser.getUser();
+        // 如果是超级管理员，则不过滤数据
+        if (MyStringUtils.isNotNull(currentUser) && !currentUser.isAdmin())
         {
-            SysUser currentUser = loginUser.getUser();
-            // 如果是超级管理员，则不过滤数据
-            if (MyStringUtils.isNotNull(currentUser) && !currentUser.isAdmin())
-            {
-                String permission = MyStringUtils.defaultIfEmpty(controllerDataScope.permission(), PermissionContextHolder.getContext());
-                dataScopeFilter(joinPoint, currentUser, controllerDataScope.deptAlias(), controllerDataScope.userAlias(), permission);
-            }
+            String permission = MyStringUtils.defaultIfEmpty(controllerDataScope.permission(), PermissionContextHolder.getContext());
+            dataScopeFilter(joinPoint, currentUser, controllerDataScope.deptAlias(), controllerDataScope.userAlias(), permission);
         }
     }
 
@@ -92,8 +88,8 @@ public class DataScopeAspect
     public static void dataScopeFilter(JoinPoint joinPoint, SysUser user, String deptAlias, String userAlias, String permission)
     {
         StringBuilder sqlString = new StringBuilder();
-        List<String> conditions = new ArrayList<String>();
-        List<String> scopeCustomIds = new ArrayList<String>();
+        List<String> conditions = new ArrayList<>();
+        List<String> scopeCustomIds = new ArrayList<>();
         user.getRoles().forEach(role -> {
             if (DATA_SCOPE_CUSTOM.equals(role.getDataScope()) && MyStringUtils.equals(role.getStatus(), UserConstants.ROLE_NORMAL) && MyStringUtils.containsAny(role.getPermissions(), Convert.toStrArray(permission)))
             {
@@ -162,9 +158,8 @@ public class DataScopeAspect
         if (MyStringUtils.isNotBlank(sqlString.toString()))
         {
             Object params = joinPoint.getArgs()[0];
-            if (MyStringUtils.isNotNull(params) && params instanceof BaseEntity)
+            if (MyStringUtils.isNotNull(params) && params instanceof BaseEntity baseEntity)
             {
-                BaseEntity baseEntity = (BaseEntity) params;
                 baseEntity.getParams().put(DATA_SCOPE, " AND (" + sqlString.substring(4) + ")");
             }
         }
@@ -176,9 +171,8 @@ public class DataScopeAspect
     private void clearDataScope(final JoinPoint joinPoint)
     {
         Object params = joinPoint.getArgs()[0];
-        if (MyStringUtils.isNotNull(params) && params instanceof BaseEntity)
+        if (MyStringUtils.isNotNull(params) && params instanceof BaseEntity baseEntity)
         {
-            BaseEntity baseEntity = (BaseEntity) params;
             baseEntity.getParams().put(DATA_SCOPE, "");
         }
     }

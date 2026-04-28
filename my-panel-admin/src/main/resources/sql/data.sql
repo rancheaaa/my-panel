@@ -155,7 +155,7 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (1, '系统管理', 0, 2, 'system', NULL, '', '', 1, 0, 'M', '0', '0', '', 'SettingOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:11:52.0', '系统管理目录'),
         (2, '系统监控', 0, 3, 'monitor', NULL, '', '', 1, 0, 'M', '0', '0', '', 'DashboardOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:12:03.0', '系统监控目录'),
         (3, '注册配置中心', 0, 4, 'registry-config-center', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-13 09:48:49.545433', '注册配置中心目录'),
-        (4, '首页', 0, 1, 'index', 'home/index', '', '', 1, 0, 'M', '0', '0', '', 'HomeTwoTone', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-08 22:58:26.0', '若依官网地址'),
+        (4, '首页', 0, 1, 'index', 'home/index', '', '', 1, 0, 'M', '0', '0', '', 'HomeOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-08 22:58:26.0', '若依官网地址'),
         (100, '用户管理', 1, 1, 'user', 'system/user/index', '', '', 1, 0, 'C', '0', '0', 'system:user:list', 'user', 'admin', '2026-02-07 14:13:09.0', '', NULL, '用户管理菜单'),
         (101, '角色管理', 1, 2, 'role', 'system/role/index', '', '', 1, 0, 'C', '0', '0', 'system:role:list', 'peoples', 'admin', '2026-02-07 14:13:09.0', '', NULL, '角色管理菜单'),
         (102, '菜单管理', 1, 3, 'menu', 'system/menu/index', '', '', 1, 0, 'C', '0', '0', 'system:menu:list', 'tree-table', 'admin', '2026-02-07 14:13:09.0', '', NULL, '菜单管理菜单'),

@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.vo.monitor;
 
-import com.cq.panel.admin.server.common.utils.Arith;
+import com.cq.panel.admin.server.common.utils.MyMathUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -59,23 +59,23 @@ public class CpuVO {
     }
 
     public double getTotal() {
-        return Arith.round(Arith.mul(total, 100), 2);
+        return MyMathUtils.round(MyMathUtils.mul(total, 100), 2);
     }
 
     public double getSys() {
-        return Arith.round(Arith.mul(sys / total, 100), 2);
+        return MyMathUtils.round(MyMathUtils.mul(sys / total, 100), 2);
     }
 
     public double getUsed() {
-        return Arith.round(Arith.mul(used / total, 100), 2);
+        return MyMathUtils.round(MyMathUtils.mul(used / total, 100), 2);
     }
 
     public double getWait() {
-        return Arith.round(Arith.mul(wait / total, 100), 2);
+        return MyMathUtils.round(MyMathUtils.mul(wait / total, 100), 2);
     }
 
     public double getFree() {
-        return Arith.round(Arith.mul(free / total, 100), 2);
+        return MyMathUtils.round(MyMathUtils.mul(free / total, 100), 2);
     }
 }
 

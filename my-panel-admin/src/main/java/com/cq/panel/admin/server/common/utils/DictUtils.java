@@ -36,7 +36,7 @@ public class DictUtils
      * 获取字典缓存
      * 
      * @param key 参数键
-     * @return dictDatas 字典数据列表
+     * @return dict Data 字典数据列表
      */
     public static List<SysDictData> getDictCache(String key)
     {

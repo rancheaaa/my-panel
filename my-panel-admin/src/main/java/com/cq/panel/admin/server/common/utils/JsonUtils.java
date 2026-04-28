@@ -2,6 +2,8 @@ package com.cq.panel.admin.server.common.utils;
 
 import com.cq.panel.admin.server.filter.PropertyPreExcludeFilter;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,18 +16,14 @@ public class JsonUtils
 {
     private static final Logger log = LoggerFactory.getLogger(JsonUtils.class);
 
-    private static final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    @Getter
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     static
     {
-        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
         objectMapper.configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.configure(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    }
-
-    public static com.fasterxml.jackson.databind.ObjectMapper getObjectMapper()
-    {
-        return objectMapper;
     }
 
     public static String toJSONString(Object object)

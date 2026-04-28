@@ -146,7 +146,7 @@ public class EscapeUtil
                 }
                 else
                 {
-                    tmp.append(content.substring(lastPos, pos));
+                    tmp.append(content, lastPos, pos);
                     lastPos = pos;
                 }
             }

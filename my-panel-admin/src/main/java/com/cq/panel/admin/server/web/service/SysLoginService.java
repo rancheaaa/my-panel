@@ -8,9 +8,9 @@ import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.web.exception.ServiceException;
 import com.cq.panel.admin.server.web.exception.user.*;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.MessageUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
@@ -93,7 +93,7 @@ public class SysLoginService
         boolean captchaEnabled = configService.selectCaptchaEnabled();
         if (captchaEnabled)
         {
-            String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + ":" + StringUtils.nvl(uuid, "");
+            String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + ":" + MyStringUtils.nvl(uuid, "");
             String captcha = cacheService.get(verifyKey);
             if (captcha == null)
             {
@@ -117,7 +117,7 @@ public class SysLoginService
     public void loginPreCheck(String username, String password)
     {
         // 用户名或密码为空 错误
-        if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password))
+        if (MyStringUtils.isEmpty(username) || MyStringUtils.isEmpty(password))
         {
             AsyncManager.me().execute(AsyncFactory.recordLoginInfo(username, Constants.LOGIN_FAIL, MessageUtils.message("not.null")));
             throw new UserNotExistsException();
@@ -148,7 +148,7 @@ public class SysLoginService
         SysUser sysUser = new SysUser();
         sysUser.setUserId(userId);
         sysUser.setLoginIp(MyIpUtils.getIpAddr());
-        sysUser.setLoginDate(DateUtils.getNowDate());
+        sysUser.setLoginDate(MyDateUtils.getNowDate());
         userService.updateUserProfile(sysUser);
     }
 }

@@ -10,7 +10,7 @@ import com.github.pagehelper.PageInfo;
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.domain.SysDictData;
 import com.cq.panel.admin.server.repository.service.ISysDictDataService;
@@ -91,7 +91,7 @@ public class SysDictDataController extends BaseController
     public Result<List<SysDictDataVO>> dictType(@Parameter(description = "字典类型", required = true) @PathVariable String dictType)
     {
         List<SysDictData> data = dictTypeService.selectDictDataByType(dictType);
-        if (StringUtils.isNull(data))
+        if (MyStringUtils.isNull(data))
         {
             data = new ArrayList<>();
         }

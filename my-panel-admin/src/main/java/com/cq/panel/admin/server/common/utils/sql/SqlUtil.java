@@ -18,7 +18,7 @@ public class SqlUtil
     /**
      * 仅支持字母、数字、下划线、空格、逗号、小数点（支持多个字段排序）
      */
-    public static String SQL_PATTERN = "[a-zA-Z0-9_\\ \\,\\.]+";
+    public static String SQL_PATTERN = "[a-zA-Z0-9_ ,.]+";
 
     /**
      * 限制orderBy最大长度
@@ -61,7 +61,7 @@ public class SqlUtil
         String[] sqlKeywords = MyStringUtils.split(SQL_REGEX, "\\|");
         for (String sqlKeyword : sqlKeywords)
         {
-            if (MyStringUtils.indexOfIgnoreCase(value, sqlKeyword) > -1)
+            if (MyStringUtils.indexOf(value, sqlKeyword) > -1)
             {
                 throw new UtilException("参数存在SQL注入风险");
             }

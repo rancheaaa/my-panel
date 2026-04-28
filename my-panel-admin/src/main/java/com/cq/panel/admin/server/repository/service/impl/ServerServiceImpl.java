@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
-import com.cq.panel.admin.server.common.utils.Arith;
+import com.cq.panel.admin.server.common.utils.MyMathUtils;
 import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.repository.service.IServerService;
@@ -118,11 +118,11 @@ public class ServerServiceImpl implements IServerService {
         long maxMemory = runtime.maxMemory();
         long usedMemory = totalMemory - freeMemory;
 
-        jvm.setTotal(Arith.div(totalMemory, (1024 * 1024), 2));
-        jvm.setMax(Arith.div(maxMemory, (1024 * 1024), 2));
-        jvm.setFree(Arith.div(freeMemory, (1024 * 1024), 2));
-        jvm.setUsed(Arith.div(usedMemory, (1024 * 1024), 2));
-        jvm.setUsage(Arith.mul(Arith.div(usedMemory, totalMemory, 4), 100));
+        jvm.setTotal(MyMathUtils.div(totalMemory, (1024 * 1024), 2));
+        jvm.setMax(MyMathUtils.div(maxMemory, (1024 * 1024), 2));
+        jvm.setFree(MyMathUtils.div(freeMemory, (1024 * 1024), 2));
+        jvm.setUsed(MyMathUtils.div(usedMemory, (1024 * 1024), 2));
+        jvm.setUsage(MyMathUtils.mul(MyMathUtils.div(usedMemory, totalMemory, 4), 100));
         jvm.setVersion(props.getProperty("java.version"));
         jvm.setHome(props.getProperty("java.home"));
         jvm.setName(ManagementFactory.getRuntimeMXBean().getVmName());
@@ -149,7 +149,7 @@ public class ServerServiceImpl implements IServerService {
             sysFile.setTotal(convertFileSize(total));
             sysFile.setFree(convertFileSize(free));
             sysFile.setUsed(convertFileSize(used));
-            sysFile.setUsage(Arith.mul(Arith.div(used, total, 4), 100));
+            sysFile.setUsage(MyMathUtils.mul(MyMathUtils.div(used, total, 4), 100));
             sysFiles.add(sysFile);
         }
     }
@@ -159,7 +159,7 @@ public class ServerServiceImpl implements IServerService {
         long rss = getProcessRss();
         List<ProcessMemoryVO.MemoryRegionVO> regions = analyzeMemoryRegions(rss);
         ProcessMemoryVO.KernelResourceDetail kernelResource = analyzeKernelResources();
-        double rssMb = Arith.div(rss, (1024 * 1024), 2);
+        double rssMb = MyMathUtils.div(rss, (1024 * 1024), 2);
         return new ProcessMemoryVO(rss, rssMb, regions, kernelResource);
     }
 
@@ -251,7 +251,7 @@ public class ServerServiceImpl implements IServerService {
                 .mapToLong(ProcessMemoryVO.MemoryRegionVO::getBytes)
                 .sum();
         for (ProcessMemoryVO.MemoryRegionVO region : regions) {
-            region.setPercent(Arith.mul(Arith.div(region.getBytes(), finalTotal, 4), 100));
+            region.setPercent(MyMathUtils.mul(MyMathUtils.div(region.getBytes(), finalTotal, 4), 100));
         }
         return regions;
     }
@@ -414,11 +414,11 @@ public class ServerServiceImpl implements IServerService {
     }
 
     private double toMb(long bytes) {
-        return Arith.div(bytes, (1024 * 1024), 2);
+        return MyMathUtils.div(bytes, (1024 * 1024), 2);
     }
 
     private void addRegion(List<ProcessMemoryVO.MemoryRegionVO> regions, String name, long bytes) {
-        double mb = Arith.div(bytes, (1024 * 1024), 2);
+        double mb = MyMathUtils.div(bytes, (1024 * 1024), 2);
         regions.add(new ProcessMemoryVO.MemoryRegionVO(name, bytes, mb, 0.0));
     }
 

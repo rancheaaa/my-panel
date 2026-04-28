@@ -21,14 +21,13 @@ import java.nio.charset.StandardCharsets;
  */
 public class FileUtils
 {
-    public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+";
+    public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-|.\\u4e00-\\u9fa5]+";
 
     /**
      * 输出指定文件的byte数组
      * 
      * @param filePath 文件路径
      * @param os 输出流
-     * @return
      */
     public static void writeBytes(String filePath, OutputStream os) throws IOException
     {
@@ -100,20 +99,18 @@ public class FileUtils
 
     /**
      * 删除文件
-     * 
+     *
      * @param filePath 文件
-     * @return
      */
     public static boolean deleteFile(String filePath)
     {
-        boolean flag = false;
         File file = new File(filePath);
         // 路径为文件且不为空则进行删除
         if (file.isFile() && file.exists())
         {
-            flag = file.delete();
+            return file.delete();
         }
-        return flag;
+        return false;
     }
 
     /**
@@ -142,13 +139,7 @@ public class FileUtils
         }
 
         // 检查允许下载的文件规则
-        if (ArrayUtils.contains(MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION, FileTypeUtils.getFileType(resource)))
-        {
-            return true;
-        }
-
-        // 不在允许下载的文件规则
-        return false;
+        return ArrayUtils.contains(MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION, FileTypeUtils.getFileType(resource));
     }
 
     /**
@@ -165,7 +156,7 @@ public class FileUtils
         if (agent.contains("MSIE"))
         {
             // IE浏览器
-            filename = URLEncoder.encode(filename, "utf-8");
+            filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
             filename = filename.replace("+", " ");
         }
         else if (agent.contains("Firefox"))
@@ -176,12 +167,12 @@ public class FileUtils
         else if (agent.contains("Chrome"))
         {
             // google浏览器
-            filename = URLEncoder.encode(filename, "utf-8");
+            filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
         }
         else
         {
             // 其它浏览器
-            filename = URLEncoder.encode(filename, "utf-8");
+            filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
         }
         return filename;
     }
@@ -196,16 +187,15 @@ public class FileUtils
     {
         String percentEncodedFileName = percentEncode(realFileName);
 
-        StringBuilder contentDispositionValue = new StringBuilder();
-        contentDispositionValue.append("attachment; filename=")
-                .append(percentEncodedFileName)
-                .append(";")
-                .append("filename*=")
-                .append("utf-8''")
-                .append(percentEncodedFileName);
+        String contentDispositionValue = "attachment; filename=" +
+                percentEncodedFileName +
+                ";" +
+                "filename*=" +
+                "utf-8''" +
+                percentEncodedFileName;
 
         response.addHeader("Access-Control-Expose-Headers", "Content-Disposition,download-filename");
-        response.setHeader("Content-disposition", contentDispositionValue.toString());
+        response.setHeader("Content-disposition", contentDispositionValue);
         response.setHeader("download-filename", percentEncodedFileName);
     }
 
@@ -217,7 +207,7 @@ public class FileUtils
      */
     public static String percentEncode(String s) throws UnsupportedEncodingException
     {
-        String encode = URLEncoder.encode(s, StandardCharsets.UTF_8.toString());
+        String encode = URLEncoder.encode(s, StandardCharsets.UTF_8);
         return encode.replaceAll("\\+", "%20");
     }
 
@@ -280,7 +270,6 @@ public class FileUtils
         {
             return null;
         }
-        String baseName = FilenameUtils.getBaseName(fileName);
-        return baseName;
+        return FilenameUtils.getBaseName(fileName);
     }
 }

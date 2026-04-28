@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.vo.system;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -64,7 +64,7 @@ public class MetaVo
         this.title = title;
         this.icon = icon;
         this.noCache = noCache;
-        if (StringUtils.ishttp(link))
+        if (MyStringUtils.isHttp(link))
         {
             this.link = link;
         }

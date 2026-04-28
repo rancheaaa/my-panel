@@ -7,7 +7,7 @@ import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.file.FileUploadUtils;
 import com.cq.panel.admin.server.common.utils.file.MimeTypeUtils;
 import com.cq.panel.admin.server.repository.service.ISysUserService;
@@ -78,11 +78,11 @@ public class SysProfileController extends BaseController
         LoginUser loginUser = getLoginUser();
         SysUser currentUser = loginUser.getUser();
         userConverter.updateEntity(currentUser, dto);
-        if (StringUtils.isNotEmpty(dto.getPhonenumber()) && !userService.checkPhoneUnique(currentUser))
+        if (MyStringUtils.isNotEmpty(dto.getPhonenumber()) && !userService.checkPhoneUnique(currentUser))
         {
             return Result.error("修改用户'" + loginUser.getUsername() + "'失败，手机号码已存在");
         }
-        if (StringUtils.isNotEmpty(dto.getEmail()) && !userService.checkEmailUnique(currentUser))
+        if (MyStringUtils.isNotEmpty(dto.getEmail()) && !userService.checkEmailUnique(currentUser))
         {
             return Result.error("修改用户'" + loginUser.getUsername() + "'失败，邮箱账号已存在");
         }

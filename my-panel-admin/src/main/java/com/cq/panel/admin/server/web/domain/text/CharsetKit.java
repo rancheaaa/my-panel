@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.text;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
@@ -34,7 +34,7 @@ public class CharsetKit
      */
     public static Charset charset(String charset)
     {
-        return StringUtils.isEmpty(charset) ? Charset.defaultCharset() : Charset.forName(charset);
+        return MyStringUtils.isEmpty(charset) ? Charset.defaultCharset() : Charset.forName(charset);
     }
 
     /**
@@ -70,7 +70,7 @@ public class CharsetKit
             destCharset = StandardCharsets.UTF_8;
         }
 
-        if (StringUtils.isEmpty(source) || srcCharset.equals(destCharset))
+        if (MyStringUtils.isEmpty(source) || srcCharset.equals(destCharset))
         {
             return source;
         }

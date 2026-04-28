@@ -3,16 +3,11 @@ package com.cq.panel.admin.server.repository.service.impl;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.common.utils.IpUtils;
-import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent;
-import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorMetricSample;
-import com.cq.panel.admin.server.repository.mapper.MonitorAlertEventMapper;
-import com.cq.panel.admin.server.repository.mapper.MonitorAlertRuleMapper;
 import com.cq.panel.admin.server.repository.mapper.MonitorMetricMapper;
 import com.cq.panel.admin.server.repository.service.IMonitorDashboardService;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
 import com.cq.panel.admin.server.web.domain.dto.monitor.MetricTrendQueryDTO;
-import com.cq.panel.admin.server.web.domain.dto.monitor.MonitorAlertRuleSaveDTO;
 import com.sun.management.OperatingSystemMXBean;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
@@ -55,8 +50,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     private static final int DEFAULT_RETENTION_DAYS = 7;
 
     private final MonitorMetricMapper monitorMetricMapper;
-    private final MonitorAlertRuleMapper monitorAlertRuleMapper;
-    private final MonitorAlertEventMapper monitorAlertEventMapper;
     private final ISysConfigService sysConfigService;
     private final ApplicationContext applicationContext;
 
@@ -69,19 +62,13 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
 
     private final SystemInfo systemInfo = new SystemInfo();
     private final Map<String, Long> gcMaxPauseMillis = new ConcurrentHashMap<>();
-    private final Map<Long, Instant> ruleViolationStartTime = new ConcurrentHashMap<>();
-    private final Map<Long, Instant> ruleLastAlertTime = new ConcurrentHashMap<>();
     private volatile long[] previousCpuTicks = null;
     private volatile Date lastSampleTime;
 
     public MonitorDashboardServiceImpl(MonitorMetricMapper monitorMetricMapper,
-            MonitorAlertRuleMapper monitorAlertRuleMapper,
-            MonitorAlertEventMapper monitorAlertEventMapper,
             ISysConfigService sysConfigService,
             ApplicationContext applicationContext) {
         this.monitorMetricMapper = monitorMetricMapper;
-        this.monitorAlertRuleMapper = monitorAlertRuleMapper;
-        this.monitorAlertEventMapper = monitorAlertEventMapper;
         this.sysConfigService = sysConfigService;
         this.applicationContext = applicationContext;
     }
@@ -108,7 +95,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         if (!samples.isEmpty()) {
             monitorMetricMapper.batchInsert(samples);
             lastSampleTime = now;
-            evaluateAlertRules(latestValueMap, now);
         }
 
         return buildOverviewFromCurrent(latestValueMap, now);
@@ -123,7 +109,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         overview.put("sampleTime", sampleTime);
         overview.put("categories", categories);
         overview.put("basicStats", basicStats);
-        overview.put("alertSummary", buildAlertSummary());
         return overview;
     }
 
@@ -214,59 +199,10 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     }
 
     @Override
-    public List<MonitorAlertRule> listAlertRules() {
-        return monitorAlertRuleMapper.selectAll();
-    }
-
-    @Override
-    public void saveAlertRule(MonitorAlertRuleSaveDTO dto, String operator) {
-        MonitorAlertRule rule = new MonitorAlertRule();
-        rule.setId(dto.getId());
-        rule.setRuleName(dto.getRuleName());
-        rule.setMetricCategory(dto.getMetricCategory());
-        rule.setMetricName(dto.getMetricName());
-        rule.setMetricScope(nvl(dto.getMetricScope()));
-        rule.setOperator(MyStringUtils.isEmpty(dto.getOperator()) ? "GT" : dto.getOperator());
-        rule.setThresholdValue(dto.getThresholdValue());
-        rule.setDurationSeconds(Optional.ofNullable(dto.getDurationSeconds()).orElse(0));
-        rule.setSeverity(MyStringUtils.isEmpty(dto.getSeverity()) ? "warning" : dto.getSeverity());
-        rule.setEnabled(MyStringUtils.isEmpty(dto.getEnabled()) ? "1" : dto.getEnabled());
-        rule.setDescription(nvl(dto.getDescription()));
-        rule.setUpdateBy(nvl(operator));
-
-        if (dto.getId() == null) {
-            rule.setCreateBy(nvl(operator));
-            monitorAlertRuleMapper.insert(rule);
-        } else {
-            monitorAlertRuleMapper.update(rule);
-        }
-    }
-
-    @Override
-    public void deleteAlertRule(Long id) {
-        monitorAlertRuleMapper.deleteById(id);
-        ruleViolationStartTime.remove(id);
-        ruleLastAlertTime.remove(id);
-    }
-
-    @Override
-    public List<MonitorAlertEvent> listAlertEvents(String range, Integer limit) {
-        Date end = new Date();
-        Date begin = Date.from(end.toInstant().minus(parseGranularityDuration(range)));
-        int safeLimit = limit == null ? 500 : Math.max(1, Math.min(limit, 5000));
-        return monitorAlertEventMapper.selectByTimeRange(begin, end, safeLimit);
-    }
-
-    @Override
     public int cleanupHistory() {
         int retentionDays = parseIntConfig("sys.monitor.retentionDays", DEFAULT_RETENTION_DAYS);
         Date cutoff = Date.from(Instant.now().minus(Duration.ofDays(Math.max(1, retentionDays))));
         return monitorMetricMapper.deleteBefore(cutoff);
-    }
-
-    @Override
-    public void updateAlertEventStatus(Long id, String status) {
-        monitorAlertEventMapper.updateStatus(id, status);
     }
 
     private void collectHeap(List<MonitorMetricSample> samples, Map<String, Double> latestValueMap, Date now,
@@ -518,52 +454,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                 classLoadingMXBean.getUnloadedClassCount(), "count", null, serviceId, serviceIpPort);
     }
 
-    private void evaluateAlertRules(Map<String, Double> latestValueMap, Date now) {
-        List<MonitorAlertRule> rules = monitorAlertRuleMapper.selectEnabledRules();
-        Instant nowInstant = now.toInstant();
-        for (MonitorAlertRule rule : rules) {
-            String key = buildMetricKey(rule.getMetricCategory(), rule.getMetricName(), nvl(rule.getMetricScope()));
-            Double currentValue = latestValueMap.get(key);
-            if (currentValue == null) {
-                continue;
-            }
-            boolean violated = compare(currentValue, rule.getOperator(), rule.getThresholdValue());
-            if (!violated) {
-                ruleViolationStartTime.remove(rule.getId());
-                continue;
-            }
-
-            Instant begin = ruleViolationStartTime.computeIfAbsent(rule.getId(), k -> nowInstant);
-            long continuousSeconds = Duration.between(begin, nowInstant).getSeconds();
-            int requiredSeconds = Math.max(0, Optional.ofNullable(rule.getDurationSeconds()).orElse(0));
-            if (continuousSeconds < requiredSeconds) {
-                continue;
-            }
-
-            Instant lastAlert = ruleLastAlertTime.get(rule.getId());
-            if (lastAlert != null
-                    && Duration.between(lastAlert, nowInstant).getSeconds() < Math.max(10, requiredSeconds)) {
-                continue;
-            }
-
-            MonitorAlertEvent event = new MonitorAlertEvent();
-            event.setRuleId(rule.getId());
-            event.setRuleName(rule.getRuleName());
-            event.setMetricCategory(rule.getMetricCategory());
-            event.setMetricName(rule.getMetricName());
-            event.setMetricScope(nvl(rule.getMetricScope()));
-            event.setSeverity(rule.getSeverity());
-            event.setObservedValue(round2(currentValue));
-            event.setThresholdValue(rule.getThresholdValue());
-            event.setTriggerTime(now);
-            event.setStatus("open");
-            event.setDetail("metric=" + key + ", current=" + currentValue + ", threshold=" + rule.getThresholdValue()
-                    + ", operator=" + rule.getOperator());
-            monitorAlertEventMapper.insert(event);
-            ruleLastAlertTime.put(rule.getId(), nowInstant);
-        }
-    }
-
     private Map<String, Object> buildOverviewFromCurrent(Map<String, Double> latestValueMap, Date now) {
         Map<String, Object> basicStats = new HashMap<>();
         basicStats.put("processRss", latestValueMap.getOrDefault(
@@ -583,7 +473,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
         Map<String, Object> result = new HashMap<>();
         result.put("sampleTime", now);
         result.put("basicStats", basicStats);
-        result.put("alertSummary", buildAlertSummary());
         return result;
     }
 
@@ -601,20 +490,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
     @Override
     public List<Map<String, String>> listServiceInstances() {
         return monitorMetricMapper.selectDistinctServiceInstances();
-    }
-
-    private Map<String, Object> buildAlertSummary() {
-        List<MonitorAlertEvent> recent = listAlertEvents("1h", 200);
-        List<MonitorAlertEvent> pendingEvents = recent.stream()
-                .filter(it -> "open".equalsIgnoreCase(it.getStatus()))
-                .toList();
-        long critical = pendingEvents.stream().filter(it -> "critical".equalsIgnoreCase(it.getSeverity())).count();
-        long warning = pendingEvents.stream().filter(it -> "warning".equalsIgnoreCase(it.getSeverity())).count();
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("critical", critical);
-        summary.put("warning", warning);
-        summary.put("total", pendingEvents.size());
-        return summary;
     }
 
     private void addSample(List<MonitorMetricSample> samples,
@@ -719,22 +594,6 @@ public class MonitorDashboardServiceImpl implements IMonitorDashboardService {
                 })
                 .sorted(Comparator.comparing(MonitorMetricSample::getSampleTime))
                 .collect(Collectors.toList());
-    }
-
-    private boolean compare(Double value, String operator, Double threshold) {
-        if (value == null || threshold == null) {
-            return false;
-        }
-        String op = MyStringUtils.isEmpty(operator) ? "GT" : operator.toUpperCase(Locale.ROOT);
-        return switch (op) {
-            case "GT" -> value > threshold;
-            case "GTE" -> value >= threshold;
-            case "LT" -> value < threshold;
-            case "LTE" -> value <= threshold;
-            case "EQ" -> Double.compare(value, threshold) == 0;
-            case "NE" -> Double.compare(value, threshold) != 0;
-            default -> false;
-        };
     }
 
     private long parseGranularityMillis(String granularity) {

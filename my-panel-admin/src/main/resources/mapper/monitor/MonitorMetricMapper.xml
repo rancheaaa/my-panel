@@ -86,4 +86,34 @@
     <delete id="deleteBefore">
         delete from monitor_metric_sample where sample_time <![CDATA[<]]> #{cutoffTime}
     </delete>
+
+    <select id="selectLatestAll" resultMap="MonitorMetricSampleResult">
+        select t1.id, t1.metric_category, t1.metric_name, t1.metric_scope, t1.metric_value, t1.metric_unit, t1.tag_json,
+               t1.service_id, t1.service_ip_port, t1.sample_time, t1.create_time
+        from monitor_metric_sample t1
+        inner join (
+            select metric_category, metric_name, metric_scope, max(sample_time) as max_time
+            from monitor_metric_sample
+            <where>
+                <if test="serviceId != null and serviceId != ''">
+                    and service_id = #{serviceId}
+                    <if test="serviceIpPort != null and serviceIpPort != ''">
+                        and service_ip_port = #{serviceIpPort}
+                    </if>
+                </if>
+            </where>
+            group by metric_category, metric_name, metric_scope
+        ) t2 on t1.metric_category = t2.metric_category
+            and t1.metric_name = t2.metric_name
+            and t1.metric_scope = t2.metric_scope
+            and t1.sample_time = t2.max_time
+        <where>
+            <if test="serviceId != null and serviceId != ''">
+                and t1.service_id = #{serviceId}
+                <if test="serviceIpPort != null and serviceIpPort != ''">
+                    and t1.service_ip_port = #{serviceIpPort}
+                </if>
+            </if>
+        </where>
+    </select>
 </mapper>

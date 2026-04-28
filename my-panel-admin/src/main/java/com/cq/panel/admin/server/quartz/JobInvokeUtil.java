@@ -427,9 +427,7 @@ public class JobInvokeUtil {
             return true;
         if (from == Float.class && to == double.class)
             return true;
-        if (from == float.class && to == Double.class)
-            return true;
-        return false;
+        return from == float.class && to == Double.class;
     }
 
     private static Object[] convertParams(List<Object[]> methodParams, Class<?>[] targetTypes) {
@@ -447,8 +445,7 @@ public class JobInvokeUtil {
             return null;
         if (targetType.isAssignableFrom(value.getClass()))
             return value;
-        if (value instanceof Number) {
-            Number num = (Number) value;
+        if (value instanceof Number num) {
             if (targetType == long.class || targetType == Long.class)
                 return num.longValue();
             if (targetType == double.class || targetType == Double.class)
@@ -564,12 +561,12 @@ public class JobInvokeUtil {
      * @return 参数值列表
      */
     public static Object[] getMethodParamsValue(List<Object[]> methodParams) {
-        Object[] classs = new Object[methodParams.size()];
+        Object[] methodParas = new Object[methodParams.size()];
         int index = 0;
         for (Object[] os : methodParams) {
-            classs[index] = os[0];
+            methodParas[index] = os[0];
             index++;
         }
-        return classs;
+        return methodParas;
     }
 }

@@ -9,7 +9,6 @@ import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.service.ISysMenuService;
 import com.cq.panel.admin.server.repository.service.ISysRoleService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -21,11 +20,14 @@ import org.springframework.util.CollectionUtils;
 @Component
 public class SysPermissionService
 {
-    @Autowired
-    private ISysRoleService roleService;
+    private final ISysRoleService roleService;
 
-    @Autowired
-    private ISysMenuService menuService;
+    private final ISysMenuService menuService;
+
+    public SysPermissionService(ISysRoleService roleService, ISysMenuService menuService) {
+        this.roleService = roleService;
+        this.menuService = menuService;
+    }
 
     /**
      * 获取角色数据权限
@@ -56,7 +58,7 @@ public class SysPermissionService
      */
     public Set<String> getMenuPermission(SysUser user)
     {
-        Set<String> perms = new HashSet<String>();
+        Set<String> perms = new HashSet<>();
         // 管理员拥有所有权限
         if (user.isAdmin())
         {

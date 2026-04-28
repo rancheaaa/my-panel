@@ -25,14 +25,14 @@ public class PermissionService
      * @param permission 权限字符串
      * @return 用户是否具备某权限
      */
-    public boolean hasPermi(String permission)
+    public boolean hasPermission(String permission)
     {
         if (MyStringUtils.isEmpty(permission))
         {
             return false;
         }
         LoginUser loginUser = SecurityUtils.getLoginUser();
-        if (MyStringUtils.isNull(loginUser) || CollectionUtils.isEmpty(loginUser.getPermissions()))
+        if (CollectionUtils.isEmpty(loginUser.getPermissions()))
         {
             return false;
         }
@@ -41,23 +41,23 @@ public class PermissionService
     }
 
     /**
-     * 验证用户是否不具备某权限，与 hasPermi逻辑相反
+     * 验证用户是否不具备某权限，与 hasPermission逻辑相反
      *
      * @param permission 权限字符串
      * @return 用户是否不具备某权限
      */
-    public boolean lacksPermi(String permission)
+    public boolean lacksPermission(String permission)
     {
-        return hasPermi(permission) != true;
+        return !hasPermission(permission);
     }
 
     /**
      * 验证用户是否具有以下任意一个权限
      *
-     * @param permissions 以 PERMISSION_DELIMETER 为分隔符的权限列表
+     * @param permissions 以 PERMISSION_DELIMITER 为分隔符的权限列表
      * @return 用户是否具有以下任意一个权限
      */
-    public boolean hasAnyPermi(String permissions)
+    public boolean hasAnyPermission(String permissions)
     {
         if (MyStringUtils.isEmpty(permissions))
         {
@@ -70,9 +70,9 @@ public class PermissionService
         }
         PermissionContextHolder.setContext(permissions);
         Set<String> authorities = loginUser.getPermissions();
-        for (String permission : permissions.split(Constants.PERMISSION_DELIMETER))
+        for (String permission : permissions.split(Constants.PERMISSION_DELIMITER))
         {
-            if (permission != null && hasPermissions(authorities, permission))
+            if (hasPermissions(authorities, permission))
             {
                 return true;
             }
@@ -116,7 +116,7 @@ public class PermissionService
      */
     public boolean lacksRole(String role)
     {
-        return hasRole(role) != true;
+        return !hasRole(role);
     }
 
     /**
@@ -136,7 +136,7 @@ public class PermissionService
         {
             return false;
         }
-        for (String role : roles.split(Constants.ROLE_DELIMETER))
+        for (String role : roles.split(Constants.ROLE_DELIMITER))
         {
             if (hasRole(role))
             {

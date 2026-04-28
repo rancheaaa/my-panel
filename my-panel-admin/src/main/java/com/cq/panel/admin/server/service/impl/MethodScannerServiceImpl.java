@@ -234,6 +234,15 @@ public class MethodScannerServiceImpl implements IMethodScannerService {
         methodInfo.setComponentName(componentName);
         methodInfo.setDescription("内置方法");
 
+        final List<MethodInfoVO.ParameterInfo> parameterList = getParameterInfos(method);
+
+        methodInfo.setParameters(parameterList);
+        methodInfo.setHasParameters(!parameterList.isEmpty());
+
+        return methodInfo;
+    }
+
+    private List<MethodInfoVO.ParameterInfo> getParameterInfos(Method method) {
         Class<?>[] parameterTypes = method.getParameterTypes();
         Parameter[] parameters = method.getParameters();
 
@@ -246,11 +255,7 @@ public class MethodScannerServiceImpl implements IMethodScannerService {
             paramInfo.setIsPrimitive(isPrimitiveType(parameterTypes[i]));
             parameterList.add(paramInfo);
         }
-
-        methodInfo.setParameters(parameterList);
-        methodInfo.setHasParameters(!parameterList.isEmpty());
-
-        return methodInfo;
+        return parameterList;
     }
 
     private MethodValidationVO.ParameterValidationResult validateParameter(

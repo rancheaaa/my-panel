@@ -15,7 +15,6 @@ import com.cq.panel.admin.server.common.utils.uuid.IdUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import eu.bitwalker.useragentutils.UserAgent;
@@ -51,8 +50,11 @@ public class TokenService
 
     private static final Long MILLIS_MINUTE_TEN = 20 * 60 * 1000L;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
+
+    public TokenService(CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
 
     /**
      * 获取用户身份信息
@@ -130,8 +132,7 @@ public class TokenService
     /**
      * 验证令牌有效期，相差不足20分钟，自动刷新缓存
      *
-     * @param loginUser
-     * @return 令牌
+     * @param loginUser 登录信息
      */
     public void verifyToken(LoginUser loginUser)
     {
@@ -180,10 +181,9 @@ public class TokenService
      */
     private String createToken(Map<String, Object> claims)
     {
-        String token = Jwts.builder()
+        return Jwts.builder()
                 .setClaims(claims)
                 .signWith(SignatureAlgorithm.HS512, secret).compact();
-        return token;
     }
 
     /**
@@ -215,7 +215,7 @@ public class TokenService
     /**
      * 获取请求token
      *
-     * @param request
+     * @param request 请求对象
      * @return token
      */
     public String getToken(HttpServletRequest request)

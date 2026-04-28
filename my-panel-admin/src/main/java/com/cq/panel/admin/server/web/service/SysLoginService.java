@@ -15,8 +15,6 @@ import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.context.AuthenticationContextHolder;
-import jakarta.annotation.Resource;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.cq.panel.authlite.AuthenticationToken;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
@@ -31,20 +29,23 @@ import com.cq.panel.admin.server.repository.service.ISysUserService;
 @Component
 public class SysLoginService
 {
-    @Autowired
-    private TokenService tokenService;
+    private final TokenService tokenService;
 
-    @Resource
-    private LoginUserService loginUserService;
+    private final LoginUserService loginUserService;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
     
-    @Autowired
-    private ISysConfigService configService;
+    private final ISysConfigService configService;
 
-    @Autowired
-    private ISysUserService userService;
+    private final ISysUserService userService;
+
+    public SysLoginService(TokenService tokenService, CacheService cacheService, ISysConfigService configService, ISysUserService userService, LoginUserService loginUserService) {
+        this.tokenService = tokenService;
+        this.cacheService = cacheService;
+        this.configService = configService;
+        this.userService = userService;
+        this.loginUserService = loginUserService;
+    }
 
     /**
      * 登录验证
@@ -86,7 +87,6 @@ public class SysLoginService
      * @param username 用户名
      * @param code 验证码
      * @param uuid 唯一标识
-     * @return 结果
      */
     public void validateCaptcha(String username, String code, String uuid)
     {

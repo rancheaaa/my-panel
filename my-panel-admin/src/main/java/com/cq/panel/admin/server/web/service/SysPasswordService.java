@@ -8,7 +8,6 @@ import com.cq.panel.admin.server.web.exception.user.UserPasswordNotMatchExceptio
 import com.cq.panel.admin.server.web.exception.user.UserPasswordRetryLimitExceedException;
 import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
 import com.cq.panel.admin.server.context.AuthenticationContextHolder;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.cq.panel.authlite.AuthenticationToken;
@@ -21,14 +20,17 @@ import com.cq.panel.authlite.AuthenticationToken;
 @Component
 public class SysPasswordService
 {
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
 
     @Value(value = "${user.password.maxRetryCount}")
     private int maxRetryCount;
 
     @Value(value = "${user.password.lockTime}")
     private int lockTime;
+
+    public SysPasswordService(CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
 
     /**
      * 登录账户密码错误次数缓存键名

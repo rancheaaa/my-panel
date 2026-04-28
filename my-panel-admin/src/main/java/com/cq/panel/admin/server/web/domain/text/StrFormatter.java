@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.web.domain.text;
 
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * 字符串格式化
@@ -30,7 +30,7 @@ public class StrFormatter
      */
     public static String format(final String strPattern, final Object... argArray)
     {
-        if (StringUtils.isEmpty(strPattern) || StringUtils.isEmpty(argArray))
+        if (MyStringUtils.isEmpty(strPattern) || MyStringUtils.isEmpty(argArray))
         {
             return strPattern;
         }

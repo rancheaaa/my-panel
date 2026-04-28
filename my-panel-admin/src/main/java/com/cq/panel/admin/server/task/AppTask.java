@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.task;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -38,7 +38,7 @@ public class AppTask
      */
     public void runMultipleParams(String s, Boolean b, Long l, Double d, Integer i)
     {
-        log.info(StringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
+        log.info(MyStringUtils.format("执行多参方法： 字符串类型{}，布尔类型{}，长整型{}，浮点型{}，整形{}", s, b, l, d, i));
     }
 
     /**

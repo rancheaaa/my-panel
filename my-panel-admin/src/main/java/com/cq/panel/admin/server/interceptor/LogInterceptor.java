@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.interceptor;
 
-import com.alibaba.fastjson2.JSON;
+import com.cq.panel.admin.server.common.utils.JsonUtils;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -9,12 +9,12 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
-
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
 @Component
+@SuppressWarnings("all")
 public class LogInterceptor implements HandlerInterceptor
 {
     private static final Logger logger = LoggerFactory.getLogger(LogInterceptor.class);
@@ -54,26 +54,26 @@ public class LogInterceptor implements HandlerInterceptor
             }
         }
         
-        logger.info("========== 请求开始 ==========");
-        logger.info("traceId: {}", traceId);
-        logger.info("请求方法: {}", method);
-        logger.info("请求URI: {}", uri);
+        logger.trace("========== 请求开始 ==========");
+        logger.trace("traceId: {}", traceId);
+        logger.trace("请求方法: {}", method);
+        logger.trace("请求URI: {}", uri);
         if (queryString != null && !queryString.isEmpty())
         {
-            logger.info("查询参数: {}", queryString);
+            logger.trace("查询参数: {}", queryString);
         }
-        logger.info("Content-Type: {}", contentType);
-        logger.info("请求头: {}", JSON.toJSONString(headers));
+        logger.trace("Content-Type: {}", contentType);
+        logger.trace("请求头: {}", JsonUtils.toJSONString(headers));
         if (!params.isEmpty())
         {
-            logger.info("请求参数: {}", JSON.toJSONString(params));
+            logger.trace("请求参数: {}", JsonUtils.toJSONString(params));
         }
         if (!requestBody.isEmpty())
         {
-            logger.info("请求体: {}", requestBody);
+            logger.trace("请求体: {}", requestBody);
         }
-        logger.info("远程地址: {}", request.getRemoteAddr());
-        logger.info("============================");
+        logger.trace("远程地址: {}", request.getRemoteAddr());
+        logger.trace("============================");
         
         return true;
     }
@@ -94,22 +94,22 @@ public class LogInterceptor implements HandlerInterceptor
             responseHeaders.put(headerName, response.getHeader(headerName));
         }
         
-        logger.info("========== 响应结束 ==========");
-        logger.info("traceId: {}", traceId);
-        logger.info("请求方法: {}", method);
-        logger.info("请求URI: {}", uri);
-        logger.info("响应状态: {}", status);
-        logger.info("响应头: {}", JSON.toJSONString(responseHeaders));
+        logger.trace("========== 响应结束 ==========");
+        logger.trace("traceId: {}", traceId);
+        logger.trace("请求方法: {}", method);
+        logger.trace("请求URI: {}", uri);
+        logger.trace("响应状态: {}", status);
+        logger.trace("响应头: {}", JsonUtils.toJSONString(responseHeaders));
         // todo 打印出报文响应体
-        logger.info("响应体: {}", "");
-        logger.info("执行时间: {} ms", executeTime);
+        logger.trace("响应体: {}", "");
+        logger.trace("执行时间: {} ms", executeTime);
         
         if (ex != null)
         {
-            logger.error("请求异常: ", ex);
+            logger.trace("请求异常: ", ex);
         }
         
-        logger.info("============================");
+        logger.trace("============================");
         
         startTime.remove();
         MDC.remove(TRACE_ID_KEY);

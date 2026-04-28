@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.controller.tool;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.web.domain.dto.tool.TestUserDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
@@ -74,7 +74,7 @@ public class TestController extends BaseController
     @PostMapping("/save")
     public Result<Map<Integer, TestUserVO>> save(@RequestBody TestUserDTO user)
     {
-        if (StringUtils.isNull(user) || StringUtils.isNull(user.getUserId()))
+        if (MyStringUtils.isNull(user) || MyStringUtils.isNull(user.getUserId()))
         {
             throw new ServiceException("用户ID不能为空");
         }
@@ -87,7 +87,7 @@ public class TestController extends BaseController
     @PutMapping("/update")
     public Result<Map<Integer, TestUserVO>> update(@RequestBody TestUserDTO user)
     {
-        if (StringUtils.isNull(user) || StringUtils.isNull(user.getUserId()))
+        if (MyStringUtils.isNull(user) || MyStringUtils.isNull(user.getUserId()))
         {
             throw new ServiceException("用户ID不能为空");
         }

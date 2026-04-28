@@ -10,7 +10,7 @@ import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.constant.CacheConstants;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysUserOnline;
 import com.cq.panel.admin.server.repository.service.ISysUserOnlineService;
 import com.cq.panel.admin.server.web.service.cache.CacheService;
@@ -52,28 +52,28 @@ public class SysUserOnlineController extends BaseController
     @GetMapping("/list")
     public Result<PageVO<SysUserOnlineVO>> list(@Parameter(description = "查询条件") SysUserOnlineQueryDTO query)
     {
-        Collection<String> keys = cacheService.keys(CacheConstants.LOGIN_TOKEN_KEY + "*");
+        Collection<String> keys = cacheService.keys(CacheConstants.LOGIN_TOKEN_KEY + ":*");
         List<SysUserOnline> userOnlineList = new ArrayList<>();
         for (String key : keys)
         {
             LoginUser user = cacheService.get(key);
-            if (StringUtils.isNotEmpty(query.getIpaddr()) && StringUtils.isNotEmpty(query.getUserName()))
+            if (MyStringUtils.isNotEmpty(query.getIpaddr()) && MyStringUtils.isNotEmpty(query.getUserName()))
             {
-                if (StringUtils.equals(query.getIpaddr(), user.getIpaddr()) && StringUtils.equals(query.getUserName(), user.getUsername()))
+                if (MyStringUtils.equals(query.getIpaddr(), user.getIpaddr()) && MyStringUtils.equals(query.getUserName(), user.getUsername()))
                 {
                     userOnlineList.add(userOnlineService.selectOnlineByInfo(query.getIpaddr(), query.getUserName(), user));
                 }
             }
-            else if (StringUtils.isNotEmpty(query.getIpaddr()))
+            else if (MyStringUtils.isNotEmpty(query.getIpaddr()))
             {
-                if (StringUtils.equals(query.getIpaddr(), user.getIpaddr()))
+                if (MyStringUtils.equals(query.getIpaddr(), user.getIpaddr()))
                 {
                     userOnlineList.add(userOnlineService.selectOnlineByIpaddr(query.getIpaddr(), user));
                 }
             }
-            else if (StringUtils.isNotEmpty(query.getUserName()) && StringUtils.isNotNull(user.getUser()))
+            else if (MyStringUtils.isNotEmpty(query.getUserName()) && MyStringUtils.isNotNull(user.getUser()))
             {
-                if (StringUtils.equals(query.getUserName(), user.getUsername()))
+                if (MyStringUtils.equals(query.getUserName(), user.getUsername()))
                 {
                     userOnlineList.add(userOnlineService.selectOnlineByUserName(query.getUserName(), user));
                 }
@@ -95,7 +95,7 @@ public class SysUserOnlineController extends BaseController
     @DeleteMapping("/{tokenId}")
     public Result<Void> forceLogout(@Parameter(description = "会话编号", required = true) @PathVariable String tokenId)
     {
-        cacheService.delete(CacheConstants.LOGIN_TOKEN_KEY + tokenId);
+        cacheService.delete(CacheConstants.LOGIN_TOKEN_KEY + ":" + tokenId);
         return Result.success();
     }
 }

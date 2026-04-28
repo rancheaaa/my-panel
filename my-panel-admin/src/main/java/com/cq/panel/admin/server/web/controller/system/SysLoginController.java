@@ -13,6 +13,9 @@ import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.admin.server.web.domain.vo.system.UserInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.system.RouterVo;
 import com.cq.panel.admin.server.web.converter.system.SysUserConverter;
+import com.cq.panel.admin.server.repository.service.ISysUserService;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
+import com.cq.panel.admin.server.web.exception.ServiceException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
@@ -43,12 +46,28 @@ public class SysLoginController
 
     private final TokenService tokenService;
 
-    public SysLoginController(SysLoginService loginService, ISysMenuService menuService, SysPermissionService permissionService, SysUserConverter userConverter, TokenService tokenService) {
+    private final ISysUserService userService;
+
+    public SysLoginController(SysLoginService loginService, ISysMenuService menuService, SysPermissionService permissionService, SysUserConverter userConverter, TokenService tokenService, ISysUserService userService) {
         this.loginService = loginService;
         this.menuService = menuService;
         this.permissionService = permissionService;
         this.userConverter = userConverter;
         this.tokenService = tokenService;
+        this.userService = userService;
+    }
+
+    @Operation(summary = "获取密码盐值")
+    @GetMapping("/getSalt")
+    public Result<String> getSalt(String username) {
+        if (MyStringUtils.isEmpty(username)) {
+            throw new ServiceException("用户名不能为空");
+        }
+        SysUser user = userService.selectUserByUserName(username);
+        if (user == null || user.getSalt() == null) {
+            return Result.success("用户不存在或密码盐值为空", null);
+        }
+        return Result.success("操作成功", user.getSalt());
     }
 
     /**
@@ -111,7 +130,7 @@ public class SysLoginController
         {
             tokenService.delLoginUser(loginUser.getToken());
         }
-        return Result.success("退出成功");
+        return Result.success("退出成功", null);
     }
 }
 

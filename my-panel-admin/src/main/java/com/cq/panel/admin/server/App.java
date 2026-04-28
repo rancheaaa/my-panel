@@ -2,21 +2,21 @@ package com.cq.panel.admin.server;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import de.codecentric.boot.admin.server.config.EnableAdminServer;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 启动程序
- * 
+ *
  * @author cq
  */
 @EnableAdminServer
-@SpringBootApplication(scanBasePackages = { "com.cq.panel.admin.server", "com.cq.panel.authlite" }, exclude = { DataSourceAutoConfiguration.class })
+@EnableScheduling
+@SpringBootApplication(scanBasePackages = { "com.cq.panel.admin.server", "com.cq.panel.authlite" })
 public class App
 {
     public static void main(String[] args)
     {
-//        System.setProperty("spring.devtools.restart.enabled", "false");
         SpringApplication.run(App.class, args);
     }
 }

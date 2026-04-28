@@ -3,18 +3,21 @@ package com.cq.panel.admin.server.repository.service.impl;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
+import com.cq.panel.admin.server.common.utils.SecurityUtils;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandRequest;
+import com.cq.panel.common.dto.agent.AgentExecuteCommandResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
+import com.cq.panel.admin.server.repository.domain.AgentCommandHistory;
 import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
+import com.cq.panel.admin.server.repository.service.IAgentCommandHistoryService;
 
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Agent注册信息Service业务层处理
@@ -25,9 +28,11 @@ import java.util.Map;
 public class AgentRegistryServiceImpl implements IAgentRegistryService {
 
     private final AgentRegistryMapper agentRegistryMapper;
+    private final IAgentCommandHistoryService agentCommandHistoryService;
 
-    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper) {
+    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper, IAgentCommandHistoryService agentCommandHistoryService) {
         this.agentRegistryMapper = agentRegistryMapper;
+        this.agentCommandHistoryService = agentCommandHistoryService;
     }
 
     /**
@@ -63,7 +68,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int insertAgentRegistry(AgentRegistry agentRegistry)
     {
-        agentRegistry.setCreateTime(DateUtils.getNowDate());
+        agentRegistry.setCreateTime(MyDateUtils.getNowDate());
         return agentRegistryMapper.insertAgentRegistry(agentRegistry);
     }
 
@@ -76,7 +81,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int updateAgentRegistry(AgentRegistry agentRegistry)
     {
-        agentRegistry.setUpdateTime(DateUtils.getNowDate());
+        agentRegistry.setUpdateTime(MyDateUtils.getNowDate());
         return agentRegistryMapper.updateAgentRegistry(agentRegistry);
     }
 
@@ -119,7 +124,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         query.setAgentPort(agentRegistry.getAgentPort());
         AgentRegistry existing = agentRegistryMapper.selectAgentRegistryByIpAndPort(query);
         
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         
         if (existing != null)
         {
@@ -165,7 +170,8 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             update.setAgentIp(agentIp);
             update.setAgentPort(agentPort);
             update.setNodeStatus(1);
-            update.setUpdateTime(DateUtils.getNowDate());
+            update.setLastRefreshTime(MyDateUtils.getNowDate());
+            update.setUpdateTime(MyDateUtils.getNowDate());
             agentRegistryMapper.updateNodeStatusByIpAndPort(update);
             return true;
         }
@@ -181,7 +187,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public int offlineTimeoutNodes(Integer timeoutSeconds)
     {
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         long timeoutMillis = timeoutSeconds * 1000L;
         
         List<AgentRegistry> onlineNodes = agentRegistryMapper.selectOnlineNodes();
@@ -197,7 +203,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             if (updateTime == null)
             {
                 node.setNodeStatus(0);
-                node.setUpdateTime(DateUtils.getNowDate());
+                node.setUpdateTime(MyDateUtils.getNowDate());
                 agentRegistryMapper.updateAgentRegistry(node);
                 offlineCount++;
                 continue;
@@ -207,7 +213,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             if (timeDiff > timeoutMillis)
             {
                 node.setNodeStatus(0);
-                node.setUpdateTime(DateUtils.getNowDate());
+                node.setUpdateTime(MyDateUtils.getNowDate());
                 agentRegistryMapper.updateAgentRegistry(node);
                 offlineCount++;
             }
@@ -227,52 +233,132 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
     @Override
     public Object executeCommand(String agentId, String command, Integer timeout)
     {
-        // 1. 根据agentId查询Agent信息
         AgentRegistry agent = agentRegistryMapper.selectAgentRegistryById(agentId);
         if (agent == null)
         {
             throw new RuntimeException("Agent节点不存在");
         }
         
-        // 2. 检查Agent是否在线
         if (agent.getNodeStatus() != 1)
         {
             throw new RuntimeException("Agent节点不在线，无法执行命令");
         }
-        
-        // 3. 构建Agent API URL
+
         String agentUrl = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort() + "/api/execute";
-        
-        // 4. 准备请求参数
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("command", command);
-        requestBody.put("timeout", timeout);
-        
-        // 5. 发送HTTP请求到Agent
+
+        final AgentExecuteCommandRequest requestBody = new AgentExecuteCommandRequest();
+        requestBody.setCommand(command);
+        requestBody.setTimeout((long)timeout);
+
+        AgentCommandHistory history = new AgentCommandHistory();
+        history.setAgentId(agent.getId());
+        history.setAgentName(agent.getNodeName());
+        history.setAgentIp(agent.getAgentIp());
+        history.setAgentPort(agent.getAgentPort());
+        history.setCommand(command);
+        history.setCommandTimeout(timeout);
+        history.setSubmitTime(MyDateUtils.getNowDate());
+        history.setUserId(SecurityUtils.getUserId());
+        history.setUserName(SecurityUtils.getUsername());
         try
         {
             RestTemplate restTemplate = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             
-            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+            HttpEntity<AgentExecuteCommandRequest> requestEntity = new HttpEntity<>(requestBody, headers);
             
-            // 设置超时时间
+            Date startTime = MyDateUtils.getNowDate();
+            history.setStartTime(startTime);
+            
             ResponseEntity<String> response = restTemplate.postForEntity(agentUrl, requestEntity, String.class);
+            
+            Date endTime = MyDateUtils.getNowDate();
+            long duration = endTime.getTime() - startTime.getTime();
+            history.setEndTime(endTime);
+            history.setExecuteTime(duration);
             
             if (response.getStatusCode() == HttpStatus.OK)
             {
-                // 解析Agent返回的JSON响应
                 ObjectMapper objectMapper = new ObjectMapper();
-                return objectMapper.readValue(response.getBody(), Object.class);
+                AgentExecuteCommandResponse result = objectMapper.readValue(response.getBody(), AgentExecuteCommandResponse.class);
+                
+                boolean success = result.isSuccess();
+                int exitCode = result.getExitCode();
+                String output = result.getOutput();
+                String error = result.getError();
+
+                if (success)
+                {
+                    history.setCommandStatus(0);
+                }
+                else if (exitCode == -999)
+                {
+                    // timeout
+                    history.setCommandStatus(2);
+                }
+                else if (exitCode < 0)
+                {
+                    // 未知
+                    history.setCommandStatus(3);
+                }
+                else
+                {
+                    // 失败
+                    history.setCommandStatus(1);
+                }
+                
+                history.setExitCode(exitCode);
+                history.setOutput(output);
+                history.setError(error);
+                
+                agentCommandHistoryService.insert(history);
+                
+                return result;
             }
             else
             {
+                history.setCommandStatus(1);
+                history.setError("HTTP " + response.getStatusCode().value());
+                agentCommandHistoryService.insert(history);
                 throw new RuntimeException("Agent服务返回错误状态码: " + response.getStatusCode());
             }
         }
+        catch (RuntimeException e)
+        {
+            if (history.getEndTime() == null)
+            {
+                history.setEndTime(MyDateUtils.getNowDate());
+                if (history.getStartTime() != null)
+                {
+                    history.setExecuteTime(history.getEndTime().getTime() - history.getStartTime().getTime());
+                }
+            }
+            if (e.getMessage() != null && e.getMessage().contains("超时"))
+            {
+                history.setCommandStatus(2);
+            }
+            else
+            {
+                history.setCommandStatus(1);
+            }
+            history.setError(e.getMessage());
+            agentCommandHistoryService.insert(history);
+            throw e;
+        }
         catch (Exception e)
         {
+            if (history.getEndTime() == null)
+            {
+                history.setEndTime(MyDateUtils.getNowDate());
+                if (history.getStartTime() != null)
+                {
+                    history.setExecuteTime(history.getEndTime().getTime() - history.getStartTime().getTime());
+                }
+            }
+            history.setCommandStatus(3);
+            history.setError(e.getMessage());
+            agentCommandHistoryService.insert(history);
             throw new RuntimeException("调用Agent服务失败: " + e.getMessage(), e);
         }
     }

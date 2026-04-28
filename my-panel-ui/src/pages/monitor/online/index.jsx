@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, message, Popconfirm, Tooltip, Dropdown, Row, Col } from 'antd';
+import { Table, Card, Button, Space, Form, Input, message, Popconfirm, Tooltip, Dropdown, Row, Col, Pagination } from 'antd';
 import { SearchOutlined, ReloadOutlined, DeleteOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { list, forceLogout } from '../../../api/monitor/online';
 import dayjs from 'dayjs';
+import './Online.scss';
 
 const Online = () => {
   const [data, setData] = useState([]);
@@ -121,8 +122,8 @@ const Online = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <div className="online-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
@@ -145,8 +146,8 @@ const Online = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
-        <div className="table-toolbar" style={{ marginBottom: 16 }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar">
           <Space size="middle">
              <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={fetchData} shape="circle" />
@@ -170,31 +171,35 @@ const Online = () => {
           </Space>
         </div>
 
-        <Table
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          rowKey="tokenId"
-          loading={loading}
-          size={tableSize}
-          scroll={{ x: 1220 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-                setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
+        <div className="online-table-container">
+          <Table
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            rowKey="tokenId"
+            loading={loading}
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
     </div>
   );

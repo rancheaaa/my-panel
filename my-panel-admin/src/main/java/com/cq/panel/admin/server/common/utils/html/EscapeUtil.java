@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.html;
 
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * 转义和反转义工具类
@@ -70,9 +70,9 @@ public class EscapeUtil
      */
     private static String encode(String text)
     {
-        if (StringUtils.isEmpty(text))
+        if (MyStringUtils.isEmpty(text))
         {
-            return StringUtils.EMPTY;
+            return MyStringUtils.EMPTY;
         }
 
         final StringBuilder tmp = new StringBuilder(text.length() * 6);
@@ -111,7 +111,7 @@ public class EscapeUtil
      */
     public static String decode(String content)
     {
-        if (StringUtils.isEmpty(content))
+        if (MyStringUtils.isEmpty(content))
         {
             return content;
         }
@@ -146,7 +146,7 @@ public class EscapeUtil
                 }
                 else
                 {
-                    tmp.append(content.substring(lastPos, pos));
+                    tmp.append(content, lastPos, pos);
                     lastPos = pos;
                 }
             }

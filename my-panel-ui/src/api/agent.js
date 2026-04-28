@@ -93,3 +93,37 @@ export function offlineTimeoutNodes(timeoutSeconds) {
     params: { timeoutSeconds }
   });
 }
+
+// 查询命令执行历史列表
+export function listCommandHistory(query) {
+  return request({
+    url: '/agent/command-history/list',
+    method: 'get',
+    params: query
+  });
+}
+
+// 获取命令详情
+export function getCommandHistory(id) {
+  return request({
+    url: '/agent/command-history/' + id,
+    method: 'get'
+  });
+}
+
+// 删除命令历史
+export function delCommandHistory(ids) {
+  return request({
+    url: '/agent/command-history/' + ids,
+    method: 'delete'
+  });
+}
+
+// 导出命令历史
+export function exportCommandHistory(query) {
+  return request({
+    url: '/agent/command-history/export',
+    method: 'post',
+    responseType: 'blob'
+  });
+}

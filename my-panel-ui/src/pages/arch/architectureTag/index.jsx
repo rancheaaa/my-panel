@@ -10,7 +10,8 @@ import {
   message, 
   Popconfirm, 
   Tag,
-  Select
+  Select,
+  Pagination
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -21,6 +22,7 @@ import {
   TagOutlined
 } from '@ant-design/icons';
 import { listTag, addTag, updateTag, delTag } from '@/api/op/archTag.js';
+import './ArchTag.scss';
 
 const { Option } = Select;
 
@@ -207,8 +209,8 @@ const ArchTag = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card bordered={false} style={{ marginBottom: '16px' }}>
+    <div className="arch-tag-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: '16px', flexShrink: 0 }}>
         <Form form={searchForm} layout="inline" onFinish={handleSearch}>
           <Form.Item name="tagName" label="标签名称">
             <Input placeholder="请输入标签名称" allowClear />
@@ -229,8 +231,8 @@ const ArchTag = () => {
         </Form>
       </Card>
 
-      <Card bordered={false}>
-        <div style={{ marginBottom: '16px' }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar">
           <Button 
             type="primary" 
             icon={<TagOutlined />} 
@@ -241,20 +243,29 @@ const ArchTag = () => {
             新增标签
           </Button>
         </div>
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            total,
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            onChange: (page, pageSize) => setQueryParams({ ...queryParams, pageNum: page, pageSize }),
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`
-          }}
-        />
+        <div className="arch-tag-table-container">
+          <Table
+            columns={columns}
+            dataSource={data}
+            rowKey="id"
+            loading={loading}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              total={total}
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              onChange={(page, pageSize) => setQueryParams({ ...queryParams, pageNum: page, pageSize })}
+              showSizeChanger
+              showTotal={(t) => `共 ${t} 条`}
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

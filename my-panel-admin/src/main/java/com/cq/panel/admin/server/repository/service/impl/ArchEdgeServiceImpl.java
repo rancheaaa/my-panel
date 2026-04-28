@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.Date;
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -69,9 +69,9 @@ public class ArchEdgeServiceImpl implements IArchEdgeService
     public int insertArchEdge(ArchEdge archEdge)
     {
         archEdge.setCreateBy(SecurityUtils.getUsername());
-        archEdge.setCreateTime(DateUtils.getNowDate());
+        archEdge.setCreateTime(MyDateUtils.getNowDate());
         archEdge.setUpdateBy(SecurityUtils.getUsername());
-        archEdge.setUpdateTime(DateUtils.getNowDate());
+        archEdge.setUpdateTime(MyDateUtils.getNowDate());
         archEdge.setStatus("0");
         archEdge.setVisible("1");
         archEdge.setDelFlag("0");
@@ -92,7 +92,7 @@ public class ArchEdgeServiceImpl implements IArchEdgeService
         {
             return 0;
         }
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         String username = SecurityUtils.getUsername();
         for (ArchEdge archEdge : edgeList)
         {
@@ -118,7 +118,7 @@ public class ArchEdgeServiceImpl implements IArchEdgeService
     public int updateArchEdge(ArchEdge archEdge)
     {
         archEdge.setUpdateBy(SecurityUtils.getUsername());
-        archEdge.setUpdateTime(DateUtils.getNowDate());
+        archEdge.setUpdateTime(MyDateUtils.getNowDate());
         return archEdgeMapper.updateArchEdge(archEdge);
     }
 

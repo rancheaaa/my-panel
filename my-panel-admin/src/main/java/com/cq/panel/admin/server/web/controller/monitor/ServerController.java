@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.web.controller.monitor;
 
 import com.cq.panel.admin.server.repository.service.IServerService;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
+import com.cq.panel.admin.server.web.domain.vo.monitor.ProcessMemoryVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.ServerVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,6 +33,14 @@ public class ServerController
     public Result<ServerVO> getInfo() throws Exception
     {
         return Result.success(serverService.getServerInfo());
+    }
+
+    @RequirePermission("monitor:server:list")
+    @Operation(summary = "获取进程内存分布", description = "获取Java进程RSS及各内存区域占用分布")
+    @GetMapping("/memory-distribution")
+    public Result<ProcessMemoryVO> getProcessMemoryDistribution()
+    {
+        return Result.success(serverService.getProcessMemoryInfo());
     }
 }
 

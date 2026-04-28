@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.web.controller.system;
 
 import com.cq.panel.admin.server.config.AppConfig;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,7 +31,7 @@ public class SysIndexController
     @RequestMapping("/")
     public Result<String> index()
     {
-        return Result.success(StringUtils.format("欢迎使用{}后台管理框架，当前版本：v{}，请通过前端地址访问。", cqConfig.getName(), cqConfig.getVersion()));
+        return Result.success(MyStringUtils.format("欢迎使用{}后台管理框架，当前版本：v{}，请通过前端地址访问。", cqConfig.getName(), cqConfig.getVersion()), null);
     }
 }
 

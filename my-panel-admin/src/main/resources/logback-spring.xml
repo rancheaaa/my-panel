@@ -2,7 +2,7 @@
 <configuration scan="true" scanPeriod="60 seconds" debug="false">
     <!-- 读取 Spring 配置 -->
     <springProperty name="appName" source="spring.application.name" defaultValue="app"/>
-    <springProperty name="logPath" source="logging.file.path" defaultValue="/tmp/my-panel/admin/logs/admin"/>
+    <springProperty name="logPath" source="logging.file.path" defaultValue="${ROOT_DIR:/tmp/my-panel/admin}/logs/admin"/>
 
     <!-- 日志存放路径 -->
 	<property name="log.path" value="${logPath}" />

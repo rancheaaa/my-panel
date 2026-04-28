@@ -11,10 +11,6 @@ import java.util.concurrent.*;
  */
 public class AsyncManager
 {
-    /**
-     * 操作延迟10毫秒
-     */
-    private final int OPERATE_DELAY_TIME = 10;
 
     /**
      * 调度器（使用单线程平台线程）
@@ -47,6 +43,7 @@ public class AsyncManager
      */
     public void execute(TimerTask task)
     {
+        int OPERATE_DELAY_TIME = 10;
         scheduler.schedule(() -> executor.execute(task), OPERATE_DELAY_TIME, TimeUnit.MILLISECONDS);
     }
 

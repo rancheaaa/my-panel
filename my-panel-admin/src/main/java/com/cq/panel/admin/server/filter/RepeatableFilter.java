@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.filter;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
@@ -25,7 +25,7 @@ public class RepeatableFilter implements Filter
     {
         ServletRequest requestWrapper = null;
         if (request instanceof HttpServletRequest
-                && StringUtils.startsWithIgnoreCase(request.getContentType(), MediaType.APPLICATION_JSON_VALUE))
+                && MyStringUtils.startsWithIgnoreCase(request.getContentType(), MediaType.APPLICATION_JSON_VALUE))
         {
             requestWrapper = new RepeatedlyRequestWrapper((HttpServletRequest) request, response);
         }

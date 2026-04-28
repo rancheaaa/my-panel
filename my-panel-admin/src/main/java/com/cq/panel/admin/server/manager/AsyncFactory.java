@@ -5,9 +5,9 @@ import java.util.TimerTask;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.utils.LogUtils;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.ip.AddressUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysLoginInfo;
 import com.cq.panel.admin.server.repository.domain.SysOperLog;
@@ -39,21 +39,20 @@ public class AsyncFactory
                                             final Object... args)
     {
         final UserAgent userAgent = UserAgent.parseUserAgentString(ServletUtils.getRequest().getHeader("User-Agent"));
-        final String ip = IpUtils.getIpAddr();
+        final String ip = MyIpUtils.getIpAddr();
         return new TimerTask()
         {
             @Override
             public void run()
             {
                 String address = AddressUtils.getRealAddressByIP(ip);
-                StringBuilder s = new StringBuilder();
-                s.append(LogUtils.getBlock(ip));
-                s.append(address);
-                s.append(LogUtils.getBlock(username));
-                s.append(LogUtils.getBlock(status));
-                s.append(LogUtils.getBlock(message));
+                String s = LogUtils.getBlock(ip) +
+                        address +
+                        LogUtils.getBlock(username) +
+                        LogUtils.getBlock(status) +
+                        LogUtils.getBlock(message);
                 // 打印信息到日志
-                sys_user_logger.info(s.toString(), args);
+                sys_user_logger.info(s, args);
                 // 获取客户端操作系统
                 String os = userAgent.getOperatingSystem().getName();
                 // 获取客户端浏览器
@@ -68,7 +67,7 @@ public class AsyncFactory
                 logininfor.setMsg(message);
                 logininfor.setLoginTime(new Date());
                 // 日志状态
-                if (StringUtils.equalsAny(status, Constants.LOGIN_SUCCESS, Constants.LOGOUT, Constants.REGISTER))
+                if (MyStringUtils.equalsAny(status, Constants.LOGIN_SUCCESS, Constants.LOGOUT, Constants.REGISTER))
                 {
                     logininfor.setStatus(Constants.SUCCESS);
                 }

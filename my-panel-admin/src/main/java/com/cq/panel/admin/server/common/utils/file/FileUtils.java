@@ -2,8 +2,8 @@ package com.cq.panel.admin.server.common.utils.file;
 
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.config.AppConfig;
-import com.cq.panel.admin.server.common.utils.DateUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.uuid.IdUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,14 +21,13 @@ import java.nio.charset.StandardCharsets;
  */
 public class FileUtils
 {
-    public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+";
+    public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-|.\\u4e00-\\u9fa5]+";
 
     /**
      * 输出指定文件的byte数组
      * 
      * @param filePath 文件路径
      * @param os 输出流
-     * @return
      */
     public static void writeBytes(String filePath, OutputStream os) throws IOException
     {
@@ -86,7 +85,7 @@ public class FileUtils
         try
         {
             String extension = getFileExtendName(data);
-            pathName = DateUtils.datePath() + "/" + IdUtils.fastUUID() + "." + extension;
+            pathName = MyDateUtils.datePath() + "/" + IdUtils.fastUUID() + "." + extension;
             File file = FileUploadUtils.getAbsoluteFile(uploadDir, pathName);
             fos = new FileOutputStream(file);
             fos.write(data);
@@ -100,20 +99,18 @@ public class FileUtils
 
     /**
      * 删除文件
-     * 
+     *
      * @param filePath 文件
-     * @return
      */
     public static boolean deleteFile(String filePath)
     {
-        boolean flag = false;
         File file = new File(filePath);
         // 路径为文件且不为空则进行删除
         if (file.isFile() && file.exists())
         {
-            flag = file.delete();
+            return file.delete();
         }
-        return flag;
+        return false;
     }
 
     /**
@@ -136,19 +133,13 @@ public class FileUtils
     public static boolean checkAllowDownload(String resource)
     {
         // 禁止目录上跳级别
-        if (StringUtils.contains(resource, ".."))
+        if (MyStringUtils.contains(resource, ".."))
         {
             return false;
         }
 
         // 检查允许下载的文件规则
-        if (ArrayUtils.contains(MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION, FileTypeUtils.getFileType(resource)))
-        {
-            return true;
-        }
-
-        // 不在允许下载的文件规则
-        return false;
+        return ArrayUtils.contains(MimeTypeUtils.DEFAULT_ALLOWED_EXTENSION, FileTypeUtils.getFileType(resource));
     }
 
     /**
@@ -165,7 +156,7 @@ public class FileUtils
         if (agent.contains("MSIE"))
         {
             // IE浏览器
-            filename = URLEncoder.encode(filename, "utf-8");
+            filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
             filename = filename.replace("+", " ");
         }
         else if (agent.contains("Firefox"))
@@ -176,12 +167,12 @@ public class FileUtils
         else if (agent.contains("Chrome"))
         {
             // google浏览器
-            filename = URLEncoder.encode(filename, "utf-8");
+            filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
         }
         else
         {
             // 其它浏览器
-            filename = URLEncoder.encode(filename, "utf-8");
+            filename = URLEncoder.encode(filename, StandardCharsets.UTF_8);
         }
         return filename;
     }
@@ -196,16 +187,15 @@ public class FileUtils
     {
         String percentEncodedFileName = percentEncode(realFileName);
 
-        StringBuilder contentDispositionValue = new StringBuilder();
-        contentDispositionValue.append("attachment; filename=")
-                .append(percentEncodedFileName)
-                .append(";")
-                .append("filename*=")
-                .append("utf-8''")
-                .append(percentEncodedFileName);
+        String contentDispositionValue = "attachment; filename=" +
+                percentEncodedFileName +
+                ";" +
+                "filename*=" +
+                "utf-8''" +
+                percentEncodedFileName;
 
         response.addHeader("Access-Control-Expose-Headers", "Content-Disposition,download-filename");
-        response.setHeader("Content-disposition", contentDispositionValue.toString());
+        response.setHeader("Content-disposition", contentDispositionValue);
         response.setHeader("download-filename", percentEncodedFileName);
     }
 
@@ -217,7 +207,7 @@ public class FileUtils
      */
     public static String percentEncode(String s) throws UnsupportedEncodingException
     {
-        String encode = URLEncoder.encode(s, StandardCharsets.UTF_8.toString());
+        String encode = URLEncoder.encode(s, StandardCharsets.UTF_8);
         return encode.replaceAll("\\+", "%20");
     }
 
@@ -280,7 +270,6 @@ public class FileUtils
         {
             return null;
         }
-        String baseName = FilenameUtils.getBaseName(fileName);
-        return baseName;
+        return FilenameUtils.getBaseName(fileName);
     }
 }

@@ -13,16 +13,35 @@ import java.net.UnknownHostException;
 public class IpUtils {
 
     private static final Logger log = LoggerFactory.getLogger(IpUtils.class);
+    private static volatile String cachedLocalIp = null;
 
     public static String getLocalHost() throws SocketException, UnknownHostException {
+        if (cachedLocalIp != null) {
+            return cachedLocalIp;
+        }
+        synchronized (IpUtils.class) {
+            if (cachedLocalIp != null) {
+                return cachedLocalIp;
+            }
+            try {
+                String ip = resolveLocalIp();
+                cachedLocalIp = ip;
+                log.info("Resolved and cached local IP: {}", ip);
+                return ip;
+            } catch (Exception e) {
+                log.error("无法获取本地IP地址", e);
+                throw e;
+            }
+        }
+    }
+
+    private static String resolveLocalIp() throws SocketException, UnknownHostException {
         try {
-            // 方法1: 尝试获取非回环地址
             java.net.InetAddress address = getPreferredInetAddress();
             if (address != null && !address.isLoopbackAddress()) {
                 return address.getHostAddress();
             }
 
-            // 方法2: 获取所有网络接口的IP地址
             java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
             while (interfaces.hasMoreElements()) {
                 java.net.NetworkInterface networkInterface = interfaces.nextElement();
@@ -39,7 +58,6 @@ public class IpUtils {
                 }
             }
 
-            // 方法3: 回退到传统方式
             return java.net.InetAddress.getLocalHost().getHostAddress();
 
         } catch (Exception e) {
@@ -50,11 +68,13 @@ public class IpUtils {
 
     /**
      * 获取首选网络地址，参考Spring Cloud的实现
+     * 优先选择静态IP，过滤DHCP分配的IP
      */
     private static java.net.InetAddress getPreferredInetAddress() {
         try {
-            // 优先获取非回环的IPv4地址
+            java.util.List<NetworkInterfaceInfo> candidates = new java.util.ArrayList<>();
             java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            
             while (interfaces.hasMoreElements()) {
                 java.net.NetworkInterface networkInterface = interfaces.nextElement();
                 if (shouldIgnoreInterface(networkInterface)) {
@@ -65,14 +85,77 @@ public class IpUtils {
                 while (addresses.hasMoreElements()) {
                     java.net.InetAddress address = addresses.nextElement();
                     if (isPreferredAddress(address)) {
-                        return address;
+                        candidates.add(new NetworkInterfaceInfo(networkInterface, address));
                     }
                 }
             }
+            
+            if (candidates.isEmpty()) {
+                return null;
+            }
+            
+            candidates.sort((a, b) -> {
+                int scoreA = calculateInterfaceScore(a.networkInterface);
+                int scoreB = calculateInterfaceScore(b.networkInterface);
+                return Integer.compare(scoreB, scoreA);
+            });
+            
+            return candidates.getFirst().address;
         } catch (Exception e) {
             log.debug("获取首选网络地址失败", e);
         }
         return null;
+    }
+    
+    private static class NetworkInterfaceInfo {
+        final java.net.NetworkInterface networkInterface;
+        final java.net.InetAddress address;
+        
+        NetworkInterfaceInfo(java.net.NetworkInterface networkInterface, java.net.InetAddress address) {
+            this.networkInterface = networkInterface;
+            this.address = address;
+        }
+    }
+
+    @SuppressWarnings("all")
+    private static int calculateInterfaceScore(java.net.NetworkInterface networkInterface) {
+        int score = 0;
+        String name = networkInterface.getName().toLowerCase();
+        
+        try {
+            if (networkInterface.getHardwareAddress() != null && networkInterface.getHardwareAddress().length > 0) {
+                score += 100;
+            }
+            
+            if (networkInterface.getMTU() == 1500) {
+                score += 50;
+            }
+            
+            if (name.matches("eth\\d+") || name.matches("ens\\d+") || name.matches("enp\\d+s\\d+")) {
+                score += 200;
+            } else if (name.matches("em\\d+")) {
+                score += 180;
+            } else if (name.startsWith("bond")) {
+                score += 150;
+            } else if (name.startsWith("wlan") || name.startsWith("wlx")) {
+                score -= 100;
+            }
+            
+            try {
+                java.lang.reflect.Method speedMethod = java.net.NetworkInterface.class.getMethod("getSpeed");
+                Long speed = (Long) speedMethod.invoke(networkInterface);
+                if (speed != null && speed > 0) {
+                    score += (int) Math.min(speed / 100000000, 100);
+                }
+            } catch (Exception e) {
+                //
+            }
+            
+        } catch (Exception e) {
+            log.debug("计算网卡评分失败: {}", name, e);
+        }
+        
+        return score;
     }
 
     /**
@@ -166,5 +249,9 @@ public class IpUtils {
                 address instanceof java.net.Inet4Address &&
                 !address.isLinkLocalAddress() &&
                 !address.isMulticastAddress();
+    }
+
+    public static void main(String[] args) throws SocketException, UnknownHostException {
+        System.out.println(getLocalHost());
     }
 }

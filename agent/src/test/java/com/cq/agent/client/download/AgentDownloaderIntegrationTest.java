@@ -30,7 +30,6 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         AgentConfig config = new AgentConfig();
-        config.setAgentApiUrl(AGENT_URL);
         this.downloader = new AgentDownloader(config);
         this.downloader.init();
 

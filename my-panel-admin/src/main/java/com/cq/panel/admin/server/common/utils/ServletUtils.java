@@ -1,18 +1,18 @@
 package com.cq.panel.admin.server.common.utils;
 
-import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.domain.text.Convert;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -22,6 +22,7 @@ import java.util.Map;
  * 
  * @author cq
  */
+@Slf4j
 public class ServletUtils
 {
     /**
@@ -33,7 +34,7 @@ public class ServletUtils
     }
 
     /**
-     * 获取String参数
+     * 获取String参数，默认值为空字符串
      */
     public static String getParameter(String name, String defaultValue)
     {
@@ -95,7 +96,7 @@ public class ServletUtils
         Map<String, String> params = new HashMap<>();
         for (Map.Entry<String, String[]> entry : getParams(request).entrySet())
         {
-            params.put(entry.getKey(), StringUtils.join(entry.getValue(), ","));
+            params.put(entry.getKey(), MyStringUtils.join(entry.getValue(), ","));
         }
         return params;
     }
@@ -147,14 +148,15 @@ public class ServletUtils
         }
         catch (IOException e)
         {
-            e.printStackTrace();
+            log.error("渲染字符串到客户端失败", e);
         }
     }
 
     /**
      * 是否是Ajax异步请求
      * 
-     * @param request
+     * @param request 请求对象
+     * @return 是否是Ajax异步请求
      */
     public static boolean isAjaxRequest(HttpServletRequest request)
     {
@@ -171,13 +173,13 @@ public class ServletUtils
         }
 
         String uri = request.getRequestURI();
-        if (StringUtils.inStringIgnoreCase(uri, ".json", ".xml"))
+        if (MyStringUtils.inStringIgnoreCase(uri, ".json", ".xml"))
         {
             return true;
         }
 
         String ajax = request.getParameter("__ajax");
-        return StringUtils.inStringIgnoreCase(ajax, "json", "xml");
+        return MyStringUtils.inStringIgnoreCase(ajax, "json", "xml");
     }
 
     /**
@@ -188,14 +190,7 @@ public class ServletUtils
      */
     public static String urlEncode(String str)
     {
-        try
-        {
-            return URLEncoder.encode(str, Constants.UTF8);
-        }
-        catch (UnsupportedEncodingException e)
-        {
-            return StringUtils.EMPTY;
-        }
+        return URLEncoder.encode(str, StandardCharsets.UTF_8);
     }
 
     /**
@@ -206,13 +201,6 @@ public class ServletUtils
      */
     public static String urlDecode(String str)
     {
-        try
-        {
-            return URLDecoder.decode(str, Constants.UTF8);
-        }
-        catch (UnsupportedEncodingException e)
-        {
-            return StringUtils.EMPTY;
-        }
+        return URLDecoder.decode(str, StandardCharsets.UTF_8);
     }
 }

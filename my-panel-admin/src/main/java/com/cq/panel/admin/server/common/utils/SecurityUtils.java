@@ -143,7 +143,7 @@ public class SecurityUtils
      */
     public static boolean hasPermi(Collection<String> authorities, String permission)
     {
-        return authorities.stream().filter(StringUtils::hasText)
+        return authorities.stream().filter(MyStringUtils::hasText)
                 .anyMatch(x -> Constants.ALL_PERMISSION.equals(x) || PatternMatchUtils.simpleMatch(x, permission));
     }
 
@@ -169,7 +169,7 @@ public class SecurityUtils
      */
     public static boolean hasRole(Collection<String> roles, String role)
     {
-        return roles.stream().filter(StringUtils::hasText)
+        return roles.stream().filter(MyStringUtils::hasText)
                 .anyMatch(x -> Constants.SUPER_ADMIN.equals(x) || PatternMatchUtils.simpleMatch(x, role));
     }
 

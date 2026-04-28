@@ -3,7 +3,7 @@ package com.cq.panel.admin.server.aspectj;
 import java.util.Objects;
 
 import com.cq.panel.admin.server.annotation.DataSource;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.datasource.DynamicDataSourceContextHolder;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -40,7 +40,7 @@ public class DataSourceAspect
     {
         DataSource dataSource = getDataSource(point);
 
-        if (StringUtils.isNotNull(dataSource))
+        if (MyStringUtils.isNotNull(dataSource))
         {
             DynamicDataSourceContextHolder.setDataSourceType(dataSource.value().name());
         }

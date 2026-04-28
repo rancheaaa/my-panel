@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysUserOnline;
 import com.cq.panel.admin.server.repository.service.ISysUserOnlineService;
 import org.springframework.stereotype.Service;
@@ -24,7 +24,7 @@ public class SysUserOnlineServiceImpl implements ISysUserOnlineService
     @Override
     public SysUserOnline selectOnlineByIpaddr(String ipaddr, LoginUser user)
     {
-        if (StringUtils.equals(ipaddr, user.getIpaddr()))
+        if (MyStringUtils.equals(ipaddr, user.getIpaddr()))
         {
             return loginUserToUserOnline(user);
         }
@@ -41,7 +41,7 @@ public class SysUserOnlineServiceImpl implements ISysUserOnlineService
     @Override
     public SysUserOnline selectOnlineByUserName(String userName, LoginUser user)
     {
-        if (StringUtils.equals(userName, user.getUsername()))
+        if (MyStringUtils.equals(userName, user.getUsername()))
         {
             return loginUserToUserOnline(user);
         }
@@ -59,7 +59,7 @@ public class SysUserOnlineServiceImpl implements ISysUserOnlineService
     @Override
     public SysUserOnline selectOnlineByInfo(String ipaddr, String userName, LoginUser user)
     {
-        if (StringUtils.equals(ipaddr, user.getIpaddr()) && StringUtils.equals(userName, user.getUsername()))
+        if (MyStringUtils.equals(ipaddr, user.getIpaddr()) && MyStringUtils.equals(userName, user.getUsername()))
         {
             return loginUserToUserOnline(user);
         }
@@ -75,7 +75,7 @@ public class SysUserOnlineServiceImpl implements ISysUserOnlineService
     @Override
     public SysUserOnline loginUserToUserOnline(LoginUser user)
     {
-        if (StringUtils.isNull(user) || StringUtils.isNull(user.getUser()))
+        if (MyStringUtils.isNull(user) || MyStringUtils.isNull(user.getUser()))
         {
             return null;
         }
@@ -87,7 +87,7 @@ public class SysUserOnlineServiceImpl implements ISysUserOnlineService
         sysUserOnline.setBrowser(user.getBrowser());
         sysUserOnline.setOs(user.getOs());
         sysUserOnline.setLoginTime(user.getLoginTime());
-        if (StringUtils.isNotNull(user.getUser().getDept()))
+        if (MyStringUtils.isNotNull(user.getUser().getDept()))
         {
             sysUserOnline.setDeptName(user.getUser().getDept().getDeptName());
         }

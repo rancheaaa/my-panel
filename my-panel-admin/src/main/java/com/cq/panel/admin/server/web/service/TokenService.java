@@ -8,14 +8,13 @@ import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.ip.AddressUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.common.utils.uuid.IdUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import eu.bitwalker.useragentutils.UserAgent;
@@ -51,8 +50,11 @@ public class TokenService
 
     private static final Long MILLIS_MINUTE_TEN = 20 * 60 * 1000L;
 
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
+
+    public TokenService(CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
 
     /**
      * 获取用户身份信息
@@ -68,7 +70,7 @@ public class TokenService
 
     public LoginUser getLoginUser(String token)
     {
-        if (StringUtils.isEmpty(token))
+        if (MyStringUtils.isEmpty(token))
         {
             return null;
         }
@@ -91,7 +93,7 @@ public class TokenService
      */
     public void setLoginUser(LoginUser loginUser)
     {
-        if (StringUtils.isNotNull(loginUser) && StringUtils.isNotEmpty(loginUser.getToken()))
+        if (MyStringUtils.isNotNull(loginUser) && MyStringUtils.isNotEmpty(loginUser.getToken()))
         {
             refreshToken(loginUser);
         }
@@ -102,7 +104,7 @@ public class TokenService
      */
     public void delLoginUser(String token)
     {
-        if (StringUtils.isNotEmpty(token))
+        if (MyStringUtils.isNotEmpty(token))
         {
             String userKey = getTokenKey(token);
             cacheService.delete(userKey);
@@ -130,8 +132,7 @@ public class TokenService
     /**
      * 验证令牌有效期，相差不足20分钟，自动刷新缓存
      *
-     * @param loginUser
-     * @return 令牌
+     * @param loginUser 登录信息
      */
     public void verifyToken(LoginUser loginUser)
     {
@@ -165,7 +166,7 @@ public class TokenService
     public void setUserAgent(LoginUser loginUser)
     {
         UserAgent userAgent = UserAgent.parseUserAgentString(ServletUtils.getRequest().getHeader("User-Agent"));
-        String ip = IpUtils.getIpAddr();
+        String ip = MyIpUtils.getIpAddr();
         loginUser.setIpaddr(ip);
         loginUser.setLoginLocation(AddressUtils.getRealAddressByIP(ip));
         loginUser.setBrowser(userAgent.getBrowser().getName());
@@ -180,10 +181,9 @@ public class TokenService
      */
     private String createToken(Map<String, Object> claims)
     {
-        String token = Jwts.builder()
+        return Jwts.builder()
                 .setClaims(claims)
                 .signWith(SignatureAlgorithm.HS512, secret).compact();
-        return token;
     }
 
     /**
@@ -215,13 +215,13 @@ public class TokenService
     /**
      * 获取请求token
      *
-     * @param request
+     * @param request 请求对象
      * @return token
      */
     public String getToken(HttpServletRequest request)
     {
         String token = request.getHeader(header);
-        if (StringUtils.isNotEmpty(token) && token.startsWith(Constants.TOKEN_PREFIX))
+        if (MyStringUtils.isNotEmpty(token) && token.startsWith(Constants.TOKEN_PREFIX))
         {
             token = token.replace(Constants.TOKEN_PREFIX, "");
         }
@@ -230,6 +230,6 @@ public class TokenService
 
     private String getTokenKey(String uuid)
     {
-        return CacheConstants.LOGIN_TOKEN_KEY + uuid;
+        return CacheConstants.LOGIN_TOKEN_KEY + ":" + uuid;
     }
 }

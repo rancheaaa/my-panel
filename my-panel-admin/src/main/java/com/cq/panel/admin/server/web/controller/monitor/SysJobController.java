@@ -19,7 +19,7 @@ import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.web.exception.job.TaskException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.quartz.CronUtils;
 import com.cq.panel.admin.server.quartz.ScheduleUtils;
@@ -104,7 +104,7 @@ public class SysJobController extends BaseController
     @PostMapping("/validateMethod")
     public Result<MethodValidationVO> validateMethod(@Validated @RequestBody MethodValidationDTO dto)
     {
-        if (StringUtils.isEmpty(dto.getParameterValues())) {
+        if (MyStringUtils.isEmpty(dto.getParameterValues())) {
             return Result.success(methodScannerService.validateMethod(dto.getMethodName()));
         } else {
             return Result.success(methodScannerService.validateMethodWithParameters(dto.getMethodName(), dto.getParameterValues()));
@@ -157,7 +157,7 @@ public class SysJobController extends BaseController
         if (job.getJobType() == null || job.getJobType() == 0 || job.getJobType() == 1) {
             String target = job.getJobType() == 1 ? job.getMethodName() : job.getInvokeTarget();
 
-            if (StringUtils.isEmpty(target)) {
+            if (MyStringUtils.isEmpty(target)) {
                 // 如果是 jobType=1, validateJob 已经校验了 methodName 不能为空
                 // 这里只是为了兼容原有逻辑的 invokeTarget 校验
                 if (job.getJobType() == null || job.getJobType() == 0) {
@@ -208,7 +208,7 @@ public class SysJobController extends BaseController
 
         if (job.getJobType() == null || job.getJobType() == 0 || job.getJobType() == 1) {
             String target = job.getJobType() == 1 ? job.getMethodName() : job.getInvokeTarget();
-            if (StringUtils.isNotEmpty(target)) {
+            if (MyStringUtils.isNotEmpty(target)) {
                 validateInvokeTarget(job.getJobName(), target);
             }
             if (job.getJobType() == 1) {
@@ -228,59 +228,59 @@ public class SysJobController extends BaseController
 
     private void validateJob(SysJobDTO dto) {
         if (dto.getJobType() == 1) {
-            if (StringUtils.isEmpty(dto.getMethodName())) {
+            if (MyStringUtils.isEmpty(dto.getMethodName())) {
                 throw new ServiceException("内置方法不能为空");
             }
-            if (StringUtils.isNotEmpty(dto.getHttpUrl())) {
+            if (MyStringUtils.isNotEmpty(dto.getHttpUrl())) {
                 throw new ServiceException("内置方法模式下，HTTP接口URL必须为空");
             }
-            if (StringUtils.isNotEmpty(dto.getScriptName())) {
+            if (MyStringUtils.isNotEmpty(dto.getScriptName())) {
                 throw new ServiceException("内置方法模式下，脚本名称必须为空");
             }
         } else if (dto.getJobType() == 2) {
-            if (StringUtils.isEmpty(dto.getHttpUrl())) {
+            if (MyStringUtils.isEmpty(dto.getHttpUrl())) {
                 throw new ServiceException("HTTP接口URL不能为空");
             }
-            if (StringUtils.isNotEmpty(dto.getMethodName())) {
+            if (MyStringUtils.isNotEmpty(dto.getMethodName())) {
                 throw new ServiceException("HTTP接口模式下，内置方法必须为空");
             }
-            if (StringUtils.isNotEmpty(dto.getScriptName())) {
+            if (MyStringUtils.isNotEmpty(dto.getScriptName())) {
                 throw new ServiceException("HTTP接口模式下，脚本名称必须为空");
             }
         } else if (dto.getJobType() == 3) {
-            if (StringUtils.isEmpty(dto.getScriptName())) {
+            if (MyStringUtils.isEmpty(dto.getScriptName())) {
                 throw new ServiceException("脚本名称不能为空");
             }
-            if (StringUtils.isEmpty(dto.getScriptType())) {
+            if (MyStringUtils.isEmpty(dto.getScriptType())) {
                 throw new ServiceException("脚本类型不能为空");
             }
-            if (StringUtils.isEmpty(dto.getScriptContent())) {
+            if (MyStringUtils.isEmpty(dto.getScriptContent())) {
                 throw new ServiceException("脚本内容不能为空");
             }
-            if (StringUtils.isNotEmpty(dto.getMethodName())) {
+            if (MyStringUtils.isNotEmpty(dto.getMethodName())) {
                 throw new ServiceException("脚本模式下，内置方法必须为空");
             }
-            if (StringUtils.isNotEmpty(dto.getHttpUrl())) {
+            if (MyStringUtils.isNotEmpty(dto.getHttpUrl())) {
                 throw new ServiceException("脚本模式下，HTTP接口URL必须为空");
             }
         }
     }
 
     private void validateInvokeTarget(String jobName, String invokeTarget) {
-        if (StringUtils.contains(invokeTarget, Constants.LOOKUP_RMI))
+        if (MyStringUtils.contains(invokeTarget, Constants.LOOKUP_RMI))
         {
             throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'rmi'调用");
         }
-        else if (StringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.LOOKUP_LDAP, Constants.LOOKUP_LDAPS }))
+        else if (MyStringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.LOOKUP_LDAP, Constants.LOOKUP_LDAPS }))
         {
             throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'ldap(s)'调用");
         }
-        else if (StringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.HTTP, Constants.HTTPS }))
+        else if (MyStringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.HTTP, Constants.HTTPS }))
         {
             // 如果是 jobType=1, 这里不允许输入 http，因为它是反射调用
             throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'http(s)'调用");
         }
-        else if (StringUtils.containsAnyIgnoreCase(invokeTarget, Constants.JOB_ERROR_STR))
+        else if (MyStringUtils.containsAnyIgnoreCase(invokeTarget, Constants.JOB_ERROR_STR))
         {
             throw new ServiceException("任务'" + jobName + "'失败，目标字符串存在违规");
         }

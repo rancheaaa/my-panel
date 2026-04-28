@@ -6,8 +6,8 @@ import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.domain.model.LoginUser;
 import com.cq.panel.admin.server.common.enums.BusinessType;
-import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.file.FileUploadUtils;
 import com.cq.panel.admin.server.common.utils.file.MimeTypeUtils;
 import com.cq.panel.admin.server.repository.service.ISysUserService;
@@ -21,6 +21,7 @@ import com.cq.panel.admin.server.web.converter.system.SysUserConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -77,11 +78,11 @@ public class SysProfileController extends BaseController
         LoginUser loginUser = getLoginUser();
         SysUser currentUser = loginUser.getUser();
         userConverter.updateEntity(currentUser, dto);
-        if (StringUtils.isNotEmpty(dto.getPhonenumber()) && !userService.checkPhoneUnique(currentUser))
+        if (MyStringUtils.isNotEmpty(dto.getPhonenumber()) && !userService.checkPhoneUnique(currentUser))
         {
             return Result.error("修改用户'" + loginUser.getUsername() + "'失败，手机号码已存在");
         }
-        if (StringUtils.isNotEmpty(dto.getEmail()) && !userService.checkEmailUnique(currentUser))
+        if (MyStringUtils.isNotEmpty(dto.getEmail()) && !userService.checkEmailUnique(currentUser))
         {
             return Result.error("修改用户'" + loginUser.getUsername() + "'失败，邮箱账号已存在");
         }
@@ -104,20 +105,21 @@ public class SysProfileController extends BaseController
     {
         LoginUser loginUser = getLoginUser();
         String userName = loginUser.getUsername();
-        String password = loginUser.getPassword();
-        if (!SecurityUtils.matchesPassword(dto.getOldPassword(), password))
+        SysUser user = loginUser.getUser();
+        if (!Md5PasswordEncoder.matches(dto.getOldPassword(), user.getPassword()))
         {
             return Result.error("修改密码失败，旧密码错误");
         }
-        if (SecurityUtils.matchesPassword(dto.getNewPassword(), password))
+        if (dto.getOldPassword().equals(dto.getNewPassword()))
         {
             return Result.error("新密码不能与旧密码相同");
         }
-        String newPassword = SecurityUtils.encryptPassword(dto.getNewPassword());
-        if (userService.resetUserPwd(userName, newPassword) > 0)
+        String newSalt = Md5PasswordEncoder.generateSalt();
+        String newPassword = BCrypt.hashpw(dto.getNewPassword(), BCrypt.gensalt());
+        if (userService.resetUserPwd(userName, newPassword, newSalt) > 0)
         {
-            // 更新缓存用户密码
-            loginUser.getUser().setPassword(newPassword);
+            user.setPassword(newPassword);
+            user.setSalt(newSalt);
             tokenService.setLoginUser(loginUser);
             return Result.success();
         }

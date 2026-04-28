@@ -22,7 +22,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.cq.panel.authlite.annotation.RequirePermission;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
@@ -112,7 +112,7 @@ public class RcConfigController extends BaseController
         }
         
         String format = exportFormat;
-        if (StringUtils.isEmpty(format)) {
+        if (MyStringUtils.isEmpty(format)) {
             format = "yml";
         }
         

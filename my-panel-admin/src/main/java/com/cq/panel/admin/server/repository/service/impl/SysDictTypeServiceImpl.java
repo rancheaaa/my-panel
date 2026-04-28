@@ -5,13 +5,11 @@ import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.repository.domain.SysDictData;
 import com.cq.panel.admin.server.repository.domain.SysDictType;
 import com.cq.panel.admin.server.web.exception.ServiceException;
-import com.cq.panel.admin.server.common.utils.DictUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.mapper.SysDictDataMapper;
 import com.cq.panel.admin.server.repository.mapper.SysDictTypeMapper;
 import com.cq.panel.admin.server.repository.service.ISysDictTypeService;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheConfig;
@@ -32,14 +30,17 @@ import java.util.stream.Collectors;
 @CacheConfig(cacheNames = CacheConstants.SYS_DICT_KEY)
 public class SysDictTypeServiceImpl implements ISysDictTypeService
 {
-    @Autowired
-    private SysDictTypeMapper dictTypeMapper;
+    private final SysDictTypeMapper dictTypeMapper;
 
-    @Autowired
-    private SysDictDataMapper dictDataMapper;
+    private final SysDictDataMapper dictDataMapper;
 
-    @Autowired
-    private CacheManager cacheManager;
+    private final CacheManager cacheManager;
+
+    public SysDictTypeServiceImpl(SysDictTypeMapper dictTypeMapper, SysDictDataMapper dictDataMapper, CacheManager cacheManager) {
+        this.dictTypeMapper = dictTypeMapper;
+        this.dictDataMapper = dictDataMapper;
+        this.cacheManager = cacheManager;
+    }
 
     /**
      * 项目启动时，初始化字典到缓存
@@ -83,10 +84,10 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     @Cacheable(key = "#dictType")
     public List<SysDictData> selectDictDataByType(String dictType)
     {
-        List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(dictType);
-        if (StringUtils.isNotEmpty(dictDatas))
+        List<SysDictData> dictData = dictDataMapper.selectDictDataByType(dictType);
+        if (MyStringUtils.isNotEmpty(dictData))
         {
-            return dictDatas;
+            return dictData;
         }
         return null;
     }
@@ -236,9 +237,9 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     @Override
     public boolean checkDictTypeUnique(SysDictType dict)
     {
-        Long dictId = StringUtils.isNull(dict.getDictId()) ? -1L : dict.getDictId();
+        long dictId = MyStringUtils.isNull(dict.getDictId()) ? -1L : dict.getDictId();
         SysDictType dictType = dictTypeMapper.checkDictTypeUnique(dict.getDictType());
-        if (StringUtils.isNotNull(dictType) && dictType.getDictId().longValue() != dictId.longValue())
+        if (MyStringUtils.isNotNull(dictType) && dictType.getDictId() != dictId)
         {
             return UserConstants.NOT_UNIQUE;
         }

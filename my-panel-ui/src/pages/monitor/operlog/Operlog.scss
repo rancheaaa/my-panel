@@ -1,0 +1,160 @@
+/* 操作日志页面样式 */
+.operlog-page-container {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  width: 100%;
+
+  .search-card {
+    border-radius: 12px;
+    flex-shrink: 0;
+    height: 180px;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+
+    :global {
+      .ant-card-body {
+        padding: 24px 24px 0 24px;
+        height: 100%;
+        overflow: hidden;
+      }
+      .ant-form-item {
+        margin-bottom: 24px;
+      }
+    }
+  }
+
+  .table-card {
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+    min-height: 0;
+
+    :global {
+      .ant-card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 24px 24px 0 24px;
+        overflow: hidden;
+      }
+
+      .ant-table-cell {
+        padding: 8px 16px !important;
+      }
+    }
+
+    .table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+      flex-shrink: 0;
+    }
+
+    /* 表格容器 - 唯一可纵向滚动的容器 */
+    .operlog-table-container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      
+      /* 固定定位的分页栏 */
+      .fixed-pagination-bar {
+        flex-shrink: 0;
+        background: #fafafa;
+        border-top: 1px solid #f0f0f0;
+        padding: 12px 16px;
+        display: flex;
+        justify-content: flex-end;
+      }
+    }
+
+    /* 固定定位的分页栏 - 像Copyright一样固定不动 */
+    .fixed-pagination-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 12px 0 0 0;
+      background: #fff;
+      border-top: 1px solid #f0f0f0;
+      
+      /* 分页组件样式 */
+      .ant-pagination {
+        margin: 0;
+        
+        .ant-pagination-total-text {
+          color: #666;
+          font-size: 13px;
+        }
+        
+        .ant-pagination-item {
+          border-radius: 6px;
+          transition: all 0.2s ease;
+          
+          &:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+            transform: translateY(-1px);
+          }
+          
+          &-active {
+            background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+            border-color: transparent;
+            
+            a {
+              color: #fff;
+              font-weight: 500;
+            }
+          }
+        }
+        
+        .ant-pagination-prev,
+        .ant-pagination-next {
+          border-radius: 6px;
+          transition: all 0.2s ease;
+          
+          &:hover:not(.ant-pagination-disabled) {
+            border-color: #1890ff;
+            color: #1890ff;
+            transform: translateY(-1px);
+          }
+        }
+        
+        .ant-pagination-options {
+          .ant-pagination-options-quick-jumper {
+            margin-left: 8px;
+            
+            input {
+              border-radius: 6px;
+              width: 48px;
+              text-align: center;
+              transition: all 0.2s ease;
+              
+              &:focus {
+                border-color: #1890ff;
+                box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.15);
+              }
+            }
+          }
+          
+          .ant-select-selector {
+            border-radius: 6px !important;
+          }
+        }
+      }
+    }
+  }
+}

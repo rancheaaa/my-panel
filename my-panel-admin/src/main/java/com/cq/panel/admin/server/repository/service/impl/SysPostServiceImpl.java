@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.repository.service.impl;
 
 import com.cq.panel.admin.server.common.constant.UserConstants;
 import com.cq.panel.admin.server.web.exception.ServiceException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.domain.SysPost;
 import com.cq.panel.admin.server.repository.mapper.SysPostMapper;
 import com.cq.panel.admin.server.repository.mapper.SysUserPostMapper;
@@ -81,9 +81,9 @@ public class SysPostServiceImpl implements ISysPostService
     @Override
     public boolean checkPostNameUnique(SysPost post)
     {
-        Long postId = StringUtils.isNull(post.getPostId()) ? -1L : post.getPostId();
+        Long postId = MyStringUtils.isNull(post.getPostId()) ? -1L : post.getPostId();
         SysPost info = postMapper.checkPostNameUnique(post.getPostName());
-        if (StringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue())
         {
             return UserConstants.NOT_UNIQUE;
         }
@@ -99,9 +99,9 @@ public class SysPostServiceImpl implements ISysPostService
     @Override
     public boolean checkPostCodeUnique(SysPost post)
     {
-        Long postId = StringUtils.isNull(post.getPostId()) ? -1L : post.getPostId();
+        Long postId = MyStringUtils.isNull(post.getPostId()) ? -1L : post.getPostId();
         SysPost info = postMapper.checkPostCodeUnique(post.getPostCode());
-        if (StringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue())
         {
             return UserConstants.NOT_UNIQUE;
         }

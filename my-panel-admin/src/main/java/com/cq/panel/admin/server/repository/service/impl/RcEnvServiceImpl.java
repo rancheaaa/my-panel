@@ -1,14 +1,14 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.cq.panel.admin.server.repository.mapper.RcEnvMapper;
 import com.cq.panel.admin.server.repository.domain.RcEnv;
 import com.cq.panel.admin.server.repository.service.IRcEnvService;
 import com.cq.panel.admin.server.common.constant.UserConstants;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 
 /**
  * 环境管理Service业务层处理
@@ -54,7 +54,7 @@ public class RcEnvServiceImpl implements IRcEnvService
     @Override
     public int insertRcEnv(RcEnv rcEnv)
     {
-        rcEnv.setCreateTime(DateUtils.getNowDate());
+        rcEnv.setCreateTime(MyDateUtils.getNowDate());
         return rcEnvMapper.insertRcEnv(rcEnv);
     }
 
@@ -67,7 +67,7 @@ public class RcEnvServiceImpl implements IRcEnvService
     @Override
     public int updateRcEnv(RcEnv rcEnv)
     {
-        rcEnv.setUpdateTime(DateUtils.getNowDate());
+        rcEnv.setUpdateTime(MyDateUtils.getNowDate());
         return rcEnvMapper.updateRcEnv(rcEnv);
     }
 
@@ -104,9 +104,9 @@ public class RcEnvServiceImpl implements IRcEnvService
     @Override
     public boolean checkEnvNameUnique(RcEnv rcEnv)
     {
-        Long id = StringUtils.isNull(rcEnv.getId()) ? -1L : rcEnv.getId();
+        Long id = MyStringUtils.isNull(rcEnv.getId()) ? -1L : rcEnv.getId();
         RcEnv info = rcEnvMapper.checkEnvNameUnique(rcEnv.getEnvName());
-        if (StringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
+        if (MyStringUtils.isNotNull(info) && info.getId().longValue() != id.longValue())
         {
             return UserConstants.NOT_UNIQUE;
         }

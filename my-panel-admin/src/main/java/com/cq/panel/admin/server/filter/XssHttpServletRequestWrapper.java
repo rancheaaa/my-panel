@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.filter;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.html.EscapeUtil;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * XSS过滤处理
@@ -20,7 +21,7 @@ import java.io.IOException;
 public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
 {
     /**
-     * @param request
+     * @param request HttpServletRequest
      */
     public XssHttpServletRequestWrapper(HttpServletRequest request)
     {
@@ -55,15 +56,15 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
         }
 
         // 为空，直接返回
-        String json = IOUtils.toString(super.getInputStream(), "utf-8");
-        if (StringUtils.isEmpty(json))
+        String json = IOUtils.toString(super.getInputStream(), StandardCharsets.UTF_8);
+        if (MyStringUtils.isEmpty(json))
         {
             return super.getInputStream();
         }
 
         // xss过滤
         json = EscapeUtil.clean(json).trim();
-        byte[] jsonBytes = json.getBytes("utf-8");
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         final ByteArrayInputStream bis = new ByteArrayInputStream(jsonBytes);
         return new ServletInputStream()
         {
@@ -105,6 +106,6 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
     public boolean isJsonRequest()
     {
         String header = super.getHeader(HttpHeaders.CONTENT_TYPE);
-        return StringUtils.startsWithIgnoreCase(header, MediaType.APPLICATION_JSON_VALUE);
+        return MyStringUtils.startsWithIgnoreCase(header, MediaType.APPLICATION_JSON_VALUE);
     }
 }

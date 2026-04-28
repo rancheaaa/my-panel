@@ -1,24 +1,32 @@
 package com.cq.panel.admin.server.filter;
 
-import com.alibaba.fastjson2.filter.SimplePropertyPreFilter;
+import lombok.Getter;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * 排除JSON敏感属性
+ * 排除JSON敏感属性（Jackson版本）
  * 
  * @author cq
  */
-public class PropertyPreExcludeFilter extends SimplePropertyPreFilter
+@Getter
+public class PropertyPreExcludeFilter
 {
+    private final Set<String> excludes = new HashSet<>();
+
     public PropertyPreExcludeFilter()
     {
     }
 
     public PropertyPreExcludeFilter addExcludes(String... filters)
     {
-        for (int i = 0; i < filters.length; i++)
-        {
-            this.getExcludes().add(filters[i]);
-        }
+        Collections.addAll(this.excludes, filters);
         return this;
+    }
+
+    public boolean shouldExclude(String property)
+    {
+        return excludes.contains(property);
     }
 }

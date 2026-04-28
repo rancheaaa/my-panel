@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, Col, Dropdown, Form, Input, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tooltip, message } from 'antd';
+import { Button, Card, Col, Dropdown, Form, Input, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tooltip, message, Pagination } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import { listAccessToken, getAccessToken, addAccessToken, updateAccessToken, delAccessToken, exportAccessToken, changeAccessTokenStatus } from '../../../api/rc/accessToken';
+import './AccessToken.scss';
 
 const { Option } = Select;
 
@@ -210,8 +211,8 @@ const AccessToken = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <div className="access-token-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
@@ -237,8 +238,8 @@ const AccessToken = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
-        <div className="table-toolbar" style={{ marginBottom: 16 }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar">
           <Space size="middle">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
             <Button 
@@ -272,35 +273,39 @@ const AccessToken = () => {
           </Space>
         </div>
 
-        <Table
-          rowSelection={{
-            selectedRowKeys,
-            onChange: (keys) => setSelectedRowKeys(keys),
-          }}
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          loading={loading}
-          rowKey="id"
-          size={tableSize}
-          scroll={{ x: 1500 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
+        <div className="access-token-table-container">
+          <Table
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+            }}
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            loading={loading}
+            rowKey="id"
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

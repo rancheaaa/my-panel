@@ -3,6 +3,7 @@ package com.cq.panel.admin.server.repository.domain;
 import com.cq.panel.admin.server.annotation.Excel;
 import com.cq.panel.admin.server.annotation.Excels;
 import com.cq.panel.admin.server.common.xss.Xss;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,8 +20,7 @@ import lombok.EqualsAndHashCode;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class SysUser extends BaseEntity
-{
+public class SysUser extends BaseEntity {
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -66,6 +66,9 @@ public class SysUser extends BaseEntity
     /** 密码 */
     private String password;
 
+    /** 盐值 */
+    private String salt;
+
     /** 帐号状态（0正常 1停用） */
     @Excel(name = "帐号状态", readConverterExp = "0=正常,1=停用")
     private String status;
@@ -83,8 +86,8 @@ public class SysUser extends BaseEntity
 
     /** 部门对象 */
     @Excels({
-        @Excel(name = "部门名称", targetAttr = "deptName", type = Excel.Type.EXPORT),
-        @Excel(name = "部门负责人", targetAttr = "leader", type = Excel.Type.EXPORT)
+            @Excel(name = "部门名称", targetAttr = "deptName", type = Excel.Type.EXPORT),
+            @Excel(name = "部门负责人", targetAttr = "leader", type = Excel.Type.EXPORT)
     })
     private SysDept dept;
 
@@ -102,14 +105,17 @@ public class SysUser extends BaseEntity
 
     /**
      * 是否为超级管理员
+     * 
      * @return 是否为超级管理员
      */
+    @JsonIgnore
     public boolean isAdmin() {
         return isAdmin(this.userId);
     }
 
     /**
      * 判断用户ID是否为超级管理员
+     * 
      * @param userId 用户ID
      * @return 结果
      */
@@ -119,6 +125,7 @@ public class SysUser extends BaseEntity
 
     /**
      * 带用户ID的构造器
+     * 
      * @param userId 用户ID
      */
     public SysUser(Long userId) {

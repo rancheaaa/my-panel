@@ -1,56 +1,3 @@
-CREATE TABLE IF NOT EXISTS `gen_table`
-(
-    `table_id`          bigint(20) NOT NULL AUTO_INCREMENT COMMENT '编号',
-    `table_name`        varchar(200)  DEFAULT '' COMMENT '表名称',
-    `table_comment`     varchar(500)  DEFAULT '' COMMENT '表描述',
-    `sub_table_name`    varchar(64)   DEFAULT NULL COMMENT '关联子表的表名',
-    `sub_table_fk_name` varchar(64)   DEFAULT NULL COMMENT '子表关联的外键名',
-    `class_name`        varchar(100)  DEFAULT '' COMMENT '实体类名称',
-    `tpl_category`      varchar(200)  DEFAULT 'crud' COMMENT '使用的模板（crud单表操作 tree树表操作）',
-    `tpl_web_type`      varchar(30)   DEFAULT '' COMMENT '前端模板类型（element-ui模版 element-plus模版）',
-    `package_name`      varchar(100)  DEFAULT NULL COMMENT '生成包路径',
-    `module_name`       varchar(30)   DEFAULT NULL COMMENT '生成模块名',
-    `business_name`     varchar(30)   DEFAULT NULL COMMENT '生成业务名',
-    `function_name`     varchar(50)   DEFAULT NULL COMMENT '生成功能名',
-    `function_author`   varchar(50)   DEFAULT NULL COMMENT '生成功能作者',
-    `gen_type`          char(1)       DEFAULT '0' COMMENT '生成代码方式（0zip压缩包 1自定义路径）',
-    `gen_path`          varchar(200)  DEFAULT '/' COMMENT '生成路径（不填默认项目路径）',
-    `options`           varchar(1000) DEFAULT NULL COMMENT '其它生成选项',
-    `create_by`         varchar(64)   DEFAULT '' COMMENT '创建者',
-    `create_time`       datetime      DEFAULT NULL COMMENT '创建时间',
-    `update_by`         varchar(64)   DEFAULT '' COMMENT '更新者',
-    `update_time`       datetime      DEFAULT NULL COMMENT '更新时间',
-    `remark`            varchar(500)  DEFAULT NULL COMMENT '备注',
-    PRIMARY KEY (`table_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码生成业务表';
-
-CREATE TABLE IF NOT EXISTS `gen_table_column`
-(
-    `column_id`      bigint(20) NOT NULL AUTO_INCREMENT COMMENT '编号',
-    `table_id`       bigint(20) DEFAULT NULL COMMENT '归属表编号',
-    `column_name`    varchar(200) DEFAULT NULL COMMENT '列名称',
-    `column_comment` varchar(500) DEFAULT NULL COMMENT '列描述',
-    `column_type`    varchar(100) DEFAULT NULL COMMENT '列类型',
-    `java_type`      varchar(500) DEFAULT NULL COMMENT 'JAVA类型',
-    `java_field`     varchar(200) DEFAULT NULL COMMENT 'JAVA字段名',
-    `is_pk`          char(1)      DEFAULT NULL COMMENT '是否主键（1是）',
-    `is_increment`   char(1)      DEFAULT NULL COMMENT '是否自增（1是）',
-    `is_required`    char(1)      DEFAULT NULL COMMENT '是否必填（1是）',
-    `is_insert`      char(1)      DEFAULT NULL COMMENT '是否为插入字段（1是）',
-    `is_edit`        char(1)      DEFAULT NULL COMMENT '是否编辑字段（1是）',
-    `is_list`        char(1)      DEFAULT NULL COMMENT '是否列表字段（1是）',
-    `is_query`       char(1)      DEFAULT NULL COMMENT '是否查询字段（1是）',
-    `query_type`     varchar(200) DEFAULT 'EQ' COMMENT '查询方式（等于、不等于、大于、小于、范围）',
-    `html_type`      varchar(200) DEFAULT NULL COMMENT '显示类型（文本框、文本域、下拉框、复选框、单选框、日期控件）',
-    `dict_type`      varchar(200) DEFAULT '' COMMENT '字典类型',
-    `sort`           int(11) DEFAULT NULL COMMENT '排序',
-    `create_by`      varchar(64)  DEFAULT '' COMMENT '创建者',
-    `create_time`    datetime     DEFAULT NULL COMMENT '创建时间',
-    `update_by`      varchar(64)  DEFAULT '' COMMENT '更新者',
-    `update_time`    datetime     DEFAULT NULL COMMENT '更新时间',
-    PRIMARY KEY (`column_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码生成业务表字段';
-
 CREATE TABLE IF NOT EXISTS `sys_config`
 (
     `config_id`    int(5) NOT NULL AUTO_INCREMENT COMMENT '参数主键',
@@ -311,6 +258,7 @@ CREATE TABLE IF NOT EXISTS `sys_user`
     `sex`         char(1)      DEFAULT '0' COMMENT '用户性别（0男 1女 2未知）',
     `avatar`      varchar(100) DEFAULT '' COMMENT '头像地址',
     `password`    varchar(100) DEFAULT '' COMMENT '密码',
+    `salt`        varchar(50) NOT NULL DEFAULT '1234567890123456' COMMENT '盐值',
     `status`      char(1)      DEFAULT '0' COMMENT '帐号状态（0正常 1停用）',
     `del_flag`    char(1)      DEFAULT '0' COMMENT '删除标志（0代表存在 2代表删除）',
     `login_ip`    varchar(128) DEFAULT '' COMMENT '最后登录IP',
@@ -444,6 +392,38 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
     KEY `idx_app_id` (`app_id`),
     KEY `idx_node_status` (`node_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent客户端注册表';
+
+-- ----------------------------
+-- 5.2 Agent命令执行历史表
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `agent_command_history` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+    `agent_id` varchar(64) NOT NULL COMMENT 'Agent节点ID',
+    `agent_name` varchar(128) DEFAULT NULL COMMENT 'Agent节点名称',
+    `agent_ip` varchar(64) DEFAULT NULL COMMENT 'Agent IP地址',
+    `agent_port` int DEFAULT NULL COMMENT 'Agent端口',
+    `command` text NOT NULL COMMENT '执行的命令内容',
+    `command_timeout` int DEFAULT NULL COMMENT '命令超时时间（秒）',
+    `command_status` tinyint NOT NULL DEFAULT '0' COMMENT '命令执行状态：0-成功 1-失败 2-超时 3-未知',
+    `exit_code` int DEFAULT NULL COMMENT '进程退出码',
+    `output` longtext COMMENT '标准输出内容',
+    `error` longtext COMMENT '错误输出内容',
+    `execute_time` bigint(20) DEFAULT NULL COMMENT '执行耗时（毫秒）',
+    `submit_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '命令提交时间',
+    `start_time` datetime DEFAULT NULL COMMENT '命令开始执行时间',
+    `end_time` datetime DEFAULT NULL COMMENT '命令完成时间',
+    `user_id` bigint(20) DEFAULT NULL COMMENT '操作用户ID',
+    `user_name` varchar(64) DEFAULT NULL COMMENT '操作用户名',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_agent_command_history_agent_id` (`agent_id`),
+    KEY `idx_agent_command_history_agent_name` (`agent_name`),
+    KEY `idx_agent_command_history_command_status` (`command_status`),
+    KEY `idx_agent_command_history_user_id` (`user_id`),
+    KEY `idx_agent_command_history_submit_time` (`submit_time`),
+    KEY `idx_agent_command_history_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent命令执行历史表';
 
 -- ----------------------------
 -- 6. 架构编排页面表结构
@@ -640,3 +620,69 @@ CREATE TABLE IF NOT EXISTS `arch_diagram_version_data` (
     KEY `idx_version_id9` (`version_id`),
     KEY `idx_data_type9` (`data_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='架构图版本数据表';
+
+-- ----------------------------
+-- 7. 服务监控大屏 - 历史指标与告警
+-- ----------------------------
+
+CREATE TABLE IF NOT EXISTS `monitor_metric_sample` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `metric_category` varchar(64) NOT NULL COMMENT '指标分类：heap/gc/thread/cpu/system_load/db_pool',
+    `metric_name` varchar(128) NOT NULL COMMENT '指标名称',
+    `metric_scope` varchar(128) DEFAULT '' COMMENT '指标作用域：young/old/eden/survivor/poolName/gcName等',
+    `metric_value` double NOT NULL COMMENT '指标值',
+    `metric_unit` varchar(32) DEFAULT '' COMMENT '指标单位：bytes/ms/count/percent等',
+    `tag_json` varchar(1000) DEFAULT NULL COMMENT '扩展标签JSON',
+    `service_id` varchar(64) DEFAULT '' COMMENT '服务实例ID',
+    `service_ip_port` varchar(128) DEFAULT '' COMMENT '服务IP和端口，格式：IP:PORT',
+    `sample_time` datetime NOT NULL COMMENT '采样时间',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_mms_time` (`sample_time`),
+    KEY `idx_mms_category_name_time` (`metric_category`, `metric_name`, `sample_time`),
+    KEY `idx_mms_scope_time` (`metric_scope`, `sample_time`),
+    KEY `idx_mms_service` (`service_id`, `sample_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控指标采样明细';
+
+CREATE TABLE IF NOT EXISTS `monitor_alert_rule` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '规则ID',
+    `rule_name` varchar(128) NOT NULL COMMENT '规则名称',
+    `metric_category` varchar(64) NOT NULL COMMENT '指标分类',
+    `metric_name` varchar(128) NOT NULL COMMENT '指标名称',
+    `metric_scope` varchar(128) DEFAULT '' COMMENT '指标作用域',
+    `operator` varchar(16) NOT NULL COMMENT '比较符：GT/GTE/LT/LTE/EQ/NE',
+    `threshold_value` double NOT NULL COMMENT '阈值',
+    `duration_seconds` int(11) NOT NULL DEFAULT 0 COMMENT '持续时长（秒）',
+    `severity` varchar(16) NOT NULL DEFAULT 'warning' COMMENT '级别：warning/critical',
+    `enabled` char(1) NOT NULL DEFAULT '1' COMMENT '启用状态（1启用 0禁用）',
+    `description` varchar(500) DEFAULT '' COMMENT '规则描述',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建者',
+    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新者',
+    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_mar_enabled` (`enabled`),
+    KEY `idx_mar_metric` (`metric_category`, `metric_name`, `metric_scope`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控告警规则';
+
+CREATE TABLE IF NOT EXISTS `monitor_alert_event` (
+    `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '事件ID',
+    `rule_id` bigint(20) NOT NULL COMMENT '规则ID',
+    `rule_name` varchar(128) NOT NULL COMMENT '规则名称',
+    `metric_category` varchar(64) NOT NULL COMMENT '指标分类',
+    `metric_name` varchar(128) NOT NULL COMMENT '指标名称',
+    `metric_scope` varchar(128) DEFAULT '' COMMENT '指标作用域',
+    `severity` varchar(16) NOT NULL COMMENT '告警级别',
+    `observed_value` double NOT NULL COMMENT '触发时指标值',
+    `threshold_value` double NOT NULL COMMENT '触发阈值',
+    `trigger_time` datetime NOT NULL COMMENT '触发时间',
+    `status` varchar(16) NOT NULL DEFAULT 'open' COMMENT '状态：open/closed',
+    `detail` varchar(1000) DEFAULT '' COMMENT '告警详情',
+    PRIMARY KEY (`id`),
+    KEY `idx_mae_trigger_time` (`trigger_time`),
+    KEY `idx_mae_metric` (`metric_category`, `metric_name`, `metric_scope`),
+    KEY `idx_mae_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控告警事件';
+
+-- 分区建议（MySQL生产环境可启用，H2无需启用）：
+-- ALTER TABLE monitor_metric_sample PARTITION BY RANGE (TO_DAYS(sample_time)) (...)

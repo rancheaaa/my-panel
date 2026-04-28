@@ -106,7 +106,7 @@ public class ArchDiagramVersionController extends BaseController {
             boolean result = archDiagramVersionService.deleteVersion(versionId);
             if (result) {
                 log.info("版本删除成功: versionId={}", versionId);
-                return Result.success("版本删除成功");
+                return Result.success("版本删除成功", null);
             } else {
                 return Result.error("版本删除失败");
             }

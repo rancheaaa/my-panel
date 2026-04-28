@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.converter.monitor;
 
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.repository.domain.SysJobLog;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobLogQueryDTO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysJobLogVO;
@@ -34,7 +34,7 @@ public interface SysJobLogConverter {
         if (date == null) {
             return null;
         }
-        return DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, date);
+        return MyDateUtils.parseDateToStr(MyDateUtils.YYYY_MM_DD_HH_MM_SS, date);
     }
 
     @Named("parseDateTime")
@@ -43,7 +43,7 @@ public interface SysJobLogConverter {
             return null;
         }
         try {
-            Date date = DateUtils.parseDate(dateStr);
+            Date date = MyDateUtils.parseDate(dateStr);
             if (date == null) {
                 throw new RuntimeException("日期解析失败: " + dateStr);
             }

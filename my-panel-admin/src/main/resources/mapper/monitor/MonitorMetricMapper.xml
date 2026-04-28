@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.MonitorMetricMapper">
+
+    <resultMap id="MonitorMetricSampleResult" type="com.cq.panel.admin.server.repository.domain.monitor.MonitorMetricSample">
+        <id property="id" column="id"/>
+        <result property="metricCategory" column="metric_category"/>
+        <result property="metricName" column="metric_name"/>
+        <result property="metricScope" column="metric_scope"/>
+        <result property="metricValue" column="metric_value"/>
+        <result property="metricUnit" column="metric_unit"/>
+        <result property="tagJson" column="tag_json"/>
+        <result property="serviceId" column="service_id"/>
+        <result property="serviceIpPort" column="service_ip_port"/>
+        <result property="sampleTime" column="sample_time"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        insert into monitor_metric_sample
+        (metric_category, metric_name, metric_scope, metric_value, metric_unit, tag_json, service_id, service_ip_port, sample_time, create_time)
+        values
+        <foreach collection="samples" item="item" separator=",">
+            (#{item.metricCategory}, #{item.metricName}, #{item.metricScope}, #{item.metricValue},
+            #{item.metricUnit}, #{item.tagJson}, #{item.serviceId}, #{item.serviceIpPort}, #{item.sampleTime}, now())
+        </foreach>
+    </insert>
+
+    <select id="selectByTimeRange" resultMap="MonitorMetricSampleResult">
+        select id, metric_category, metric_name, metric_scope, metric_value, metric_unit, tag_json,
+               service_id, service_ip_port, sample_time, create_time
+        from monitor_metric_sample
+        where metric_category = #{category}
+        and sample_time <![CDATA[>=]]> #{beginTime}
+        and sample_time <![CDATA[<=]]> #{endTime}
+        <if test="serviceId != null and serviceId != ''">
+            and service_id = #{serviceId}
+        </if>
+        <if test="serviceIpPort != null and serviceIpPort != ''">
+            and service_ip_port = #{serviceIpPort}
+        </if>
+        <if test="metricNames != null and metricNames.size() > 0">
+            and metric_name in
+            <foreach collection="metricNames" item="metricName" open="(" close=")" separator=",">
+                #{metricName}
+            </foreach>
+        </if>
+        order by sample_time asc
+        <if test="limit != null and limit > 0">
+            limit #{limit}
+        </if>
+    </select>
+
+    <select id="selectLatestByCategory" resultMap="MonitorMetricSampleResult">
+        select id, metric_category, metric_name, metric_scope, metric_value, metric_unit, tag_json,
+               service_id, service_ip_port, sample_time, create_time
+        from monitor_metric_sample
+        where metric_category = #{category}
+          and sample_time = (
+              select max(sample_time) from monitor_metric_sample
+              where metric_category = #{category}
+              <if test="serviceId != null and serviceId != ''">
+                  and service_id = #{serviceId}
+                  <if test="serviceIpPort != null and serviceIpPort != ''">
+                      and service_ip_port = #{serviceIpPort}
+                  </if>
+              </if>
+          )
+        <if test="serviceId != null and serviceId != ''">
+            and service_id = #{serviceId}
+            <if test="serviceIpPort != null and serviceIpPort != ''">
+                and service_ip_port = #{serviceIpPort}
+            </if>
+        </if>
+    </select>
+
+    <select id="selectDistinctServiceInstances" resultType="java.util.Map">
+        select distinct service_id as serviceId, service_ip_port as serviceIpPort
+        from monitor_metric_sample
+        where service_id is not null and service_id != ''
+        order by service_id
+    </select>
+
+    <delete id="deleteBefore">
+        delete from monitor_metric_sample where sample_time <![CDATA[<]]> #{cutoffTime}
+    </delete>
+</mapper>

@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.web.controller.system;
 
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.web.domain.dto.system.RegisterDTO;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
 import com.cq.panel.admin.server.web.service.SysRegisterService;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
@@ -40,7 +40,7 @@ public class SysRegisterController extends BaseController
             return Result.error("当前系统没有开启注册功能！");
         }
         String msg = registerService.register(registerDTO);
-        if (StringUtils.isNotEmpty(msg))
+        if (MyStringUtils.isNotEmpty(msg))
         {
             return Result.error(msg);
         }

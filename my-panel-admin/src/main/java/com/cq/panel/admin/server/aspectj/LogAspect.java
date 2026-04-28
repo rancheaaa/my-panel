@@ -10,8 +10,8 @@ import com.cq.panel.admin.server.common.enums.HttpMethod;
 import com.cq.panel.admin.server.filter.PropertyPreExcludeFilter;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
 import com.cq.panel.admin.server.common.utils.ServletUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.repository.domain.SysOperLog;
@@ -30,7 +30,7 @@ import org.springframework.core.NamedThreadLocal;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.multipart.MultipartFile;
-import com.alibaba.fastjson2.JSON;
+import com.cq.panel.admin.server.common.utils.JsonUtils;
 
 /**
  * 操作日志记录处理
@@ -47,7 +47,7 @@ public class LogAspect
     public static final String[] EXCLUDE_PROPERTIES = { "password", "oldPassword", "newPassword", "confirmPassword" };
 
     /** 计算操作消耗时间 */
-    private static final ThreadLocal<Long> TIME_THREADLOCAL = new NamedThreadLocal<Long>("Cost Time");
+    private static final ThreadLocal<Long> TIME_THREADLOCAL = new NamedThreadLocal<>("Cost Time");
 
     /**
      * 处理请求前执行
@@ -95,12 +95,12 @@ public class LogAspect
             SysOperLog operLog = new SysOperLog();
             operLog.setStatus(BusinessStatus.SUCCESS.ordinal());
             // 请求的地址
-            String ip = IpUtils.getIpAddr();
+            String ip = MyIpUtils.getIpAddr();
             operLog.setOperIp(ip);
-            operLog.setOperUrl(StringUtils.substring(ServletUtils.getRequest().getRequestURI(), 0, 255));
+            operLog.setOperUrl(MyStringUtils.substring(ServletUtils.getRequest().getRequestURI(), 0, 255));
             operLog.setOperName(loginUser.getUsername());
             SysUser currentUser = loginUser.getUser();
-            if (StringUtils.isNotNull(currentUser) && StringUtils.isNotNull(currentUser.getDept()))
+            if (MyStringUtils.isNotNull(currentUser) && MyStringUtils.isNotNull(currentUser.getDept()))
             {
                 operLog.setDeptName(currentUser.getDept().getDeptName());
             }
@@ -108,7 +108,7 @@ public class LogAspect
             if (e != null)
             {
                 operLog.setStatus(BusinessStatus.FAIL.ordinal());
-                operLog.setErrorMsg(StringUtils.substring(e.getMessage(), 0, 2000));
+                operLog.setErrorMsg(MyStringUtils.substring(e.getMessage(), 0, 2000));
             }
             // 设置方法名称
             String className = joinPoint.getTarget().getClass().getName();
@@ -139,10 +139,8 @@ public class LogAspect
      * 
      * @param log 日志
      * @param operLog 操作日志
-     * @throws Exception 异常
      */
-    public void getControllerMethodDescription(JoinPoint joinPoint, Log log, SysOperLog operLog, Object jsonResult) throws Exception
-    {
+    public void getControllerMethodDescription(JoinPoint joinPoint, Log log, SysOperLog operLog, Object jsonResult) {
         // 设置action动作
         operLog.setBusinessType(log.businessType().ordinal());
         // 设置标题
@@ -156,9 +154,9 @@ public class LogAspect
             setRequestValue(joinPoint, operLog, log.excludeParamNames());
         }
         // 是否需要保存response，参数和值
-        if (log.isSaveResponseData() && StringUtils.isNotNull(jsonResult))
+        if (log.isSaveResponseData() && MyStringUtils.isNotNull(jsonResult))
         {
-            operLog.setJsonResult(StringUtils.substring(JSON.toJSONString(jsonResult), 0, 2000));
+            operLog.setJsonResult(MyStringUtils.substring(JsonUtils.toJSONString(jsonResult), 0, 2000));
         }
     }
 
@@ -166,21 +164,19 @@ public class LogAspect
      * 获取请求的参数，放到log中
      * 
      * @param operLog 操作日志
-     * @throws Exception 异常
      */
-    private void setRequestValue(JoinPoint joinPoint, SysOperLog operLog, String[] excludeParamNames) throws Exception
-    {
+    private void setRequestValue(JoinPoint joinPoint, SysOperLog operLog, String[] excludeParamNames) {
         Map<?, ?> paramsMap = ServletUtils.getParamMap(ServletUtils.getRequest());
         String requestMethod = operLog.getRequestMethod();
-        if (StringUtils.isEmpty(paramsMap)
+        if (MyStringUtils.isEmpty(paramsMap)
                 && (HttpMethod.PUT.name().equals(requestMethod) || HttpMethod.POST.name().equals(requestMethod)))
         {
             String params = argsArrayToString(joinPoint.getArgs(), excludeParamNames);
-            operLog.setOperParam(StringUtils.substring(params, 0, 2000));
+            operLog.setOperParam(MyStringUtils.substring(params, 0, 2000));
         }
         else
         {
-            operLog.setOperParam(StringUtils.substring(JSON.toJSONString(paramsMap, excludePropertyPreFilter(excludeParamNames)), 0, 2000));
+            operLog.setOperParam(MyStringUtils.substring(JsonUtils.toJSONString(paramsMap, excludePropertyPreFilter(excludeParamNames)), 0, 2000));
         }
     }
 
@@ -194,11 +190,11 @@ public class LogAspect
         {
             for (Object o : paramsArray)
             {
-                if (StringUtils.isNotNull(o) && !isFilterObject(o))
+                if (MyStringUtils.isNotNull(o) && !isFilterObject(o))
                 {
                     try
                     {
-                        String jsonObj = JSON.toJSONString(o, excludePropertyPreFilter(excludeParamNames));
+                        String jsonObj = JsonUtils.toJSONString(o);
                         params.append(jsonObj).append(" ");
                     }
                     catch (Exception ignored)

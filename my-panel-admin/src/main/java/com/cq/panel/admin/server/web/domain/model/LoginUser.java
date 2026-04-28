@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.model;
 
-import com.alibaba.fastjson2.annotation.JSONField;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.cq.panel.admin.server.repository.domain.SysUser;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -75,12 +75,13 @@ public class LoginUser implements Serializable
      */
     private SysUser user;
 
-    @JSONField(serialize = false)
+    @JsonIgnore
     public String getPassword()
     {
         return user.getPassword();
     }
 
+    @JsonIgnore
     public String getUsername()
     {
         return user.getUserName();

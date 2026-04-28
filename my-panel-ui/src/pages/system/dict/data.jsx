@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, message, Popconfirm, Tag, Tooltip, Dropdown, Row, Col } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Select, Modal, InputNumber, Radio, message, Popconfirm, Tag, Tooltip, Dropdown, Row, Col, Pagination } from 'antd';
 import { 
   SearchOutlined, 
   ReloadOutlined, 
@@ -88,13 +88,14 @@ const DictData = () => {
 
   const handleReset = () => {
     form.resetFields();
-    form.setFieldsValue({ dictType: dictType }); // Keep current dict type
+    form.setFieldsValue({ dictType: dictType });
     setQueryParams({
-      ...queryParams,
+      pageNum: 1,
+      pageSize: queryParams.pageSize,
+      dictName: undefined,
       dictLabel: undefined,
-      status: undefined,
       dictType: dictType,
-      pageNum: 1
+      status: undefined
     });
   };
   
@@ -206,7 +207,7 @@ const DictData = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 160,
+      width: 200,
       fixed: 'right',
       render: (_, record) => (
         <Space size="middle">
@@ -220,8 +221,8 @@ const DictData = () => {
   ];
 
   return (
-    <div className="dict-container">
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <div className="dict-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
@@ -256,7 +257,7 @@ const DictData = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
         <div className="table-toolbar">
           <Space size="middle">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
@@ -291,27 +292,31 @@ const DictData = () => {
           </Space>
         </div>
 
-        <Table
-          rowSelection={rowSelection}
-          columns={columns}
-          dataSource={data}
-          rowKey="dictCode"
-          loading={loading}
-          size={tableSize}
-          scroll={{ x: 1300 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-                setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
+        <div className="dict-table-container">
+          <Table
+            rowSelection={rowSelection}
+            columns={columns}
+            dataSource={data}
+            rowKey="dictCode"
+            loading={loading}
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

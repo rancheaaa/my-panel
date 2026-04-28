@@ -4,7 +4,6 @@ import com.cq.panel.admin.server.common.constant.CacheConstants;
 import com.cq.panel.admin.server.repository.domain.SysDictData;
 import com.cq.panel.admin.server.repository.mapper.SysDictDataMapper;
 import com.cq.panel.admin.server.repository.service.ISysDictDataService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
@@ -18,11 +17,14 @@ import java.util.List;
 @Service
 public class SysDictDataServiceImpl implements ISysDictDataService
 {
-    @Autowired
-    private SysDictDataMapper dictDataMapper;
+    private final SysDictDataMapper dictDataMapper;
 
-    @Autowired
-    private CacheManager cacheManager;
+    private final CacheManager cacheManager;
+
+    public SysDictDataServiceImpl(SysDictDataMapper dictDataMapper, CacheManager cacheManager) {
+        this.dictDataMapper = dictDataMapper;
+        this.cacheManager = cacheManager;
+    }
 
     /**
      * 根据条件分页查询字典数据
@@ -34,6 +36,12 @@ public class SysDictDataServiceImpl implements ISysDictDataService
     public List<SysDictData> selectDictDataList(SysDictData dictData)
     {
         return dictDataMapper.selectDictDataList(dictData);
+    }
+
+    @Override
+    public List<SysDictData> selectDictDataByType(String dictType)
+    {
+        return dictDataMapper.selectDictDataByType(dictType);
     }
 
     /**

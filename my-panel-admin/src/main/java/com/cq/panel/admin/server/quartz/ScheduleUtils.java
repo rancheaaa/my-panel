@@ -3,7 +3,7 @@ package com.cq.panel.admin.server.quartz;
 import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;
 import com.cq.panel.admin.server.web.exception.job.TaskException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import org.quartz.*;
@@ -74,7 +74,7 @@ public class ScheduleUtils
         }
 
         // 判断任务是否过期
-        if (StringUtils.isNotNull(CronUtils.getNextExecution(job.getCronExpression())))
+        if (MyStringUtils.isNotNull(CronUtils.getNextExecution(job.getCronExpression())))
         {
             // 执行调度任务
             scheduler.scheduleJob(jobDetail, trigger);
@@ -111,15 +111,15 @@ public class ScheduleUtils
      */
     public static boolean whiteList(String invokeTarget)
     {
-        String packageName = StringUtils.substringBefore(invokeTarget, "(");
-        int count = StringUtils.countMatches(packageName, ".");
+        String packageName = MyStringUtils.substringBefore(invokeTarget, "(");
+        int count = MyStringUtils.countMatches(packageName, ".");
         if (count > 1)
         {
-            return StringUtils.containsAnyIgnoreCase(invokeTarget, Constants.JOB_WHITELIST_STR);
+            return MyStringUtils.containsAnyIgnoreCase(invokeTarget, Constants.JOB_WHITELIST_STR);
         }
-        Object obj = SpringUtils.getBean(StringUtils.split(invokeTarget, ".")[0]);
+        Object obj = SpringUtils.getBean(MyStringUtils.split(invokeTarget, ".")[0]);
         String beanPackageName = obj.getClass().getPackage().getName();
-        return StringUtils.containsAnyIgnoreCase(beanPackageName, Constants.JOB_WHITELIST_STR)
-                && !StringUtils.containsAnyIgnoreCase(beanPackageName, Constants.JOB_ERROR_STR);
+        return MyStringUtils.containsAnyIgnoreCase(beanPackageName, Constants.JOB_WHITELIST_STR)
+                && !MyStringUtils.containsAnyIgnoreCase(beanPackageName, Constants.JOB_ERROR_STR);
     }
 }

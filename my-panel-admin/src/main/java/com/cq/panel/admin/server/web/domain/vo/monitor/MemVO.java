@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.web.domain.vo.monitor;
 
-import com.cq.panel.admin.server.common.utils.Arith;
+import com.cq.panel.admin.server.common.utils.MyMathUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -34,20 +34,20 @@ public class MemVO {
     }
 
     public double getTotal() {
-        return Arith.div(total, (1024 * 1024 * 1024), 2);
+        return MyMathUtils.div(total, (1024 * 1024 * 1024), 2);
     }
 
     public double getUsed() {
-        return Arith.div(used, (1024 * 1024 * 1024), 2);
+        return MyMathUtils.div(used, (1024 * 1024 * 1024), 2);
     }
 
     public double getFree() {
-        return Arith.div(free, (1024 * 1024 * 1024), 2);
+        return MyMathUtils.div(free, (1024 * 1024 * 1024), 2);
     }
 
     @Schema(description = "内存使用率")
     public double getUsage() {
-        return Arith.mul(Arith.div(used, total, 4), 100);
+        return MyMathUtils.mul(MyMathUtils.div(used, total, 4), 100);
     }
 }
 

@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Form, Input, Button, message, Row, Col } from 'antd';
 import { UserOutlined, LockOutlined, RocketOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { login, getCodeImg, getUserInfo, getRouters } from '../../api/auth';
+import { login, getCodeImg, getUserInfo, getRouters, getSalt } from '../../api/auth';
+import { encryptPassword } from '../../utils/crypto';
 import './Login.scss';
 
 const Login = () => {
@@ -42,9 +43,19 @@ const Login = () => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
+      let encryptedPassword = values.password;
+      try {
+        const saltRes = await getSalt(values.username);
+        const salt = saltRes.data || '';
+        encryptedPassword = encryptPassword(values.password, salt);
+        console.log("Encrypted password:", encryptedPassword);
+      } catch (e) {
+        console.error("Failed to get salt, using original password", e);
+      }
+
       const loginData = {
         username: values.username,
-        password: values.password,
+        password: encryptedPassword,
         code: values.code,
         uuid: uuid
       };

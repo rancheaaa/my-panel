@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="OFF">
+    <Loggers>
+        <Logger name="org.apache.poi" level="off"/>
+        <Logger name="org.apache.logging.log4j" level="off"/>
+        <Root level="off">
+            <AppenderRef ref="NullAppender"/>
+        </Root>
+    </Loggers>
+    <Appenders>
+        <Null name="NullAppender"/>
+    </Appenders>
+</Configuration>

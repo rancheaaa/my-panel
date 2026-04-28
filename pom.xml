@@ -23,14 +23,13 @@
         <java.version>21</java.version>
         <maven-jar-plugin.version>3.1.1</maven-jar-plugin.version>
 
-        <springboot.version>3.5.13</springboot.version>
-        <mybatis-spring-boot.version>3.0.3</mybatis-spring-boot.version>
-        <druid.version>1.2.23</druid.version>
+        <springboot.version>4.0.4</springboot.version>
+        <mybatis-spring-boot.version>4.0.1</mybatis-spring-boot.version>
+        <druid.version>1.2.28</druid.version>
         <bitwalker.version>1.21</bitwalker.version>
         <swagger.version>3.0.0</swagger.version>
         <kaptcha.version>2.3.3</kaptcha.version>
         <pagehelper.boot.version>2.1.0</pagehelper.boot.version>
-        <fastjson.version>2.0.43</fastjson.version>
         <oshi.version>6.6.3</oshi.version>
         <commons.io.version>2.21.0</commons.io.version>
         <poi.version>5.5.1</poi.version>
@@ -38,16 +37,45 @@
         <jwt.version>0.9.1</jwt.version>
         <mysql.version>8.4.0</mysql.version>
         <jaxb-api.version>2.3.1</jaxb-api.version>
-        <jakarta.version>6.0.0</jakarta.version>
         <commons.lang3.version>3.20.0</commons.lang3.version>
         <guava.version>31.1-jre</guava.version>
         <rocksdb.version>6.10.2</rocksdb.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.44</lombok.version>
+        <jbcrypt.version>0.4</jbcrypt.version>
+        <commons.configuration2.version>2.10.1</commons.configuration2.version>
+        <springdoc.version>3.0.3</springdoc.version>
+        <spring.boot.admin.version>4.0.0-M2</spring.boot.admin.version>
+        <mockwebserver.version>4.12.0</mockwebserver.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <caffeine.version>3.2.0</caffeine.version>
+        <swagger.annotations.version>2.2.28</swagger.annotations.version>
+        <jacoco.version>0.8.13</jacoco.version>
+        <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
+        <maven.jar.plugin.version>3.4.1</maven.jar.plugin.version>
+        <netty.version>4.2.5.Final</netty.version>
+        <gson.version>2.11.0</gson.version>
+        <slf4j.version>2.0.16</slf4j.version>
+        <logback.version>1.5.6</logback.version>
+        <commons-exec.version>1.6.0</commons-exec.version>
+        <httpclient5.version>5.5</httpclient5.version>
+        <junit.jupiter.version>5.9.2</junit.jupiter.version>
+        <maven.assembly.plugin.version>3.6.0</maven.assembly.plugin.version>
+        <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
     </properties>
 
     <!-- 依赖声明 -->
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>cli-tools</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.cq</groupId>
+                <artifactId>agent</artifactId>
+                <version>${revision}</version>
+            </dependency>
             <dependency>
                 <groupId>com.cq</groupId>
                 <artifactId>my-panel-admin</artifactId>
@@ -79,10 +107,10 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- 阿里数据库连接池 -->
+            <!-- 阿里数据库连接池 (Spring Boot 4 版本) -->
             <dependency>
                 <groupId>com.alibaba</groupId>
-                <artifactId>druid-spring-boot-3-starter</artifactId>
+                <artifactId>druid-spring-boot-4-starter</artifactId>
                 <version>${druid.version}</version>
             </dependency>
 
@@ -110,12 +138,6 @@
                 <groupId>javax.xml.bind</groupId>
                 <artifactId>jaxb-api</artifactId>
                 <version>${jaxb-api.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>jakarta.servlet</groupId>
-                <artifactId>jakarta.servlet-api</artifactId>
-                <version>${jakarta.version}</version>
             </dependency>
 
             <!-- 获取系统信息 -->
@@ -150,13 +172,6 @@
                 <groupId>org.apache.velocity</groupId>
                 <artifactId>velocity-engine-core</artifactId>
                 <version>${velocity.version}</version>
-            </dependency>
-
-            <!-- 阿里JSON解析器 -->
-            <dependency>
-                <groupId>com.alibaba.fastjson2</groupId>
-                <artifactId>fastjson2</artifactId>
-                <version>${fastjson.version}</version>
             </dependency>
 
             <!-- Token生成与解析-->
@@ -195,6 +210,129 @@
                 <scope>provided</scope>
             </dependency>
 
+            <!-- jbcrypt -->
+            <dependency>
+                <groupId>org.mindrot</groupId>
+                <artifactId>jbcrypt</artifactId>
+                <version>${jbcrypt.version}</version>
+            </dependency>
+
+            <!-- commons-configuration2 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-configuration2</artifactId>
+                <version>${commons.configuration2.version}</version>
+            </dependency>
+
+            <!-- springdoc swagger-ui -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- Spring Boot Admin -->
+            <dependency>
+                <groupId>de.codecentric</groupId>
+                <artifactId>spring-boot-admin-starter-server</artifactId>
+                <version>${spring.boot.admin.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.codecentric</groupId>
+                <artifactId>spring-boot-admin-starter-client</artifactId>
+                <version>${spring.boot.admin.version}</version>
+            </dependency>
+
+            <!-- mockwebserver -->
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>mockwebserver</artifactId>
+                <version>${mockwebserver.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- MapStruct -->
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct</artifactId>
+                <version>${mapstruct.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mapstruct</groupId>
+                <artifactId>mapstruct-processor</artifactId>
+                <version>${mapstruct.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- Caffeine -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+
+            <!-- swagger-annotations -->
+            <dependency>
+                <groupId>io.swagger.core.v3</groupId>
+                <artifactId>swagger-annotations-jakarta</artifactId>
+                <version>${swagger.annotations.version}</version>
+            </dependency>
+
+            <!-- Netty -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-all</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+
+            <!-- Gson -->
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>${gson.version}</version>
+            </dependency>
+
+            <!-- Commons Exec -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-exec</artifactId>
+                <version>${commons-exec.version}</version>
+            </dependency>
+
+            <!-- SLF4J -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+
+            <!-- Logback -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
+
+            <!-- HttpClient5 -->
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>${httpclient5.version}</version>
+            </dependency>
+
+            <!-- JUnit 5 -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+
             <!-- Testing -->
             <dependency>
                 <groupId>org.mockito</groupId>
@@ -215,10 +353,11 @@
     <modules>
         <module>my-panel-auth-lite</module>
         <module>my-panel-admin</module>
-        <module>distribution</module>
         <module>agent</module>
         <module>my-panel-proxy</module>
         <module>my-panel-common</module>
+        <module>cli-tools</module>
+        <module>distribution</module>
     </modules>
     <packaging>pom</packaging>
 

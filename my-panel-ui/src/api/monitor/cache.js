@@ -17,25 +17,27 @@ export function listCacheName() {
 }
 
 // 查询缓存键名列表
-export function listCacheKey(cacheName) {
+export function listCacheKey(cacheKey) {
   return request({
-    url: '/monitor/cache/getKeys/' + cacheName,
-    method: 'get'
+    url: '/monitor/cache/getKeys',
+    method: 'get',
+    params: { cacheKey }
   });
 }
 
 // 查询缓存内容
-export function getCacheValue(cacheName, cacheKey) {
+export function getCacheValue(cacheKey) {
   return request({
-    url: '/monitor/cache/getValue/' + cacheName + '/' + cacheKey,
-    method: 'get'
+    url: '/monitor/cache/getValue',
+    method: 'get',
+    params: { cacheKey }
   });
 }
 
 // 清理指定名称缓存
 export function clearCacheName(cacheName) {
   return request({
-    url: '/monitor/cache/clearCacheName/' + cacheName,
+    url: '/monitor/cache/clearCacheName/' + encodeURIComponent(cacheName),
     method: 'delete'
   });
 }
@@ -43,7 +45,7 @@ export function clearCacheName(cacheName) {
 // 清理指定键名缓存
 export function clearCacheKey(cacheKey) {
   return request({
-    url: '/monitor/cache/clearCacheKey/' + cacheKey,
+    url: '/monitor/cache/clearCacheKey/' + encodeURIComponent(cacheKey),
     method: 'delete'
   });
 }

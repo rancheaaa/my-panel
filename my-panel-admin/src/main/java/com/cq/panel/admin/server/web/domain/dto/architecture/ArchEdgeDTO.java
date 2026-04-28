@@ -1,5 +1,6 @@
 package com.cq.panel.admin.server.web.domain.dto.architecture;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -19,6 +20,14 @@ public class ArchEdgeDTO {
     @Schema(description = "所属架构图ID")
     @NotNull(message = "所属架构图ID不能为空")
     private Long diagramId;
+
+    @Schema(description = "源节点前端临时ID（用于保存时映射）")
+    @JsonIgnore
+    private String sourceFrontId;
+
+    @Schema(description = "目标节点前端临时ID（用于保存时映射）")
+    @JsonIgnore
+    private String targetFrontId;
 
     @Schema(description = "边缘类型（如：default、dashed、dotted等）")
     private String edgeType;

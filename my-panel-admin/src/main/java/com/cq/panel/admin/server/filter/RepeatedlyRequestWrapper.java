@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 构建可重复读取inputStream的request
@@ -27,30 +28,26 @@ public class RepeatedlyRequestWrapper extends HttpServletRequestWrapper
         request.setCharacterEncoding(Constants.UTF8);
         response.setCharacterEncoding(Constants.UTF8);
 
-        body = HttpHelper.getBodyString(request).getBytes(Constants.UTF8);
+        body = HttpHelper.getBodyString(request).getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
-    public BufferedReader getReader() throws IOException
-    {
+    public BufferedReader getReader() {
         return new BufferedReader(new InputStreamReader(getInputStream()));
     }
 
     @Override
-    public ServletInputStream getInputStream() throws IOException
-    {
-        final ByteArrayInputStream bais = new ByteArrayInputStream(body);
+    public ServletInputStream getInputStream() {
+        final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(body);
         return new ServletInputStream()
         {
             @Override
-            public int read() throws IOException
-            {
-                return bais.read();
+            public int read() {
+                return byteArrayInputStream.read();
             }
 
             @Override
-            public int available() throws IOException
-            {
+            public int available() {
                 return body.length;
             }
 

@@ -20,6 +20,16 @@
             <groupId>com.cq</groupId>
             <artifactId>my-panel-proxy</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>agent</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.cq</groupId>
+            <artifactId>cli-tools</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -32,7 +42,7 @@
                 <executions>
                     <execution>
                         <id>npm-install</id>
-                        <phase>generate-resources</phase>
+                        <phase>package</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
@@ -46,7 +56,7 @@
                     </execution>
                     <execution>
                         <id>npm-run-build</id>
-                        <phase>generate-resources</phase>
+                        <phase>package</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
@@ -57,6 +67,25 @@
                                 <argument>build</argument>
                             </arguments>
                             <workingDirectory>../my-panel-ui</workingDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>build-cli-tools</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>mvn</executable>
+                            <workingDirectory>${project.basedir}/..</workingDirectory>
+                            <arguments>
+                                <argument>package</argument>
+                                <argument>-pl</argument>
+                                <argument>cli-tools</argument>
+                                <argument>-am</argument>
+                                <argument>-DskipTests</argument>
+                                <argument>-Dexec.skip=true</argument>
+                            </arguments>
                         </configuration>
                     </execution>
                 </executions>
@@ -74,29 +103,25 @@
                         </goals>
                         <configuration>
                             <target>
-                                <!-- JDK Linux -->
                                 <available file="jdk/jdk-21-linux.tar.gz" property="jdk-linux-exists"/>
-                                <get src="https://download.oracle.com/java/21/latest/jdk-21_linux-x64_bin.tar.gz" 
-                                     dest="jdk/jdk-21-linux.tar.gz" 
+                                <get src="https://download.oracle.com/graalvm/21/archive/graalvm-jdk-21.0.7_linux-x64_bin.tar.gz"
+                                     dest="jdk/jdk-21-linux.tar.gz"
                                      skipexisting="true"
                                      verbose="true"/>
-                                
-                                <!-- JDK Windows -->
+
                                 <available file="jdk/jdk-21-windows.zip" property="jdk-windows-exists"/>
-                                <get src="https://download.oracle.com/java/21/latest/jdk-21_windows-x64_bin.zip" 
-                                     dest="jdk/jdk-21-windows.zip" 
+                                <get src="https://download.oracle.com/graalvm/21/archive/graalvm-jdk-21.0.7_windows-x64_bin.zip"
+                                     dest="jdk/jdk-21-windows.zip"
                                      skipexisting="true"
                                      verbose="true"/>
 
-                                <!-- Nginx Linux -->
-                                <get src="http://nginx.org/download/nginx-1.24.0.tar.gz" 
-                                     dest="nginx/nginx-1.24.0.tar.gz" 
+                                <get src="http://nginx.org/download/nginx-1.24.0.tar.gz"
+                                     dest="nginx/nginx-1.24.0.tar.gz"
                                      skipexisting="true"
                                      verbose="true"/>
 
-                                <!-- Nginx Windows -->
-                                <get src="http://nginx.org/download/nginx-1.24.0.zip" 
-                                     dest="nginx/nginx-1.24.0.zip" 
+                                <get src="http://nginx.org/download/nginx-1.24.0.zip"
+                                     dest="nginx/nginx-1.24.0.zip"
                                      skipexisting="true"
                                      verbose="true"/>
                             </target>
@@ -107,7 +132,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.8.0</version>
                 <configuration>
                     <descriptors>
                         <descriptor>src/main/assembly/assembly.xml</descriptor>

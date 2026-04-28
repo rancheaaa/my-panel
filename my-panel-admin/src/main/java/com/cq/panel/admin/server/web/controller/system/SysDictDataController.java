@@ -10,7 +10,7 @@ import com.github.pagehelper.PageInfo;
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.common.enums.BusinessType;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.domain.SysDictData;
 import com.cq.panel.admin.server.repository.service.ISysDictDataService;
@@ -55,8 +55,9 @@ public class SysDictDataController extends BaseController
         startPage();
         SysDictData dictData = dictDataConverter.toEntity(query);
         List<SysDictData> list = dictDataService.selectDictDataList(dictData);
+        PageInfo<SysDictData> pageInfo = new PageInfo<>(list);
         List<SysDictDataVO> voList = dictDataConverter.toVOList(list);
-        return Result.success(new PageVO<>(voList, new PageInfo<>(voList).getPages()));
+        return Result.success(new PageVO<>(voList, pageInfo.getTotal()));
     }
 
     @Operation(summary = "导出字典数据", description = "导出符合条件的字典数据")
@@ -90,7 +91,7 @@ public class SysDictDataController extends BaseController
     public Result<List<SysDictDataVO>> dictType(@Parameter(description = "字典类型", required = true) @PathVariable String dictType)
     {
         List<SysDictData> data = dictTypeService.selectDictDataByType(dictType);
-        if (StringUtils.isNull(data))
+        if (MyStringUtils.isNull(data))
         {
             data = new ArrayList<>();
         }

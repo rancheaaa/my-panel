@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Button, Space, Form, Input, Select, Tag, Tooltip, Modal, message, Popconfirm, Row, Col, Switch, Tree, TreeSelect, DatePicker, Dropdown } from 'antd';
-import { 
-  SearchOutlined, 
-  ReloadOutlined, 
-  PlusOutlined, 
-  DeleteOutlined, 
+import { Table, Card, Button, Space, Form, Input, Select, Tag, Tooltip, Modal, message, Popconfirm, Row, Col, Switch, Tree, TreeSelect, DatePicker, Dropdown, Pagination } from 'antd';
+import {
+  SearchOutlined,
+  ReloadOutlined,
+  PlusOutlined,
+  DeleteOutlined,
   EditOutlined,
   ColumnHeightOutlined,
   KeyOutlined,
@@ -17,6 +17,8 @@ import { ResizableTitle } from '../../../components/ResizableTable';
 import { listUser, addUser, updateUser, delUser, resetUserPwd, changeUserStatus, getUser, exportUser, getAuthRole, updateAuthRole } from '../../../api/user';
 import { listDept } from '../../../api/dept';
 import { getDicts } from '../../../api/dict/data';
+import { getSalt } from '../../../api/auth';
+import { encryptPassword } from '../../../utils/crypto';
 import './index.scss';
 
 const { Option } = Select;
@@ -94,6 +96,7 @@ const User = () => {
   const [isPwdModalOpen, setIsPwdModalOpen] = useState(false);
   const [pwdForm] = Form.useForm();
   const [currentResetId, setCurrentResetId] = useState(null);
+  const [currentResetUserName, setCurrentResetUserName] = useState(null);
   const [roleOptions, setRoleOptions] = useState([]);
   const [postOptions, setPostOptions] = useState([]);
   const [sysUserSex, setSysUserSex] = useState([]);
@@ -292,7 +295,9 @@ const User = () => {
         await updateUser({ ...values, userId: currentId });
         message.success('更新成功');
       } else {
-        await addUser(values);
+        const salt = Math.random().toString(36).substring(2, 18);
+        const encryptedPassword = encryptPassword(values.password, salt);
+        await addUser({ ...values, password: encryptedPassword, salt: salt });
         message.success('新增成功');
       }
       setIsModalOpen(false);
@@ -318,6 +323,7 @@ const User = () => {
   // Password Reset
   const handleResetPwd = (record) => {
       setCurrentResetId(record.userId);
+      setCurrentResetUserName(record.userName);
       pwdForm.resetFields();
       setIsPwdModalOpen(true);
   };
@@ -325,11 +331,31 @@ const User = () => {
   const handlePwdModalOk = async () => {
       try {
           const values = await pwdForm.validateFields();
-          await resetUserPwd(currentResetId, values.password);
-          message.success('密码重置成功');
-          setIsPwdModalOpen(false);
+          Modal.confirm({
+              title: '确认重置密码',
+              content: `确定要重置用户 "${currentResetUserName}" 的密码吗？`,
+              okText: '确认',
+              cancelText: '取消',
+              onOk: async () => {
+                  try {
+                      let salt = '';
+                      try {
+                          const saltRes = await getSalt(currentResetUserName);
+                          salt = saltRes.data || '';
+                      } catch (e) {
+                          console.error("Failed to get salt", e);
+                      }
+                      const encryptedPassword = encryptPassword(values.password, salt);
+                      await resetUserPwd(currentResetId, encryptedPassword, salt);
+                      message.success('密码重置成功');
+                      setIsPwdModalOpen(false);
+                  } catch (error) {
+                      message.error('密码重置失败');
+                  }
+              }
+          });
       } catch (error) {
-          message.error('密码重置失败');
+          console.error(error);
       }
   };
 
@@ -352,7 +378,7 @@ const User = () => {
 
   const handleAuthRoleOk = async () => {
     try {
-        await updateAuthRole({ userId: authRoleUser.userId, roleIds: selectedRoleIds.join(',') });
+        await updateAuthRole({ userId: authRoleUser.userId, roleIds: selectedRoleIds });
         message.success('授权角色成功');
         setIsAuthRoleOpen(false);
     } catch (error) {
@@ -407,7 +433,7 @@ const User = () => {
       title: '操作',
       key: 'action',
       align: 'center',
-      width: 160,
+      width: 200,
       fixed: 'right',
       render: (_, record) => (
         <Space size="middle">
@@ -450,7 +476,7 @@ const User = () => {
   }));
 
   return (
-    <div className="app-container">
+    <div className="user-page-container">
       <Row gutter={16} style={{ height: '100%' }}>
         <Col span={4} style={{ height: '100%' }}>
             <Card bordered={false} className="dept-card" style={{ height: '100%', overflow: 'auto' }}>
@@ -464,7 +490,7 @@ const User = () => {
             </Card>
         </Col>
         <Col span={20} style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+            <Card bordered={false} className="search-card" style={{ flexShrink: 0 }}>
                 <Form form={form} component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }}>
                     <Row gutter={[24, 16]}>
                         <Col span={6}>
@@ -510,7 +536,7 @@ const User = () => {
                 </Form>
             </Card>
 
-            <Card bordered={false} className="table-card">
+            <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
                 <div className="table-toolbar">
                 <Space size="middle">
                     <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
@@ -559,32 +585,36 @@ const User = () => {
                 </Space>
                 </div>
 
-                <Table
-                rowSelection={rowSelection}
-                components={{
-                  header: {
-                    cell: ResizableTitle,
-                  },
-                }}
-                columns={resizableColumns}
-                dataSource={data}
-                rowKey="userId"
-                loading={loading}
-                size={tableSize}
-                scroll={{ x: 1200 }}
-                pagination={{
-                    current: queryParams.pageNum,
-                    pageSize: queryParams.pageSize,
-                    total: total,
-                    showTotal: (total, range) => `共 ${total} 条`,
-                    onChange: (page, pageSize) => {
-                        setQueryParams(prev => ({ ...prev, pageNum: page, pageSize }));
+                <div className="user-table-container">
+                  <Table
+                  rowSelection={rowSelection}
+                  components={{
+                    header: {
+                      cell: ResizableTitle,
                     },
-                    position: ['bottomRight'],
-                    showSizeChanger: true,
-                    pageSizeOptions: ['10', '20', '50', '100']
-                }}
-                />
+                  }}
+                  columns={resizableColumns}
+                  dataSource={data}
+                  rowKey="userId"
+                  loading={loading}
+                  size={tableSize}
+                  scroll={{ x: 'max-content', y: 'calc(100vh - 600px)' }}
+                  pagination={false}
+                  />
+                  <div className="fixed-pagination-bar">
+                    <Pagination
+                      current={queryParams.pageNum}
+                      pageSize={queryParams.pageSize}
+                      total={total}
+                      showTotal={(t) => `共 ${t} 条`}
+                      onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+                      showSizeChanger
+                      pageSizeOptions={['10', '20', '50', '100']}
+                      showQuickJumper
+                      size="default"
+                    />
+                  </div>
+                </div>
             </Card>
         </Col>
       </Row>

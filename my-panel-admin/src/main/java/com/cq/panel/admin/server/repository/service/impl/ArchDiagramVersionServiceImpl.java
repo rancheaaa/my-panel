@@ -12,7 +12,7 @@ import com.cq.panel.admin.server.repository.mapper.ArchEdgeMapper;
 import com.cq.panel.admin.server.repository.mapper.ArchNodeMapper;
 import com.cq.panel.admin.server.repository.service.IArchDiagramVersionService;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -62,7 +62,7 @@ public class ArchDiagramVersionServiceImpl implements IArchDiagramVersionService
         }
 
         // 生成唯一版本号
-        if (StringUtils.isEmpty(version)) {
+        if (MyStringUtils.isEmpty(version)) {
             version = "V" + System.currentTimeMillis();
         }
 

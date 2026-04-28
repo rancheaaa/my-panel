@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.MonitorAlertEventMapper">
+
+    <resultMap id="MonitorAlertEventResult" type="com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent">
+        <id property="id" column="id"/>
+        <result property="ruleId" column="rule_id"/>
+        <result property="ruleName" column="rule_name"/>
+        <result property="metricCategory" column="metric_category"/>
+        <result property="metricName" column="metric_name"/>
+        <result property="metricScope" column="metric_scope"/>
+        <result property="severity" column="severity"/>
+        <result property="observedValue" column="observed_value"/>
+        <result property="thresholdValue" column="threshold_value"/>
+        <result property="triggerTime" column="trigger_time"/>
+        <result property="status" column="status"/>
+        <result property="detail" column="detail"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent" useGeneratedKeys="true" keyProperty="id">
+        insert into monitor_alert_event
+        (rule_id, rule_name, metric_category, metric_name, metric_scope, severity, observed_value, threshold_value, trigger_time, status, detail)
+        values
+        (#{ruleId}, #{ruleName}, #{metricCategory}, #{metricName}, #{metricScope}, #{severity}, #{observedValue}, #{thresholdValue}, #{triggerTime}, #{status}, #{detail})
+    </insert>
+
+    <select id="selectByTimeRange" resultMap="MonitorAlertEventResult">
+        select *
+        from monitor_alert_event
+        where trigger_time <![CDATA[>=]]> #{beginTime}
+          and trigger_time <![CDATA[<=]]> #{endTime}
+        order by trigger_time desc
+        <if test="limit != null and limit > 0">
+            limit #{limit}
+        </if>
+    </select>
+
+    <update id="updateStatus">
+        update monitor_alert_event
+        set status = #{status}
+        where id = #{id}
+    </update>
+</mapper>

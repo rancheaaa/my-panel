@@ -4,7 +4,7 @@
     <id>bin</id>
     <formats>
 <!--        <format>zip</format>-->
-<!--        <format>tar.gz</format>-->
+        <format>tar.gz</format>
         <format>dir</format>
     </formats>
     <includeBaseDirectory>true</includeBaseDirectory>
@@ -27,9 +27,36 @@
                 <include>com.cq:my-panel-proxy</include>
             </includes>
         </dependencySet>
+
+        <dependencySet>
+            <useProjectArtifact>false</useProjectArtifact>
+            <outputDirectory>agent/libs</outputDirectory>
+            <scope>runtime</scope>
+            <includes>
+                <include>com.cq:agent</include>
+            </includes>
+        </dependencySet>
     </dependencySets>
 
     <fileSets>
+        <!-- CLI tools standalone JARs -->
+        <fileSet>
+            <directory>../cli-tools/target</directory>
+            <outputDirectory>tools/libs</outputDirectory>
+            <includes>
+                <include>cli-tools-*-mysql-standalone.jar</include>
+                <include>cli-tools-*-redis-standalone.jar</include>
+            </includes>
+        </fileSet>
+
+        <fileSet>
+            <directory>../cli-tools</directory>
+            <outputDirectory>tools/libs</outputDirectory>
+            <includes>
+                <include>README.md</include>
+            </includes>
+        </fileSet>
+
         <!-- bin -->
         <fileSet>
             <directory>${project.basedir}/bin</directory>
@@ -58,6 +85,7 @@
             <includes>
                 <include>application*.yml</include>
                 <include>logback*.xml</include>
+                <include>common.properties</include>
                 <include>banner.txt</include>
             </includes>
         </fileSet>
@@ -71,6 +99,18 @@
                 <include>logback*.xml</include>
             </includes>
         </fileSet>
+
+        <fileSet>
+            <directory>../agent/src/main/resources</directory>
+            <outputDirectory>agent/config</outputDirectory>
+            <includes>
+                <include>application*.yml</include>
+                <include>application*.properties</include>
+                <include>agent*.properties</include>
+                <include>logback*.xml</include>
+            </includes>
+        </fileSet>
+
         <!-- also include README from distribution/config if exists -->
         <fileSet>
             <directory>${project.basedir}/config</directory>

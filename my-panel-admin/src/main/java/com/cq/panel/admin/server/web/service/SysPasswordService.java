@@ -6,9 +6,8 @@ import com.cq.panel.admin.server.web.service.cache.CacheService;
 import com.cq.panel.admin.server.repository.domain.SysUser;
 import com.cq.panel.admin.server.web.exception.user.UserPasswordNotMatchException;
 import com.cq.panel.admin.server.web.exception.user.UserPasswordRetryLimitExceedException;
-import com.cq.panel.admin.server.common.utils.SecurityUtils;
+import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
 import com.cq.panel.admin.server.context.AuthenticationContextHolder;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.cq.panel.authlite.AuthenticationToken;
@@ -21,14 +20,17 @@ import com.cq.panel.authlite.AuthenticationToken;
 @Component
 public class SysPasswordService
 {
-    @Autowired
-    private CacheService cacheService;
+    private final CacheService cacheService;
 
     @Value(value = "${user.password.maxRetryCount}")
     private int maxRetryCount;
 
     @Value(value = "${user.password.lockTime}")
     private int lockTime;
+
+    public SysPasswordService(CacheService cacheService) {
+        this.cacheService = cacheService;
+    }
 
     /**
      * 登录账户密码错误次数缓存键名
@@ -38,7 +40,7 @@ public class SysPasswordService
      */
     private String getCacheKey(String username)
     {
-        return CacheConstants.PWD_ERR_CNT_KEY + username;
+        return CacheConstants.PWD_ERR_CNT_KEY + ":" + username;
     }
 
     public void validate(SysUser user)
@@ -54,7 +56,7 @@ public class SysPasswordService
             retryCount = 0;
         }
 
-        if (retryCount >= Integer.valueOf(maxRetryCount).intValue())
+        if (retryCount >= maxRetryCount)
         {
             throw new UserPasswordRetryLimitExceedException(maxRetryCount, lockTime);
         }
@@ -73,7 +75,11 @@ public class SysPasswordService
 
     public boolean matches(SysUser user, String rawPassword)
     {
-        return SecurityUtils.matchesPassword(rawPassword, user.getPassword());
+        String salt = user.getSalt();
+        if (salt == null || salt.isEmpty()) {
+            throw new IllegalStateException("用户密码盐值为空");
+        }
+        return Md5PasswordEncoder.matches(rawPassword, user.getPassword());
     }
 
     public void clearLoginRecordCache(String loginName)

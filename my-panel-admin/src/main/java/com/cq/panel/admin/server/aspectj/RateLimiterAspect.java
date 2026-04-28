@@ -7,8 +7,8 @@ import java.util.List;
 import com.cq.panel.admin.server.annotation.RateLimiter;
 import com.cq.panel.admin.server.common.enums.LimitType;
 import com.cq.panel.admin.server.web.exception.ServiceException;
-import com.cq.panel.admin.server.common.utils.StringUtils;
-import com.cq.panel.admin.server.common.utils.ip.IpUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
+import com.cq.panel.admin.server.common.utils.ip.MyIpUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -60,7 +60,7 @@ public class RateLimiterAspect
         try
         {
             Long number = redisTemplate.execute(limitScript, keys, count, time);
-            if (StringUtils.isNull(number) || number.intValue() > count)
+            if (MyStringUtils.isNull(number) || number.intValue() > count)
             {
                 throw new ServiceException("访问过于频繁，请稍候再试");
             }
@@ -78,10 +78,10 @@ public class RateLimiterAspect
 
     public String getCombineKey(RateLimiter rateLimiter, JoinPoint point)
     {
-        StringBuffer stringBuffer = new StringBuffer(rateLimiter.key());
+        StringBuilder stringBuffer = new StringBuilder(rateLimiter.key());
         if (rateLimiter.limitType() == LimitType.IP)
         {
-            stringBuffer.append(IpUtils.getIpAddr()).append("-");
+            stringBuffer.append(MyIpUtils.getIpAddr()).append("-");
         }
         MethodSignature signature = (MethodSignature) point.getSignature();
         Method method = signature.getMethod();

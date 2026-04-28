@@ -92,7 +92,7 @@ export function updateAuthRole(data) {
   return request({
     url: '/system/user/authRole',
     method: 'put',
-    params: data
+    data: data
   })
 }
 
@@ -114,14 +114,15 @@ export function updateUserProfile(data) {
 }
 
 // 修改用户密码
-export function updateUserPwd(oldPassword, newPassword) {
+export function updateUserPwd(oldPassword, newPassword, salt) {
   const data = {
     oldPassword,
-    newPassword
+    newPassword,
+    salt
   }
   return request({
     url: '/system/user/profile/updatePwd',
     method: 'put',
-    params: data
+    data: data
   })
 }

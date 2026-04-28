@@ -3,7 +3,7 @@ package com.cq.panel.admin.server.common.utils.file;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.config.AppConfig;
 import com.cq.panel.admin.server.common.constant.Constants;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import org.apache.poi.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +81,7 @@ public class ImageUtils
             {
                 // 本机地址
                 String localPath = SpringUtils.getBean(AppConfig.class).getProfile();
-                String downloadPath = localPath + StringUtils.substringAfter(url, Constants.RESOURCE_PREFIX);
+                String downloadPath = localPath + MyStringUtils.substringAfter(url, Constants.RESOURCE_PREFIX);
                 in = new FileInputStream(downloadPath);
             }
             return IOUtils.toByteArray(in);

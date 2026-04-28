@@ -9,12 +9,13 @@ import com.cq.panel.admin.server.web.domain.dto.system.RegisterDTO;
 import com.cq.panel.admin.server.web.exception.user.CaptchaException;
 import com.cq.panel.admin.server.web.exception.user.CaptchaExpireException;
 import com.cq.panel.admin.server.common.utils.MessageUtils;
-import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.Md5PasswordEncoder;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.manager.AsyncManager;
 import com.cq.panel.admin.server.manager.AsyncFactory;
 import com.cq.panel.admin.server.repository.service.ISysConfigService;
 import com.cq.panel.admin.server.repository.service.ISysUserService;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Component;
 
 
@@ -54,11 +55,11 @@ public class SysRegisterService
             validateCaptcha(username, registerDTO.getCode(), registerDTO.getUuid());
         }
 
-        if (StringUtils.isEmpty(username))
+        if (MyStringUtils.isEmpty(username))
         {
             msg = "用户名不能为空";
         }
-        else if (StringUtils.isEmpty(password))
+        else if (MyStringUtils.isEmpty(password))
         {
             msg = "用户密码不能为空";
         }
@@ -70,7 +71,7 @@ public class SysRegisterService
         else if (password.length() < UserConstants.PASSWORD_MIN_LENGTH
                 || password.length() > UserConstants.PASSWORD_MAX_LENGTH)
         {
-            msg = "密码长度必须在5到20个字符之间";
+            msg = "密码长度必须在5到100个字符之间";
         }
         else if (!userService.checkUserNameUnique(sysUser))
         {
@@ -79,7 +80,13 @@ public class SysRegisterService
         else
         {
             sysUser.setNickName(username);
-            sysUser.setPassword(SecurityUtils.encryptPassword(password));
+            String salt = registerDTO.getSalt();
+            if (MyStringUtils.isEmpty(salt)) {
+                salt = Md5PasswordEncoder.generateSalt();
+            }
+            String md5WithSalt = Md5PasswordEncoder.encryptPassword(password, salt);
+            sysUser.setSalt(salt);
+            sysUser.setPassword(BCrypt.hashpw(md5WithSalt, BCrypt.gensalt()));
             boolean regFlag = userService.registerUser(sysUser);
             if (!regFlag)
             {
@@ -103,7 +110,7 @@ public class SysRegisterService
     @SuppressWarnings("all")
     public void validateCaptcha(String username, String code, String uuid)
     {
-        String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + StringUtils.nvl(uuid, "");
+        String verifyKey = CacheConstants.CAPTCHA_CODE_KEY + MyStringUtils.nvl(uuid, "");
         String captcha = cacheService.get(verifyKey);
         cacheService.delete(verifyKey);
         if (captcha == null)

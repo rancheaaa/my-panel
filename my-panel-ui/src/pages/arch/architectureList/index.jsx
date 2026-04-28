@@ -13,7 +13,8 @@ import {
   Tag, 
   Tooltip,
   Row,
-  Col
+  Col,
+  Pagination
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -26,6 +27,7 @@ import {
   EyeOutlined
 } from '@ant-design/icons';
 import { listDiagram, addDiagram, delDiagram, publishDiagram } from '@/api/op/architecture.js';
+import './ArchitectureList.scss';
 
 const ArchitectureList = () => {
   const navigate = useNavigate();
@@ -185,8 +187,8 @@ const ArchitectureList = () => {
   ];
 
   return (
-    <div className="app-container" style={{ padding: '24px' }}>
-      <Card bordered={false} style={{ marginBottom: 16 }}>
+    <div className="architecture-list-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} layout="inline">
           <Form.Item name="diagramName" label="架构名称">
             <Input placeholder="请输入架构名称" allowClear onPressEnter={handleSearch} />
@@ -200,26 +202,34 @@ const ArchitectureList = () => {
         </Form>
       </Card>
 
-      <Card bordered={false}>
-        <div style={{ marginBottom: 16 }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>创建架构图</Button>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={data}
-          loading={loading}
-          rowKey="id"
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-          }}
-        />
+        <div className="architecture-list-table-container">
+          <Table
+            columns={columns}
+            dataSource={data}
+            loading={loading}
+            rowKey="id"
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(page, pageSize) => setQueryParams({ ...queryParams, pageNum: page, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

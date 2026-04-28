@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.common.utils.uuid;
 
-import com.cq.panel.admin.server.common.utils.DateUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -16,10 +16,10 @@ public class Seq
     public static final String uploadSeqType = "UPLOAD";
 
     // 通用接口序列数
-    private static AtomicInteger commSeq = new AtomicInteger(1);
+    private static final AtomicInteger commSeq = new AtomicInteger(1);
 
     // 上传接口序列数
-    private static AtomicInteger uploadSeq = new AtomicInteger(1);
+    private static final AtomicInteger uploadSeq = new AtomicInteger(1);
 
     // 机器标识
     private static final String machineCode = "A";
@@ -58,7 +58,7 @@ public class Seq
      */
     public static String getId(AtomicInteger atomicInt, int length)
     {
-        String result = DateUtils.dateTimeNow();
+        String result = MyDateUtils.dateTimeNow();
         result += machineCode;
         result += getSeq(atomicInt, length);
         return result;
@@ -81,6 +81,6 @@ public class Seq
             atomicInt.set(1);
         }
         // 转字符串，用0左补齐
-        return StringUtils.padl(value, length);
+        return MyStringUtils.padl(value, length);
     }
 }

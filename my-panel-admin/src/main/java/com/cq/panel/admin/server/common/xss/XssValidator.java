@@ -1,6 +1,6 @@
 package com.cq.panel.admin.server.common.xss;
 
-import com.cq.panel.admin.server.common.utils.StringUtils;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import java.util.regex.Matcher;
@@ -18,7 +18,7 @@ public class XssValidator implements ConstraintValidator<Xss, String>
     @Override
     public boolean isValid(String value, ConstraintValidatorContext constraintValidatorContext)
     {
-        if (StringUtils.isBlank(value))
+        if (MyStringUtils.isBlank(value))
         {
             return true;
         }

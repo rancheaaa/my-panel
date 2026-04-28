@@ -160,10 +160,7 @@
 .section-header {
   text-align: center;
   margin-bottom: 48px;
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0 20px;
+  padding: 0 40px;
   box-sizing: border-box;
 
   h2 {
@@ -179,7 +176,6 @@
   p {
     font-size: 1rem;
     color: #6b7280;
-    max-width: 600px;
     margin: 0 auto;
     line-height: 1.6;
   }
@@ -188,9 +184,7 @@
 // Stats Section
 .stats-section {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 60px 20px;
+  padding: 60px 40px;
   background: white;
   box-sizing: border-box;
 }
@@ -262,9 +256,7 @@
 // Features Section
 .features-section {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 60px 20px;
+  padding: 60px 40px;
   background: white;
   box-sizing: border-box;
 }
@@ -321,9 +313,7 @@
 // System Section
 .system-section {
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 60px 20px;
+  padding: 60px 40px;
   background: white;
   box-sizing: border-box;
 }

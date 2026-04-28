@@ -15,7 +15,8 @@ import {
   Col,
   InputNumber,
   Radio,
-  Tooltip
+  Tooltip,
+  Pagination
 } from 'antd';
 import { 
   SearchOutlined, 
@@ -51,6 +52,7 @@ import { listNodeType, addNodeType, updateNodeType, delNodeType } from '@/api/op
 import { getDicts } from '@/api/dict/data';
 import BrandIcon, { BRAND_ICON_OPTIONS } from '@/components/BrandIcon';
 import NodeShape, { COMMON_SHAPES } from '@/components/NodeShape';
+import './ArchNodeType.scss';
 
 const { Option, OptGroup } = Select;
 
@@ -610,8 +612,8 @@ const ArchNodeType = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Card bordered={false} style={{ marginBottom: '16px' }}>
+    <div className="arch-node-type-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: '16px', flexShrink: 0 }}>
         <Form form={searchForm} layout="inline" onFinish={handleSearch}>
           <Form.Item name="typeName" label="类型名称">
             <Input placeholder="请输入类型名称" allowClear />
@@ -632,8 +634,8 @@ const ArchNodeType = () => {
         </Form>
       </Card>
 
-      <Card bordered={false}>
-        <div style={{ marginBottom: '16px' }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar">
           <Button 
             type="primary" 
             icon={<SettingOutlined />} 
@@ -644,20 +646,29 @@ const ArchNodeType = () => {
             新增自定义节点类型
           </Button>
         </div>
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            total,
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            onChange: (page, pageSize) => setQueryParams({ ...queryParams, pageNum: page, pageSize }),
-            showSizeChanger: true,
-            showTotal: (total) => `共 ${total} 条`
-          }}
-        />
+        <div className="arch-node-type-table-container">
+          <Table
+            columns={columns}
+            dataSource={data}
+            rowKey="id"
+            loading={loading}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              total={total}
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              onChange={(page, pageSize) => setQueryParams({ ...queryParams, pageNum: page, pageSize })}
+              showSizeChanger
+              showTotal={(t) => `共 ${t} 条`}
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

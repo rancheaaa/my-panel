@@ -5,7 +5,10 @@ INSERT IGNORE INTO `sys_config` VALUES (1, '主框架页-默认皮肤样式名�
        (5, '账号自助-是否开启用户注册功能', 'sys.account.registerUser', 'false', 'Y', 'admin', '2026-02-07 14:13:10.0', '', NULL, '是否开启注册用户功能（true开启，false关闭）'),
        (6, '用户登录-黑名单列表', 'sys.login.blackIPList', '', 'Y', 'admin', '2026-02-07 14:13:10.0', '', NULL, '设置登录IP黑名单限制，多个匹配项以;分隔，支持匹配（*通配、网段）'),
        (7, '系统监控-是否显示Swagger文档', 'sys.monitor.showSwagger', 'false', 'Y', 'admin', '2026-02-12 14:13:10.0', '', NULL, '是否在服务监控页面显示Swagger文档按钮（true显示，false隐藏）'),
-       (8, '系统监控-是否显示Actuator监控', 'sys.monitor.showActuator', 'false', 'Y', 'admin', '2026-02-12 14:13:10.0', '', NULL, '是否在服务监控页面显示Actuator监控按钮（true显示，false隐藏）');
+       (8, '系统监控-是否显示Actuator监控', 'sys.monitor.showActuator', 'false', 'Y', 'admin', '2026-02-12 14:13:10.0', '', NULL, '是否在服务监控页面显示Actuator监控按钮（true显示，false隐藏）'),
+       (9, '系统监控-采集间隔毫秒', 'sys.monitor.collectIntervalMs', '10000', 'Y', 'admin', NOW(), '', NULL, '服务监控采集间隔，默认10000毫秒'),
+       (10, '系统监控-历史保留天数', 'sys.monitor.retentionDays', '7', 'Y', 'admin', NOW(), '', NULL, '监控历史数据保留天数，默认7天'),
+       (11, '系统监控-查询最大点数', 'sys.monitor.maxPoints', '2000', 'Y', 'admin', NOW(), '', NULL, '单次趋势查询最多返回点数');
 
 INSERT IGNORE INTO `sys_dept` VALUES (100, 0, '0', '总部', 0, '刘邦', '15888888888', 'liubang@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:18:01.0'),
        (101, 100, '0,100', '深圳总公司', 1, '若依', '15888888888', 'ry@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', '', NULL),
@@ -19,7 +22,14 @@ INSERT IGNORE INTO `sys_dept` VALUES (100, 0, '0', '总部', 0, '刘邦', '15888
        (109, 102, '0,100,102', '财务部门', 2, '若依', '15888888888', 'ry@qq.com', '0', '0', 'admin', '2026-02-07 14:13:09.0', '', NULL),
        (200, 100, '0,100', '上海分公司', 5, NULL, NULL, NULL, '0', '0', 'admin', '2026-02-07 18:18:26.0', '', NULL);
 
-INSERT IGNORE INTO `sys_dict_data` VALUES (1, 1, '男', '0', 'sys_user_sex', '', '', 'Y', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '性别男'),
+INSERT IGNORE INTO `monitor_alert_rule` (`id`, `rule_name`, `metric_category`, `metric_name`, `metric_scope`, `operator`, `threshold_value`, `duration_seconds`, `severity`, `enabled`, `description`, `create_by`, `create_time`, `update_by`, `update_time`)
+VALUES
+       (1, 'CPU使用率过高', 'cpu', 'cpu_usage_pct', '', 'GT', 85, 60, 'warning', '1', 'CPU使用率超过85%持续60秒触发告警', 'admin', NOW(), 'admin', NOW()),
+       (2, '堆内存使用率过高', 'heap', 'heap_usage_pct', '', 'GT', 90, 60, 'critical', '1', '堆内存使用率超过90%持续60秒触发告警', 'admin', NOW(), 'admin', NOW()),
+       (3, '连接池等待连接过多', 'db_pool', 'pool_pending_threads', '', 'GT', 10, 30, 'warning', '1', '连接池等待线程超过10持续30秒触发告警', 'admin', NOW(), 'admin', NOW());
+
+INSERT IGNORE INTO `sys_dict_data` VALUES
+       (1, 1, '男', '0', 'sys_user_sex', '', '', 'Y', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '性别男'),
        (2, 2, '女', '1', 'sys_user_sex', '', '', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '性别女'),
        (3, 3, '未知', '2', 'sys_user_sex', '', '', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '性别未知'),
        (4, 1, '显示', '0', 'sys_show_hide', '', 'primary', 'Y', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '显示菜单'),
@@ -48,15 +58,43 @@ INSERT IGNORE INTO `sys_dict_data` VALUES (1, 1, '男', '0', 'sys_user_sex', '',
        (27, 9, '清空数据', '9', 'sys_oper_type', '', 'danger', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '清空操作'),
        (28, 1, '成功', '0', 'sys_common_status', '', 'primary', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '正常状态'),
        (29, 2, '失败', '1', 'sys_common_status', '', 'danger', 'N', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '停用状态'),
-       (100, 1, 'Windows', '0', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:10.339291', '', NULL, NULL),
-       (101, 2, 'Linux', '1', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:29.980307', '', NULL, NULL),
-       (102, 3, 'Mac', '2', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:53.705331', '', NULL, NULL),
-       (103, 4, '其他系统', '3', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:29:44.779131', 'admin', '2026-03-27 16:33:34.82214', NULL),
-       (104, 1, '启用', '0', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:35:33.036305', '', NULL, NULL),
-       (105, 2, '临时关闭', '1', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:36:50.903384', 'admin', '2026-03-27 16:36:58.52115', NULL),
-       (106, 3, '注销', '2', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:37:18.98585', '', NULL, NULL);
+       (30, 1, 'Windows', '0', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:10.339291', '', NULL, 'Windows操作系统'),
+       (31, 2, 'Linux', '1', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:29.980307', '', NULL, 'Linux操作系统'),
+       (32, 3, 'Mac', '2', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:28:53.705331', '', NULL, 'Mac操作系统'),
+       (33, 4, '其他系统', '3', 'agent_os_type', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:29:44.779131', '', NULL, '其他操作系统'),
+       (34, 1, '启用', '0', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:35:33.036305', '', NULL, '启用节点'),
+       (35, 2, '临时关闭', '1', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:36:50.903384', '', NULL, '临时关闭节点'),
+       (36, 3, '注销', '2', 'agent_node_switch', NULL, NULL, 'N', '0', 'admin', '2026-03-27 16:37:18.98585', '', NULL, '注销节点'),
+       (37, 1, '用户信息', 'login_tokens', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '登录用户token'),
+       (38, 2, '配置信息', 'sys_config', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '系统配置缓存'),
+       (39, 3, '数据字典', 'sys_dict', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '字典数据缓存'),
+       (40, 4, '验证码', 'captcha_codes', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '验证码缓存'),
+       (41, 5, '防重提交', 'repeat_submit', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '防重复提交缓存'),
+       (42, 6, '限流处理', 'rate_limit', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '限流处理缓存'),
+       (43, 7, '密码错误次数', 'pwd_err_cnt', 'sys_cache_key', NULL, NULL, 'N', '0', 'admin', NOW(), '', NULL, '密码错误次数缓存'),
+       (44, 1, '草稿', '0', 'arch_diagram_status', '', 'default', 'N', '0', 'admin', NOW(), '', NULL, '草稿状态'),
+       (45, 2, '已发布', '1', 'arch_diagram_status', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '已发布状态'),
+       (46, 3, '已归档', '2', 'arch_diagram_status', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '已归档状态'),
+       (47, 1, '基础设施', 'infrastructure', 'arch_node_category', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '基础设施分类'),
+       (48, 2, '中间件', 'middleware', 'arch_node_category', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '中间件分类'),
+       (49, 3, '应用服务', 'application', 'arch_node_category', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '应用服务分类'),
+       (50, 4, '数据库', 'database', 'arch_node_category', '', 'danger', 'N', '0', 'admin', NOW(), '', NULL, '数据库分类'),
+       (51, 5, '缓存', 'cache', 'arch_node_category', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '缓存分类'),
+       (52, 6, '消息队列', 'mq', 'arch_node_category', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '消息队列分类'),
+       (53, 7, '存储', 'storage', 'arch_node_category', '', 'cyan', 'N', '0', 'admin', NOW(), '', NULL, '存储分类'),
+       (54, 8, '网络', 'network', 'arch_node_category', '', 'orange', 'N', '0', 'admin', NOW(), '', NULL, '网络分类'),
+       (55, 9, '安全', 'security', 'arch_node_category', '', 'red', 'N', '0', 'admin', NOW(), '', NULL, '安全分类'),
+       (56, 10, '监控', 'monitor', 'arch_node_category', '', 'blue', 'N', '0', 'admin', NOW(), '', NULL, '监控分类'),
+       (57, 11, '逻辑', 'logic', 'arch_node_category', '', 'geekblue', 'N', '0', 'admin', NOW(), '', NULL, '逻辑形状分类'),
+       (58, 12, '数学运算', 'math', 'arch_node_category', '', 'lime', 'N', '0', 'admin', NOW(), '', NULL, '数学运算分类'),
+       (59, 1, '默认实线', 'default', 'arch_edge_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '默认实线'),
+       (60, 2, '虚线', 'dashed', 'arch_edge_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '虚线'),
+       (61, 3, '点线', 'dotted', 'arch_edge_type', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '点线'),
+       (62, 4, '双向箭头', 'bidirectional', 'arch_edge_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '双向箭头'),
+       (63, 5, '曲线', 'curved', 'arch_edge_type', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '曲线');
 
-INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '用户性别列表'),
+INSERT IGNORE INTO `sys_dict_type` VALUES
+       (1, '用户性别', 'sys_user_sex', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '用户性别列表'),
        (2, '菜单状态', 'sys_show_hide', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '菜单状态列表'),
        (3, '系统开关', 'sys_normal_disable', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '系统开关列表'),
        (4, '任务状态', 'sys_job_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '任务状态列表'),
@@ -66,8 +104,12 @@ INSERT IGNORE INTO `sys_dict_type` VALUES (1, '用户性别', 'sys_user_sex', '0
        (8, '通知状态', 'sys_notice_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '通知状态列表'),
        (9, '操作类型', 'sys_oper_type', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '操作类型列表'),
        (10, '系统状态', 'sys_common_status', '0', 'admin', '2026-02-07 14:13:10.0', '', NULL, '登录状态列表'),
-       (100, 'Agent所在操作系统', 'agent_os_type', '0', 'admin', '2026-03-27 16:07:18.471015', '', NULL, 'Agent所在操作系统列表'),
-       (132, 'Agent节点开关', 'agent_node_switch', '0', 'admin', '2026-03-27 16:34:36.442403', '', NULL, 'Agent节点开关列表');
+       (11, 'Agent所在操作系统', 'agent_os_type', '0', 'admin', '2026-03-27 16:07:18.471015', '', NULL, 'Agent所在操作系统列表'),
+       (12, 'Agent节点开关', 'agent_node_switch', '0', 'admin', '2026-03-27 16:34:36.442403', '', NULL, 'Agent节点开关列表'),
+       (13, '缓存键名', 'sys_cache_key', '0', 'admin', NOW(), '', NULL, '系统缓存键名列表'),
+       (14, '架构图状态', 'arch_diagram_status', '0', 'admin', NOW(), '', NULL, '架构图状态列表'),
+       (15, '节点分类', 'arch_node_category', '0', 'admin', NOW(), '', NULL, '节点分类列表'),
+       (16, '边缘类型', 'arch_edge_type', '0', 'admin', NOW(), '', NULL, '边缘类型列表');
 
 INSERT IGNORE INTO `sys_job` (
     `job_id`,
@@ -96,7 +138,7 @@ INSERT IGNORE INTO `sys_job` (
 ) VALUES
        (1, '备份系统初始化数据表', 'SYSTEM', 'appTask.backupSystemAllTable', 1, 'appTask.backupSystemAllTable', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '0/10 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-13 10:13:34.873309', '备份系统初始化数据表'),
        (2, '调用内置方法（有参）', 'DEFAULT', 'appTask.runSingleParam("hello")', 1, 'appTask.runSingleParam("hello")', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', '调用内置方法（有参）'),
-       (3, '调用内置方法（多参）', 'DEFAULT', 'appTask.runMultipleParams("hello", true, 2000, 316.50, 100)', 1, 'appTask.runMultipleParams("hello", true, 2000, 316.50, 100)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '0/20 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:14.0', '调用内置方法（有参）'),
+       (3, '调用内置方法（多参）', 'DEFAULT', 'appTask.runMultipleParams("hello", true, 2000L, 316.50D, 100)', 1, 'appTask.runMultipleParams("hello", true, 2000L, 316.50D, 100)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '0/20 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:14.0', '调用内置方法（有参）'),
        (4, '扫描并下线超时节点', 'SYSTEM', 'rcNodeTask.scanOfflineNodes(60)', 1, 'rcNodeTask.scanOfflineNodes(60)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-13 11:00:00.0', 'admin', '2026-02-13 11:00:00.0', '扫描注册中心表中超时未刷新的节点并设为下线状态'),
        (5, '扫描并下线Agent超时节点', 'SYSTEM', 'agentTask.scanOfflineAgents(60)', 1, 'agentTask.scanOfflineAgents(60)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-03-30 00:00:00.0', 'admin', '2026-03-30 00:00:00.0', '扫描Agent注册表中超时未更新的节点并设为下线状态'),
        (6, 'HTTP接口调度示例', 'TEST', 'http://localhost:8888/test/user/1', 2, NULL, 'http://localhost:8888/test/user/1', 'GET', '{"Content-Type": "application/json"}', '{"id": "{jobId}", "name": "test"}', 'roundRobin', NULL, NULL, NULL, '0/15 * * * * ?', '3', '1', '1', 'admin', '2026-02-07 14:13:10.0', 'admin', '2026-02-08 21:09:32.0', '演示HTTP接口调度'),
@@ -113,7 +155,7 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (1, '系统管理', 0, 2, 'system', NULL, '', '', 1, 0, 'M', '0', '0', '', 'SettingOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:11:52.0', '系统管理目录'),
         (2, '系统监控', 0, 3, 'monitor', NULL, '', '', 1, 0, 'M', '0', '0', '', 'DashboardOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:12:03.0', '系统监控目录'),
         (3, '注册配置中心', 0, 4, 'registry-config-center', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ToolOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-13 09:48:49.545433', '注册配置中心目录'),
-        (4, '首页', 0, 1, 'index', 'home/index', '', '', 1, 0, 'M', '0', '0', '', 'HomeTwoTone', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-08 22:58:26.0', '若依官网地址'),
+        (4, '首页', 0, 1, 'index', 'home/index', '', '', 1, 0, 'M', '0', '0', '', 'HomeOutlined', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-08 22:58:26.0', '若依官网地址'),
         (100, '用户管理', 1, 1, 'user', 'system/user/index', '', '', 1, 0, 'C', '0', '0', 'system:user:list', 'user', 'admin', '2026-02-07 14:13:09.0', '', NULL, '用户管理菜单'),
         (101, '角色管理', 1, 2, 'role', 'system/role/index', '', '', 1, 0, 'C', '0', '0', 'system:role:list', 'peoples', 'admin', '2026-02-07 14:13:09.0', '', NULL, '角色管理菜单'),
         (102, '菜单管理', 1, 3, 'menu', 'system/menu/index', '', '', 1, 0, 'C', '0', '0', 'system:menu:list', 'tree-table', 'admin', '2026-02-07 14:13:09.0', '', NULL, '菜单管理菜单'),
@@ -127,6 +169,7 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (110, '定时任务', 2, 2, 'job', 'monitor/job/index', '', '', 1, 0, 'C', '0', '0', 'monitor:job:list', 'job', 'admin', '2026-02-07 14:13:09.0', '', NULL, '定时任务菜单'),
         (111, '数据监控', 2, 3, 'druid', 'monitor/druid/index', '', '', 1, 0, 'C', '0', '0', 'monitor:druid:list', 'druid', 'admin', '2026-02-07 14:13:09.0', '', NULL, '数据监控菜单'),
         (112, '服务监控', 2, 4, 'server', 'monitor/server/index', '', '', 1, 0, 'C', '0', '0', 'monitor:server:list', 'server', 'admin', '2026-02-07 14:13:09.0', '', NULL, '服务监控菜单'),
+        (502, '服务监控大屏', 2, 0, 'dashboard', 'monitor/dashboard/index', '', '', 1, 0, 'C', '0', '0', 'monitor:server:list', 'dashboard', 'admin', NOW(), '', NULL, '服务监控大屏菜单'),
         (113, '缓存监控', 2, 5, 'cache', 'monitor/cache/index', '', '', 1, 0, 'C', '0', '0', 'monitor:cache:list', 'redis', 'admin', '2026-02-07 14:13:09.0', '', NULL, '缓存监控菜单'),
         (114, '缓存列表', 2, 6, 'cacheList', 'monitor/cacheList/index', '', '', 1, 0, 'C', '0', '0', 'monitor:cache:list', 'redis-list', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-08 16:46:53.0', '缓存列表菜单'),
         (115, '配置中心', 3, 2, 'config-center', 'rc/configCenter/index', '', '', 1, 0, 'C', '0', '0', 'rc:configCenter:list', 'FileFilled', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-03-27 18:46:31.008615', '表单构建菜单'),
@@ -193,6 +236,20 @@ INSERT IGNORE INTO `sys_menu` VALUES
         (2000, '环境管理', 3, 3, 'env-manage', 'rc/envManage/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:envManage:list', 'EnvironmentTwoTone', 'admin', '2026-02-13 09:56:15.041545', 'admin', '2026-03-27 18:46:31.008615', ''),
         (2001, 'AccessToken', 3, 5, 'access-token', 'rc/accessToken/index', NULL, '', 1, 0, 'C', '0', '0', 'rc:accessToken:list', 'KeyOutlined', 'admin', '2026-02-13 10:12:09.691179', 'admin', '2026-03-27 18:46:31.01306', ''),
         (2002, 'Agent管理', 1500, 1, 'agentManage', 'op/agentManage/index', NULL, '', 1, 0, 'C', '0', '0', 'op:agentManage:list', 'CreditCardOutlined', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
+        (2003, 'Agent新增', 2002, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'op:agentManage:add', '#', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
+        (2004, 'Agent修改', 2002, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'op:agentManage:edit', '#', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
+        (2005, 'Agent删除', 2002, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'op:agentManage:remove', '#', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
+        (2006, 'Agent导出', 2002, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'op:agentManage:export', '#', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
+        (2007, 'Agent下线', 2002, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'op:agentManage:offline', '#', 'admin', '2026-03-26 15:34:13.105463', '', NULL, ''),
+        (2008, 'Agent命令历史', 1500, 2, 'command-history', 'op/commandHistory/index', NULL, '', 1, 0, 'C', '0', '0', 'agent:registry:list', 'HistoryOutlined', 'admin', NOW(), '', NULL, 'Agent命令执行历史'),
+        (2009, '命令历史查询', 2008, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'agent:registry:query', '#', 'admin', NOW(), '', NULL, ''),
+        (2010, '命令历史删除', 2008, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'agent:registry:remove', '#', 'admin', NOW(), '', NULL, ''),
+        (2011, '命令历史导出', 2008, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'agent:registry:export', '#', 'admin', NOW(), '', NULL, ''),
+        (2200, '报警规则管理', 2, 10, 'alert-rule-manage', 'monitor/alertRuleManage/index', NULL, '', 1, 0, 'C', '0', '0', 'monitor:alertRule:list', 'AlertOutlined', 'admin', NOW(), '', NULL, '报警规则管理'),
+        (2201, '规则新增', 2200, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:alertRule:add', '#', 'admin', NOW(), '', NULL, ''),
+        (2202, '规则修改', 2200, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:alertRule:edit', '#', 'admin', NOW(), '', NULL, ''),
+        (2203, '规则删除', 2200, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:alertRule:remove', '#', 'admin', NOW(), '', NULL, ''),
+        (2204, '告警事件查询', 2200, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'monitor:alertEvent:query', '#', 'admin', NOW(), '', NULL, ''),
         (2100, '架构编排', 0, 6, 'architecture', NULL, '', '', 1, 0, 'M', '0', '0', '', 'ApartmentOutlined', 'admin', NOW(), '', NULL, '架构编排目录'),
         (2101, '架构图管理', 2100, 1, 'arch-diagram', 'arch/architectureList/index', '', '', 1, 0, 'C', '0', '0', 'arch:diagram:list', 'diagram', 'admin', NOW(), '', NULL, '架构图管理菜单'),
         (2102, '节点类型管理', 2100, 2, 'arch-node-type', 'arch/architectureNodeType/index', '', '', 1, 0, 'C', '0', '0', 'arch:nodeType:list', 'nodeType', 'admin', NOW(), '', NULL, '节点类型管理菜单'),
@@ -223,7 +280,9 @@ INSERT IGNORE INTO `sys_post` VALUES (1, 'ceo', '董事长', 1, '0', 'admin', '2
        (4, 'user', '普通员工', 4, '0', 'admin', '2026-02-07 14:13:09.0', '', NULL, '');
 
 INSERT IGNORE INTO `sys_role` VALUES (1, '超级管理员', 'admin', 1, '1', 1, 1, '0', '0', 'admin', '2026-02-07 14:13:09.0', '', NULL, '超级管理员'),
-       (2, '普通角色', 'common', 2, '2', 0, 0, '0', '0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:45:51.0', '普通角色');
+       (2, '普通角色', 'common', 2, '2', 0, 0, '0', '0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:45:51.0', '普通角色'),
+       (3, '访客角色', 'guest', 3, '1', 0, 0, '0', '0', 'admin', NOW(), '', NULL, '访客角色，仅查看权限'),
+       (4, '开发角色', 'developer', 4, '1', 0, 0, '0', '0', 'admin', NOW(), '', NULL, '开发人员角色，包含系统监控和操作日志查看权限');
 
 INSERT IGNORE INTO `sys_role_dept` VALUES (2, 100),
        (2, 101),
@@ -273,19 +332,59 @@ INSERT IGNORE INTO `sys_role_menu` VALUES (2, 1),
        (2, 1035),
        (2, 1036),
        (2, 1037),
-       (2, 1038);
+       (2, 1038),
+       (3, 1),
+       (3, 100),
+       (3, 101),
+       (3, 102),
+       (3, 103),
+       (3, 104),
+       (3, 105),
+       (3, 1000),
+       (3, 1001),
+       (4, 1),
+       (4, 4),
+       (4, 100),
+       (4, 101),
+       (4, 102),
+       (4, 103),
+       (4, 104),
+       (4, 105),
+       (4, 106),
+       (4, 107),
+       (4, 1000),
+       (4, 1001),
+       (4, 1002),
+       (4, 1003),
+       (4, 1004),
+       (4, 1005),
+       (4, 1006),
+       (4, 1007),
+       (4, 1008),
+       (4, 1009),
+       (4, 1010),
+       (4, 1020),
+       (4, 1022),
+       (4, 1023),
+       (4, 1024),
+       (4, 1025),
+       (4, 1026),
+       (4, 1027),
+       (4, 1028),
+       (4, 1029),
+       (4, 1030);
 
-INSERT IGNORE INTO `sys_user` VALUES (1, 103, 'admin', 'sa', '00', 'sa666@163.com', '15888888888', '0', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', '2026-02-13 10:07:13.628', 'admin', '2026-02-07 14:13:09.0', '', '2026-02-13 10:07:13.639739', '管理员'),
-       (2, 105, 'ry', '若依', '00', 'ry@qq.com', '15666666666', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:25:59.0', '测试员'),
-       (100, 109, 'cq', 'cq', '00', '1111@qq.com', '18325567876', '0', '', '$2a$10$I2yU3XQi/00Dea2MTx9DReoLAJ.2cS.Seao30cd9y2CQMYjBG4ja2', '0', '0', '127.0.0.1', '2026-02-07 18:47:01.0', 'admin', '2026-02-07 14:29:00.0', 'admin', '2026-02-07 18:47:00.0', NULL);
+INSERT IGNORE INTO `sys_user` VALUES (1, 103, 'admin', 'sa', '00', 'sa666@163.com', '15888888888', '0', '', '$2a$10$03UwhgRkyPnWAMis07hfBOWNFc7dR/FtLKdIs7KGu8BII7NgCm2hu', '1234567890123456', '0', '0', '127.0.0.1', '2026-02-13 10:07:13.628', 'admin', '2026-02-07 14:13:09.0', '', '2026-02-13 10:07:13.639739', '管理员'),
+       (2, 105, 'guest', 'guest', '00', 'guest@qq.com', '15666666666', '1', '', '$2a$10$LJ7O8BLAaQY.7ZKK1E0IHeFvamrXuj1gBvRmNhHouT.QNHVotoXRG', '1234567890123456', '0', '0', '127.0.0.1', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 14:13:09.0', 'admin', '2026-02-07 18:25:59.0', '游客'),
+       (100, 109, 'cq', 'cq', '00', '1111@qq.com', '18325567876', '0', '', '$2a$10$isvwbPSI65fXE3bHE5JgM.zFoKP../YtFw0.XwqxAUb5.ZvqaKWR.', '1234567890123456', '0', '0', '127.0.0.1', '2026-02-07 18:47:01.0', 'admin', '2026-02-07 14:29:00.0', 'admin', '2026-02-07 18:47:00.0', '测试员');
 
 INSERT IGNORE INTO `sys_user_post` VALUES (1, 1),
        (2, 2),
        (100, 2);
 
 INSERT IGNORE INTO `sys_user_role` VALUES (1, 1),
-       (2, 2),
-       (100, 2);
+       (2, 3),
+       (100, 4);
 
 -- ----------------------------
 -- XXL-Conf 初始化数据
@@ -307,43 +406,6 @@ VALUES
 -- ----------------------------
 -- 架构编排页面预置数据
 -- ----------------------------
-
--- 1. 字典类型：架构图状态
-INSERT IGNORE INTO `sys_dict_type` VALUES (200, '架构图状态', 'arch_diagram_status', '0', 'admin', NOW(), '', NULL, '架构图状态列表');
-
--- 2. 字典数据：架构图状态
-INSERT IGNORE INTO `sys_dict_data` VALUES (200, 1, '草稿', '0', 'arch_diagram_status', '', 'default', 'N', '0', 'admin', NOW(), '', NULL, '草稿状态'),
-       (201, 2, '已发布', '1', 'arch_diagram_status', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '已发布状态'),
-       (202, 3, '已归档', '2', 'arch_diagram_status', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '已归档状态');
-
--- 3. 字典类型：节点分类
-INSERT IGNORE INTO `sys_dict_type` VALUES (201, '节点分类', 'arch_node_category', '0', 'admin', NOW(), '', NULL, '节点分类列表');
-
--- 4. 字典数据：节点分类
-INSERT IGNORE INTO `sys_dict_data` VALUES (203, 1, '基础设施', 'infrastructure', 'arch_node_category', '', 'primary', 'N', '0', 'admin', NOW(), '', NULL, '基础设施分类'),
-       (204, 2, '中间件', 'middleware', 'arch_node_category', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '中间件分类'),
-       (205, 3, '应用服务', 'application', 'arch_node_category', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '应用服务分类'),
-       (206, 4, '数据库', 'database', 'arch_node_category', '', 'danger', 'N', '0', 'admin', NOW(), '', NULL, '数据库分类'),
-       (207, 5, '缓存', 'cache', 'arch_node_category', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '缓存分类'),
-       (208, 6, '消息队列', 'mq', 'arch_node_category', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '消息队列分类'),
-       (209, 7, '存储', 'storage', 'arch_node_category', '', 'cyan', 'N', '0', 'admin', NOW(), '', NULL, '存储分类'),
-       (210, 8, '网络', 'network', 'arch_node_category', '', 'orange', 'N', '0', 'admin', NOW(), '', NULL, '网络分类'),
-       (211, 9, '安全', 'security', 'arch_node_category', '', 'red', 'N', '0', 'admin', NOW(), '', NULL, '安全分类'),
-       (212, 10, '监控', 'monitor', 'arch_node_category', '', 'blue', 'N', '0', 'admin', NOW(), '', NULL, '监控分类'),
-       (223, 11, '逻辑', 'logic', 'arch_node_category', '', 'geekblue', 'N', '0', 'admin', NOW(), '', NULL, '逻辑形状分类'),
-       (224, 12, '数学运算', 'math', 'arch_node_category', '', 'lime', 'N', '0', 'admin', NOW(), '', NULL, '数学运算分类');
-
--- 5. 字典类型：边缘类型
-INSERT IGNORE INTO `sys_dict_type` VALUES (202, '边缘类型', 'arch_edge_type', '0', 'admin', NOW(), '', NULL, '边缘类型列表');
-
--- 6. 字典数据：边缘类型
-INSERT IGNORE INTO `sys_dict_data` VALUES (213, 1, '默认实线', 'default', 'arch_edge_type', '', 'primary', 'Y', '0', 'admin', NOW(), '', NULL, '默认实线'),
-       (214, 2, '虚线', 'dashed', 'arch_edge_type', '', 'warning', 'N', '0', 'admin', NOW(), '', NULL, '虚线'),
-       (215, 3, '点线', 'dotted', 'arch_edge_type', '', 'info', 'N', '0', 'admin', NOW(), '', NULL, '点线'),
-       (216, 4, '双向箭头', 'bidirectional', 'arch_edge_type', '', 'success', 'N', '0', 'admin', NOW(), '', NULL, '双向箭头'),
-       (217, 5, '曲线', 'curved', 'arch_edge_type', '', 'purple', 'N', '0', 'admin', NOW(), '', NULL, '曲线');
-
-
 
 -- 8. 架构图标签预置数据
 INSERT IGNORE INTO `arch_diagram_tag` (`id`, `tag_name`, `tag_default_value`, `tag_color`, `tag_type`, `create_by`, `create_time`, `del_flag`, `remark`) VALUES

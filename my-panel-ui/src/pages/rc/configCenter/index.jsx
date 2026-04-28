@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col, Upload } from 'antd';
+import { Table, Card, Button, Space, Form, Input, Modal, message, Popconfirm, Tooltip, Select, Tag, Dropdown, Row, Col, Upload, Pagination } from 'antd';
 import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, EditOutlined, ExportOutlined, ImportOutlined, FileTextOutlined, DownOutlined, EyeOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { ResizableTitle } from '../../../components/ResizableTable';
 import Editor, { loader } from '@monaco-editor/react';
@@ -11,6 +11,7 @@ loader.config({ monaco });
 
 import { listEnv } from '../../../api/rc/env';
 import { listProject } from '../../../api/rc/project';
+import './ConfigCenter.scss';
 
 const { Option } = Select;
 
@@ -455,8 +456,8 @@ const ConfigCenter = () => {
   }));
 
   return (
-    <div className="app-container">
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <div className="config-center-page-container">
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16, flexShrink: 0 }}>
         <Form form={form} layout="inline" component="div" labelCol={{ span: 6 }} wrapperCol={{ span: 18 }} style={{ width: '100%' }}>
           <Row gutter={[24, 16]} style={{ width: '100%' }}>
             <Col span={6}>
@@ -492,8 +493,8 @@ const ConfigCenter = () => {
         </Form>
       </Card>
 
-      <Card bordered={false} className="table-card">
-        <div className="table-toolbar" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+      <Card bordered={false} className="table-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div className="table-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <Space size="small" style={{ flexWrap: 'wrap' }}>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增</Button>
             <Button 
@@ -545,35 +546,39 @@ const ConfigCenter = () => {
           </Space>
         </div>
 
-        <Table
-          rowSelection={{
-            selectedRowKeys,
-            onChange: (keys) => setSelectedRowKeys(keys),
-          }}
-          components={{
-            header: {
-              cell: ResizableTitle,
-            },
-          }}
-          columns={resizableColumns}
-          dataSource={data}
-          loading={loading}
-          rowKey="id"
-          size={tableSize}
-          scroll={{ x: 1600 }}
-          pagination={{
-            current: queryParams.pageNum,
-            pageSize: queryParams.pageSize,
-            total: total,
-            showTotal: (total, range) => `共 ${total} 条`,
-            onChange: (page, pageSize) => {
-              setQueryParams({ ...queryParams, pageNum: page, pageSize });
-            },
-            position: ['bottomRight'],
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100']
-          }}
-        />
+        <div className="config-center-table-container">
+          <Table
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys),
+            }}
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            columns={resizableColumns}
+            dataSource={data}
+            loading={loading}
+            rowKey="id"
+            size={tableSize}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 550px)' }}
+            pagination={false}
+          />
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={queryParams.pageNum}
+              pageSize={queryParams.pageSize}
+              total={total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(pageNum, pageSize) => setQueryParams({ ...queryParams, pageNum, pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </div>
       </Card>
 
       <Modal

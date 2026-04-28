@@ -2,9 +2,8 @@ package com.cq.panel.admin.server.repository.service.impl;
 
 import java.util.Date;
 import java.util.List;
-import com.cq.panel.admin.server.common.utils.DateUtils;
+import com.cq.panel.admin.server.common.utils.MyDateUtils;
 import com.cq.panel.admin.server.common.utils.SecurityUtils;
-import com.cq.panel.admin.server.common.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -70,9 +69,9 @@ public class ArchNodeServiceImpl implements IArchNodeService
     public int insertArchNode(ArchNode archNode)
     {
         archNode.setCreateBy(SecurityUtils.getUsername());
-        archNode.setCreateTime(DateUtils.getNowDate());
+        archNode.setCreateTime(MyDateUtils.getNowDate());
         archNode.setUpdateBy(SecurityUtils.getUsername());
-        archNode.setUpdateTime(DateUtils.getNowDate());
+        archNode.setUpdateTime(MyDateUtils.getNowDate());
         archNode.setStatus("0");
         archNode.setLocked("0");
         archNode.setVisible("1");
@@ -94,7 +93,7 @@ public class ArchNodeServiceImpl implements IArchNodeService
         {
             return 0;
         }
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         String username = SecurityUtils.getUsername();
         for (ArchNode archNode : nodeList)
         {
@@ -121,7 +120,7 @@ public class ArchNodeServiceImpl implements IArchNodeService
     public int updateArchNode(ArchNode archNode)
     {
         archNode.setUpdateBy(SecurityUtils.getUsername());
-        archNode.setUpdateTime(DateUtils.getNowDate());
+        archNode.setUpdateTime(MyDateUtils.getNowDate());
         return archNodeMapper.updateArchNode(archNode);
     }
 
@@ -139,7 +138,7 @@ public class ArchNodeServiceImpl implements IArchNodeService
         {
             return 0;
         }
-        Date now = DateUtils.getNowDate();
+        Date now = MyDateUtils.getNowDate();
         String username = SecurityUtils.getUsername();
         int count = 0;
         for (ArchNode archNode : nodeList)

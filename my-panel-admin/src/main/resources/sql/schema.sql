@@ -91,7 +91,9 @@ CREATE TABLE IF NOT EXISTS `sys_job`
     `update_by`       varchar(64)           DEFAULT '' COMMENT '更新者',
     `update_time`     datetime              DEFAULT NULL COMMENT '更新时间',
     `remark`          varchar(500)          DEFAULT '' COMMENT '备注信息',
-    PRIMARY KEY (`job_id`, `job_name`, `job_group`),
+    PRIMARY KEY (`job_id`),
+    KEY `idx_job_name` (`job_name`),
+    KEY `idx_job_group` (`job_group`),
     CONSTRAINT `check_job_type_fields` CHECK (
         (job_type = 1 AND method_name IS NOT NULL AND http_url IS NULL AND script_name IS NULL) OR
         (job_type = 2 AND http_url IS NOT NULL AND method_name IS NULL AND script_name IS NULL) OR

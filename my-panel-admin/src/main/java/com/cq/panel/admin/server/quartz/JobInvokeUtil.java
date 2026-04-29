@@ -333,17 +333,16 @@ public class JobInvokeUtil {
     private static String executePythonScript(String scriptContent) throws Exception {
         String os = System.getProperty("os.name").toLowerCase();
         boolean isWindows = os.contains("win");
-        boolean hasGuiCode = containsGuiCode(scriptContent);
-        
+
         String pythonCommand = isWindows ? "python" : "python3";
         String tempFile = createTempScriptFile(scriptContent, ".py");
         
-        log.info("操作系统: {}, Python命令: {}, GUI代码: {}, 临时文件: {}", 
-                os, pythonCommand, hasGuiCode, tempFile);
+        log.info("操作系统: {}, Python命令: {}, 临时文件: {}",
+                os, pythonCommand, tempFile);
 
         ProcessBuilder processBuilder;
-        if (isWindows && hasGuiCode) {
-            processBuilder = buildWindowsGuiProcess(pythonCommand, tempFile);
+        if (isWindows) {
+            processBuilder = new ProcessBuilder("cmd", "/c", pythonCommand, tempFile);
         } else {
             processBuilder = new ProcessBuilder(pythonCommand, tempFile);
         }
@@ -352,62 +351,9 @@ public class JobInvokeUtil {
         try {
             return executeProcess(processBuilder);
         } catch (Exception e) {
-            log.error("Python脚本执行失败，尝试使用python3命令", e);
-            if (isWindows) {
-                ProcessBuilder processBuilder2;
-                if (hasGuiCode) {
-                    processBuilder2 = buildWindowsGuiProcess("python3", tempFile);
-                } else {
-                    processBuilder2 = new ProcessBuilder("python3", tempFile);
-                }
-                processBuilder2.redirectErrorStream(true);
-                return executeProcess(processBuilder2);
-            }
+            log.error("Python脚本执行失败", e);
             throw e;
         }
-    }
-
-    /**
-     * 构建Windows GUI进程（使用PowerShell Start-Process）
-     */
-    private static ProcessBuilder buildWindowsGuiProcess(String pythonCommand, String scriptFile) {
-        String psCommand = String.format(
-                "Start-Process -FilePath '%s' -ArgumentList '%s' -WindowStyle Normal -Wait",
-                pythonCommand, scriptFile);
-        log.info("使用PowerShell Start-Process启动GUI脚本");
-        return new ProcessBuilder("powershell", "-Command", psCommand);
-    }
-
-    /**
-     * 检测脚本是否包含GUI相关代码
-     */
-    private static boolean containsGuiCode(String scriptContent) {
-        if (scriptContent == null) {
-            return false;
-        }
-        String[] guiKeywords = {
-            "tkinter", "Tk(", "tk.Tk(",
-            "PyQt5", "PyQt6", "PySide2", "PySide6",
-            "wxPython", "wx.",
-            "messagebox", "tkinter.messagebox",
-            "tkinter.filedialog", "tkinter.simpledialog",
-            "tkinter.colorchooser",
-            "input(", "raw_input(",
-            "dialog", "Dialog",
-            "MessageBox", "QMessageBox",
-            "QDialog", "QInputDialog",
-            "QFileDialog", "QColorDialog",
-            "font", "Font",
-            "canvas", "Canvas",
-            "turtle", "Turtle"
-        };
-        
-        for (String keyword : guiKeywords) {
-            if (scriptContent.contains(keyword)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -451,7 +397,139 @@ public class JobInvokeUtil {
      * 执行SQL脚本
      */
     private static String executeSqlScript(String scriptContent) throws Exception {
-        throw new Exception(String.format("SQL脚本%s执行功能暂未实现，请使用数据库管理工具执行", scriptContent));
+        if (MyStringUtils.isEmpty(scriptContent)) {
+            throw new Exception("SQL脚本内容不能为空");
+        }
+
+        log.info("开始执行SQL脚本，SQL内容: {}", scriptContent);
+
+        javax.sql.DataSource dataSource;
+        try {
+            dataSource = SpringUtils.getBean(javax.sql.DataSource.class);
+        } catch (Exception e) {
+            throw new Exception("获取数据源失败，请确保Spring容器中存在DataSource配置", e);
+        }
+
+        java.sql.Connection conn = null;
+        java.sql.Statement stmt = null;
+        StringBuilder result = new StringBuilder();
+        
+        try {
+            conn = dataSource.getConnection();
+            if (conn == null) {
+                throw new Exception("获取数据库连接失败");
+            }
+
+            conn.setAutoCommit(false);
+
+            stmt = conn.createStatement();
+            stmt.setQueryTimeout(30);
+
+            String[] sqlStatements = scriptContent.split(";");
+            int successCount = 0;
+            int errorCount = 0;
+
+            for (String sql : sqlStatements) {
+                String trimmedSql = sql.trim();
+                if (MyStringUtils.isEmpty(trimmedSql)) {
+                    continue;
+                }
+
+                try {
+                    boolean hasResultSet = stmt.execute(trimmedSql);
+                    
+                    if (hasResultSet) {
+                        java.sql.ResultSet rs = stmt.getResultSet();
+                        int rowCount = 0;
+                        StringBuilder sqlResult = new StringBuilder();
+                        
+                        java.sql.ResultSetMetaData metaData = rs.getMetaData();
+                        int columnCount = metaData.getColumnCount();
+                        
+                        for (int i = 1; i <= columnCount; i++) {
+                            sqlResult.append(metaData.getColumnName(i));
+                            if (i < columnCount) {
+                                sqlResult.append("\t");
+                            }
+                        }
+                        sqlResult.append("\n");
+
+                        while (rs.next()) {
+                            for (int i = 1; i <= columnCount; i++) {
+                                sqlResult.append(rs.getString(i));
+                                if (i < columnCount) {
+                                    sqlResult.append("\t");
+                                }
+                            }
+                            sqlResult.append("\n");
+                            rowCount++;
+                        }
+                        
+                        result.append(String.format("[SQL %d] 查询成功，返回 %d 行数据:\n%s\n", 
+                                successCount + 1, rowCount, sqlResult.toString()));
+                    } else {
+                        int updateCount = stmt.getUpdateCount();
+                        result.append(String.format("[SQL %d] 执行成功，影响 %d 行: %s\n", 
+                                successCount + 1, updateCount, trimmedSql));
+                    }
+                    
+                    successCount++;
+                } catch (Exception e) {
+                    errorCount++;
+                    result.append(String.format("[SQL %d] 执行失败: %s\n错误信息: %s\n", 
+                            successCount + errorCount + 1, trimmedSql, e.getMessage()));
+                    log.error("SQL执行失败: {}, 错误: {}", trimmedSql, e.getMessage());
+                }
+            }
+
+            if (errorCount > 0) {
+                conn.rollback();
+                result.insert(0, String.format("SQL脚本执行完成: 成功 %d 条, 失败 %d 条，已回滚所有操作\n\n", 
+                        successCount, errorCount));
+                throw new Exception(result.toString());
+            } else {
+                conn.commit();
+                result.insert(0, String.format("SQL脚本执行成功: 共执行 %d 条SQL，已全部提交\n\n", successCount));
+            }
+
+            log.info("SQL脚本执行完成: 成功 {} 条, 失败 {} 条", successCount, errorCount);
+            return result.toString().trim();
+
+        } catch (java.sql.SQLTimeoutException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (Exception ex) {
+                    log.error("SQL超时回滚失败", ex);
+                }
+            }
+            throw new Exception("SQL执行超时（30秒），已回滚所有操作。错误信息: " + e.getMessage(), e);
+        } catch (Exception e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (Exception ex) {
+                    log.error("SQL执行异常回滚失败", ex);
+                }
+            }
+            throw new Exception("SQL脚本执行失败，已回滚所有操作。错误信息: " + e.getMessage(), e);
+        } finally {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (Exception e) {
+                    log.error("关闭Statement失败", e);
+                }
+            }
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                    conn.close();
+                } catch (Exception e) {
+                    log.error("关闭Connection失败", e);
+                }
+            }
+        }
     }
 
     /**

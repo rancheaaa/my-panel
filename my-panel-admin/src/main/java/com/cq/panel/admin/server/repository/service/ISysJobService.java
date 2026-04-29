@@ -106,4 +106,52 @@ public interface ISysJobService
      * @return 任务组名列表
      */
     List<String> selectJobGroupList(String jobGroup);
+    
+    /**
+     * 验证任务信息（根据jobType验证各字段）
+     * 
+     * @param job 任务信息
+     */
+    void validateJob(SysJob job);
+    
+    /**
+     * 验证调用目标字符串（安全检查）
+     * 
+     * @param jobName 任务名称
+     * @param invokeTarget 调用目标
+     */
+    void validateInvokeTarget(String jobName, String invokeTarget);
+    
+    /**
+     * 新增定时任务（包含完整业务逻辑）
+     * 
+     * @param job 任务信息
+     * @param username 操作用户
+     * @return 结果
+     */
+    int addJob(SysJob job, String username) throws SchedulerException, TaskException;
+    
+    /**
+     * 修改定时任务（包含完整业务逻辑）
+     * 
+     * @param job 任务信息
+     * @param username 操作用户
+     * @return 结果
+     */
+    int updateJobWithValidation(SysJob job, String username) throws SchedulerException, TaskException;
+    
+    /**
+     * 修改定时任务状态（包含完整业务逻辑）
+     * 
+     * @param job 任务信息
+     * @return 结果
+     */
+    int changeStatusWithValidation(SysJob job) throws SchedulerException;
+    
+    /**
+     * 立即执行任务（包含完整业务逻辑）
+     * 
+     * @param jobId 任务ID
+     */
+    void runJobImmediately(Long jobId);
 }

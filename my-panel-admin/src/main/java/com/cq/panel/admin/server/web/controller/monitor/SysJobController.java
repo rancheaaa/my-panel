@@ -1,11 +1,16 @@
 package com.cq.panel.admin.server.web.controller.monitor;
 
+import com.cq.panel.admin.server.web.domain.dto.monitor.MethodValidationDTO;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobDTO;
 import com.cq.panel.admin.server.web.domain.dto.monitor.SysJobQueryDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.PageVO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
+import com.cq.panel.admin.server.web.domain.vo.monitor.MethodInfoVO;
+import com.cq.panel.admin.server.web.domain.vo.monitor.MethodValidationVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysJobVO;
 import com.cq.panel.admin.server.web.converter.monitor.SysJobConverter;
+import com.cq.panel.admin.server.service.IMethodScannerService;
+import com.cq.panel.admin.server.web.exception.job.TaskException;
 import com.github.pagehelper.PageInfo;
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
@@ -37,9 +42,12 @@ public class SysJobController extends BaseController
 
     private final SysJobConverter jobConverter;
 
-    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter) {
+    private final IMethodScannerService methodScannerService;
+
+    public SysJobController(ISysJobService jobService, SysJobConverter jobConverter, IMethodScannerService methodScannerService) {
         this.jobService = jobService;
         this.jobConverter = jobConverter;
+        this.methodScannerService = methodScannerService;
     }
 
     /**
@@ -65,6 +73,30 @@ public class SysJobController extends BaseController
     public Result<List<String>> getJobGroups(@Parameter(description = "任务组名（支持模糊查询）") @RequestParam(required = false) String jobGroup)
     {
         return Result.success(jobService.selectJobGroupList(jobGroup));
+    }
+
+    /**
+     * 扫描内置方法列表
+     */
+    @Operation(summary = "扫描内置方法列表", description = "扫描task包下所有组件的public方法，返回可调用的内置方法列表")
+    @GetMapping("/methods")
+    public Result<List<MethodInfoVO>> scanMethods()
+    {
+        return Result.success(methodScannerService.scanTaskMethods());
+    }
+
+    /**
+     * 验证内置方法
+     */
+    @Operation(summary = "验证内置方法", description = "校验内置方法字符串是否正确，包括方法是否存在、入参类型是否正确等")
+    @PostMapping("/validateMethod")
+    public Result<MethodValidationVO> validateMethod(@Validated @RequestBody MethodValidationDTO dto)
+    {
+        if (dto.getParameterValues() == null || dto.getParameterValues().isEmpty()) {
+            return Result.success(methodScannerService.validateMethod(dto.getMethodName()));
+        } else {
+            return Result.success(methodScannerService.validateMethodWithParameters(dto.getMethodName(), dto.getParameterValues()));
+        }
     }
 
     /**
@@ -100,10 +132,12 @@ public class SysJobController extends BaseController
     @RequirePermission("monitor:job:add")
     @Log(title = "定时任务", businessType = BusinessType.INSERT)
     @PostMapping
-    public Result<Void> add(@Validated @RequestBody SysJobDTO dto) throws SchedulerException
+    public Result<Void> add(@Validated @RequestBody SysJobDTO dto) throws SchedulerException, TaskException
     {
         SysJob job = jobConverter.toEntity(dto);
-        jobService.addJob(job, getUsername());
+        job.setCreateBy(getUsername());
+        final int rows = jobService.addJob(job);
+        logger.info("新增定时任务影响行数{}", rows);
         return Result.success();
     }
 
@@ -114,10 +148,12 @@ public class SysJobController extends BaseController
     @RequirePermission("monitor:job:edit")
     @Log(title = "定时任务", businessType = BusinessType.UPDATE)
     @PutMapping
-    public Result<Void> edit(@Validated @RequestBody SysJobDTO dto) throws SchedulerException
+    public Result<Void> edit(@Validated @RequestBody SysJobDTO dto) throws SchedulerException, TaskException
     {
         SysJob job = jobConverter.toEntity(dto);
-        jobService.updateJobWithValidation(job, getUsername());
+        job.setUpdateBy(getUsername());
+        final int row = jobService.updateJobWithValidation(job);
+        logger.info("修改定时任务{}影响行数：{}", job.getJobId(), row);
         return Result.success();
     }
 
@@ -131,7 +167,8 @@ public class SysJobController extends BaseController
     public Result<Void> changeStatus(@RequestBody SysJobDTO dto) throws SchedulerException
     {
         SysJob job = jobConverter.toEntity(dto);
-        jobService.changeStatusWithValidation(job);
+        final int rows = jobService.changeStatusWithValidation(job);
+        logger.info("修改定时任务状态{}影响行数{}", dto.getJobId(),  rows);
         return Result.success();
     }
 

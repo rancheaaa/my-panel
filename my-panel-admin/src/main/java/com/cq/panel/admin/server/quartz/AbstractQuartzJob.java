@@ -52,6 +52,7 @@ public abstract class AbstractQuartzJob implements Job
     protected void before(JobExecutionContext context, SysJob sysJob)
     {
         threadLocal.set(new Date());
+        log.debug("job before status context:{}, job:{}", context, sysJob);
     }
 
     /**

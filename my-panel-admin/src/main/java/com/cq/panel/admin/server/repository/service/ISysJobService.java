@@ -68,38 +68,6 @@ public interface ISysJobService
     int changeStatus(SysJob job) throws SchedulerException;
 
     /**
-     * 立即运行任务
-     * 
-     * @param job 调度信息
-     * @return 结果
-     */
-    boolean run(SysJob job) throws SchedulerException;
-
-    /**
-     * 新增任务
-     * 
-     * @param job 调度信息
-     * @return 结果
-     */
-    int insertJob(SysJob job) throws SchedulerException, TaskException;
-
-    /**
-     * 更新任务
-     * 
-     * @param job 调度信息
-     * @return 结果
-     */
-    int updateJob(SysJob job) throws SchedulerException, TaskException;
-
-    /**
-     * 校验cron表达式是否有效
-     * 
-     * @param cronExpression 表达式
-     * @return 结果
-     */
-    boolean checkCronExpressionIsValid(String cronExpression);
-    
-    /**
      * 查询任务组名列表（用于自动完成）
      * 
      * @param jobGroup 任务组名（支持模糊查询）
@@ -126,25 +94,22 @@ public interface ISysJobService
      * 新增定时任务（包含完整业务逻辑）
      * 
      * @param job 任务信息
-     * @param username 操作用户
      * @return 结果
      */
-    int addJob(SysJob job, String username) throws SchedulerException, TaskException;
+    int addJob(SysJob job) throws SchedulerException, TaskException;
     
     /**
      * 修改定时任务（包含完整业务逻辑）
      * 
      * @param job 任务信息
-     * @param username 操作用户
      * @return 结果
      */
-    int updateJobWithValidation(SysJob job, String username) throws SchedulerException, TaskException;
+    int updateJobWithValidation(SysJob job) throws SchedulerException, TaskException;
     
     /**
      * 修改定时任务状态（包含完整业务逻辑）
      * 
      * @param job 任务信息
-     * @return 结果
      */
     int changeStatusWithValidation(SysJob job) throws SchedulerException;
     

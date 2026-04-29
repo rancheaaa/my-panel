@@ -36,22 +36,16 @@ public class JobInvokeUtil {
      */
     public static String invokeMethod(SysJob sysJob) throws Exception {
         Integer jobType = sysJob.getJobType();
-        if (jobType == null || jobType == 0) // 兼容原有逻辑
-        {
-            invokeTargetMethod(sysJob);
-        } else if (jobType == 1) {
+        if (jobType == 1) {
             invokeInternalMethod(sysJob);
         } else if (jobType == 2) {
             return invokeHttpInterface(sysJob);
         } else if (jobType == 3) {
             invokeScript(sysJob);
         }
-        return null;
+        throw new IllegalArgumentException("not support job type "  + jobType);
     }
 
-    /**
-     * 原有 invokeTarget 调度逻辑
-     */
     private static void invokeTargetMethod(SysJob sysJob) throws Exception {
         String invokeTarget = sysJob.getInvokeTarget();
         String beanName = getBeanName(invokeTarget);
@@ -131,7 +125,6 @@ public class JobInvokeUtil {
         if (headers.getContentType() == null && MyStringUtils.isNotEmpty(body)) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
-
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
 
         String selectedUrl;
@@ -326,7 +319,7 @@ public class JobInvokeUtil {
      * 执行SQL脚本
      */
     private static String executeSqlScript(String scriptContent) throws Exception {
-        throw new Exception("SQL脚本执行功能暂未实现，请使用数据库管理工具执行");
+        throw new Exception(String.format("SQL脚本%s执行功能暂未实现，请使用数据库管理工具执行", scriptContent));
     }
 
     /**
@@ -545,28 +538,12 @@ public class JobInvokeUtil {
      * @return 参数类型列表
      */
     public static Class<?>[] getMethodParamsType(List<Object[]> methodParams) {
-        Class<?>[] classs = new Class<?>[methodParams.size()];
+        Class<?>[] classes = new Class<?>[methodParams.size()];
         int index = 0;
         for (Object[] os : methodParams) {
-            classs[index] = (Class<?>) os[1];
+            classes[index] = (Class<?>) os[1];
             index++;
         }
-        return classs;
-    }
-
-    /**
-     * 获取参数值
-     * 
-     * @param methodParams 参数相关列表
-     * @return 参数值列表
-     */
-    public static Object[] getMethodParamsValue(List<Object[]> methodParams) {
-        Object[] methodParas = new Object[methodParams.size()];
-        int index = 0;
-        for (Object[] os : methodParams) {
-            methodParas[index] = os[0];
-            index++;
-        }
-        return methodParas;
+        return classes;
     }
 }

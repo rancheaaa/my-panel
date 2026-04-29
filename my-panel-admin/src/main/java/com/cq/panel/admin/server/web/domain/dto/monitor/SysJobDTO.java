@@ -15,14 +15,16 @@ import jakarta.validation.constraints.Pattern;
 public class SysJobDTO {
 
     @Schema(description = "任务序号", example = "1")
+    @NotNull(message = "任务序号不能为空")
     private Long jobId;
 
     @Schema(description = "任务名称", example = "系统默认定时任务")
     @NotBlank(message = "任务名称不能为空")
-    @Size(min = 0, max = 64, message = "任务名称不能超过64个字符")
+    @Size(max = 128, message = "任务名称不能超过128个字符")
     private String jobName;
 
     @Schema(description = "任务组名", example = "DEFAULT")
+    @NotBlank(message = "任务组名不能为空")
     private String jobGroup;
 
     @Schema(description = "调用目标字符串", example = "ryTask.ryParams('ry')")

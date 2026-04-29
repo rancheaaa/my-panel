@@ -81,7 +81,7 @@ public class SysJobDTO {
 
     @Schema(description = "Cron执行表达式", example = "0/10 * * * * ?")
     @NotBlank(message = "Cron执行表达式不能为空")
-    @Size(min = 0, max = 255, message = "Cron执行表达式不能超过255个字符")
+    @Size(max = 255, message = "Cron执行表达式不能超过255个字符")
     private String cronExpression;
 
     @Schema(description = "计划策略", example = "1")
@@ -94,6 +94,6 @@ public class SysJobDTO {
     private String status;
 
     @Schema(description = "备注", example = "备注信息")
-    @Size(min = 0, max = 500, message = "备注不能超过500个字符")
+    @Size(max = 500, message = "备注不能超过500个字符")
     private String remark;
 }

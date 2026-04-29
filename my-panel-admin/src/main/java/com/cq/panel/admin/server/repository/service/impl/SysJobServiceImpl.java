@@ -359,17 +359,14 @@ public class SysJobServiceImpl implements ISysJobService
         }
         
         Integer jobType = job.getJobType();
-        if (jobType == null || jobType == 0 || jobType == 1)
+        if (jobType == 1)
         {
-            String target = (jobType != null && jobType == 1) ? job.getMethodName() : job.getInvokeTarget();
+            String target = job.getMethodName();
             if (MyStringUtils.isNotEmpty(target))
             {
                 validateInvokeTarget(job.getJobName(), target);
             }
-            if (jobType != null && jobType == 1)
-            {
-                job.setInvokeTarget(job.getMethodName());
-            }
+            job.setInvokeTarget(job.getMethodName());
         }
         else if (jobType == 2)
         {

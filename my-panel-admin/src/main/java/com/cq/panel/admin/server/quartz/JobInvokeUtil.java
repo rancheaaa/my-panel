@@ -4,19 +4,17 @@ import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.common.loadbalancer.*;
-import java.lang.reflect.InvocationTargetException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.Strings;
 import org.springframework.http.*;
 import org.springframework.web.client.RestTemplate;
-import java.util.Map;
 
 /**
  * 任务执行工具
@@ -29,6 +27,8 @@ public class JobInvokeUtil {
 
     private static final HealthChecker HEALTH_CHECKER = HealthCheckerFactory.createDefault();
 
+    private static final java.util.concurrent.ConcurrentHashMap<String, MethodHandle> METHOD_HANDLE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
     /**
      * 执行方法
      *
@@ -38,26 +38,13 @@ public class JobInvokeUtil {
         Integer jobType = sysJob.getJobType();
         if (jobType == 1) {
             invokeInternalMethod(sysJob);
+            return "success";
         } else if (jobType == 2) {
             return invokeHttpInterface(sysJob);
         } else if (jobType == 3) {
-            invokeScript(sysJob);
-        }
-        throw new IllegalArgumentException("not support job type "  + jobType);
-    }
-
-    private static void invokeTargetMethod(SysJob sysJob) throws Exception {
-        String invokeTarget = sysJob.getInvokeTarget();
-        String beanName = getBeanName(invokeTarget);
-        String methodName = getMethodName(invokeTarget);
-        List<Object[]> methodParams = getMethodParams(invokeTarget);
-
-        if (!isValidClassName(beanName)) {
-            Object bean = SpringUtils.getBean(beanName);
-            invokeMethod(bean, methodName, methodParams);
+            return invokeScript(sysJob);
         } else {
-            Object bean = Class.forName(beanName).getDeclaredConstructor().newInstance();
-            invokeMethod(bean, methodName, methodParams);
+            throw new IllegalArgumentException("not support job type "  + jobType);
         }
     }
 
@@ -87,7 +74,6 @@ public class JobInvokeUtil {
 
         Object bean;
         try {
-            // 先尝试从 Spring 容器获取，如果失败则尝试反射实例化
             String beanName = MyStringUtils.uncapitalize(className.substring(className.lastIndexOf(".") + 1));
             bean = SpringUtils.getBean(beanName);
         } catch (Exception e) {
@@ -98,8 +84,89 @@ public class JobInvokeUtil {
             }
         }
 
-        Method method = bean.getClass().getMethod(methodName);
-        method.invoke(bean);
+        String cacheKey = className + "#" + methodName + "#" + bean.getClass().getName();
+        final Object finalBean = bean;
+        MethodHandle methodHandle = METHOD_HANDLE_CACHE.computeIfAbsent(cacheKey, key -> {
+            try {
+                Method method = finalBean.getClass().getMethod(methodName);
+                return MethodHandles.lookup().unreflect(method);
+            } catch (NoSuchMethodException | IllegalAccessException e) {
+                throw new RuntimeException("获取方法句柄失败: " + className + "." + methodName, e);
+            }
+        });
+
+        try {
+            methodHandle.invoke(bean);
+        } catch (Throwable e) {
+            if (e instanceof Exception) {
+                throw (Exception) e;
+            }
+            throw new Exception("方法调用失败: " + className + "." + methodName, e);
+        }
+    }
+
+    private static void invokeTargetMethod(SysJob sysJob) throws Exception {
+        String invokeTarget = sysJob.getInvokeTarget();
+        String beanName = getBeanName(invokeTarget);
+        String methodName = getMethodName(invokeTarget);
+        List<Object[]> methodParams = getMethodParams(invokeTarget);
+
+        Object bean;
+        if (!isValidClassName(beanName)) {
+            bean = SpringUtils.getBean(beanName);
+        } else {
+            bean = Class.forName(beanName).getDeclaredConstructor().newInstance();
+        }
+
+        if (MyStringUtils.isNotNull(methodParams) && !methodParams.isEmpty()) {
+            Class<?>[] paramTypes = getMethodParamsType(methodParams);
+            Method method = findCompatibleMethod(bean.getClass(), methodName, paramTypes);
+            Object[] paramValues = convertParams(methodParams, method.getParameterTypes());
+
+            String cacheKey = bean.getClass().getName() + "#" + methodName + "#" + paramTypes.length;
+            MethodHandle methodHandle = METHOD_HANDLE_CACHE.computeIfAbsent(cacheKey, key -> {
+                try {
+                    return MethodHandles.lookup().unreflect(method);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("获取方法句柄失败: " + bean.getClass().getName() + "." + methodName, e);
+                }
+            });
+
+            try {
+                methodHandle.invokeWithArguments(buildArgumentsList(bean, paramValues));
+            } catch (Throwable e) {
+                if (e instanceof Exception) {
+                    throw (Exception) e;
+                }
+                throw new Exception("带参数方法调用失败: " + bean.getClass().getName() + "." + methodName, e);
+            }
+        } else {
+            String cacheKey = bean.getClass().getName() + "#" + methodName + "#0";
+            MethodHandle methodHandle = METHOD_HANDLE_CACHE.computeIfAbsent(cacheKey, key -> {
+                try {
+                    Method method = bean.getClass().getMethod(methodName);
+                    return MethodHandles.lookup().unreflect(method);
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new RuntimeException("获取方法句柄失败: " + bean.getClass().getName() + "." + methodName, e);
+                }
+            });
+
+            try {
+                methodHandle.invoke(bean);
+            } catch (Throwable e) {
+                if (e instanceof Exception) {
+                    throw (Exception) e;
+                }
+                throw new Exception("方法调用失败: " + bean.getClass().getName() + "." + methodName, e);
+            }
+        }
+    }
+
+    private static java.util.ArrayList<Object> buildArgumentsList(Object bean, Object[] paramValues) {
+        java.util.ArrayList<Object> args = new java.util.ArrayList<>(paramValues.length + 1);
+        args.add(bean);
+        args.addAll(Arrays.asList(paramValues));
+        return args;
     }
 
     /**
@@ -222,7 +289,7 @@ public class JobInvokeUtil {
     /**
      * 3-脚本调度
      */
-    private static void invokeScript(SysJob sysJob) throws Exception {
+    private static String invokeScript(SysJob sysJob) throws Exception {
         String scriptName = sysJob.getScriptName();
         String scriptType = sysJob.getScriptType();
         String scriptContent = sysJob.getScriptContent();
@@ -240,22 +307,16 @@ public class JobInvokeUtil {
         log.info("开始执行脚本，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}",
                 sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType);
 
-        try {
-            String output = executeScriptByType(scriptType, scriptContent);
-            log.info("脚本执行成功，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}，执行输出：{}",
-                    sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType, output);
-        } catch (Exception e) {
-            log.error("脚本执行失败，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}，错误信息：{}",
-                    sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType,
-                    e.getMessage(), e);
-            throw new Exception("脚本执行失败：" + e.getMessage(), e);
-        }
+        String output = executeScriptByType(scriptType, scriptContent);
+        log.info("脚本执行成功，sysJobId：{}，jobName：{}，jobGroup：{}，脚本名称：{}，脚本类型：{}，执行输出：{}",
+                sysJob.getJobId(), sysJob.getJobName(), sysJob.getJobGroup(), scriptName, scriptType, output);
+        return output;
     }
 
     /**
      * 根据脚本类型执行脚本
      */
-    private static String executeScriptByType(String scriptType, String scriptContent) throws Exception {
+    static String executeScriptByType(String scriptType, String scriptContent) throws Exception {
         return switch (scriptType.toLowerCase()) {
             case "python" -> executePythonScript(scriptContent);
             case "shell" -> executeShellScript(scriptContent);
@@ -271,11 +332,82 @@ public class JobInvokeUtil {
      */
     private static String executePythonScript(String scriptContent) throws Exception {
         String os = System.getProperty("os.name").toLowerCase();
-        String pythonCommand = os.contains("win") ? "python" : "python3";
-
+        boolean isWindows = os.contains("win");
+        boolean hasGuiCode = containsGuiCode(scriptContent);
+        
+        String pythonCommand = isWindows ? "python" : "python3";
         String tempFile = createTempScriptFile(scriptContent, ".py");
-        ProcessBuilder processBuilder = new ProcessBuilder(pythonCommand, tempFile);
-        return executeProcess(processBuilder);
+        
+        log.info("操作系统: {}, Python命令: {}, GUI代码: {}, 临时文件: {}", 
+                os, pythonCommand, hasGuiCode, tempFile);
+
+        ProcessBuilder processBuilder;
+        if (isWindows && hasGuiCode) {
+            processBuilder = buildWindowsGuiProcess(pythonCommand, tempFile);
+        } else {
+            processBuilder = new ProcessBuilder(pythonCommand, tempFile);
+        }
+        processBuilder.redirectErrorStream(true);
+        
+        try {
+            return executeProcess(processBuilder);
+        } catch (Exception e) {
+            log.error("Python脚本执行失败，尝试使用python3命令", e);
+            if (isWindows) {
+                ProcessBuilder processBuilder2;
+                if (hasGuiCode) {
+                    processBuilder2 = buildWindowsGuiProcess("python3", tempFile);
+                } else {
+                    processBuilder2 = new ProcessBuilder("python3", tempFile);
+                }
+                processBuilder2.redirectErrorStream(true);
+                return executeProcess(processBuilder2);
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * 构建Windows GUI进程（使用PowerShell Start-Process）
+     */
+    private static ProcessBuilder buildWindowsGuiProcess(String pythonCommand, String scriptFile) {
+        String psCommand = String.format(
+                "Start-Process -FilePath '%s' -ArgumentList '%s' -WindowStyle Normal -Wait",
+                pythonCommand, scriptFile);
+        log.info("使用PowerShell Start-Process启动GUI脚本");
+        return new ProcessBuilder("powershell", "-Command", psCommand);
+    }
+
+    /**
+     * 检测脚本是否包含GUI相关代码
+     */
+    private static boolean containsGuiCode(String scriptContent) {
+        if (scriptContent == null) {
+            return false;
+        }
+        String[] guiKeywords = {
+            "tkinter", "Tk(", "tk.Tk(",
+            "PyQt5", "PyQt6", "PySide2", "PySide6",
+            "wxPython", "wx.",
+            "messagebox", "tkinter.messagebox",
+            "tkinter.filedialog", "tkinter.simpledialog",
+            "tkinter.colorchooser",
+            "input(", "raw_input(",
+            "dialog", "Dialog",
+            "MessageBox", "QMessageBox",
+            "QDialog", "QInputDialog",
+            "QFileDialog", "QColorDialog",
+            "font", "Font",
+            "canvas", "Canvas",
+            "turtle", "Turtle"
+        };
+        
+        for (String keyword : guiKeywords) {
+            if (scriptContent.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -326,6 +458,18 @@ public class JobInvokeUtil {
      * 执行进程并获取输出
      */
     private static String executeProcess(ProcessBuilder processBuilder) throws Exception {
+        return executeProcess(processBuilder, 60);
+    }
+
+    /**
+     * 执行进程并获取输出（带超时控制）
+     * 
+     * @param processBuilder 进程构建器
+     * @param timeoutSeconds 超时时间（秒）
+     */
+    private static String executeProcess(ProcessBuilder processBuilder, int timeoutSeconds) throws Exception {
+        log.info("执行命令: {}, 超时时间: {}秒", String.join(" ", processBuilder.command()), timeoutSeconds);
+        
         processBuilder.redirectErrorStream(true);
         Process process = processBuilder.start();
 
@@ -338,7 +482,15 @@ public class JobInvokeUtil {
             }
         }
 
-        int exitCode = process.waitFor();
+        boolean finished = process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new Exception("进程执行超时（" + timeoutSeconds + "秒），已强制终止。输出：" + output);
+        }
+        
+        int exitCode = process.exitValue();
+        log.info("命令执行完成，退出码: {}, 输出: {}", exitCode, output);
+        
         if (exitCode != 0) {
             throw new Exception("进程执行失败，退出码：" + exitCode + "，输出：" + output);
         }
@@ -355,27 +507,6 @@ public class JobInvokeUtil {
         return text.replace("{jobId}", String.valueOf(sysJob.getJobId()))
                 .replace("{jobName}", sysJob.getJobName())
                 .replace("{jobGroup}", sysJob.getJobGroup());
-    }
-
-    /**
-     * 调用任务方法
-     *
-     * @param bean         目标对象
-     * @param methodName   方法名称
-     * @param methodParams 方法参数
-     */
-    private static void invokeMethod(Object bean, String methodName, List<Object[]> methodParams)
-            throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException,
-            InvocationTargetException {
-        if (MyStringUtils.isNotNull(methodParams) && !methodParams.isEmpty()) {
-            Class<?>[] paramTypes = getMethodParamsType(methodParams);
-            Method method = findCompatibleMethod(bean.getClass(), methodName, paramTypes);
-            Object[] paramValues = convertParams(methodParams, method.getParameterTypes());
-            method.invoke(bean, paramValues);
-        } else {
-            Method method = bean.getClass().getMethod(methodName);
-            method.invoke(bean);
-        }
     }
 
     private static Method findCompatibleMethod(Class<?> clazz, String methodName, Class<?>[] paramTypes)
@@ -461,7 +592,7 @@ public class JobInvokeUtil {
      * @param invokeTarget 名称
      * @return true是 false否
      */
-    public static boolean isValidClassName(String invokeTarget) {
+    private static boolean isValidClassName(String invokeTarget) {
         return MyStringUtils.countMatches(invokeTarget, ".") > 1;
     }
 
@@ -471,7 +602,7 @@ public class JobInvokeUtil {
      * @param invokeTarget 目标字符串
      * @return bean名称
      */
-    public static String getBeanName(String invokeTarget) {
+    private static String getBeanName(String invokeTarget) {
         String beanName = MyStringUtils.substringBefore(invokeTarget, "(");
         return MyStringUtils.substringBeforeLast(beanName, ".");
     }
@@ -482,7 +613,7 @@ public class JobInvokeUtil {
      * @param invokeTarget 目标字符串
      * @return method方法
      */
-    public static String getMethodName(String invokeTarget) {
+    private static String getMethodName(String invokeTarget) {
         String methodName = MyStringUtils.substringBefore(invokeTarget, "(");
         return MyStringUtils.substringAfterLast(methodName, ".");
     }
@@ -493,7 +624,7 @@ public class JobInvokeUtil {
      * @param invokeTarget 目标字符串
      * @return method方法相关参数列表
      */
-    public static List<Object[]> getMethodParams(String invokeTarget) {
+    private static List<Object[]> getMethodParams(String invokeTarget) {
         String methodStr = MyStringUtils.substringBetween(invokeTarget, "(", ")");
         if (MyStringUtils.isEmpty(methodStr)) {
             return null;
@@ -537,7 +668,7 @@ public class JobInvokeUtil {
      * @param methodParams 参数相关列表
      * @return 参数类型列表
      */
-    public static Class<?>[] getMethodParamsType(List<Object[]> methodParams) {
+    private static Class<?>[] getMethodParamsType(List<Object[]> methodParams) {
         Class<?>[] classes = new Class<?>[methodParams.size()];
         int index = 0;
         for (Object[] os : methodParams) {

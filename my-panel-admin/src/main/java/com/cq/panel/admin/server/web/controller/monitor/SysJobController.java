@@ -153,7 +153,7 @@ public class SysJobController extends BaseController
         SysJob job = jobConverter.toEntity(dto);
         job.setUpdateBy(getUsername());
         final int row = jobService.updateJobWithValidation(job);
-        logger.info("修改定时任务{}影响行数：{}", job.getJobId(), row);
+        logger.info("修改定时任务[jobId={}]影响行数：{}", job.getJobId(), row);
         return Result.success();
     }
 
@@ -168,7 +168,7 @@ public class SysJobController extends BaseController
     {
         SysJob job = jobConverter.toEntity(dto);
         final int rows = jobService.changeStatusWithValidation(job);
-        logger.info("修改定时任务状态{}影响行数{}", dto.getJobId(),  rows);
+        logger.info("修改定时任务状态[jobId={}]影响行数{}", dto.getJobId(),  rows);
         return Result.success();
     }
 

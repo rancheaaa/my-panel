@@ -288,6 +288,14 @@ public class MethodScannerServiceImpl implements IMethodScannerService {
                 return result;
             }
 
+            if (providedValue instanceof String strValue) {
+                boolean canConvert = tryParseString(strValue, expectedType);
+                if (canConvert) {
+                    result.setValid(true);
+                    return result;
+                }
+            }
+
             result.setValid(false);
             result.setErrorMessage(String.format("参数类型不匹配，期望: %s, 实际: %s", 
                 getTypeDisplayName(expectedType), getTypeDisplayName(providedType)));
@@ -298,6 +306,37 @@ public class MethodScannerServiceImpl implements IMethodScannerService {
         }
 
         return result;
+    }
+
+    private boolean tryParseString(String value, Class<?> targetType) {
+        try {
+            if (targetType == String.class) {
+                return true;
+            } else if (targetType == Integer.class || targetType == int.class) {
+                Integer.parseInt(value);
+                return true;
+            } else if (targetType == Long.class || targetType == long.class) {
+                Long.parseLong(value.replace("L", "").replace("l", ""));
+                return true;
+            } else if (targetType == Double.class || targetType == double.class) {
+                Double.parseDouble(value.replace("D", "").replace("d", ""));
+                return true;
+            } else if (targetType == Float.class || targetType == float.class) {
+                Float.parseFloat(value.replace("F", "").replace("f", ""));
+                return true;
+            } else if (targetType == Boolean.class || targetType == boolean.class) {
+                return "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value);
+            } else if (targetType == Short.class || targetType == short.class) {
+                Short.parseShort(value);
+                return true;
+            } else if (targetType == Byte.class || targetType == byte.class) {
+                Byte.parseByte(value);
+                return true;
+            }
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        return false;
     }
 
     private String getTypeDisplayName(Class<?> type) {

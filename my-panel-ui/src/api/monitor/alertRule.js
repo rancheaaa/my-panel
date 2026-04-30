@@ -37,3 +37,10 @@ export function updateAlertEventStatus(id, status) {
     params: { status }
   });
 }
+
+export function getAlertSummary() {
+  return request({
+    url: '/monitor/alert/summary',
+    method: 'get'
+  });
+}

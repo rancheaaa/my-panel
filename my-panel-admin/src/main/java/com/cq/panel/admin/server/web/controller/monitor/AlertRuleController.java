@@ -2,7 +2,7 @@ package com.cq.panel.admin.server.web.controller.monitor;
 
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertEvent;
 import com.cq.panel.admin.server.repository.domain.monitor.MonitorAlertRule;
-import com.cq.panel.admin.server.repository.service.IMonitorDashboardService;
+import com.cq.panel.admin.server.repository.service.IAlertRuleService;
 import com.cq.panel.admin.server.web.domain.dto.monitor.MonitorAlertRuleSaveDTO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import com.cq.panel.authlite.annotation.RequirePermission;
@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 报警规则管理
@@ -22,10 +23,10 @@ import java.util.List;
 @RequestMapping("/monitor/alert")
 public class AlertRuleController
 {
-    private final IMonitorDashboardService monitorDashboardService;
+    private final IAlertRuleService alertRuleService;
 
-    public AlertRuleController(IMonitorDashboardService monitorDashboardService) {
-        this.monitorDashboardService = monitorDashboardService;
+    public AlertRuleController(IAlertRuleService alertRuleService) {
+        this.alertRuleService = alertRuleService;
     }
 
     @RequirePermission("op:alertRule:list")
@@ -33,7 +34,7 @@ public class AlertRuleController
     @GetMapping("/rules")
     public Result<List<MonitorAlertRule>> listAlertRules()
     {
-        return Result.success(monitorDashboardService.listAlertRules());
+        return Result.success(alertRuleService.listAlertRules());
     }
 
     @RequirePermission("op:alertRule:add")
@@ -41,7 +42,7 @@ public class AlertRuleController
     @PostMapping("/rule")
     public Result<Void> saveAlertRule(@RequestBody MonitorAlertRuleSaveDTO dto)
     {
-        monitorDashboardService.saveAlertRule(dto, "system");
+        alertRuleService.saveAlertRule(dto, "system");
         return Result.success();
     }
 
@@ -50,7 +51,7 @@ public class AlertRuleController
     @DeleteMapping("/rule/{id}")
     public Result<Void> deleteAlertRule(@PathVariable("id") Long id)
     {
-        monitorDashboardService.deleteAlertRule(id);
+        alertRuleService.deleteAlertRule(id);
         return Result.success();
     }
 
@@ -60,7 +61,7 @@ public class AlertRuleController
     public Result<List<MonitorAlertEvent>> listAlertEvents(@RequestParam(value = "range", required = false, defaultValue = "1h") String range,
                                                            @RequestParam(value = "limit", required = false, defaultValue = "200") Integer limit)
     {
-        return Result.success(monitorDashboardService.listAlertEvents(range, limit));
+        return Result.success(alertRuleService.listAlertEvents(range, limit));
     }
 
     @RequirePermission("op:alertEvent:query")
@@ -69,7 +70,14 @@ public class AlertRuleController
     public Result<Void> updateAlertEventStatus(@PathVariable("id") Long id,
                                                @RequestParam("status") String status)
     {
-        monitorDashboardService.updateAlertEventStatus(id, status);
+        alertRuleService.updateAlertEventStatus(id, status);
         return Result.success();
+    }
+
+    @Operation(summary = "获取告警汇总信息")
+    @GetMapping("/summary")
+    public Result<Map<String, Object>> getAlertSummary()
+    {
+        return Result.success(alertRuleService.buildAlertSummary());
     }
 }

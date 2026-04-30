@@ -31,6 +31,7 @@ import {
   getDashboardTrend,
   getServiceInstances
 } from '../../../api/monitor/dashboard';
+import { getAlertSummary } from '../../../api/monitor/alertRule';
 import './index.scss';
 
 const CATEGORY_METRICS = {
@@ -448,6 +449,7 @@ const ServiceDashboard = () => {
   const [serviceInstances, setServiceInstances] = useState([]);
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [selectedInstance, setSelectedInstance] = useState('');
+  const [alertSummary, setAlertSummary] = useState({ critical: 0, warning: 0, total: 0 });
 
   const fetchServiceInstances = async () => {
     try {
@@ -462,6 +464,17 @@ const ServiceDashboard = () => {
       }
     } catch (e) {
       console.error('Failed to fetch service instances:', e);
+    }
+  };
+
+  const fetchAlertSummary = async () => {
+    try {
+      const res = await getAlertSummary();
+      if (res.code === 200 && res.data) {
+        setAlertSummary(res.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch alert summary:', e);
     }
   };
 
@@ -521,15 +534,18 @@ const ServiceDashboard = () => {
   useEffect(() => {
     fetchServiceInstances();
     doFetch();
+    fetchAlertSummary();
     if (!autoRefresh) {
       return undefined;
     }
-    const timer = setInterval(() => doFetch(true), refreshInterval);
+    const timer = setInterval(() => {
+      doFetch(true);
+      fetchAlertSummary();
+    }, refreshInterval);
     return () => clearInterval(timer);
   }, [range, activeCategory, autoRefresh, refreshInterval, selectedInstance]);
 
   const stats = overview?.basicStats || {};
-  const alertSummary = overview?.alertSummary || {};
 
   const summaryCards = [
     {

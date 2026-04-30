@@ -21,7 +21,7 @@ public class MonitorCollectTask {
         this.sysConfigService = sysConfigService;
     }
 
-    @Scheduled(fixedDelay = 1000)
+    @Scheduled(fixedDelay = 3000)
     public void collect() {
         long now = System.currentTimeMillis();
         int intervalMs = getCollectIntervalMs();

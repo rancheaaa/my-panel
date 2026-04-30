@@ -25,4 +25,7 @@ public interface MonitorMetricMapper {
     List<Map<String, String>> selectDistinctServiceInstances();
 
     int deleteBefore(@Param("cutoffTime") Date cutoffTime);
+
+    List<MonitorMetricSample> selectLatestAll(@Param("serviceId") String serviceId,
+            @Param("serviceIpPort") String serviceIpPort);
 }

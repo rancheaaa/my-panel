@@ -15,14 +15,16 @@ import jakarta.validation.constraints.Pattern;
 public class SysJobDTO {
 
     @Schema(description = "任务序号", example = "1")
+    @NotNull(message = "任务序号不能为空")
     private Long jobId;
 
     @Schema(description = "任务名称", example = "系统默认定时任务")
     @NotBlank(message = "任务名称不能为空")
-    @Size(min = 0, max = 64, message = "任务名称不能超过64个字符")
+    @Size(max = 128, message = "任务名称不能超过128个字符")
     private String jobName;
 
     @Schema(description = "任务组名", example = "DEFAULT")
+    @NotBlank(message = "任务组名不能为空")
     private String jobGroup;
 
     @Schema(description = "调用目标字符串", example = "ryTask.ryParams('ry')")
@@ -79,7 +81,7 @@ public class SysJobDTO {
 
     @Schema(description = "Cron执行表达式", example = "0/10 * * * * ?")
     @NotBlank(message = "Cron执行表达式不能为空")
-    @Size(min = 0, max = 255, message = "Cron执行表达式不能超过255个字符")
+    @Size(max = 255, message = "Cron执行表达式不能超过255个字符")
     private String cronExpression;
 
     @Schema(description = "计划策略", example = "1")
@@ -92,6 +94,6 @@ public class SysJobDTO {
     private String status;
 
     @Schema(description = "备注", example = "备注信息")
-    @Size(min = 0, max = 500, message = "备注不能超过500个字符")
+    @Size(max = 500, message = "备注不能超过500个字符")
     private String remark;
 }

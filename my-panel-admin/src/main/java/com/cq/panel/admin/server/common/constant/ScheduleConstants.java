@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.common.constant;
 
+import lombok.Getter;
+
 /**
  * 任务调度通用常量
  * 
@@ -7,8 +9,6 @@ package com.cq.panel.admin.server.common.constant;
  */
 public class ScheduleConstants
 {
-    public static final String TASK_CLASS_NAME = "TASK_CLASS_NAME";
-
     /** 执行目标key */
     public static final String TASK_PROPERTIES = "TASK_PROPERTIES";
 
@@ -24,6 +24,7 @@ public class ScheduleConstants
     /** 不触发立即执行 */
     public static final String MISFIRE_DO_NOTHING = "3";
 
+    @Getter
     public enum Status
     {
         /**
@@ -35,16 +36,12 @@ public class ScheduleConstants
          */
         PAUSE("1");
 
-        private String value;
+        private final String value;
 
-        private Status(String value)
+        Status(String value)
         {
             this.value = value;
         }
 
-        public String getValue()
-        {
-            return value;
-        }
     }
 }

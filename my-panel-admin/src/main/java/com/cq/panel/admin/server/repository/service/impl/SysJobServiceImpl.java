@@ -1,20 +1,26 @@
 package com.cq.panel.admin.server.repository.service.impl;
 
+import com.cq.panel.admin.server.common.constant.Constants;
 import com.cq.panel.admin.server.common.constant.ScheduleConstants;
-import com.cq.panel.admin.server.web.exception.job.TaskException;
+import com.cq.panel.admin.server.common.utils.JobLogUtil;
+import com.cq.panel.admin.server.common.utils.MyStringUtils;
 import com.cq.panel.admin.server.quartz.CronUtils;
+import com.cq.panel.admin.server.quartz.JobInvokeUtil;
 import com.cq.panel.admin.server.quartz.ScheduleUtils;
 import com.cq.panel.admin.server.repository.domain.SysJob;
 import com.cq.panel.admin.server.repository.mapper.SysJobMapper;
 import com.cq.panel.admin.server.repository.service.ISysJobService;
+import com.cq.panel.admin.server.web.exception.ServiceException;
+import com.cq.panel.admin.server.web.exception.job.TaskException;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.quartz.JobDataMap;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -30,9 +36,12 @@ public class SysJobServiceImpl implements ISysJobService
 
     private final SysJobMapper jobMapper;
 
-    public SysJobServiceImpl(Scheduler scheduler, SysJobMapper jobMapper) {
+    private final TaskExecutor threadPoolTaskExecutor;
+
+    public SysJobServiceImpl(Scheduler scheduler, SysJobMapper jobMapper, TaskExecutor threadPoolTaskExecutor) {
         this.scheduler = scheduler;
         this.jobMapper = jobMapper;
+        this.threadPoolTaskExecutor = threadPoolTaskExecutor;
     }
 
     /**
@@ -82,13 +91,11 @@ public class SysJobServiceImpl implements ISysJobService
     @Transactional(rollbackFor = Exception.class)
     public int pauseJob(SysJob job) throws SchedulerException
     {
-        Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
         job.setStatus(ScheduleConstants.Status.PAUSE.getValue());
         int rows = jobMapper.updateJob(job);
         if (rows > 0)
         {
-            scheduler.pauseJob(ScheduleUtils.getJobKey(jobId, jobGroup));
+            scheduler.pauseJob(ScheduleUtils.getJobKey(job));
         }
         return rows;
     }
@@ -102,13 +109,11 @@ public class SysJobServiceImpl implements ISysJobService
     @Transactional(rollbackFor = Exception.class)
     public int resumeJob(SysJob job) throws SchedulerException
     {
-        Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
         job.setStatus(ScheduleConstants.Status.NORMAL.getValue());
         int rows = jobMapper.updateJob(job);
         if (rows > 0)
         {
-            scheduler.resumeJob(ScheduleUtils.getJobKey(jobId, jobGroup));
+            scheduler.resumeJob(ScheduleUtils.getJobKey(job));
         }
         return rows;
     }
@@ -123,11 +128,10 @@ public class SysJobServiceImpl implements ISysJobService
     public int deleteJob(SysJob job) throws SchedulerException
     {
         Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
         int rows = jobMapper.deleteJobById(jobId);
         if (rows > 0)
         {
-            scheduler.deleteJob(ScheduleUtils.getJobKey(jobId, jobGroup));
+            scheduler.deleteJob(ScheduleUtils.getJobKey(job));
         }
         return rows;
     }
@@ -172,98 +176,6 @@ public class SysJobServiceImpl implements ISysJobService
     }
 
     /**
-     * 立即运行任务
-     * 
-     * @param job 调度信息
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public boolean run(SysJob job) throws SchedulerException
-    {
-        boolean result = false;
-        Long jobId = job.getJobId();
-        String jobGroup = job.getJobGroup();
-        SysJob properties = selectJobById(job.getJobId());
-        // 参数
-        JobDataMap dataMap = new JobDataMap();
-        dataMap.put(ScheduleConstants.TASK_PROPERTIES, properties);
-        JobKey jobKey = ScheduleUtils.getJobKey(jobId, jobGroup);
-        if (scheduler.checkExists(jobKey))
-        {
-            result = true;
-            scheduler.triggerJob(jobKey, dataMap);
-        }
-        return result;
-    }
-
-    /**
-     * 新增任务
-     * 
-     * @param job 调度信息 调度信息
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int insertJob(SysJob job) throws SchedulerException, TaskException
-    {
-        job.setStatus(ScheduleConstants.Status.PAUSE.getValue());
-        int rows = jobMapper.insertJob(job);
-        if (rows > 0)
-        {
-            ScheduleUtils.createScheduleJob(scheduler, job);
-        }
-        return rows;
-    }
-
-    /**
-     * 更新任务的时间表达式
-     * 
-     * @param job 调度信息
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int updateJob(SysJob job) throws SchedulerException, TaskException
-    {
-        SysJob properties = selectJobById(job.getJobId());
-        int rows = jobMapper.updateJob(job);
-        if (rows > 0)
-        {
-            updateSchedulerJob(job, properties.getJobGroup());
-        }
-        return rows;
-    }
-
-    /**
-     * 更新任务
-     * 
-     * @param job 任务对象
-     * @param jobGroup 任务组名
-     */
-    public void updateSchedulerJob(SysJob job, String jobGroup) throws SchedulerException, TaskException
-    {
-        Long jobId = job.getJobId();
-        // 判断是否存在
-        JobKey jobKey = ScheduleUtils.getJobKey(jobId, jobGroup);
-        if (scheduler.checkExists(jobKey))
-        {
-            // 防止创建时存在数据问题 先移除，然后在执行创建操作
-            scheduler.deleteJob(jobKey);
-        }
-        ScheduleUtils.createScheduleJob(scheduler, job);
-    }
-
-    /**
-     * 校验cron表达式是否有效
-     * 
-     * @param cronExpression 表达式
-     * @return 结果
-     */
-    @Override
-    public boolean checkCronExpressionIsValid(String cronExpression)
-    {
-        return CronUtils.isValid(cronExpression);
-    }
-    
-    /**
      * 查询任务组名列表（用于自动完成）
      * 
      * @param jobGroup 任务组名（支持模糊查询）
@@ -273,5 +185,266 @@ public class SysJobServiceImpl implements ISysJobService
     public List<String> selectJobGroupList(String jobGroup)
     {
         return jobMapper.selectJobGroupList(jobGroup);
+    }
+    
+    /**
+     * 验证任务信息（根据jobType验证各字段）
+     * 
+     * @param job 任务信息
+     */
+    @Override
+    public void validateJob(SysJob job)
+    {
+        Integer jobType = job.getJobType();
+        if (Integer.valueOf(1).equals(jobType))
+        {
+            if (MyStringUtils.isEmpty(job.getMethodName()))
+            {
+                throw new ServiceException("内置方法不能为空");
+            }
+            if (MyStringUtils.isNotEmpty(job.getHttpUrl()))
+            {
+                throw new ServiceException("内置方法模式下，HTTP接口URL必须为空");
+            }
+            if (MyStringUtils.isNotEmpty(job.getScriptName()))
+            {
+                throw new ServiceException("内置方法模式下，脚本名称必须为空");
+            }
+        }
+        else if (Integer.valueOf(2).equals(jobType))
+        {
+            if (MyStringUtils.isEmpty(job.getHttpUrl()))
+            {
+                throw new ServiceException("HTTP接口URL不能为空");
+            }
+            if (MyStringUtils.isNotEmpty(job.getMethodName()))
+            {
+                throw new ServiceException("HTTP接口模式下，内置方法必须为空");
+            }
+            if (MyStringUtils.isNotEmpty(job.getScriptName()))
+            {
+                throw new ServiceException("HTTP接口模式下，脚本名称必须为空");
+            }
+        }
+        else if (Integer.valueOf(3).equals(jobType))
+        {
+            if (MyStringUtils.isEmpty(job.getScriptName()))
+            {
+                throw new ServiceException("脚本名称不能为空");
+            }
+            if (MyStringUtils.isEmpty(job.getScriptType()))
+            {
+                throw new ServiceException("脚本类型不能为空");
+            }
+            if (MyStringUtils.isEmpty(job.getScriptContent()))
+            {
+                throw new ServiceException("脚本内容不能为空");
+            }
+            if (MyStringUtils.isNotEmpty(job.getMethodName()))
+            {
+                throw new ServiceException("脚本模式下，内置方法必须为空");
+            }
+            if (MyStringUtils.isNotEmpty(job.getHttpUrl()))
+            {
+                throw new ServiceException("脚本模式下，HTTP接口URL必须为空");
+            }
+        }
+    }
+    
+    /**
+     * 验证调用目标字符串（安全检查）
+     * 
+     * @param jobName 任务名称
+     * @param invokeTarget 调用目标
+     */
+    @Override
+    public void validateInvokeTarget(String jobName, String invokeTarget)
+    {
+        if (MyStringUtils.contains(invokeTarget, Constants.LOOKUP_RMI))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'rmi'调用");
+        }
+        else if (MyStringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.LOOKUP_LDAP, Constants.LOOKUP_LDAPS }))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'ldap(s)'调用");
+        }
+        else if (MyStringUtils.containsAnyIgnoreCase(invokeTarget, new String[] { Constants.HTTP, Constants.HTTPS }))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不允许'http(s)'调用");
+        }
+        else if (MyStringUtils.containsAnyIgnoreCase(invokeTarget, Constants.JOB_ERROR_STR))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串存在违规");
+        }
+        else if (!ScheduleUtils.whiteList(invokeTarget))
+        {
+            throw new ServiceException("任务'" + jobName + "'失败，目标字符串不在白名单内");
+        }
+    }
+    
+    /**
+     * 新增定时任务（包含完整业务逻辑）
+     * 
+     * @param job 任务信息
+     * @return 结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int addJob(SysJob job) throws SchedulerException, TaskException
+    {
+        validateJob(job);
+        
+        if (!CronUtils.isValid(job.getCronExpression()))
+        {
+            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，Cron表达式不正确");
+        }
+        
+        Integer jobType = job.getJobType();
+        if (jobType == null || jobType == 0 || jobType == 1)
+        {
+            String target = (jobType != null && jobType == 1) ? job.getMethodName() : job.getInvokeTarget();
+            
+            if (MyStringUtils.isEmpty(target))
+            {
+                if (jobType == null || jobType == 0)
+                {
+                    throw new ServiceException("调用目标不能为空");
+                }
+            }
+            else
+            {
+                validateInvokeTarget(job.getJobName(), target);
+            }
+            
+            if (jobType != null && jobType == 1)
+            {
+                job.setInvokeTarget(job.getMethodName());
+            }
+        }
+        else if (jobType == 2)
+        {
+            job.setInvokeTarget(job.getHttpUrl());
+        }
+        else if (jobType == 3)
+        {
+            job.setInvokeTarget(job.getScriptName());
+        }
+        final int insertRows = jobMapper.insertJob(job);
+        if (insertRows <= 0)
+        {
+            throw new ServiceException("新增任务'" + job.getJobName() + "'失败，插入数据库失败");
+        }
+        
+        job.setStatus(ScheduleConstants.Status.PAUSE.getValue());
+        ScheduleUtils.createScheduleJob(scheduler, job);
+        
+        return insertRows;
+    }
+    
+    /**
+     * 修改定时任务（包含完整业务逻辑）
+     * 
+     * @param job 任务信息
+     * @return 结果
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int updateJobWithValidation(SysJob job) throws SchedulerException, TaskException
+    {
+        validateJob(job);
+        
+        if (!CronUtils.isValid(job.getCronExpression()))
+        {
+            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，Cron表达式不正确" + job.getCronExpression());
+        }
+        
+        Integer jobType = job.getJobType();
+        if (jobType == 1)
+        {
+            String target = job.getMethodName();
+            if (MyStringUtils.isNotEmpty(target))
+            {
+                validateInvokeTarget(job.getJobName(), target);
+            }
+            job.setInvokeTarget(job.getMethodName());
+        }
+        else if (jobType == 2)
+        {
+            job.setInvokeTarget(job.getHttpUrl());
+        }
+        
+        final int updateRows = jobMapper.updateJob(job);
+        if (updateRows <= 0)
+        {
+            throw new ServiceException("修改任务'" + job.getJobName() + "'失败，更新数据库失败");
+        }
+
+        // 判断是否存在
+        JobKey jobKey = ScheduleUtils.getJobKey(job);
+        if (scheduler.checkExists(jobKey))
+        {
+            // 防止创建时存在数据问题 先移除，然后在执行创建操作
+            scheduler.deleteJob(jobKey);
+        }
+        ScheduleUtils.createScheduleJob(scheduler, job);
+        
+        return updateRows;
+    }
+    
+    /**
+     * 修改定时任务状态（包含完整业务逻辑）
+     * 
+     * @param job 任务信息
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int changeStatusWithValidation(SysJob job) throws SchedulerException
+    {
+        SysJob newJob = jobMapper.selectJobById(job.getJobId());
+        newJob.setStatus(job.getStatus());
+        final int changeRows = changeStatus(newJob);
+        if (changeRows <= 0)
+        {
+            throw new ServiceException("任务状态修改失败");
+        }
+        return changeRows;
+    }
+    
+    /**
+     * 立即执行任务（包含完整业务逻辑）
+     * 
+     * @param jobId 任务ID
+     */
+    @Override
+    public void runJobImmediately(Long jobId)
+    {
+        if (jobId == null)
+        {
+            throw new ServiceException("任务ID不能为空");
+        }
+        
+        SysJob job = jobMapper.selectJobById(jobId);
+        if (job == null)
+        {
+            throw new ServiceException("任务不存在或已过期！");
+        }
+        
+        if (!CronUtils.isValid(job.getCronExpression()))
+        {
+            throw new ServiceException("任务'" + job.getJobName() + "'失败，Cron表达式不正确");
+        }
+        
+        threadPoolTaskExecutor.execute(() -> {
+            try
+            {
+                String selectedUrl = JobInvokeUtil.invokeMethod(job);
+                JobLogUtil.createAndSaveJobLog(job, new Date(), null, "1", selectedUrl);
+            }
+            catch (Exception e)
+            {
+                log.error("执行定时任务 {} 失败", job, e);
+                JobLogUtil.createAndSaveJobLog(job, new Date(), e, "1", null);
+            }
+        });
     }
 }

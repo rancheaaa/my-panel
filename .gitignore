@@ -56,3 +56,4 @@ nginx-*.zip
 
 dependency-reduced-pom.xml
 .init.txt
+.claude

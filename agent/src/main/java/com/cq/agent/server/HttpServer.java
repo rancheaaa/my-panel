@@ -52,7 +52,7 @@ public class HttpServer {
     public HttpServer(AgentConfig config, CommandExecutor commandExecutor, FileService fileService, ChunkedTransferService chunkedTransferService) {
         this.config = config;
         this.commandExecutor = commandExecutor;
-        this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService);
+        this.handlerFactory = new HandlerFactory(config, fileService, chunkedTransferService);
     }
 
     /**

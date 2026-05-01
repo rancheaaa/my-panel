@@ -6,11 +6,11 @@ import com.cq.agent.dto.AgentRegistryResponse;
 import com.cq.agent.dto.ApiResponse;
 import com.cq.panel.common.constant.AgentNodeStatusConstant;
 import com.cq.panel.common.utils.IpUtils;
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -33,8 +33,20 @@ public class AgentRegistryService {
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean registered;
     private final AtomicBoolean running;
+    /**
+     * -- SETTER --
+     *  设置实际监听的端口号
+     *
+     */
+    @Setter
     private int actualPort;
-    
+
+    /**
+     * -- GETTER --
+     *  获取注册信息
+     *
+     */
+    @Getter
     private AgentRegistryResponse registryInfo;
 
     public AgentRegistryService(AgentConfig config) {
@@ -173,13 +185,6 @@ public class AgentRegistryService {
     private AgentRegistryRequest buildUpRegistryRequest(Integer nodeStatus) {
         AgentRegistryRequest request = new AgentRegistryRequest();
 
-        // 节点名称
-        String nodeName = config.getNodeName();
-        if (nodeName == null || nodeName.isEmpty()) {
-            nodeName = "agent-" + config.getAgentId().substring(0, 8);
-        }
-        request.setNodeName(nodeName);
-        
         // 操作系统
         String osType = config.getOsType();
         if (osType == null || osType.isEmpty()) {
@@ -188,9 +193,9 @@ public class AgentRegistryService {
         request.setOsType(osType);
         
         // 应用ID
+        final String userName = System.getProperty("user.name");
         if (config.getAppId() == null || config.getAppId().isEmpty()) {
             // 获取当前运行环境下操作系统用户名作为应用ID
-            final String userName = System.getProperty("user.name");
             logger.debug("set appId to {}", userName);
             config.setAppId(userName);
         }
@@ -210,7 +215,14 @@ public class AgentRegistryService {
         // Agent端口
         int port = actualPort > 0 ? actualPort : config.getServerPort();
         request.setAgentPort(port);
-        
+
+        // 节点名称
+        String nodeName = config.getNodeName();
+        if (nodeName == null || nodeName.isEmpty()) {
+            nodeName = userName + "@" + agentIp;
+        }
+        request.setNodeName(nodeName);
+
         // 节点状态
         request.setNodeStatus(nodeStatus);
         
@@ -248,15 +260,6 @@ public class AgentRegistryService {
     }
 
     /**
-     * 获取注册信息
-     * 
-     * @return 注册信息
-     */
-    public AgentRegistryResponse getRegistryInfo() {
-        return registryInfo;
-    }
-
-    /**
      * 检查是否正在运行
      * 
      * @return 是否正在运行
@@ -264,13 +267,5 @@ public class AgentRegistryService {
     public boolean isRunning() {
         return running.get();
     }
-    
-    /**
-     * 设置实际监听的端口号
-     * 
-     * @param actualPort 实际端口号
-     */
-    public void setActualPort(int actualPort) {
-        this.actualPort = actualPort;
-    }
+
 }

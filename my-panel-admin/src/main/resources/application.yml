@@ -22,6 +22,9 @@ app:
   avatarPath: ${app.profile}/avatar
   # 上传路径
   uploadPath: ${app.profile}/upload
+  # Proxy服务地址
+  proxy:
+    base-url: ${PROXY_URL:http://localhost:9876}
 
 # 开发环境配置
 server:

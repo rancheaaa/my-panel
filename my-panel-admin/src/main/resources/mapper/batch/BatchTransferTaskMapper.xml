@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper">
+
+    <resultMap type="BatchTransferTask" id="BatchTransferTaskResult">
+        <result property="id"    column="id"    />
+        <result property="taskName"    column="task_name"    />
+        <result property="taskDescription"    column="task_description"    />
+        <result property="sourceAgentId"    column="source_agent_id"    />
+        <result property="sourceDir"    column="source_dir"    />
+        <result property="includePatterns"    column="include_patterns"    />
+        <result property="excludePatterns"    column="exclude_patterns"    />
+        <result property="scanFrequencySec"    column="scan_frequency_sec"    />
+        <result property="maxScanFiles"    column="max_scan_files"    />
+        <result property="targetAgents"    column="target_agents"    />
+        <result property="targetDirs"    column="target_dirs"    />
+        <result property="maxBandwidthKbS"    column="max_bandwidth_kb_s"    />
+        <result property="retryEnabled"    column="retry_enabled"    />
+        <result property="retryMaxDays"    column="retry_max_days"    />
+        <result property="retryIntervalMin"    column="retry_interval_min"    />
+        <result property="postTransferAction"    column="post_transfer_action"    />
+        <result property="backupDir"    column="backup_dir"    />
+        <result property="backupMode"    column="backup_mode"    />
+        <result property="preserveDirStructure"    column="preserve_dir_structure"    />
+        <result property="transferMode"    column="transfer_mode"    />
+        <result property="routingStrategy"    column="routing_strategy"    />
+        <result property="routingConfig"    column="routing_config"    />
+        <result property="status"    column="status"    />
+        <result property="totalFiles"    column="total_files"    />
+        <result property="totalSizeBytes"    column="total_size_bytes"    />
+        <result property="transferredFiles"    column="transferred_files"    />
+        <result property="transferredSizeBytes"    column="transferred_size_bytes"    />
+        <result property="failedFiles"    column="failed_files"    />
+        <result property="postProcessFiles"    column="post_process_files"    />
+        <result property="postProcessFailed"    column="post_process_failed"    />
+        <result property="startedAt"    column="started_at"    />
+        <result property="completedAt"    column="completed_at"    />
+        <result property="postProcessedAt"    column="post_processed_at"    />
+        <result property="deleted"    column="deleted"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectBatchTransferTaskVo">
+        select id, task_name, task_description, source_agent_id, source_dir, include_patterns, exclude_patterns,
+               scan_frequency_sec, max_scan_files, target_agents, target_dirs, max_bandwidth_kb_s, retry_enabled, retry_max_days,
+               retry_interval_min, post_transfer_action, backup_dir, backup_mode, preserve_dir_structure,
+               transfer_mode, routing_strategy, routing_config, status, total_files, total_size_bytes,
+               transferred_files, transferred_size_bytes, failed_files, post_process_files, post_process_failed,
+               started_at, completed_at, post_processed_at, deleted, create_by, create_time, update_by, update_time, remark
+        from batch_transfer_task
+    </sql>
+
+    <select id="selectBatchTransferTaskList" parameterType="BatchTransferTask" resultMap="BatchTransferTaskResult">
+        <include refid="selectBatchTransferTaskVo"/>
+        <where>
+            deleted = 0
+            <if test="taskName != null and taskName != ''"> and task_name like concat('%', #{taskName}, '%')</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''"> and source_agent_id = #{sourceAgentId}</if>
+            <if test="transferMode != null and transferMode != ''"> and transfer_mode = #{transferMode}</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectBatchTransferTaskById" parameterType="Long" resultMap="BatchTransferTaskResult">
+        <include refid="selectBatchTransferTaskVo"/>
+        where id = #{id} and deleted = 0
+    </select>
+
+    <insert id="insertBatchTransferTask" parameterType="BatchTransferTask" useGeneratedKeys="true" keyProperty="id">
+        insert into batch_transfer_task
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="taskName != null and taskName != ''">task_name,</if>
+            <if test="taskDescription != null">task_description,</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">source_agent_id,</if>
+            <if test="sourceDir != null and sourceDir != ''">source_dir,</if>
+            <if test="includePatterns != null">include_patterns,</if>
+            <if test="excludePatterns != null">exclude_patterns,</if>
+            <if test="scanFrequencySec != null">scan_frequency_sec,</if>
+            <if test="maxScanFiles != null">max_scan_files,</if>
+            <if test="targetAgents != null">target_agents,</if>
+            <if test="targetDirs != null">target_dirs,</if>
+            <if test="maxBandwidthKbS != null">max_bandwidth_kb_s,</if>
+            <if test="retryEnabled != null">retry_enabled,</if>
+            <if test="retryMaxDays != null">retry_max_days,</if>
+            <if test="retryIntervalMin != null">retry_interval_min,</if>
+            <if test="postTransferAction != null">post_transfer_action,</if>
+            <if test="backupDir != null">backup_dir,</if>
+            <if test="backupMode != null">backup_mode,</if>
+            <if test="preserveDirStructure != null">preserve_dir_structure,</if>
+            <if test="transferMode != null">transfer_mode,</if>
+            <if test="routingStrategy != null">routing_strategy,</if>
+            <if test="routingConfig != null">routing_config,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="taskName != null and taskName != ''">#{taskName},</if>
+            <if test="taskDescription != null">#{taskDescription},</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">#{sourceAgentId},</if>
+            <if test="sourceDir != null and sourceDir != ''">#{sourceDir},</if>
+            <if test="includePatterns != null">#{includePatterns},</if>
+            <if test="excludePatterns != null">#{excludePatterns},</if>
+            <if test="scanFrequencySec != null">#{scanFrequencySec},</if>
+            <if test="maxScanFiles != null">#{maxScanFiles},</if>
+            <if test="targetAgents != null">#{targetAgents},</if>
+            <if test="targetDirs != null">#{targetDirs},</if>
+            <if test="maxBandwidthKbS != null">#{maxBandwidthKbS},</if>
+            <if test="retryEnabled != null">#{retryEnabled},</if>
+            <if test="retryMaxDays != null">#{retryMaxDays},</if>
+            <if test="retryIntervalMin != null">#{retryIntervalMin},</if>
+            <if test="postTransferAction != null">#{postTransferAction},</if>
+            <if test="backupDir != null">#{backupDir},</if>
+            <if test="backupMode != null">#{backupMode},</if>
+            <if test="preserveDirStructure != null">#{preserveDirStructure},</if>
+            <if test="transferMode != null">#{transferMode},</if>
+            <if test="routingStrategy != null">#{routingStrategy},</if>
+            <if test="routingConfig != null">#{routingConfig},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateBatchTransferTask" parameterType="BatchTransferTask">
+        update batch_transfer_task
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="taskName != null and taskName != ''">task_name = #{taskName},</if>
+            <if test="taskDescription != null">task_description = #{taskDescription},</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">source_agent_id = #{sourceAgentId},</if>
+            <if test="sourceDir != null and sourceDir != ''">source_dir = #{sourceDir},</if>
+            <if test="includePatterns != null">include_patterns = #{includePatterns},</if>
+            <if test="excludePatterns != null">exclude_patterns = #{excludePatterns},</if>
+            <if test="scanFrequencySec != null">scan_frequency_sec = #{scanFrequencySec},</if>
+            <if test="maxScanFiles != null">max_scan_files = #{maxScanFiles},</if>
+            <if test="targetAgents != null">target_agents = #{targetAgents},</if>
+            <if test="targetDirs != null">target_dirs = #{targetDirs},</if>
+            <if test="maxBandwidthKbS != null">max_bandwidth_kb_s = #{maxBandwidthKbS},</if>
+            <if test="retryEnabled != null">retry_enabled = #{retryEnabled},</if>
+            <if test="retryMaxDays != null">retry_max_days = #{retryMaxDays},</if>
+            <if test="retryIntervalMin != null">retry_interval_min = #{retryIntervalMin},</if>
+            <if test="postTransferAction != null">post_transfer_action = #{postTransferAction},</if>
+            <if test="backupDir != null">backup_dir = #{backupDir},</if>
+            <if test="backupMode != null">backup_mode = #{backupMode},</if>
+            <if test="preserveDirStructure != null">preserve_dir_structure = #{preserveDirStructure},</if>
+            <if test="transferMode != null">transfer_mode = #{transferMode},</if>
+            <if test="routingStrategy != null">routing_strategy = #{routingStrategy},</if>
+            <if test="routingConfig != null">routing_config = #{routingConfig},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="totalFiles != null">total_files = #{totalFiles},</if>
+            <if test="totalSizeBytes != null">total_size_bytes = #{totalSizeBytes},</if>
+            <if test="transferredFiles != null">transferred_files = #{transferredFiles},</if>
+            <if test="transferredSizeBytes != null">transferred_size_bytes = #{transferredSizeBytes},</if>
+            <if test="failedFiles != null">failed_files = #{failedFiles},</if>
+            <if test="postProcessFiles != null">post_process_files = #{postProcessFiles},</if>
+            <if test="postProcessFailed != null">post_process_failed = #{postProcessFailed},</if>
+            <if test="startedAt != null">started_at = #{startedAt},</if>
+            <if test="completedAt != null">completed_at = #{completedAt},</if>
+            <if test="postProcessedAt != null">post_processed_at = #{postProcessedAt},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <update id="updateTaskStatus">
+        update batch_transfer_task set status = #{status}, update_time = CURRENT_TIMESTAMP where id = #{id}
+    </update>
+
+    <delete id="deleteBatchTransferTaskByIds" parameterType="Long">
+        update batch_transfer_task set deleted = 1 where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+
+</mapper>

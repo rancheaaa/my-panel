@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper">
+
+    <resultMap type="BatchTransferSubtask" id="BatchTransferSubtaskResult">
+        <result property="id"    column="id"    />
+        <result property="taskId"    column="task_id"    />
+        <result property="filePath"    column="file_path"    />
+        <result property="fileName"    column="file_name"    />
+        <result property="fileSizeBytes"    column="file_size_bytes"    />
+        <result property="fileMd5"    column="file_md5"    />
+        <result property="fileLastModified"    column="file_last_modified"    />
+        <result property="targetAgentId"    column="target_agent_id"    />
+        <result property="status"    column="status"    />
+        <result property="transferId"    column="transfer_id"    />
+        <result property="transferredChunks"    column="transferred_chunks"    />
+        <result property="totalChunks"    column="total_chunks"    />
+        <result property="transferredBytes"    column="transferred_bytes"    />
+        <result property="speedBytesPerSec"    column="speed_bytes_per_sec"    />
+        <result property="startedAt"    column="started_at"    />
+        <result property="completedAt"    column="completed_at"    />
+        <result property="durationMs"    column="duration_ms"    />
+        <result property="errorCode"    column="error_code"    />
+        <result property="errorMessage"    column="error_message"    />
+        <result property="errorStackTrace"    column="error_stack_trace"    />
+        <result property="retryCount"    column="retry_count"    />
+        <result property="proxyRetryCount"    column="proxy_retry_count"    />
+        <result property="lastRetryAt"    column="last_retry_at"    />
+        <result property="nextRetryAfter"    column="next_retry_after"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <sql id="selectBatchTransferSubtaskVo">
+        select id, task_id, file_path, file_name, file_size_bytes, file_md5, file_last_modified,
+               target_agent_id, status, transfer_id, transferred_chunks, total_chunks, transferred_bytes,
+               speed_bytes_per_sec, started_at, completed_at, duration_ms, error_code, error_message,
+               error_stack_trace, retry_count, proxy_retry_count, last_retry_at, next_retry_after,
+               create_by, create_time, update_by, update_time, remark
+        from batch_transfer_subtask
+    </sql>
+
+    <select id="selectBatchTransferSubtaskById" parameterType="Long" resultMap="BatchTransferSubtaskResult">
+        <include refid="selectBatchTransferSubtaskVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectBatchTransferSubtaskList" parameterType="BatchTransferSubtask" resultMap="BatchTransferSubtaskResult">
+        <include refid="selectBatchTransferSubtaskVo"/>
+        <where>
+            <if test="taskId != null"> and task_id = #{taskId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+            <if test="targetAgentId != null and targetAgentId != ''"> and target_agent_id = #{targetAgentId}</if>
+            <if test="fileName != null and fileName != ''"> and file_name like concat('%', #{fileName}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectSubtasksByTaskId" parameterType="Long" resultMap="BatchTransferSubtaskResult">
+        <include refid="selectBatchTransferSubtaskVo"/>
+        where task_id = #{taskId} order by create_time desc
+    </select>
+
+    <select id="selectSubtasksByTaskIdAndStatus" resultMap="BatchTransferSubtaskResult">
+        <include refid="selectBatchTransferSubtaskVo"/>
+        where task_id = #{taskId} and status = #{status}
+    </select>
+
+    <select id="selectFailedSubtasksForRetry" resultMap="BatchTransferSubtaskResult">
+        <include refid="selectBatchTransferSubtaskVo"/>
+        where status = 'FAILED' and next_retry_after is not null and next_retry_after &lt;= #{beforeTime}
+    </select>
+
+    <select id="selectSubtaskSummaryByTaskId" parameterType="Long" resultType="map">
+        select status as status, count(*) as count from batch_transfer_subtask where task_id = #{taskId} group by status
+    </select>
+
+    <insert id="insertBatchTransferSubtask" parameterType="BatchTransferSubtask" useGeneratedKeys="true" keyProperty="id">
+        insert into batch_transfer_subtask
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="taskId != null">task_id,</if>
+            <if test="filePath != null and filePath != ''">file_path,</if>
+            <if test="fileName != null and fileName != ''">file_name,</if>
+            <if test="fileSizeBytes != null">file_size_bytes,</if>
+            <if test="fileMd5 != null">file_md5,</if>
+            <if test="fileLastModified != null">file_last_modified,</if>
+            <if test="targetAgentId != null and targetAgentId != ''">target_agent_id,</if>
+            <if test="status != null">status,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="taskId != null">#{taskId},</if>
+            <if test="filePath != null and filePath != ''">#{filePath},</if>
+            <if test="fileName != null and fileName != ''">#{fileName},</if>
+            <if test="fileSizeBytes != null">#{fileSizeBytes},</if>
+            <if test="fileMd5 != null">#{fileMd5},</if>
+            <if test="fileLastModified != null">#{fileLastModified},</if>
+            <if test="targetAgentId != null and targetAgentId != ''">#{targetAgentId},</if>
+            <if test="status != null">#{status},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+        </trim>
+    </insert>
+
+    <insert id="batchInsertSubtasks" parameterType="java.util.List">
+        insert into batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, file_md5, file_last_modified, target_agent_id, status, create_time)
+        values
+        <foreach item="item" collection="list" separator=",">
+            (#{item.taskId}, #{item.filePath}, #{item.fileName}, #{item.fileSizeBytes}, #{item.fileMd5}, #{item.fileLastModified}, #{item.targetAgentId}, #{item.status}, #{item.createTime})
+        </foreach>
+    </insert>
+
+    <update id="updateBatchTransferSubtask" parameterType="BatchTransferSubtask">
+        update batch_transfer_subtask
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="status != null">status = #{status},</if>
+            <if test="transferId != null">transfer_id = #{transferId},</if>
+            <if test="transferredChunks != null">transferred_chunks = #{transferredChunks},</if>
+            <if test="totalChunks != null">total_chunks = #{totalChunks},</if>
+            <if test="transferredBytes != null">transferred_bytes = #{transferredBytes},</if>
+            <if test="speedBytesPerSec != null">speed_bytes_per_sec = #{speedBytesPerSec},</if>
+            <if test="startedAt != null">started_at = #{startedAt},</if>
+            <if test="completedAt != null">completed_at = #{completedAt},</if>
+            <if test="durationMs != null">duration_ms = #{durationMs},</if>
+            <if test="errorCode != null">error_code = #{errorCode},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            <if test="errorStackTrace != null">error_stack_trace = #{errorStackTrace},</if>
+            <if test="retryCount != null">retry_count = #{retryCount},</if>
+            <if test="proxyRetryCount != null">proxy_retry_count = #{proxyRetryCount},</if>
+            <if test="lastRetryAt != null">last_retry_at = #{lastRetryAt},</if>
+            <if test="nextRetryAfter != null">next_retry_after = #{nextRetryAfter},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <update id="updateSubtaskStatus">
+        update batch_transfer_subtask set status = #{status}, update_time = CURRENT_TIMESTAMP where id = #{id}
+    </update>
+
+</mapper>

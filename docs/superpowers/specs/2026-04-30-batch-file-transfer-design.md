@@ -88,20 +88,25 @@
 **优先级**: P0\
 **描述**: 管理员通过Admin UI创建批量传输任务，配置以下参数：
 
-| 参数                 | 类型            | 必填 | 默认值     | 说明                                     |
-| ------------------ | ------------- | -- | ------- | -------------------------------------- |
-| `taskName`         | String        | 是  | -       | 任务名称，最大200字符                           |
-| `sourceAgentId`    | String        | 是  | -       | 源Agent ID（从注册中心选择）                     |
-| `sourceDir`        | String        | 是  | -       | 源目录绝对路径，如 `/var/app/logs`              |
-| `includePatterns`  | List\<String> | 否  | `["*"]` | Glob包含模式，如 `["*.log", "logs/**/*.gz"]` |
-| `excludePatterns`  | List\<String> | 否  | `[]`    | Glob排除模式，如 `["*.tmp", "temp/*"]`       |
-| `scanFrequencySec` | Int           | 否  | 300     | 扫描间隔（秒），范围\[60, 86400]                 |
-| `maxScanFiles`     | Int           | 否  | 10000   | 单次扫描最大文件数，范围\[100, 100000]             |
-| `targetAgents`     | List\<String> | 是  | -       | 目标Agent ID列表，至少1个                      |
-| `maxBandwidthKbS`  | Int           | 否  | null    | 单任务带宽上限(KB/s)，null=不限                  |
-| `retryEnabled`     | Boolean       | 否  | true    | 是否启用自动重试                               |
-| `retryMaxDays`     | Int           | 否  | 7       | 重试保留天数，范围\[1, 30]                      |
-| `retryIntervalMin` | Int           | 否  | 30      | 重试间隔（分钟），范围\[5, 1440]                  |
+| 参数                   | 类型            | 必填 | 默认值           | 说明                                                       |
+| -------------------- | ------------- | -- | ------------- | -------------------------------------------------------- |
+| `taskName`           | String        | 是  | -             | 任务名称，最大200字符                                             |
+| `sourceAgentId`      | String        | 是  | -             | 源Agent ID（从注册中心选择）                                       |
+| `sourceDir`          | String        | 是  | -             | 源目录绝对路径，如 `/var/app/logs`                                |
+| `includePatterns`    | List\<String> | 否  | `["*"]`       | Glob包含模式，如 `["*.log", "logs/**/*.gz"]`                   |
+| `excludePatterns`    | List\<String> | 否  | `[]`          | Glob排除模式，如 `["*.tmp", "temp/*"]`                         |
+| `scanFrequencySec`   | Int           | 否  | 300           | 扫描间隔（秒），范围\[60, 86400]                                   |
+| `maxScanFiles`       | Int           | 否  | 10000         | 单次扫描最大文件数，范围\[100, 100000]                               |
+| `targetAgents`       | List\<String> | 是  | -             | 目标Agent ID列表，至少1个                                        |
+| `maxBandwidthKbS`    | Int           | 否  | null          | 单任务带宽上限(KB/s)，null=不限                                    |
+| `retryEnabled`       | Boolean       | 否  | true          | 是否启用自动重试                                                 |
+| `retryMaxDays`       | Int           | 否  | 7             | 重试保留天数，范围\[1, 30]                                        |
+| `retryIntervalMin`   | Int           | 否  | 30            | 重试间隔（分钟），范围\[5, 1440]                                    |
+| `postTransferAction` | String        | 否  | NONE          | 传输后操作: NONE/DELETE/BACKUP                                |
+| `backupDir`          | String        | 否  | null          | 备份目录绝对路径（BACKUP模式必填）                                     |
+| `transferMode`       | String        | 否  | ONE\_TO\_MANY | 传输模式: ONE\_TO\_ONE/ONE\_TO\_MANY                         |
+| `routingStrategy`    | String        | 否  | BROADCAST     | 路由策略: BROADCAST/SINGLE/ROUND\_ROBIN/REGION\_BASED/RANDOM |
+| `routingConfig`      | String(JSON)  | 否  | null          | 路策略配置（REGION\_BASED模式时必填）                                |
 
 **校验规则**:
 
@@ -110,6 +115,10 @@
 3. `targetAgents`不能包含`sourceAgentId`
 4. `maxBandwidthKbS`若指定则必须 > 0
 5. 同一源目录+目标组合在任务进行中不允许重复创建
+6. **`postTransferAction=BACKUP`时，`backupDir`为必填且必须是可写目录**
+7. **`postTransferAction=DELETE`时，需前端二次确认，防止误删**
+8. **`transferMode=ONE_TO_ONE`时，`routingStrategy=BROADCAST`自动降级为`SINGLE`**
+9. **`routingStrategy=REGION_BASED`时，`routingConfig`为必填且JSON格式合法**
 
 #### FR-02: 文件扫描与Glob匹配
 
@@ -320,6 +329,227 @@ Level 1: retryCount < maxRetries?
 | `maxBandwidthKbS`  | Agent收到新配置后立即生效 | ≤10秒（取决于上报周期） |
 | `retryEnabled`     | 立即生效            | 立即            |
 | `retryIntervalMin` | 下次重试调度时生效       | 立即（下次触发）      |
+
+#### FR-09: 传输后处理（删除/备份）
+
+**优先级**: P1\
+**描述**: 任务所有子任务完成后，对源文件执行后续处理操作。
+
+**支持的操作模式**:
+
+| 模式          | 枚举值      | 说明                      | 适用场景           |
+| ----------- | -------- | ----------------------- | -------------- |
+| **无操作**     | `NONE`   | 传输完成后不执行任何操作（默认）        | 仅做文件复制/同步      |
+| **删除源文件**   | `DELETE` | 所有目标Agent成功接收后，删除源文件    | 日志归档后清理、磁盘空间释放 |
+| **备份到指定目录** | `BACKUP` | 将文件移动/复制到指定的备份目录，保留目录结构 | 重要文件归档、合规性要求   |
+
+**触发条件**:
+
+```
+任务完成判定:
+  ├─ 全部子任务 COMPLETED → 触发传输后处理
+  ├─ PARTIAL_FAILED (部分失败) → 
+  │   ├─ 仅对成功的文件执行后处理
+  │   └─ 失败的文件跳过，不执行删除/备份
+  └─ FAILED / CANCELLED / EXPIRED → 不执行任何后处理
+```
+
+**安全机制**:
+
+1. **前端二次确认**: 选择DELETE模式时，创建任务弹窗显示警告提示
+2. **操作范围限制**: 仅处理本次任务扫描到的文件，不影响其他文件
+3. **备份目录校验**: BACKUP模式下必须配置有效且可写的目录
+4. **原子性保证**: 单个文件的备份/删除失败不影响其他文件
+5. **完整审计**: 记录每个文件的处理结果（成功/失败+原因）
+6. **失败告警**: 处理失败的文件生成告警事件
+
+**DELETE模式流程**:
+
+```mermaid
+graph TD
+    A[任务全部完成] --> B[收集成功传输的文件列表]
+    B --> C{后处理操作类型?}
+    
+    C -->|无操作| Z1[结束]
+    C -->|备份| D1[进入备份流程]
+    C -->|删除| E1[进入删除流程]
+    
+    E1 --> F1[遍历待删除文件列表]
+    F1 --> G1{文件仍存在?}
+    G1 -->|否| H1[记录WARN: 文件已被外部修改]
+    G1 -->|是| I1[执行文件删除操作]
+    
+    I1 --> J1{删除成功?}
+    J1 -->|是| K1[记录审计: 删除成功]
+    J1 -->|否| L1[记录ERROR: 删除失败]
+    
+    K1 --> M1{还有文件?}
+    L1 --> M1
+    M1 -->|是| F1
+    M1 -->|否| N1[统计处理结果]
+    
+    N --> O{有失败?}
+    O -->|是| P[生成告警: POST_TRANSFER_PARTIAL_FAIL]
+    O -->|否| Q[标记任务状态: POST_PROCESSING_DONE]
+```
+
+**BACKUP模式流程**:
+
+```mermaid
+graph TD
+    A[任务全部完成] --> B[收集成功传输的文件列表]
+    B --> C{是否为BACKUP模式?}
+    
+    C -->|是| D[验证备份目录存在且可写]
+    D --> E{目录有效?}
+    
+    E -->|否| F1[终止处理并告警: 目录无效]
+    E -->|是| G1[遍历待备份文件]
+    
+    G1 --> H1[计算目标路径]
+    H1 --> I1[创建目标父目录]
+    I1 --> J1[执行复制或移动操作]
+    
+    J1 --> K1{操作成功?}
+    K1 -->|是| L1[记录审计: 备份成功]
+    K1 -->|否| M1[记录ERROR: 备份失败]
+    
+    L1 --> N1{还有文件?}
+    M1 --> N1
+    N1 -->|是| G1
+    N1 -->|否| O1[统计处理结果]
+    
+    O1 --> P1[上报Proxy处理结果]
+```
+
+**备份策略选项** (可选参数):
+
+| 参数名                    | 类型      | 默认值   | 说明                          |
+| ---------------------- | ------- | ----- | --------------------------- |
+| `backupMode`           | String  | COPY  | `COPY`=复制保留原文件, `MOVE`=移动剪切 |
+| `preserveDirStructure` | Boolean | true  | 是否保持原始目录结构                  |
+| `overwriteExisting`    | Boolean | false | 目标文件已存在时是否覆盖                |
+
+#### FR-10: 传输模式与路由策略
+
+**优先级**: P0\
+**描述**: 支持配置传输任务的传输模式（一对一/一对多）和目标Agent的路由策略。
+
+**传输模式 (transferMode)**:
+
+| 模式        | 枚举值           | 说明                       | 适用场景            |
+| --------- | ------------- | ------------------------ | --------------- |
+| **一对一传输** | `ONE_TO_ONE`  | 每个文件只传输到一个目标Agent        | 负载均衡、单机备份、分片存储  |
+| **一对多广播** | `ONE_TO_MANY` | 每个文件传输到所有目标Agent（现有默认行为） | 配置分发、日志同步、多副本冗余 |
+
+**路由策略 (routingStrategy)**:
+
+| 策略       | 枚举值            | 说明                                          | 适用场景             |
+| -------- | -------------- | ------------------------------------------- | ---------------- |
+| **广播模式** | `BROADCAST`    | 所有目标Agent都接收文件（默认，仅ONE\_TO\_MANY模式有效）       | 配置分发、全量同步        |
+| **单机模式** | `SINGLE`       | 每个文件只选择一台目标Agent传输，重传时保证始终路由到同一台Agent（会话粘性） | 单机备份、避免重复、节省带宽   |
+| **轮询模式** | `ROUND_ROBIN`  | 按顺序轮流分配给不同的目标Agent，实现负载均衡                   | 分布式存储、负载分散       |
+| **区域路由** | `REGION_BASED` | 根据目标Agent的区域标签进行路由，文件按规则分配到指定区域的Agent       | 多地域部署、就近原则、合规性要求 |
+| **随机模式** | `RANDOM`       | 随机选择一台目标Agent，适用于无状态要求的场景                   | 简单负载均衡、测试环境      |
+
+**路由策略与传输模式的关系**:
+
+```
+┌─────────────────────┬───────────────────┬──────────────────────────────────────┐
+│   transferMode      │ routingStrategy   │              行为说明                  │
+├─────────────────────┼───────────────────┼──────────────────────────────────────┤
+│ ONE_TO_ONE (1:1)    │ BROADCAST (默认)   │ ❌ 不兼容 - 自动降级为 SINGLE 策略          │
+│ ONE_TO_ONE (1:1)    │ SINGLE            │ ✅ 推荐 - 每个文件选1台，重传保同一台         │
+│ ONE_TO_ONE (1:1)    │ ROUND_ROBIN       │ ✅ 可用 - 文件轮流分配到不同Agent           │
+│ ONE_TO_ONE (1:1)    │ REGION_BASED      │ ✅ 可用 - 按区域标签选择Agent             │
+│ ONE_TO_ONE (1:1)    │ RANDOM            │ ✅ 可用 - 随机选择一台Agent               │
+├─────────────────────┼───────────────────┼──────────────────────────────────────┤
+│ ONE_TO_MANY (1:N)   │ BROADCAST (默认)   │ ✅ 推荐 - 所有Agent都接收（原有行为）        │
+│ ONE_TO_MANY (1:N)   │ SINGLE            │ ⚠️ 语义冲突 - 每文件选1台，等效于ONE_TO_ONE   │
+│ ONE_TO_MANY (1:N)   │ ROUND_ROBIN       │ ⚠️ 语义冲突 - 同上                      │
+│ ONE_TO_MANY (1:N)   │ REGION_BASED      │ ⚠️ 部分可用 - 每文件按区域选1台              │
+│ ONE_TO_MANY (1:N)   │ RANDOM            │ ⚠️ 语义冲突 - 同上                      │
+└─────────────────────┴───────────────────┴──────────────────────────────────────┘
+```
+
+**各路由策略详细说明**:
+
+##### SINGLE（单机/会话粘性）
+
+```
+特点:
+  - 基于文件路径的哈希一致性路由
+  - 相同文件永远路由到同一台Agent
+  - 重试、重传都保证在同一台Agent执行
+
+算法:
+  targetIndex = hash(filePath) % targetAgents.length
+  selectedAgent = targetAgents[targetIndex]
+
+适用场景:
+  - 单机冷备：主节点故障时快速切换
+  - 避免多副本浪费存储空间
+  - 需要文件集中管理的场景
+```
+
+##### ROUND\_ROBIN（轮询）
+
+```
+特点:
+  - 全局计数器，按顺序分配
+  - 保证均匀分布到各Agent
+  - 简单有效，无需额外配置
+
+算法:
+  globalCounter = (globalCounter + 1) % targetAgents.length
+  selectedAgent = targetAgents[globalCounter]
+
+适用场景:
+  - 存储集群的负载均衡
+  - 各Agent性能相近的场景
+  - 无状态要求的文件分发
+```
+
+##### REGION\_BASED（区域路由）
+
+```
+特点:
+  - 基于Agent的区域标签匹配
+  - 支持优先级和fallback机制
+  - 需要在agent_registry表增加region字段
+
+配置示例:
+  routingConfig: {
+    "rules": [
+      {"pattern": "logs/**/*.log", "region": "cn-east", "priority": 1},
+      {"pattern": "archive/**", "region": "cn-north", "priority": 1},
+      {"defaultRegion": "cn-east"}
+    ]
+  }
+
+适用场景:
+  - 多地域部署，数据就近存储
+  - 合规性要求（数据必须存储在特定区域）
+  - CDN边缘节点同步
+```
+
+**子任务生成逻辑变化**:
+
+```
+原始设计 (笛卡尔积):
+  files × targetAgents = N × M 个子任务
+
+新设计 (根据模式动态生成):
+
+  ONE_TO_ONE + SINGLE/ROUND_ROBIN/REGION/RANDOM:
+    files → 每个文件选1个target → N 个子任务
+    
+  ONE_TO_MANY + BROADCAST:
+    files × targetAgents = N × M 个子任务 (保持原有行为)
+    
+  ONE_TO_MANY + 其他策略:
+    每个文件选1个target → N 个子任务 (降级为ONE_TO_ONE语义)
+```
 
 ### 2.2 非功能性需求
 
@@ -631,30 +861,36 @@ Level 1: retryCount < maxRetries?
 │     task_name (VARCHAR200) │  │    │ FK  task_id (BIGINT)       │◄─┘
 │     source_agent_id (V50)   │  │    │     file_path (VARCHAR1000)│
 │     source_dir (VARCHAR500) │  │    │     file_size_bytes (BIGINT│
-│     include_patterns (TEXT) │  │    │     file_md5 (CHAR32)     │
-│     exclude_patterns (TEXT) │  │    │ FK  target_agent_id (V50)  │
-│     scan_frequency_sec (INT)│  │    │     status (ENUM)         │
-│     max_scan_files (INT)    │  │    │     transfer_id (V100)    │
-│     target_agents (JSON)    │  │    │     transferred_chunks(INT)│
-│     max_bandwidth_kb_s (INT)│  │    │     total_chunks (INT)    │
-│     retry_enabled (BOOL)    │  │    │     error_message (TEXT)   │
-│     retry_max_days (INT)    │  │    │     retry_count (INT)      │
-│     retry_interval_min (INT)│  │    │     last_retry_at (DATETIME│
-│     status (ENUM)           │  │    │     create_time (DATETIME)  │
-│     total_files (INT)       │  │    │     started_at (DATETIME)  │
-│     total_size_bytes (BIGINT│  │    │     completed_at (DATETIME)│
-│     transferred_files (INT) │  │    └────────────────────────────┘
+│     target_dirs (V2000)     │  │    │     file_md5 (CHAR32)     │
+│     include_patterns (TEXT) │  │    │ FK  target_agent_id (V50)  │
+│     exclude_patterns (TEXT) │  │    │     status (ENUM)         │
+│     scan_frequency_sec (INT)│  │    │     transfer_id (V100)    │
+│     max_scan_files (INT)    │  │    │     transferred_chunks(INT)│
+│     target_agents (JSON)    │  │    │     total_chunks (INT)    │
+│     max_bandwidth_kb_s (INT)│  │    │     error_message (TEXT)   │
+│     retry_enabled (BOOL)    │  │    │     retry_count (INT)      │
+│     retry_max_days (INT)    │  │    │     last_retry_at (DATETIME│
+│     retry_interval_min (INT)│  │    │     create_time (DATETIME)  │
+│     post_transfer_action(V20)│  │    │     started_at (DATETIME)  │
+│     backup_dir (VARCHAR500)  │  │    │     completed_at (DATETIME)│
+│     transfer_mode (V20)      │  │    └────────────────────────────┘
+│     routing_strategy (V20)   │  │              │
+│     routing_config (TEXT)    │  │              │
+│     status (ENUM)           │  │    └────────────────────────────┘
+│     transferred_files (INT) │  │              │
 │     transferred_size(BIGINT)│  │              │
+│     post_process_files(INT) │  │              │
+│     post_process_failed(INT)│  │              │
 │     failed_files (INT)      │  │              │ 1:N
 │     create_time (DATETIME)   │  │              │
 │     update_time (DATETIME)   │  │              │
 │     started_at (DATETIME)   │  │              │
 │     completed_at (DATETIME) │  │              │
+│     post_processed_at(DT)   │  │              │
 │     create_by (V50)         │  │              │
 │     update_by (V50)         │  │              │
 │     remark (V500)           │  │              │
 └────────────────────────────┘  │              │
-                                │              │
 ┌────────────────────────────┐  │  ┌───────────┴───────────┐
 │   agent_queue_snapshot     │  │  │  sys_user (现有表)     │
 │   (队列快照表)              │  │  │  agent_registry (现有) │
@@ -724,6 +960,7 @@ CREATE TABLE `batch_transfer_task` (
     -- 源配置
     `source_agent_id` VARCHAR(50) NOT NULL COMMENT '源Agent ID',
     `source_dir` VARCHAR(500) NOT NULL COMMENT '源目录绝对路径',
+    `target_dirs` VARCHAR(2000) NOT NULL COMMENT '目标节点目录(分号分隔, 与target_agents一一对应, 例: /data/backup;/data/logs;/data/archive)',
     
     -- Glob通配符规则
     `include_patterns` TEXT DEFAULT NULL 
@@ -748,11 +985,30 @@ CREATE TABLE `batch_transfer_task` (
     `retry_enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用自动重试: 0-否 1-是',
     `retry_max_days` INT NOT NULL DEFAULT 7 
         COMMENT '重试保留天数, 范围[1,30]',
-    `retry_interval_min` INT NOT NULL DEFAULT 30 
+    `retry_interval_min` INT NOT NULL DEFAULT 30
         COMMENT '重试间隔(分钟), 范围[5,1440]',
     
-    -- 任务状态
+    -- 传输后处理策略
+    `post_transfer_action` VARCHAR(20) NOT NULL DEFAULT 'NONE'
+        COMMENT '传输后操作: NONE-无操作, DELETE-删除源文件, BACKUP-备份到指定目录',
+    `backup_dir` VARCHAR(500) DEFAULT NULL
+        COMMENT '备份目录绝对路径(post_transfer_action=BACKUP时必填)',
+    `backup_mode` VARCHAR(10) DEFAULT 'COPY'
+        COMMENT '备份模式: COPY-复制保留原文件, MOVE-移动剪切原文件',
+    `preserve_dir_structure` TINYINT(1) NOT NULL DEFAULT 1
+        COMMENT '是否保持原始目录结构: 0-否 1-是',
+    
+    -- 传输模式与路由策略 (新增)
+    `transfer_mode` VARCHAR(20) NOT NULL DEFAULT 'ONE_TO_MANY'
+        COMMENT '传输模式: ONE_TO_ONE-一对一, ONE_TO_MANY-一对多广播',
+    `routing_strategy` VARCHAR(20) NOT NULL DEFAULT 'BROADCAST'
+        COMMENT '路由策略: BROADCAST-广播, SINGLE-单机粘性, ROUND_ROBIN-轮询, REGION_BASED-区域路由, RANDOM-随机',
+    `routing_config` TEXT DEFAULT NULL
+        COMMENT '路由策略配置JSON(REGION_BASED时必填), 例: {"rules":[...],"defaultRegion":"cn-east"}',
+    
+    -- 任务状态 (增加POST_PROCESSING状态)
     `status` ENUM('PENDING','SCANNING','TRANSFERRING','PAUSED',
+                  'POST_PROCESSING',  -- 新增: 正在执行传输后处理
                   'COMPLETED','PARTIAL_FAILED','FAILED','CANCELLED','EXPIRED')
         NOT NULL DEFAULT 'PENDING' COMMENT '任务状态',
     
@@ -763,11 +1019,16 @@ CREATE TABLE `batch_transfer_task` (
     `transferred_size_bytes` BIGINT NOT NULL DEFAULT 0 COMMENT '已传输大小(字节)',
     `failed_files` INT NOT NULL DEFAULT 0 COMMENT '失败文件数',
     
+    -- 传输后处理统计
+    `post_process_files` INT NOT NULL DEFAULT 0 COMMENT '已后处理文件数(删除/备份成功)',
+    `post_process_failed` INT NOT NULL DEFAULT 0 COMMENT '后处理失败文件数',
+    
     -- 时间戳
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `started_at` DATETIME DEFAULT NULL COMMENT '开始执行时间',
-    `completed_at` DATETIME DEFAULT NULL COMMENT '完成/终止时间',
+    `completed_at` DATETIME DEFAULT NULL COMMENT '传输完成时间',
+    `post_processed_at` DATETIME DEFAULT NULL COMMENT '后处理完成时间',
 
     -- 审计字段
     `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人用户ID',
@@ -1056,6 +1317,11 @@ CREATE TABLE `batch_alert_event` (
          └───────────────────►│TRANSFERRING │
                               └─────────────┘
 
+  后处理路径 (新增):
+  COMPLETED/PARTIAL_FAILED ──有后处理配置──► POST_PROCESSING
+  POST_PROCESSING ──处理完成──► COMPLETED (更新后处理统计)
+  POST_PROCESSING ──部分失败──► PARTIAL_FAILED (标记后处理失败数)
+
   异常路径:
   TRANSFERRING ──cancel()──► CANCELLED
   SCANNING ──scan error──► FAILED
@@ -1157,7 +1423,88 @@ sequenceDiagram
     Admin-->>User: UI实时更新
 ```
 
-### 5.3 文件扫描详细流程
+### 5.3 传输后处理时序图 (新增 - Phase 5)
+
+```mermaid
+sequenceDiagram
+    participant Proxy as Proxy调度核心
+    participant Source as Source Agent
+    participant PostProc as PostTransferHandler
+
+    Note over Proxy,PostProc: Phase 5 传输后处理 (仅当postTransferAction != NONE)
+
+    Proxy->>Proxy: 检测任务所有子任务完成
+    Proxy->>Proxy: 检查 postTransferAction 配置
+
+    alt postTransferAction = NONE
+        Proxy->>Proxy: 跳过后处理，直接标记COMPLETED
+    else postTransferAction = DELETE or BACKUP
+        Proxy->>Proxy: 更新 status=POST_PROCESSING
+        Proxy->>Source: POST /api/internal/batch/post-process
+        Note right of Source: {taskId, action, backupDir, successFiles[]}
+
+        Source->>PostProc: PostTransferHandler.execute()
+        
+        alt action = DELETE
+            PostProc->>PostProc: 遍历 successFiles 列表
+            loop 每个文件
+                PostProc->>PostProc: Files.delete(filePath)
+                alt 删除成功
+                    PostProc->>PostProc: 记录 DELETE_SUCCESS
+                else 文件不存在
+                    PostProc->>PostProc: 记录 WARN: 文件已被外部修改
+                else 删除失败
+                    PostProc->>PostProc: 记录 ERROR + 原因
+                end
+            end
+        
+        else action = BACKUP
+            PostProc->>PostProc: validateBackupDir(backupDir)
+            alt 备份目录无效
+                PostProc-->>Source: 抛出 InvalidBackupDirException
+                Source-->>Proxy: 500 ERROR + 告警
+            else 备份目录有效
+                PostProc->>PostProc: 遍历 successFiles 列表
+                loop 每个文件
+                    PostProc->>PostProc: 计算目标路径
+                    PostProc->>PostProc: 创建目标父目录
+                    alt backupMode = COPY
+                        PostProc->>PostProc: Files.copy(src, dst)
+                    else backupMode = MOVE
+                        PostProc->>PostProc: Files.move(src, dst)
+                    end
+                    
+                    alt 操作成功
+                        PostProc->>PostProc: 记录 BACKUP_SUCCESS
+                    else 操作失败
+                        PostProc->>PostProc: 记录 ERROR + 原因
+                    end
+                end
+            end
+        end
+
+        PostProc->>PostProc: 统计处理结果
+        PostProc-->>Source: PostProcessResult {success, failed, errors[]}
+        
+        Source->>Proxy: POST /api/internal/batch/post-process-result
+        Note right of Proxy: {taskId, processedCount, failedCount, durationMs}
+
+        Proxy->>Proxy: 更新 task.post_process_files
+        Proxy->>Proxy: 更新 task.post_process_failed
+        Proxy->>Proxy: 更新 task.post_processed_at = NOW()
+
+        alt 全部成功
+            Proxy->>Proxy: 保持 COMPLETED 状态
+        else 部分失败
+            Proxy->>Proxy: 更新为 PARTIAL_FAILED
+            Proxy->>Proxy: 生成告警 POST_TRANSFER_PARTIAL_FAIL
+        end
+
+        Proxy->>Proxy: WebSocket广播后处理完成事件
+    end
+```
+
+### 5.4 文件扫描详细流程
 
 ```mermaid
 graph TD
@@ -1327,33 +1674,53 @@ graph TD
   
   "retryEnabled": true,
   "retryMaxDays": 7,
-  "retryIntervalMin": 30
+  "retryIntervalMin": 30,
+  
+  -- 传输后处理配置 (新增)
+  "postTransferAction": "BACKUP",
+  "backupDir": "/data/backup/logs",
+  "backupMode": "COPY",
+  "preserveDirStructure": true,
+  
+  -- 传输模式与路由策略 (新增)
+  "transferMode": "ONE_TO_ONE",
+  "routingStrategy": "ROUND_ROBIN",
+  "routingConfig": null
 }
 ```
 
 **Validation Rules**:
 
-| 字段                 | 类型            | 必填 | 校验规则                        | 默认值       |
-| ------------------ | ------------- | -- | --------------------------- | --------- |
-| `taskName`         | String        | ✅  | @NotBlank, @Size(max=200)   | -         |
-| `taskDescription`  | String        | ❌  | @Size(max=500)              | -         |
-| `sourceAgentId`    | String        | ✅  | @NotBlank                   | -         |
-| `sourceDir`        | String        | ✅  | @NotBlank, @Pattern(绝对路径正则) | -         |
-| `includePatterns`  | List\<String> | ❌  | @Pattern(Glob格式校验)          | \["\*"]   |
-| `excludePatterns`  | List\<String> | ❌  | @Pattern(Glob格式校验)          | \[]       |
-| `scanFrequencySec` | Integer       | ❌  | @Min(60), @Max(86400)       | 300       |
-| `maxScanFiles`     | Integer       | ❌  | @Min(100), @Max(100000)     | 10000     |
-| `targetAgents`     | List\<String> | ✅  | @NotEmpty, @Size(max=20)    | -         |
-| `maxBandwidthKbS`  | Integer       | ❌  | @Min(1)                     | null (不限) |
-| `retryEnabled`     | Boolean       | ❌  | -                           | true      |
-| `retryMaxDays`     | Integer       | ❌  | @Min(1), @Max(30)           | 7         |
-| `retryIntervalMin` | Integer       | ❌  | @Min(5), @Max(1440)         | 30        |
+| 字段                     | 类型            | 必填   | 校验规则                        | 默认值            | <br />        | <br />        | <br />  | <br />    |
+| ---------------------- | ------------- | ---- | --------------------------- | -------------- | ------------- | ------------- | ------- | --------- |
+| `taskName`             | String        | ✅    | @NotBlank, @Size(max=200)   | -              | <br />        | <br />        | <br />  | <br />    |
+| `taskDescription`      | String        | ❌    | @Size(max=500)              | -              | <br />        | <br />        | <br />  | <br />    |
+| `sourceAgentId`        | String        | ✅    | @NotBlank                   | -              | <br />        | <br />        | <br />  | <br />    |
+| `sourceDir`            | String        | ✅    | @NotBlank, @Pattern(绝对路径正则) | -              | <br />        | <br />        | <br />  | <br />    |
+| `includePatterns`      | List\<String> | ❌    | @Pattern(Glob格式校验)          | \["\*"]        | <br />        | <br />        | <br />  | <br />    |
+| `excludePatterns`      | List\<String> | ❌    | @Pattern(Glob格式校验)          | \[]            | <br />        | <br />        | <br />  | <br />    |
+| `scanFrequencySec`     | Integer       | ❌    | @Min(60), @Max(86400)       | 300            | <br />        | <br />        | <br />  | <br />    |
+| `maxScanFiles`         | Integer       | ❌    | @Min(100), @Max(100000)     | 10000          | <br />        | <br />        | <br />  | <br />    |
+| `targetAgents`         | List\<String> | ✅    | @NotEmpty, @Size(max=20)    | -              | <br />        | <br />        | <br />  | <br />    |
+| `maxBandwidthKbS`      | Integer       | ❌    | @Min(1)                     | null (不限)      | <br />        | <br />        | <br />  | <br />    |
+| `retryEnabled`         | Boolean       | ❌    | -                           | true           | <br />        | <br />        | <br />  | <br />    |
+| `retryMaxDays`         | Integer       | ❌    | @Min(1), @Max(30)           | 7              | <br />        | <br />        | <br />  | <br />    |
+| `retryIntervalMin`     | Integer       | ❌    | @Min(5), @Max(1440)         | 30             | <br />        | <br />        | <br />  | <br />    |
+| `postTransferAction`   | String        | ❌    | @Pattern(NONE               | DELETE         | BACKUP)       | NONE          | <br />  | <br />    |
+| `backupDir`            | String        | 条件必填 | @NotBlank, BACKUP模式时必填      | null           | <br />        | <br />        | <br />  | <br />    |
+| `backupMode`           | String        | ❌    | @Pattern(COPY               | MOVE)          | COPY          | <br />        | <br />  | <br />    |
+| `preserveDirStructure` | Boolean       | ❌    | -                           | true           | <br />        | <br />        | <br />  | <br />    |
+| `transferMode`         | String        | ❌    | @Pattern(ONE\_TO\_ONE       | ONE\_TO\_MANY) | ONE\_TO\_MANY | <br />        | <br />  | <br />    |
+| `routingStrategy`      | String        | ❌    | @Pattern(BROADCAST          | SINGLE         | ROUND\_ROBIN  | REGION\_BASED | RANDOM) | BROADCAST |
+| `routingConfig`        | String(JSON)  | 条件必填 | JSON格式合法, REGION\_BASED时必填  | null           | <br />        | <br />        | <br />  | <br />    |
 
 **自定义业务校验**:
 
 - **目标不能包含源**: `targetAgents` 不能包含 `sourceAgentId`
 - **Agent可达性**: 源Agent和至少一个目标Agent必须在线
 - **路径安全**: `sourceDir` 不能包含 `..` 防止路径遍历
+- **模式兼容性**: `transferMode=ONE_TO_ONE` 时 `routingStrategy=BROADCAST` 自动降级为 `SINGLE`
+- **区域路由配置**: `routingStrategy=REGION_BASED` 时 `routingConfig` 必须包含有效的规则配置
 - **任务唯一性**: 同一源目录+目标组合在任务进行中不允许重复创建
 
 **Response 201 Created**:
@@ -2295,18 +2662,139 @@ graph TD
 
 ### 7.1 新增组件清单
 
-| 组件名                         | 包路径                          | 职责                       | 复用程度                  |
-| --------------------------- | ---------------------------- | ------------------------ | --------------------- |
-| `BatchFileScanner`          | `com.cq.agent.batch.scanner` | 目录扫描 + Glob匹配            | 全新                    |
-| `GlobMatcher`               | `com.cq.agent.batch.scanner` | Glob模式编译与匹配              | 全新                    |
-| `BatchTransferQueueManager` | `com.cq.agent.batch.queue`   | 双队列管理 (Send/Retry)       | 基于现有PersistentQueue扩展 |
-| `QueueMetricsCollector`     | `com.cq.agent.batch.queue`   | 队列指标采集与上报                | 全新                    |
-| `BatchAwareAgentUploader`   | `com.cq.agent.client.upload` | 批量感知的上传执行器               | 继承AgentUploader       |
-| `BatchDispatchHandler`      | `com.cq.agent.handler.batch` | 接收Proxy分发指令的HTTP Handler | 全新                    |
-| `BatchScanHandler`          | `com.cq.agent.handler.batch` | 执行文件扫描的HTTP Handler      | 全新                    |
-| `ProxyReportClient`         | `com.cq.agent.batch.report`  | 向Proxy上报进度和队列状态          | 全新                    |
+| 组件名                         | 包路径                              | 职责                       | 复用程度                  |
+| --------------------------- | -------------------------------- | ------------------------ | --------------------- |
+| `BatchFileScanner`          | `com.cq.agent.batch.scanner`     | 目录扫描 + Glob匹配            | 全新                    |
+| `GlobMatcher`               | `com.cq.agent.batch.scanner`     | Glob模式编译与匹配              | 全新                    |
+| `BatchTransferQueueManager` | `com.cq.agent.batch.queue`       | 双队列管理 (Send/Retry)       | 基于现有PersistentQueue扩展 |
+| `QueueMetricsCollector`     | `com.cq.agent.batch.queue`       | 队列指标采集与上报                | 全新                    |
+| `BatchAwareAgentUploader`   | `com.cq.agent.client.upload`     | 批量感知的上传执行器               | 继承AgentUploader       |
+| `BatchDispatchHandler`      | `com.cq.agent.handler.batch`     | 接收Proxy分发指令的HTTP Handler | 全新                    |
+| `BatchScanHandler`          | `com.cq.agent.handler.batch`     | 执行文件扫描的HTTP Handler      | 全新                    |
+| `ProxyReportClient`         | `com.cq.agent.batch.report`      | 向Proxy上报进度和队列状态          | 全新                    |
+| `PostTransferHandler`       | `com.cq.agent.batch.postprocess` | 传输后处理执行器(删除/备份)          | 全新                    |
 
-### 7.2 BatchFileScanner 详细设计
+### 7.2 PostTransferHandler 详细设计 (新增)
+
+**核心职责**: 任务传输完成后，根据配置对源文件执行删除或备份操作
+
+**组件交互关系**:
+
+```mermaid
+graph TB
+    A[任务全部完成] --> B[BatchAwareAgentUploader检测到完成]
+    B --> C{postTransferAction?}
+    
+    C -->|NONE| Z[结束]
+    C -->|DELETE| D[调用PostTransferHandler.executeDelete]
+    C -->|BACKUP| E[调用PostTransferHandler.executeBackup]
+    
+    D --> F[收集成功传输的文件列表]
+    F --> G[遍历文件列表]
+    G --> H{文件存在?}
+    
+    H -->|否| I[记录WARN: 跳过]
+    H -->|是| J[Files.delete]
+    
+    J --> K{成功?}
+    K -->|是| L[记录审计: SUCCESS]
+    K -->|否| M[记录ERROR: FAILED + 原因]
+    
+    L --> N{还有文件?}
+    M --> N
+    I --> N
+    N -->|是| G
+    N -->|否| O[统计结果并上报Proxy]
+    
+    E --> P[验证backupDir有效]
+    P --> Q[遍历成功文件]
+    Q --> R[计算目标路径]
+    R --> S[创建目录 + 复制/移动]
+    S --> T{成功?}
+    T -->|是| U[记录审计: SUCCESS]
+    T -->|否| V[记录ERROR: FAILED]
+    U --> W{还有?}
+    V --> W
+    W -->|是| Q
+    W -->|否| O
+```
+
+**关键方法签名**:
+
+```java
+@Component
+public class PostTransferHandler {
+    
+    /**
+     * 执行传输后处理
+     * @param taskId 任务ID
+     * @param successFiles 成功传输的文件相对路径列表
+     * @param config 后处理配置
+     * @return 处理结果统计
+     */
+    public PostProcessResult execute(Long taskId, 
+                                     List<String> successFiles,
+                                     PostTransferConfig config);
+    
+    /**
+     * 删除源文件
+     */
+    private ProcessResult deleteFiles(List<String> filePaths, Path sourceBaseDir);
+    
+    /**
+     * 备份源文件到指定目录
+     */
+    private ProcessResult backupFiles(List<String> filePaths,
+                                       Path sourceBaseDir,
+                                       Path backupBaseDir,
+                                       BackupMode mode,
+                                       boolean preserveStructure);
+    
+    /**
+     * 验证备份目录有效性
+     */
+    private void validateBackupDir(Path backupDir) throws InvalidBackupDirException;
+}
+
+/**
+ * 后处理配置
+ */
+public class PostTransferConfig {
+    private TransferAction action;          // NONE / DELETE / BACKUP
+    private Path backupDir;                // 备份目录
+    private BackupMode backupMode;         // COPY / MOVE
+    private boolean preserveDirStructure;   // 是否保持目录结构
+}
+
+/**
+ * 后处理结果
+ */
+public class PostProcessResult {
+    private int totalFiles;                // 总处理文件数
+    private int successCount;              // 成功数
+    private int failedCount;               // 失败数
+    private List<ProcessError> errors;     // 错误详情列表
+    private long durationMs;               // 处理耗时
+}
+```
+
+**安全机制实现**:
+
+1. **操作范围限制**: 仅处理本次任务的文件，不影响其他文件
+2. **原子性**: 单个文件失败不中断整体流程
+3. **日志记录**: 每个操作都详细记录（成功/失败+原因）
+4. **结果上报**: 完成后上报Proxy进行统计和告警
+
+**异常处理策略**:
+
+| 异常类型                        | 触发条件        | 处理方式           |
+| --------------------------- | ----------- | -------------- |
+| `InvalidBackupDirException` | 目录不存在、不可写   | 终止处理，生成告警      |
+| `SecurityException`         | 路径超出允许范围    | 终止处理，记录安全告警    |
+| `IOException` (单文件)         | 单个文件删除/复制失败 | 记录错误，继续处理下一个文件 |
+| `DiskFullException`         | 磁盘空间不足      | 终止处理，生成告警      |
+
+### 7.3 BatchFileScanner 详细设计
 
 **核心职责**: 基于Glob模式的目录扫描与文件元数据收集
 
@@ -2748,8 +3236,11 @@ sequenceDiagram
     else 扫描成功
         SourceAgent-->>Scheduler: ScanResponse files totalFiles=1200
 
-        Note over Scheduler: Phase 3 生成子任务
-        Scheduler->>Scheduler: generateSubtasks() 1200 files乘3 targets = 3600 subtasks
+        Note over Scheduler: Phase 3 生成子任务 (根据transferMode和routingStrategy)
+        Scheduler->>Scheduler: RoutingScheduler.resolveTargets() 根据路由策略选择目标Agent
+        Note right of Scheduler: ONE_TO_ONE+ROUND_ROBIN: 1200 files → 1200 subtasks
+        Note right of Scheduler: ONE_TO_MANY+BROADCAST: 1200 files × 3 targets = 3600 subtasks
+        Scheduler->>Scheduler: generateSubtasks() 按路由结果生成子任务
 
         Scheduler->>DB: batchInsert(subtasks) 批量插入
         Scheduler->>DB: UPDATE task totalFiles=1200 totalSizeBytes=2GB status=TRANSFERRING
@@ -2782,6 +3273,219 @@ graph TD
 
     E -->|目标遍历完成| D
     D -->|文件遍历完成| H[返回子任务列表]
+```
+
+### 8.1.1 RoutingScheduler 路由调度器 (新增)
+
+**核心职责**: 根据传输模式和路由策略，为每个文件选择合适的目标Agent
+
+**组件交互关系**:
+
+```mermaid
+graph TB
+    A[BatchTaskScheduler] --> B[RoutingScheduler]
+    B --> C{transferMode?}
+    
+    C -->|ONE_TO_ONE| D{routingStrategy?}
+    C -->|ONE_TO_MANY| E{routingStrategy?}
+    
+    D -->|SINGLE| F[SingleRoutingStrategy]
+    D -->|ROUND_ROBIN| G[RoundRobinRoutingStrategy]
+    D -->|REGION_BASED| H[RegionBasedRoutingStrategy]
+    D -->|RANDOM| I[RandomRoutingStrategy]
+    
+    E -->|BROADCAST| J[BroadcastRoutingStrategy]
+    E -->|其他策略| K[降级为ONE_TO_ONE模式]
+    
+    F & G & H & I & J --> L[返回文件→目标Agent映射]
+    L --> M[生成子任务列表]
+```
+
+**核心接口定义**:
+
+```java
+public interface RoutingStrategy {
+    
+    /**
+     * 为单个文件选择目标Agent
+     * @param filePath 文件相对路径
+     * @param candidates 候选目标Agent列表
+     * @param context 路由上下文(包含taskId、历史路由记录等)
+     * @return 选中的目标AgentID
+     */
+    String selectTarget(String filePath, List<String> candidates, RoutingContext context);
+}
+
+/**
+ * 路由上下文 - 传递路由所需的额外信息
+ */
+public class RoutingContext {
+    private Long taskId;
+    private Map<String, String> fileToAgentCache;  // 文件→Agent缓存(用于一致性)
+    private AtomicInteger roundRobinCounter;         // 轮询计数器
+    private RegionConfig regionConfig;               // 区域配置(REGION_BASED用)
+}
+```
+
+**各路由策略实现**:
+
+##### SingleRoutingStrategy (单机/会话粘性)
+
+```java
+@Component
+public class SingleRoutingStrategy implements RoutingStrategy {
+    
+    @Override
+    public String selectTarget(String filePath, List<String> candidates, RoutingContext ctx) {
+        // 基于文件路径的哈希，保证相同文件始终路由到同一台Agent
+        int hash = Math.abs(filePath.hashCode() % candidates.size());
+        return candidates.get(hash);
+    }
+    
+    // 特点: 重试、重传都保证在同一台Agent执行
+}
+```
+
+##### RoundRobinRoutingStrategy (轮询)
+
+```java
+@Component
+public class RoundRobinRoutingStrategy implements RoutingStrategy {
+    
+    @Override
+    public String selectTarget(String filePath, List<String> candidates, RoutingContext ctx) {
+        // 全局计数器，按顺序分配
+        int index = ctx.getRoundRobinCounter().getAndIncrement() % candidates.size();
+        return candidates.get(index);
+    }
+    
+    // 特点: 保证均匀分布到各Agent，简单有效
+}
+```
+
+##### RegionBasedRoutingStrategy (区域路由)
+
+```java
+@Component
+public class RegionBasedRoutingStrategy implements RoutingStrategy {
+    
+    @Override
+    public String selectTarget(String filePath, List<String> candidates, RoutingContext ctx) {
+        // 1. 匹配文件路径与区域规则
+        String matchedRegion = matchRegion(filePath, ctx.getRegionConfig());
+        
+        // 2. 筛选该区域的Agent
+        List<String> regionAgents = filterAgentsByRegion(candidates, matchedRegion);
+        
+        // 3. 如果该区域没有可用Agent，使用默认区域或fallback
+        if (regionAgents.isEmpty()) {
+            regionAgents = filterAgentsByRegion(candidates, ctx.getRegionConfig().getDefaultRegion());
+        }
+        
+        // 4. 在区域内轮询选择
+        int index = Math.abs(filePath.hashCode() % regionAgents.size());
+        return regionAgents.get(index);
+    }
+    
+    private String matchRegion(String filePath, RegionConfig config) {
+        for (RegionRule rule : config.getRules()) {
+            if (filePathMatchesPattern(filePath, rule.getPattern())) {
+                return rule.getRegion();
+            }
+        }
+        return config.getDefaultRegion();
+    }
+}
+```
+
+##### RandomRoutingStrategy (随机)
+
+```java
+@Component
+public class RandomRoutingStrategy implements RoutingStrategy {
+    
+    private final Random random = new SecureRandom();
+    
+    @Override
+    public String selectTarget(String filePath, List<String> candidates, RoutingContext ctx) {
+        // 随机选择一台Agent
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+    
+    // 特点: 无状态，适用于测试环境或无特殊要求的场景
+}
+```
+
+##### BroadcastRoutingStrategy (广播)
+
+```java
+@Component
+public class BroadcastRoutingStrategy implements RoutingStrategy {
+    
+    @Override
+    public String selectTarget(String filePath, List<String> candidates, RoutingContext ctx) {
+        // 广播模式下此方法不适用，由调用方特殊处理
+        throw new UnsupportedOperationException("Broadcast mode should be handled specially");
+    }
+    
+    /**
+     * 广播模式: 返回所有候选Agent
+     */
+    public List<String> selectAllTargets(List<String> candidates) {
+        return new ArrayList<>(candidates);
+    }
+}
+```
+
+**RoutingScheduler 主调度逻辑**:
+
+```java
+@Service
+public class RoutingScheduler {
+    
+    @Autowired
+    private Map<String, RoutingStrategy> strategyMap;
+    
+    /**
+     * 解析所有文件的目标Agent映射
+     * @return Map<filePath, List<targetAgentId>> 
+     *         ONE_TO_* 模式下每个文件对应1个Agent (list size=1)
+     *         BROADCAST 模式下每个文件对应所有Agent
+     */
+    public Map<String, List<String>> resolveTargets(
+            List<ScannedFile> files,
+            List<String> targetAgents,
+            TransferMode transferMode,
+            RoutingStrategyType strategyType,
+            RoutingConfig routingConfig) {
+        
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        RoutingContext context = buildContext(routingConfig);
+        
+        // 模式兼容性检查
+        if (transferMode == TransferMode.ONE_TO_ONE && strategyType == RoutingStrategyType.BROADCAST) {
+            strategyType = RoutingStrategyType.SINGLE;  // 自动降级
+        }
+        
+        RoutingStrategy strategy = strategyMap.get(strategyType.name());
+        
+        if (strategy instanceof BroadcastRoutingStrategy && transferMode == TransferMode.ONE_TO_MANY) {
+            // 广播模式: 每个文件 → 所有Agent
+            List<String> allTargets = ((BroadcastRoutingStrategy) strategy).selectAllTargets(targetAgents);
+            for (ScannedFile file : files) {
+                result.put(file.getRelativePath(), allTargets);
+            }
+        } else {
+            // 其他模式: 每个文件 → 选1个Agent
+            for (ScannedFile file : files) {
+                String selected = strategy.selectTarget(file.getRelativePath(), targetAgents, context);
+                result.put(file.getRelativePath(), Collections.singletonList(selected));
+            }
+        }
+        
+        return result;
+    }
+}
 ```
 
 **任务控制操作**:
@@ -3017,22 +3721,158 @@ const batchRoutes = [
 
 ### 10.2 核心组件清单
 
-| 组件名                    | 文件路径                                        | 功能               |
-| ---------------------- | ------------------------------------------- | ---------------- |
-| `BatchTaskList`        | `pages/batch/BatchTaskList.jsx`             | 任务列表展示、筛选、批量操作   |
-| `CreateTaskModal`      | `components/batch/CreateTaskModal.jsx`      | 创建任务弹窗表单         |
-| `BatchTaskDetail`      | `pages/batch/BatchTaskDetail.jsx`           | 三层进度详情页          |
-| `TaskSummaryCard`      | `components/batch/TaskSummaryCard.jsx`      | 任务级总览卡片          |
-| `TargetProgressPanel`  | `components/batch/TargetProgressPanel.jsx`  | 目标Agent进度面板      |
-| `SubtaskTable`         | `components/batch/SubtaskTable.jsx`         | 子任务明细表格          |
-| `FileProgressBar`      | `components/batch/FileProgressBar.jsx`      | 单文件进度条           |
-| `QueueMonitorPage`     | `pages/batch/QueueMonitorPage.jsx`          | 队列监控主页面          |
-| `QueueStatusCard`      | `components/batch/QueueStatusCard.jsx`      | 单Agent队列状态卡片     |
-| `QueueTrendChart`      | `components/batch/QueueTrendChart.jsx`      | 队列趋势折线图(ECharts) |
-| `AlertList`            | `components/batch/AlertList.jsx`            | 告警事件列表           |
-| `MitigationSuggestion` | `components/batch/MitigationSuggestion.jsx` | 缓解建议组件           |
+| 组件名                       | 文件路径                                           | 功能                      |
+| ------------------------- | ---------------------------------------------- | ----------------------- |
+| `BatchTaskList`           | `pages/batch/BatchTaskList.jsx`                | 任务列表展示、筛选、批量操作          |
+| `CreateTaskModal`         | `components/batch/CreateTaskModal.jsx`         | 创建任务弹窗表单                |
+| `BatchTaskDetail`         | `pages/batch/BatchTaskDetail.jsx`              | 三层进度详情页                 |
+| `TaskSummaryCard`         | `components/batch/TaskSummaryCard.jsx`         | 任务级总览卡片                 |
+| `TargetProgressPanel`     | `components/batch/TargetProgressPanel.jsx`     | 目标Agent进度面板             |
+| `SubtaskTable`            | `components/batch/SubtaskTable.jsx`            | 子任务明细表格                 |
+| `FileProgressBar`         | `components/batch/FileProgressBar.jsx`         | 单文件进度条                  |
+| `QueueMonitorPage`        | `pages/batch/QueueMonitorPage.jsx`             | 队列监控主页面                 |
+| `QueueStatusCard`         | `components/batch/QueueStatusCard.jsx`         | 单Agent队列状态卡片            |
+| `QueueTrendChart`         | `components/batch/QueueTrendChart.jsx`         | 队列趋势折线图(ECharts)        |
+| `AlertList`               | `components/batch/AlertList.jsx`               | 告警事件列表                  |
+| `MitigationSuggestion`    | `components/batch/MitigationSuggestion.jsx`    | 缓解建议组件                  |
+| `TransferModeSelector`    | `components/batch/TransferModeSelector.jsx`    | 传输模式选择器(1:1/1:N)        |
+| `RoutingStrategySelector` | `components/batch/RoutingStrategySelector.jsx` | 路由策略选择器(广播/单机/轮询/区域/随机) |
+| `RegionConfigEditor`      | `components/batch/RegionConfigEditor.jsx`      | 区域路由规则编辑器               |
 
-### 10.3 关键API调用封装
+### 10.3 CreateTaskModal 表单设计增强 (传输模式与路由策略)
+
+**表单布局**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    创建批量传输任务                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [基本信息]                                                     │
+│  ┌─────────────────────┐ ┌─────────────────────┐              │
+│  │ 任务名称 *          │ │ 源Agent *           │              │
+│  └─────────────────────┘ └─────────────────────┘              │
+│  ┌───────────────────────────────────────────────────┐         │
+│  │ 源目录 * (如 /var/app/logs)                        │         │
+│  └───────────────────────────────────────────────────┘         │
+│                                                                 │
+│  [文件过滤]                                                     │
+│  ┌─────────────────────┐ ┌─────────────────────┐              │
+│  │ 包含模式             │ │ 排除模式             │              │
+│  │ ["*.log","*.gz"]    │ │ ["*.tmp"]            │              │
+│  └─────────────────────┘ └─────────────────────┘              │
+│                                                                 │
+│  [目标配置]                                                     │
+│  ┌───────────────────────────────────────────────────┐         │
+│  │ 目标Agent *                                      │ [▼ 选择] │
+│  │ ✓ agent-test-01  ✓ agent-test-02                 │         │
+│  └───────────────────────────────────────────────────┘         │
+│                                                                 │
+│  ══════════════════════════════════════════════════════════ │
+│  🆕 传输模式与路由策略                                        │
+│  ══════════════════════════════════════════════════════════ │
+│                                                                 │
+│  传输模式 *                                                    │
+│  ┌────────────────┐  ┌────────────────┐                       │
+│  │ ○ 一对一 (1:1)  │  │ ● 一对多 (1:N)  │  ← 默认选中         │
+│  │ 每个文件传给一台  │  │ 每个文件传给所有  │                     │
+│  └────────────────┘  └────────────────┘                       │
+│                                                                 │
+│  路由策略 *                                                    │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  │
+│  │ ○ 广播 (所有)   │  │ ● 单机 (会话粘性)│  │ ○ 轮询         │  │
+│  └────────────────┘  └────────────────┘  └────────────────┘  │
+│  ┌────────────────┐  ┌────────────────┐                       │
+│  │ ○ 区域路由     │  │ ○ 随机          │                       │
+│  └────────────────┘  └────────────────┘                       │
+│                                                                 │
+│  ┌─ 选择"区域路由"时展开以下配置 ─────────────────────────┐     │
+│  │                                                         │     │
+│  │  区域路由规则配置                                         │     │
+│  │  ┌─────────────────────────────────────────────────┐   │     │
+│  │  │ 规则1:                                            │   │     │
+│  │  │ 文件模式: [logs/**/*.log      ]  区域: [cn-east ▼] │   │     │
+│  │  │ [+ 添加规则]                                     │   │     │
+│  │  │                                                  │   │     │
+│  │  │ 默认区域: [cn-east ▼]                             │   │     │
+│  │  └─────────────────────────────────────────────────┘   │     │
+│  └─────────────────────────────────────────────────────────┘     │
+│                                                                 │
+│  [高级选项] ▸ (可折叠)                                          │
+│  ┌─────────────────────┐ ┌─────────────────────┐              │
+│  │ 带宽限制(KB/s)       │ │ 重试配置...           │              │
+│  └─────────────────────┘ └─────────────────────┘              │
+│  ┌───────────────────────────────────────────────────┐         │
+│  │ 传输后处理: ○ 无操作  ● 删除源文件  ○ 备份到指定目录    │         │
+│  └───────────────────────────────────────────────────┘         │
+│                                                                 │
+│                              [取消]  [创建任务]                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**交互逻辑**:
+
+```javascript
+// TransferModeSelector 组件逻辑
+const [transferMode, setTransferMode] = useState('ONE_TO_MANY');
+const [routingStrategy, setRoutingStrategy] = useState('BROADCAST');
+
+// 当传输模式切换时，自动调整路由策略选项
+useEffect(() => {
+  if (transferMode === 'ONE_TO_ONE') {
+    // 一对一模式下，广播不可用，默认选单机
+    if (routingStrategy === 'BROADCAST') {
+      setRoutingStrategy('SINGLE');
+      message.info('一对一模式下已自动切换为单机路由策略');
+    }
+  }
+}, [transferMode]);
+
+// 当路由策略切换为区域路由时，显示区域配置编辑器
+const showRegionConfig = routingStrategy === 'REGION_BASED';
+```
+
+**任务列表页展示增强**:
+
+在任务列表表格中新增列:
+
+| 列名       | 字段              | 展示方式                            |
+| -------- | --------------- | ------------------------------- |
+| **传输模式** | transferMode    | Tag标签: `1:1` 或 `1:N`            |
+| **路由策略** | routingStrategy | Tag标签: `广播`/`单机`/`轮询`/`区域`/`随机` |
+
+**任务详情页展示增强**:
+
+在任务详情的config区域新增展示:
+
+```json
+{
+  "config": {
+    "sourceDir": "/var/app/logs",
+    
+    // 新增: 传输模式与路由策略
+    "transferMode": {
+      "value": "ONE_TO_ONE",
+      "label": "一对一",
+      "description": "每个文件只传输到一个目标Agent"
+    },
+    "routingStrategy": {
+      "value": "ROUND_ROBIN",
+      "label": "轮询",
+      "description": "按顺序轮流分配给不同的目标Agent"
+    },
+    
+    // 子任务分布统计 (新增)
+    "targetDistribution": [
+      {"agentId": "agent-test-01", "fileCount": 600, "percent": 50.0},
+      {"agentId": "agent-test-02", "fileCount": 400, "percent": 33.3},
+      {"agentId": "agent-staging", "fileCount": 200, "percent": 16.7}
+    ]
+  }
+}
+```
+
+### 10.4 关键API调用封装
 
 ```javascript
 // src/api/batch/task.js

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.AgentQueueSnapshotMapper">
+
+    <resultMap type="AgentQueueSnapshot" id="AgentQueueSnapshotResult">
+        <result property="id"    column="id"    />
+        <result property="agentId"    column="agent_id"    />
+        <result property="taskId"    column="task_id"    />
+        <result property="sendQueueDepth"    column="send_queue_depth"    />
+        <result property="sendQueuePeakDepth"    column="send_queue_peak_depth"    />
+        <result property="sendQueueCapacity"    column="send_queue_capacity"    />
+        <result property="sendQueueUtilizationPct"    column="send_queue_utilization_pct"    />
+        <result property="sendQueueAvgWaitMs"    column="send_queue_avg_wait_ms"    />
+        <result property="retryQueueDepth"    column="retry_queue_depth"    />
+        <result property="retryQueuePeakDepth"    column="retry_queue_peak_depth"    />
+        <result property="retryNextScheduleTime"    column="retry_next_schedule_time"    />
+        <result property="processingRatePerSec"    column="processing_rate_per_sec"    />
+        <result property="successRatePct"    column="success_rate_pct"    />
+        <result property="congestionLevel"    column="congestion_level"    />
+        <result property="isCongested"    column="is_congested"    />
+        <result property="congestionReason"    column="congestion_reason"    />
+        <result property="errorDistribution"    column="error_distribution"    />
+        <result property="longestWaitingTasks"    column="longest_waiting_tasks"    />
+        <result property="snapshotTime"    column="snapshot_time"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+    </resultMap>
+
+    <insert id="insertAgentQueueSnapshot" parameterType="AgentQueueSnapshot" useGeneratedKeys="true" keyProperty="id">
+        insert into agent_queue_snapshot (
+            agent_id, task_id, send_queue_depth, send_queue_peak_depth, send_queue_capacity,
+            send_queue_utilization_pct, send_queue_avg_wait_ms, retry_queue_depth, retry_queue_peak_depth,
+            retry_next_schedule_time, processing_rate_per_sec, success_rate_pct, congestion_level,
+            is_congested, congestion_reason, error_distribution, longest_waiting_tasks, snapshot_time, create_time
+        ) values (
+            #{agentId}, #{taskId}, #{sendQueueDepth}, #{sendQueuePeakDepth}, #{sendQueueCapacity},
+            #{sendQueueUtilizationPct}, #{sendQueueAvgWaitMs}, #{retryQueueDepth}, #{retryQueuePeakDepth},
+            #{retryNextScheduleTime}, #{processingRatePerSec}, #{successRatePct}, #{congestionLevel},
+            #{isCongested}, #{congestionReason}, #{errorDistribution}, #{longestWaitingTasks}, #{snapshotTime}, CURRENT_TIMESTAMP
+        )
+    </insert>
+
+    <select id="selectLatestByAgentId" parameterType="String" resultMap="AgentQueueSnapshotResult">
+        select id, agent_id, task_id, send_queue_depth, send_queue_peak_depth, send_queue_capacity,
+               send_queue_utilization_pct, send_queue_avg_wait_ms, retry_queue_depth, retry_queue_peak_depth,
+               retry_next_schedule_time, processing_rate_per_sec, success_rate_pct, congestion_level,
+               is_congested, congestion_reason, error_distribution, longest_waiting_tasks, snapshot_time
+        from agent_queue_snapshot
+        where agent_id = #{agentId}
+        order by snapshot_time desc limit 1
+    </select>
+
+    <select id="selectByAgentIdAndTimeRange" resultMap="AgentQueueSnapshotResult">
+        select id, agent_id, task_id, send_queue_depth, send_queue_peak_depth, send_queue_capacity,
+               send_queue_utilization_pct, send_queue_avg_wait_ms, retry_queue_depth, retry_queue_peak_depth,
+               retry_next_schedule_time, processing_rate_per_sec, success_rate_pct, congestion_level,
+               is_congested, congestion_reason, snapshot_time
+        from agent_queue_snapshot
+        where agent_id = #{agentId}
+        <if test="from != null"> and snapshot_time &gt;= #{from}</if>
+        <if test="to != null"> and snapshot_time &lt;= #{to}</if>
+        order by snapshot_time asc
+    </select>
+
+    <delete id="deleteBefore" parameterType="Date">
+        delete from agent_queue_snapshot where snapshot_time &lt; #{time}
+    </delete>
+
+</mapper>

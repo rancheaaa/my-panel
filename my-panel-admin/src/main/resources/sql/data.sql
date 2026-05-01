@@ -466,3 +466,24 @@ INSERT IGNORE INTO `arch_node_type` (`id`, `type_code`, `type_name`, `icon`, `ca
 -- 14.1 架构图主表
 INSERT IGNORE INTO `arch_diagram` (`id`, `diagram_name`, `diagram_description`, `diagram_version`, `status`, `is_published`, `create_by`, `create_time`, `update_by`, `update_time`, `del_flag`) VALUES
 (1, '默认架构', '系统初始化的默认架构拓扑图', '1.0', '1', '1', 'admin', NOW(), 'admin', NOW(), '0');
+
+-- ----------------------------
+-- 15. 批量文件传输系统菜单
+-- ----------------------------
+
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(3000, '批量传输', 0, 6, 'batch', '', '', '', 1, 0, 'M', '0', '0', '', 'SwapOutlined', 'admin', NOW(), '', NULL, '批量传输目录'),
+(3001, '传输任务', 3000, 1, 'taskList', 'batch/taskList/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:view', 'SendOutlined', 'admin', NOW(), '', NULL, ''),
+(3002, '任务创建', 3001, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:create', '#', 'admin', NOW(), '', NULL, ''),
+(3003, '任务启动', 3001, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:start', '#', 'admin', NOW(), '', NULL, ''),
+(3004, '任务暂停', 3001, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:pause', '#', 'admin', NOW(), '', NULL, ''),
+(3005, '任务恢复', 3001, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:resume', '#', 'admin', NOW(), '', NULL, ''),
+(3006, '任务取消', 3001, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:cancel', '#', 'admin', NOW(), '', NULL, ''),
+(3007, '配置修改', 3001, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:update', '#', 'admin', NOW(), '', NULL, ''),
+(3008, '手动重试', 3001, 7, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:retry', '#', 'admin', NOW(), '', NULL, ''),
+(3009, '任务删除', 3001, 8, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:remove', '#', 'admin', NOW(), '', NULL, ''),
+(3010, '队列监控', 3000, 2, 'queueMonitor', 'batch/queueMonitor/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'DashboardOutlined', 'admin', NOW(), '', NULL, ''),
+(3011, '传输仪表盘', 3000, 3, 'batchDashboard', 'batch/dashboard/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'FundOutlined', 'admin', NOW(), '', NULL, '');
+
+INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(1, 3000), (1, 3001), (1, 3002), (1, 3003), (1, 3004), (1, 3005), (1, 3006), (1, 3007), (1, 3008), (1, 3009), (1, 3010), (1, 3011);

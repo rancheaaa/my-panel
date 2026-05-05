@@ -1,11 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Button, Space, Spin, message, Popconfirm, Row, Col, Card, Tabs } from 'antd';
+import { Button, Space, Spin, message, Popconfirm, Row, Col, Card, Tabs, Descriptions, Tag } from 'antd';
 import { PlayCircleOutlined, PauseCircleOutlined, StopOutlined, ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons';
 import { getBatchTaskDetail, startBatchTask, pauseBatchTask, resumeBatchTask, cancelBatchTask, retrySubtask, listSubtasks } from '../../../api/batch/task';
 import TaskSummaryCard from '../../../components/batch/TaskSummaryCard';
 import TargetProgressPanel from '../../../components/batch/TargetProgressPanel';
 import SubtaskTable from '../../../components/batch/SubtaskTable';
+
+const transferModeLabel = { ONE_TO_ONE: '一对一 (1:1)', ONE_TO_MANY: '一对多 (1:N)' };
+const routingStrategyLabel = {
+  BROADCAST: '广播', SINGLE: '单机粘性', ROUND_ROBIN: '轮询',
+  REGION_BASED: '区域路由', RANDOM: '随机'
+};
+const postTransferActionLabel = { NONE: '无操作', DELETE: '删除源文件', BACKUP: '备份' };
+const backupModeLabel = { COPY: '复制', MOVE: '移动' };
+
+const parseJsonSafe = (str) => {
+  if (!str) return null;
+  try { return JSON.parse(str); } catch { return str; }
+};
+
+const renderPatterns = (patterns) => {
+  if (!patterns) return '-';
+  if (Array.isArray(patterns)) return patterns.length > 0 ? patterns.join(', ') : '-';
+  if (typeof patterns === 'string') return patterns;
+  return '-';
+};
+
+const statusColorMap = {
+  PENDING: 'default', SCANNING: 'processing', TRANSFERRING: 'processing',
+  PAUSED: 'warning', POST_PROCESSING: 'processing', COMPLETED: 'success',
+  PARTIAL_FAILED: 'error', FAILED: 'error', CANCELLED: 'default', EXPIRED: 'default'
+};
 
 const BatchTaskDetail = () => {
   const [searchParams] = useSearchParams();
@@ -66,16 +92,65 @@ const BatchTaskDetail = () => {
         { key: 'subtasks', label: '子任务明细', children: <SubtaskTable subtasks={subtasks} loading={loading} onRetry={handleRetry} /> },
         { key: 'config', label: '配置详情', children: (
           <Card size="small">
-            <pre style={{ maxHeight: 400, overflow: 'auto', fontSize: 12, background: '#f5f5f5', padding: 12, borderRadius: 4 }}>
-              {JSON.stringify({
-                sourceDir: task.sourceDir, includePatterns: task.includePatterns, excludePatterns: task.excludePatterns,
-                targetAgents: task.targetAgents, transferMode: task.transferMode, routingStrategy: task.routingStrategy,
-                routingConfig: task.routingConfig, maxBandwidthKbS: task.maxBandwidthKbS,
-                postTransferAction: task.postTransferAction, backupDir: task.backupDir, backupMode: task.backupMode,
-                retryEnabled: task.retryEnabled, retryMaxDays: task.retryMaxDays, retryIntervalMin: task.retryIntervalMin,
-                scanFrequencySec: task.scanFrequencySec, maxScanFiles: task.maxScanFiles,
-              }, null, 2)}
-            </pre>
+            <Descriptions bordered column={3} size="small" title="基本配置">
+              <Descriptions.Item label="任务名称">{task.taskName}</Descriptions.Item>
+              <Descriptions.Item label="任务描述">{task.taskDescription || '-'}</Descriptions.Item>
+              <Descriptions.Item label="状态"><Tag color={statusColorMap[task.status]}>{task.statusLabel || task.status}</Tag></Descriptions.Item>
+
+              <Descriptions.Item label="源Agent ID">{task.sourceAgentId}</Descriptions.Item>
+              <Descriptions.Item label="源目录">{task.sourceDir}</Descriptions.Item>
+              <Descriptions.Item label="目标目录">{task.targetDirs || '-'}</Descriptions.Item>
+
+              <Descriptions.Item label="传输模式">{transferModeLabel[task.transferMode] || task.transferMode}</Descriptions.Item>
+              <Descriptions.Item label="路由策略">{routingStrategyLabel[task.routingStrategy] || task.routingStrategy}</Descriptions.Item>
+              <Descriptions.Item label="保持目录结构">{task.preserveDirStructure === 1 ? '是' : '否'}</Descriptions.Item>
+
+              <Descriptions.Item label="包含模式(Glob)" span={2}>{renderPatterns(parseJsonSafe(task.includePatterns))}</Descriptions.Item>
+              <Descriptions.Item label="带宽限制(KB/s)">{task.maxBandwidthKbS || '不限'}</Descriptions.Item>
+
+              <Descriptions.Item label="排除模式(Glob)" span={3}>{renderPatterns(parseJsonSafe(task.excludePatterns))}</Descriptions.Item>
+
+              <Descriptions.Item label="后处理操作">{postTransferActionLabel[task.postTransferAction] || task.postTransferAction || 'NONE'}</Descriptions.Item>
+              {(task.postTransferAction === 'BACKUP') && (
+                <>
+                  <Descriptions.Item label="备份目录">{task.backupDir}</Descriptions.Item>
+                  <Descriptions.Item label="备份模式">{backupModeLabel[task.backupMode] || task.backupMode}</Descriptions.Item>
+                </>
+              )}
+              {(!task.postTransferAction || task.postTransferAction !== 'BACKUP') && (
+                <>
+                  <Descriptions.Item label="备份目录">-</Descriptions.Item>
+                  <Descriptions.Item label="备份模式">-</Descriptions.Item>
+                </>
+              )}
+
+              <Descriptions.Item label="自动重试">{task.retryEnabled === 1 ? '是' : '否'}</Descriptions.Item>
+              {task.retryEnabled === 1 ? (
+                <>
+                  <Descriptions.Item label="重试保留(天)">{task.retryMaxDays}</Descriptions.Item>
+                  <Descriptions.Item label="重试间隔(分)">{task.retryIntervalMin}</Descriptions.Item>
+                </>
+              ) : (
+                <>
+                  <Descriptions.Item label="重试保留(天)">-</Descriptions.Item>
+                  <Descriptions.Item label="重试间隔(分)">-</Descriptions.Item>
+                </>
+              )}
+            </Descriptions>
+            {parseJsonSafe(task.routingConfig) && typeof parseJsonSafe(task.routingConfig) === 'object' && Object.keys(parseJsonSafe(task.routingConfig)).length > 0 && (
+              <Descriptions bordered column={3} size="small" title="区域路由配置" style={{ marginTop: 12 }}>
+                {Object.entries(parseJsonSafe(task.routingConfig)).map(([key, value]) => (
+                  <Descriptions.Item key={key} label={key}>{JSON.stringify(value)}</Descriptions.Item>
+                ))}
+              </Descriptions>
+            )}
+            <Descriptions bordered column={3} size="small" title="时间信息" style={{ marginTop: 12 }}>
+              <Descriptions.Item label="创建时间">{task.createTime}</Descriptions.Item>
+              <Descriptions.Item label="创建人">{task.createBy}</Descriptions.Item>
+              <Descriptions.Item label="开始时间">{task.startedAt || '-'}</Descriptions.Item>
+              <Descriptions.Item label="完成时间">{task.completedAt || '-'}</Descriptions.Item>
+              <Descriptions.Item label="后处理完成时间">{task.postProcessedAt || '-'}</Descriptions.Item>
+            </Descriptions>
           </Card>
         )},
       ]} />

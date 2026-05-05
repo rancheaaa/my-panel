@@ -2,7 +2,9 @@ package com.cq.panel.admin.server.web.controller.batch;
 
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.enums.BusinessType;
+import com.cq.panel.admin.server.repository.domain.BatchTransferSubtask;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
+import com.cq.panel.admin.server.repository.service.IBatchTransferSubtaskService;
 import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.BatchTransferService;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
@@ -30,14 +32,17 @@ public class BatchTransferController extends BaseController
 {
     private final BatchTransferService batchTransferService;
     private final IBatchTransferTaskService batchTransferTaskService;
+    private final IBatchTransferSubtaskService batchTransferSubtaskService;
     private final BatchTransferConverter batchTransferConverter;
 
     public BatchTransferController(BatchTransferService batchTransferService,
                                    IBatchTransferTaskService batchTransferTaskService,
+                                   IBatchTransferSubtaskService batchTransferSubtaskService,
                                    BatchTransferConverter batchTransferConverter)
     {
         this.batchTransferService = batchTransferService;
         this.batchTransferTaskService = batchTransferTaskService;
+        this.batchTransferSubtaskService = batchTransferSubtaskService;
         this.batchTransferConverter = batchTransferConverter;
     }
 
@@ -151,6 +156,15 @@ public class BatchTransferController extends BaseController
         String operatorName = getOperatorName();
         batchTransferService.retrySubtask(taskId, subtaskId, operatorId, operatorName);
         return Result.success();
+    }
+
+    @RequirePermission("batch:task:view")
+    @Operation(summary = "查询子任务列表")
+    @GetMapping("/{taskId}/subtasks")
+    public Result<List<BatchTransferSubtask>> listSubtasks(@PathVariable Long taskId)
+    {
+        List<BatchTransferSubtask> subtasks = batchTransferSubtaskService.selectByTaskId(taskId);
+        return Result.success(subtasks);
     }
 
     @RequirePermission("batch:task:remove")

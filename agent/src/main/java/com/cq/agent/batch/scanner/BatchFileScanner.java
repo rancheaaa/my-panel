@@ -13,43 +13,36 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
-public class BatchFileScanner
-{
+public class BatchFileScanner {
     private static final Logger logger = LoggerFactory.getLogger(BatchFileScanner.class);
-    private static final Set<String> SKIP_DIRS = Set.of(".git", ".svn", ".hg", "node_modules", "__pycache__", ".idea", ".vscode");
+    private static final Set<String> SKIP_DIRS = Set.of(".git", ".svn", ".hg", "node_modules", "__pycache__", ".idea",
+            ".vscode");
     private static final long MD5_FILE_SIZE_LIMIT = 100 * 1024 * 1024;
 
-    public ScanResponse scan(ScanRequest request)
-    {
+    public ScanResponse scan(ScanRequest request) {
         long start = System.currentTimeMillis();
-        try
-        {
+        try {
             Path baseDir = validateRequest(request);
-            if (!Files.isDirectory(baseDir))
-            {
+            if (!Files.isDirectory(baseDir)) {
                 return ScanResponse.error(request.getRequestId(), "源目录不存在或不是目录: " + baseDir);
             }
-            if (!Files.isReadable(baseDir))
-            {
+            if (!Files.isReadable(baseDir)) {
                 return ScanResponse.error(request.getRequestId(), "源目录不可读: " + baseDir);
             }
-            GlobMatcher matcher = new GlobMatcher(baseDir.toString(), request.getIncludePatterns(), request.getExcludePatterns());
+            GlobMatcher matcher = new GlobMatcher(baseDir.toString(), request.getIncludePatterns(),
+                    request.getExcludePatterns());
             List<ScannedFile> files = new ArrayList<>();
-            int[] skippedDirs = {0};
-            boolean[] truncated = {false};
-            Files.walkFileTree(baseDir, new SimpleFileVisitor<>()
-            {
+            int[] skippedDirs = { 0 };
+            boolean[] truncated = { false };
+            Files.walkFileTree(baseDir, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                    throws IOException
-                {
-                    if (baseDir.equals(dir))
-                    {
+                        throws IOException {
+                    if (baseDir.equals(dir)) {
                         return FileVisitResult.CONTINUE;
                     }
                     String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
-                    if (SKIP_DIRS.contains(dirName) || dirName.startsWith(".") || Files.isHidden(dir))
-                    {
+                    if (SKIP_DIRS.contains(dirName) || dirName.startsWith(".") || Files.isHidden(dir)) {
                         skippedDirs[0]++;
                         return FileVisitResult.SKIP_SUBTREE;
                     }
@@ -57,21 +50,16 @@ public class BatchFileScanner
                 }
 
                 @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                {
-                    if (truncated[0])
-                    {
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (truncated[0]) {
                         return FileVisitResult.TERMINATE;
                     }
-                    try
-                    {
-                        if (!attrs.isRegularFile() || attrs.isSymbolicLink())
-                        {
+                    try {
+                        if (!attrs.isRegularFile() || attrs.isSymbolicLink()) {
                             return FileVisitResult.CONTINUE;
                         }
                         String relativePath = baseDir.relativize(file).toString().replace('\\', '/');
-                        if (!matcher.matches(relativePath))
-                        {
+                        if (!matcher.matches(relativePath)) {
                             return FileVisitResult.CONTINUE;
                         }
                         ScannedFile sf = new ScannedFile();
@@ -79,27 +67,22 @@ public class BatchFileScanner
                         sf.setAbsolutePath(file.toAbsolutePath().toString());
                         sf.setSizeBytes(attrs.size());
                         sf.setLastModified(Date.from(attrs.lastModifiedTime().toInstant()));
-                        if (request.isComputeMd5() && attrs.size() <= MD5_FILE_SIZE_LIMIT)
-                        {
+                        if (request.isComputeMd5() && attrs.size() <= MD5_FILE_SIZE_LIMIT) {
                             sf.setMd5(computeMd5(file));
                         }
                         files.add(sf);
-                        if (files.size() >= request.getMaxFiles())
-                        {
+                        if (files.size() >= request.getMaxFiles()) {
                             truncated[0] = true;
                             return FileVisitResult.TERMINATE;
                         }
-                    }
-                    catch (Exception e)
-                    {
+                    } catch (Exception e) {
                         logger.warn("Error visiting file {}: {}", file, e.getMessage());
                     }
                     return FileVisitResult.CONTINUE;
                 }
 
                 @Override
-                public FileVisitResult visitFileFailed(Path file, IOException exc)
-                {
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
                     logger.warn("Failed to visit file {}: {}", file, exc.getMessage());
                     return FileVisitResult.CONTINUE;
                 }
@@ -107,77 +90,60 @@ public class BatchFileScanner
             files.sort(Comparator.comparing(ScannedFile::getLastModified));
             ScanResult result = ScanResult.of(files, truncated[0], skippedDirs[0]);
             return ScanResponse.success(request.getRequestId(), result, System.currentTimeMillis() - start);
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             logger.error("Scan error for request {}: {}", request.getRequestId(), e.getMessage(), e);
             return ScanResponse.error(request.getRequestId(), e.getMessage());
         }
     }
 
-    private Path validateRequest(ScanRequest request)
-    {
-        if (request == null)
-        {
+    private Path validateRequest(ScanRequest request) {
+        if (request == null) {
             throw new IllegalArgumentException("扫描请求不能为空");
         }
-        if (request.getBaseDir() == null || request.getBaseDir().isBlank())
-        {
+        if (request.getBaseDir() == null || request.getBaseDir().isBlank()) {
             throw new IllegalArgumentException("源目录不能为空");
         }
         String baseDir = request.getBaseDir();
-        if (baseDir.contains(".."))
-        {
+        if (baseDir.contains("..")) {
             throw new IllegalArgumentException("源目录路径不允许包含..");
         }
 
         Path p;
-        try
-        {
+        try {
             p = Paths.get(baseDir);
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             throw new IllegalArgumentException("源目录路径格式无效: " + baseDir + ", 错误: " + e.getMessage());
-        }
-
-        boolean isAbsolute = p.isAbsolute();
-        if (!isAbsolute && (baseDir.startsWith("/") || baseDir.startsWith("\\")))
-        {
-            isAbsolute = true;
-        }
-
-        if (!isAbsolute)
-        {
-            throw new IllegalArgumentException("源目录必须是绝对路径: " + baseDir);
-        }
-
-        if (request.getMaxFiles() <= 0)
-        {
-            throw new IllegalArgumentException("maxFiles必须大于0");
         }
 
         Path normalized = p.toAbsolutePath().normalize();
         logger.info("Scan baseDir resolved: {} -> {}", baseDir, normalized);
+
+        if (!Files.isDirectory(normalized)) {
+            throw new IllegalArgumentException("源目录不存在或不是目录: " + normalized);
+        }
+        if (!Files.isReadable(normalized)) {
+            throw new IllegalArgumentException("源目录不可读: " + normalized);
+        }
+
+        if (request.getMaxFiles() <= 0) {
+            throw new IllegalArgumentException("maxFiles必须大于0");
+        }
+
         return normalized;
     }
 
-    private String computeMd5(Path file) throws Exception
-    {
+    private String computeMd5(Path file) throws Exception {
         MessageDigest md = MessageDigest.getInstance("MD5");
-        try (InputStream inputStream = Files.newInputStream(file))
-        {
+        try (InputStream inputStream = Files.newInputStream(file)) {
             byte[] buffer = new byte[8192];
             int read;
-            while ((read = inputStream.read(buffer)) != -1)
-            {
+            while ((read = inputStream.read(buffer)) != -1) {
                 md.update(buffer, 0, read);
             }
         }
         byte[] digest = md.digest();
         StringBuilder sb = new StringBuilder();
-        for (byte b : digest)
-        {
+        for (byte b : digest) {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();

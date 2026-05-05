@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.support.RestClientAdapter;
-import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,39 +53,79 @@ public class ProxyApiClient {
         return "http://localhost:9876";
     }
 
-    private ProxyApi createProxyApi() {
+    private RestClient createRestClient() {
         String baseUrl = resolveProxyBaseUrl();
-        RestClient restClient = RestClient.builder()
+        return RestClient.builder()
                 .baseUrl(baseUrl)
                 .build();
-        HttpServiceProxyFactory factory = HttpServiceProxyFactory
-                .builderFor(RestClientAdapter.create(restClient))
-                .build();
-        return factory.createClient(ProxyApi.class);
     }
 
     public Map<String, Object> startTask(Long taskId, Map<String, Object> request) {
-        return createProxyApi().startTask(taskId, request);
+        logger.info("Sending start task request to proxy for task {}", taskId);
+        try {
+            return createRestClient()
+                    .post()
+                    .uri("/api/v1/batch/tasks/{taskId}/start", taskId)
+                    .body(request)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (Exception e) {
+            logger.error("Failed to start task {} via proxy: {}", taskId, e.getMessage(), e);
+            throw new RuntimeException("Proxy启动任务失败: " + e.getMessage(), e);
+        }
     }
 
     public Map<String, Object> pauseTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl) {
+        logger.info("Sending pause task request to proxy for task {}", taskId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("sourceAgentId", sourceAgentId);
         body.put("sourceAgentApiUrl", sourceAgentApiUrl);
-        return createProxyApi().pauseTask(taskId, body);
+        try {
+            return createRestClient()
+                    .put()
+                    .uri("/api/v1/batch/tasks/{taskId}/pause", taskId)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (Exception e) {
+            logger.error("Failed to pause task {} via proxy: {}", taskId, e.getMessage(), e);
+            throw new RuntimeException("Proxy暂停任务失败: " + e.getMessage(), e);
+        }
     }
 
     public Map<String, Object> resumeTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl) {
+        logger.info("Sending resume task request to proxy for task {}", taskId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("sourceAgentId", sourceAgentId);
         body.put("sourceAgentApiUrl", sourceAgentApiUrl);
-        return createProxyApi().resumeTask(taskId, body);
+        try {
+            return createRestClient()
+                    .put()
+                    .uri("/api/v1/batch/tasks/{taskId}/resume", taskId)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (Exception e) {
+            logger.error("Failed to resume task {} via proxy: {}", taskId, e.getMessage(), e);
+            throw new RuntimeException("Proxy恢复任务失败: " + e.getMessage(), e);
+        }
     }
 
     public Map<String, Object> cancelTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl) {
+        logger.info("Sending cancel task request to proxy for task {}", taskId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("sourceAgentId", sourceAgentId);
         body.put("sourceAgentApiUrl", sourceAgentApiUrl);
-        return createProxyApi().cancelTask(taskId, body);
+        try {
+            return createRestClient()
+                    .put()
+                    .uri("/api/v1/batch/tasks/{taskId}/cancel", taskId)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (Exception e) {
+            logger.error("Failed to cancel task {} via proxy: {}", taskId, e.getMessage(), e);
+            throw new RuntimeException("Proxy取消任务失败: " + e.getMessage(), e);
+        }
     }
 }

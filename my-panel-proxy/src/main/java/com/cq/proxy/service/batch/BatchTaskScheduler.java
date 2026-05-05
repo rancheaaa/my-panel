@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.support.RestClientAdapter;
-import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -76,15 +74,11 @@ public class BatchTaskScheduler
         throw new IllegalStateException("无法解析Agent地址: agentId=" + sourceAgentId + ", 无回退URL");
     }
 
-    private AgentApi createAgentApiForUrl(String baseUrl)
+    private RestClient createRestClientForUrl(String baseUrl)
     {
-        RestClient scopedClient = RestClient.builder()
+        return RestClient.builder()
                 .baseUrl(baseUrl)
                 .build();
-        HttpServiceProxyFactory factory = HttpServiceProxyFactory
-                .builderFor(RestClientAdapter.create(scopedClient))
-                .build();
-        return factory.createClient(AgentApi.class);
     }
 
     public StartResult startTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl,
@@ -94,11 +88,18 @@ public class BatchTaskScheduler
                                   String targetDirs, Integer preserveDirStructure)
     {
         String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
-        AgentApi agent = createAgentApiForUrl(resolvedUrl);
+        RestClient restClient = createRestClientForUrl(resolvedUrl);
         try
         {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> scanResponse = (Map<String, Object>) agent.scan((Map<String, Object>) scanRequest);
+            Map<String, Object> scanResponse = restClient.post()
+                    .uri("/api/internal/batch/scan")
+                    .body(scanRequest)
+                    .retrieve()
+                    .body(Map.class);
+            if (scanResponse == null)
+            {
+                return new StartResult(false, "扫描请求无响应", null);
+            }
             if (!Boolean.TRUE.equals(scanResponse.get("success")))
             {
                 return new StartResult(false, "扫描失败", scanResponse);
@@ -135,7 +136,11 @@ public class BatchTaskScheduler
                     totalFiles, totalSizeBytes, taskId);
 
             Map<String, Object> dispatchRequest = buildDispatchRequest(taskId, subtasks, maxBandwidthBytesPerSec, agentDirMap, preserveDirStructure);
-            Map<String, Object> dispatchResult = (Map<String, Object>) agent.dispatch(dispatchRequest);
+            Map<String, Object> dispatchResult = restClient.post()
+                    .uri("/api/internal/batch/dispatch")
+                    .body(dispatchRequest)
+                    .retrieve()
+                    .body(Map.class);
 
             return new StartResult(true, "Task started", Map.of(
                     "taskId", taskId, "scanResult", scanResult,

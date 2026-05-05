@@ -97,23 +97,44 @@ public class ProgressAggregator
         Object[] values;
         if ("COMPLETED".equals(status))
         {
-            sql.append(", completed_at = NOW(), transferred_chunks = total_chunks, transferred_bytes = file_size_bytes");
-            sql.append(" WHERE id = ? AND status IN ('QUEUED','SENDING','RETRYING')");
-            values = new Object[]{status, subtaskId};
+            String transferId = report.get("transferId") != null ? String.valueOf(report.get("transferId")) : null;
+            sql.append(", completed_at = COALESCE(completed_at, NOW()), transferred_chunks = total_chunks, transferred_bytes = file_size_bytes");
+            sql.append(", started_at = COALESCE(started_at, NOW()), duration_ms = TIMESTAMPDIFF(MICROSECOND, COALESCE(started_at, NOW()), NOW()) / 1000");
+            if (transferId != null && !transferId.isBlank() && !"-".equals(transferId)) {
+                sql.append(", transfer_id = ?");
+            }
+            sql.append(" WHERE id = ? AND status IN ('QUEUED','SENDING','RETRYING','COMPLETED')");
+            if (transferId != null && !transferId.isBlank() && !"-".equals(transferId)) {
+                values = new Object[]{status, transferId, subtaskId};
+            } else {
+                values = new Object[]{status, subtaskId};
+            }
         }
         else if ("FAILED".equals(status))
         {
-            String errorCode = (String) report.get("errorCode");
-            String errorMessage = (String) report.get("errorMessage");
-            sql.append(", error_code = ?, error_message = ? WHERE id = ? AND status IN ('QUEUED','SENDING','RETRYING')");
-            values = new Object[]{status, errorCode, errorMessage, subtaskId};
+            String errorCode = report.get("errorCode") != null ? String.valueOf(report.get("errorCode")) : "UNKNOWN";
+            String errorMessage = report.get("errorMessage") != null ? String.valueOf(report.get("errorMessage")) : "";
+            Object transferredChunks = report.get("transferredChunks");
+            Object transferredBytes = report.get("transferredBytes");
+            sql.append(", error_code = ?, error_message = ?");
+            if (transferredChunks != null) sql.append(", transferred_chunks = ?");
+            if (transferredBytes != null) sql.append(", transferred_bytes = ?");
+            sql.append(", started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status IN ('QUEUED','SENDING','RETRYING')");
+            java.util.List<Object> valList = new java.util.ArrayList<>();
+            valList.add(status);
+            valList.add(errorCode);
+            valList.add(errorMessage);
+            if (transferredChunks != null) valList.add(transferredChunks);
+            if (transferredBytes != null) valList.add(transferredBytes);
+            valList.add(subtaskId);
+            values = valList.toArray();
         }
         else if ("SENDING".equals(status))
         {
             Object transferredChunks = report.get("transferredChunks");
             Object transferredBytes = report.get("transferredBytes");
             Object speedBytesPerSec = report.get("speedBytesPerSec");
-            sql.append(", transferred_chunks = ?, transferred_bytes = ?, speed_bytes_per_sec = ? WHERE id = ? AND status IN ('QUEUED','SENDING')");
+            sql.append(", transferred_chunks = ?, transferred_bytes = ?, speed_bytes_per_sec = ?, started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status IN ('QUEUED','SENDING')");
             values = new Object[]{status, transferredChunks, transferredBytes, speedBytesPerSec, subtaskId};
         }
         else
@@ -122,6 +143,7 @@ public class ProgressAggregator
             values = new Object[]{status, subtaskId};
         }
         jdbcTemplate.update(sql.toString(), values);
+        logger.debug("Updated subtask {} status={}, rows affected, sql={}", subtaskId, status, sql);
     }
 
     private Map<Long, Map<String, Object>> calculateTaskSummaries(Map<String, Map<String, Object>> batch)

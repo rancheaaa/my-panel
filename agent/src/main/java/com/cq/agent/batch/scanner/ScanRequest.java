@@ -12,5 +12,5 @@ public class ScanRequest
     private List<String> includePatterns;
     private List<String> excludePatterns;
     private int maxFiles = 10000;
-    private boolean computeMd5 = false;
+    private boolean computeMd5 = true;
 }

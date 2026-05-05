@@ -72,7 +72,7 @@ public class HandlerFactory {
         BatchAwareAgentUploader batchUploader = new BatchAwareAgentUploader(agentConfig, queueManager, proxyReportClient);
 
         try {
-            this.scanScheduler = new BatchScanScheduler(batchScanner, proxyReportClient, agentConfig.getFileBaseDirectory());
+            this.scanScheduler = new BatchScanScheduler(batchScanner, proxyReportClient, agentConfig.getFileBaseDirectory(), agentConfig.getServerPort());
         } catch (Exception e) {
             throw new RuntimeException("Failed to init BatchScanScheduler: " + e.getMessage(), e);
         }

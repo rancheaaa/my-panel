@@ -167,15 +167,24 @@ public class BatchAwareAgentUploader extends AgentUploader {
                 .toString();
     }
 
-    private String resolveRemoteTargetPath(BatchUploadTask batchTask) {
+    private String resolveRemoteTargetPath(BatchUploadTask batchTask)
+    {
         String targetDir = batchTask.getTargetDir();
         String filePath = batchTask.getFilePath();
-        if (filePath == null || filePath.isBlank()) {
+        if (filePath == null || filePath.isBlank())
+        {
             throw new IllegalArgumentException("filePath不能为空");
         }
-        String fileName = filePath.contains("/") ? filePath.substring(filePath.lastIndexOf('/') + 1) : filePath;
-        if (targetDir != null && !targetDir.isBlank()) {
-            return Path.of(targetDir).resolve(fileName).normalize().toString();
+        String fileName = filePath.contains("/") ? filePath.substring(filePath.lastIndexOf('/') + 1) :
+                filePath.contains("\\") ? filePath.substring(filePath.lastIndexOf('\\') + 1) : filePath;
+        if (targetDir != null && !targetDir.isBlank())
+        {
+            char lastChar = targetDir.charAt(targetDir.length() - 1);
+            if (lastChar == '/' || lastChar == '\\')
+            {
+                return targetDir + fileName;
+            }
+            return targetDir + '/' + fileName;
         }
         return normalizeRelativePath(filePath);
     }
@@ -229,19 +238,24 @@ public class BatchAwareAgentUploader extends AgentUploader {
                 task.getFileSizeBytes(),
                 0L,
                 0L);
+        report.setErrorCode(classification.getType() != null ? classification.getType().name() : "UNKNOWN");
+        report.setErrorMessage(uploadTask.getExceptionDesc() != null ? uploadTask.getExceptionDesc() : classification.getDescription());
         proxyReportClient.asyncReportProgress(report);
         logger.error("Batch upload failed, subtaskId={}, taskId={}, type={}, message={}",
                 task.getSubtaskId(), task.getTaskId(), classification.getType(), uploadTask.getExceptionDesc());
     }
 
     private void reportCompleted(BatchUploadTask task, UploadTask uploadTask) {
+        int totalChunks = uploadTask.getTotalChunks();
+        int transferredChunks = totalChunks > 0 ? totalChunks : 1;
         ProgressReport report = baseReport(task, "COMPLETED",
-                uploadTask.getTotalChunks(), uploadTask.getTotalChunks(), task.getFileSizeBytes(),
-                task.getFileSizeBytes(),
+                transferredChunks, totalChunks > 0 ? totalChunks : 1,
+                task.getFileSizeBytes(), task.getFileSizeBytes(),
                 0L, 0L);
+        report.setTransferId(uploadTask.getTransferId());
         proxyReportClient.asyncReportProgress(report);
-        logger.info("Batch upload completed, subtaskId={}, taskId={}, filePath={}",
-                task.getSubtaskId(), task.getTaskId(), task.getFilePath());
+        logger.info("Batch upload completed, subtaskId={}, taskId={}, filePath={}, transferId={}",
+                task.getSubtaskId(), task.getTaskId(), task.getFilePath(), uploadTask.getTransferId());
     }
 
     private void executePostProcess(BatchUploadTask batchTask) {

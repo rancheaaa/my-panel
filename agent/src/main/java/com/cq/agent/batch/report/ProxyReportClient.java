@@ -37,6 +37,7 @@ public class ProxyReportClient
 
     public void asyncReportProgress(ProgressReport report)
     {
+        final String json = gson.toJson(report);
         CompletableFuture.runAsync(() -> {
             try
             {
@@ -44,7 +45,7 @@ public class ProxyReportClient
             }
             catch (Exception e)
             {
-                logger.warn("Failed to report progress for subtask {}: {}", report.getSubtaskId(), e.getMessage());
+                logger.warn("Failed to report progress for subtaskId={}/status={}: {}", report.getSubtaskId(), report.getStatus(), e.getMessage());
             }
         }, reportExecutor);
     }

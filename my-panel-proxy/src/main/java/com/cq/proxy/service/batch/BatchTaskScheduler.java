@@ -9,11 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class BatchTaskScheduler
@@ -208,15 +204,35 @@ public class BatchTaskScheduler
             String fileName = filePath.contains("/") ? filePath.substring(filePath.lastIndexOf("/") + 1) : filePath;
             long fileSizeBytes = subtask.get("fileSizeBytes") instanceof Number ? ((Number) subtask.get("fileSizeBytes")).longValue() : 0L;
             String targetAgentId = (String) subtask.get("targetAgentId");
+            Object md5Obj = subtask.get("fileMd5");
+            String fileMd5 = md5Obj != null ? String.valueOf(md5Obj) : null;
+            Object lastModObj = subtask.get("fileLastModified");
+            java.sql.Timestamp fileLastModified = lastModObj instanceof Date ?
+                    new java.sql.Timestamp(((Date) lastModObj).getTime()) :
+                    (lastModObj instanceof Number ? new java.sql.Timestamp(((Number) lastModObj).longValue()) : null);
 
-            int rows = jdbcTemplate.update(
-                    "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
-                            "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
-                            "retry_count, proxy_retry_count, create_time, update_time) " +
-                            "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW()) " +
-                            "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
-                            "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW()",
-                    taskId, filePath, fileName, fileSizeBytes, targetAgentId);
+            int rows;
+            if (fileMd5 != null || fileLastModified != null) {
+                rows = jdbcTemplate.update(
+                        "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
+                                "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
+                                "retry_count, proxy_retry_count, create_time, update_time, file_md5, file_last_modified) " +
+                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?) " +
+                                "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
+                                "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW(), " +
+                                "file_md5 = COALESCE(?, file_md5), file_last_modified = COALESCE(?, file_last_modified)",
+                        taskId, filePath, fileName, fileSizeBytes, targetAgentId, fileMd5, fileLastModified,
+                        fileMd5, fileLastModified);
+            } else {
+                rows = jdbcTemplate.update(
+                        "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
+                                "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
+                                "retry_count, proxy_retry_count, create_time, update_time) " +
+                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW()) " +
+                                "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
+                                "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW()",
+                        taskId, filePath, fileName, fileSizeBytes, targetAgentId);
+            }
             if (rows > 0)
             {
                 inserted++;
@@ -284,6 +300,8 @@ public class BatchTaskScheduler
                 subtask.put("filePath", relativePath);
                 subtask.put("fileName", relativePath.contains("/") ? relativePath.substring(relativePath.lastIndexOf("/") + 1) : relativePath);
                 subtask.put("fileSizeBytes", file.get("sizeBytes"));
+                if (file.get("md5") != null) subtask.put("fileMd5", String.valueOf(file.get("md5")));
+                if (file.get("lastModified") != null) subtask.put("fileLastModified", file.get("lastModified"));
                 subtask.put("targetAgentId", targetAgentId);
                 subtask.put("targetDir", agentDirMap.getOrDefault(targetAgentId, "/tmp"));
                 subtask.put("priority", 5);

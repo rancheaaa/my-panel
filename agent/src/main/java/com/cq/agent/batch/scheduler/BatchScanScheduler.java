@@ -29,12 +29,14 @@ public class BatchScanScheduler {
     private final ProxyReportClient reportClient;
     private final PersistentMap<String, ScanConfig> configStore;
     private final String dataDir;
+    private final int localPort;
 
-    public BatchScanScheduler(BatchFileScanner scanner, ProxyReportClient reportClient, String dataDir)
+    public BatchScanScheduler(BatchFileScanner scanner, ProxyReportClient reportClient, String dataDir, int localPort)
             throws SchedulerException, RocksDBException {
         this.scanner = scanner;
         this.reportClient = reportClient;
         this.dataDir = dataDir;
+        this.localPort = localPort;
 
         File storeDir = new File(dataDir, "batch-schedule");
         storeDir.mkdirs();
@@ -63,6 +65,10 @@ public class BatchScanScheduler {
             configStore.close();
         }
         log.info("BatchScanScheduler shutdown complete");
+    }
+
+    public int getLocalPort() {
+        return localPort;
     }
 
     public void upsertTask(Long taskId, String cronExpression, Map<String, Object> scanConfig,
@@ -216,13 +222,64 @@ public class BatchScanScheduler {
                         st.put("filePath", file.getRelativePath());
                         st.put("fileName", file.getRelativePath().contains("/") ? file.getRelativePath().substring(file.getRelativePath().lastIndexOf('/') + 1) : file.getRelativePath());
                         st.put("fileSizeBytes", file.getSizeBytes());
+                        st.put("fileMd5", file.getMd5());
+                        st.put("fileLastModified", file.getLastModified());
                         if (config.targetAgents != null) {
                             for (Map<String, Object> agent : config.targetAgents) {
                                 Map<String, Object> subtaskCopy = new java.util.LinkedHashMap<>(st);
-                                subtaskCopy.put("targetAgentId", agent.get("agentId"));
+                                String agentId = (String) agent.get("agentId");
+                                subtaskCopy.put("targetAgentId", agentId);
                                 subtaskCopy.put("targetAgentApiUrl", agent.get("apiUrl"));
+                                if (config.targetDirs != null && config.targetDirs.containsKey(agentId)) {
+                                    subtaskCopy.put("targetDir", config.targetDirs.get(agentId));
+                                }
                                 subtasks.add(subtaskCopy);
                             }
+                        }
+                    }
+
+                    Map<String, Object> persistRequest = new java.util.LinkedHashMap<>();
+                    persistRequest.put("taskId", taskId);
+                    persistRequest.put("subtasks", subtasks);
+
+                    String proxyBaseUrl = config.proxyBaseUrl;
+                    if (proxyBaseUrl == null || proxyBaseUrl.isBlank()) {
+                        jobLog.warn("[Cron] Task {} proxyBaseUrl is empty, skipping subtask persistence", taskId);
+                    } else {
+                        try {
+                            String persistUrl = proxyBaseUrl + "/api/internal/batch/subtasks/persist";
+                            java.net.http.HttpClient persistClient = java.net.http.HttpClient.newBuilder()
+                                    .version(java.net.http.HttpClient.Version.HTTP_1_1)
+                                    .connectTimeout(java.time.Duration.ofSeconds(10))
+                                    .build();
+                            String persistBody = gson.toJson(persistRequest);
+                            java.net.http.HttpRequest persistReq = java.net.http.HttpRequest.newBuilder()
+                                    .uri(java.net.URI.create(persistUrl))
+                                    .header("Content-Type", "application/json")
+                                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(persistBody))
+                                    .timeout(java.time.Duration.ofSeconds(30))
+                                    .build();
+                            java.net.http.HttpResponse<String> persistResp = persistClient.send(persistReq,
+                                    java.net.http.HttpResponse.BodyHandlers.ofString());
+                            jobLog.info("[Cron] Task {} persist result: {}", taskId, persistResp.body());
+
+                            if (persistResp.statusCode() == 200) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> persistResult = gson.fromJson(persistResp.body(), Map.class);
+                                if (Boolean.TRUE.equals(persistResult.get("success"))) {
+                                    @SuppressWarnings("unchecked")
+                                    List<Map<String, Object>> persistedSubtasks =
+                                            (List<Map<String, Object>>) persistResult.get("persistedSubtasks");
+                                    if (persistedSubtasks != null && !persistedSubtasks.isEmpty()) {
+                                        subtasks = persistedSubtasks;
+                                        jobLog.info("[Cron] Task {} updated {} subtasks with real DB IDs", taskId, subtasks.size());
+                                    }
+                                }
+                            } else {
+                                jobLog.warn("[Cron] Task {} persist failed: {}", taskId, persistResp.body());
+                            }
+                        } catch (Exception e) {
+                            jobLog.error("[Cron] Task {} failed to persist subtasks to Proxy: {}", taskId, e.getMessage());
                         }
                     }
 
@@ -238,7 +295,7 @@ public class BatchScanScheduler {
                     dispatchRequest.put("backupMode", config.backupMode != null ? config.backupMode : "COPY");
                     dispatchRequest.put("subtasks", subtasks);
 
-                    String url = config.proxyBaseUrl + "/api/internal/batch/dispatch";
+                    String url = "http://localhost:" + scheduler.getLocalPort() + "/api/internal/batch/dispatch";
                     java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
                             .version(java.net.http.HttpClient.Version.HTTP_1_1)
                             .connectTimeout(java.time.Duration.ofSeconds(10))

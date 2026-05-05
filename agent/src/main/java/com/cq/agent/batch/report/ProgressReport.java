@@ -12,6 +12,9 @@ public class ProgressReport
     private String targetAgentId;
     private String filePath;
     private String status;
+    private String errorCode;
+    private String errorMessage;
+    private String transferId;
     private ProgressDetail progress;
     private PerformanceInfo performance;
     private Date timestamp;

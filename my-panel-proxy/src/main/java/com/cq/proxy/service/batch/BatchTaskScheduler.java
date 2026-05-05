@@ -241,6 +241,16 @@ public class BatchTaskScheduler
         {
             sourceBaseDir = (String) ((Map<?, ?>) scanRequest).get("baseDir");
         }
+        Map<String, Object> taskConfig = null;
+        try
+        {
+            taskConfig = jdbcTemplate.queryForMap(
+                    "SELECT post_transfer_action, backup_dir, backup_mode FROM batch_transfer_task WHERE id = ?", taskId);
+        }
+        catch (Exception e)
+        {
+            logger.warn("Failed to query post-process config for task {}: {}", taskId, e.getMessage());
+        }
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("dispatchId", "disp-" + UUID.randomUUID());
         request.put("taskId", taskId);
@@ -248,6 +258,9 @@ public class BatchTaskScheduler
         request.put("agentTargetDirs", agentDirMap);
         request.put("preserveDirStructure", preserveDirStructure != null && preserveDirStructure == 1);
         request.put("sourceBaseDir", sourceBaseDir);
+        request.put("postAction", taskConfig != null ? taskConfig.get("post_transfer_action") : null);
+        request.put("backupDir", taskConfig != null ? taskConfig.get("backup_dir") : null);
+        request.put("backupMode", taskConfig != null ? taskConfig.getOrDefault("backup_mode", "COPY") : "COPY");
         request.put("subtasks", subtasks);
         return request;
     }
@@ -345,6 +358,14 @@ public class BatchTaskScheduler
                 agentList.add(a);
             }
 
+            Map<String, Object> taskConfig = null;
+            try
+            {
+                taskConfig = jdbcTemplate.queryForMap(
+                        "SELECT post_transfer_action, backup_dir, backup_mode FROM batch_transfer_task WHERE id = ?", taskId);
+            }
+            catch (Exception ignored) {}
+
             Map<String, Object> scheduleRequest = new LinkedHashMap<>();
             scheduleRequest.put("action", "upsert");
             scheduleRequest.put("taskId", taskId);
@@ -355,6 +376,9 @@ public class BatchTaskScheduler
             scheduleRequest.put("targetDirs", buildAgentDirMap(targetAgents, targetDirs));
             scheduleRequest.put("preserveDirStructure", preserveDirStructure);
             scheduleRequest.put("maxBandwidthBytesPerSec", maxBandwidthBytesPerSec);
+            scheduleRequest.put("postAction", taskConfig != null ? taskConfig.get("post_transfer_action") : null);
+            scheduleRequest.put("backupDir", taskConfig != null ? taskConfig.get("backup_dir") : null);
+            scheduleRequest.put("backupMode", taskConfig != null ? taskConfig.getOrDefault("backup_mode", "COPY") : "COPY");
 
             RestClient restClient = createRestClientForUrl(agentUrl);
             Map<String, Object> result = restClient.post()

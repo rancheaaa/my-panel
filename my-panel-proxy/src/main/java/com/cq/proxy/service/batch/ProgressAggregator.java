@@ -204,6 +204,51 @@ public class ProgressAggregator
         }
     }
 
+    public void receivePostProcessResult(Object result)
+    {
+        if (!(result instanceof Map<?, ?> raw))
+        {
+            logger.warn("Ignored invalid post-process payload: {}", result);
+            return;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : raw.entrySet())
+        {
+            if (entry.getKey() != null)
+            {
+                data.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        Object taskIdObj = data.get("taskId");
+        if (taskIdObj == null) return;
+        Long taskId = ((Number) taskIdObj).longValue();
+        try
+        {
+            Object successCount = data.get("successCount");
+            Object failedCount = data.get("failedCount");
+            int success = successCount instanceof Number ? ((Number) successCount).intValue() : 0;
+            int fail = failedCount instanceof Number ? ((Number) failedCount).intValue() : 0;
+
+            jdbcTemplate.update(
+                    "UPDATE batch_transfer_statistics SET " +
+                            "post_process_completed = COALESCE(post_process_completed, 0) + ?, " +
+                            "post_process_failed = COALESCE(post_process_failed, 0) + ?, " +
+                            "post_processed_at = NOW(), " +
+                            "last_activity_at = NOW(), update_time = NOW() " +
+                            "WHERE task_id = ?",
+                    success, fail, taskId);
+
+            if (success > 0 || fail > 0)
+            {
+                logger.info("Updated post-process stats for task {}: success={}, failed={}", taskId, success, fail);
+            }
+        }
+        catch (Exception e)
+        {
+            logger.error("Failed to save post-process result for task {}: {}", taskId, e.getMessage());
+        }
+    }
+
     private String buildReportKey(Map<String, Object> report)
     {
         Object subtaskId = report.get("subtaskId");

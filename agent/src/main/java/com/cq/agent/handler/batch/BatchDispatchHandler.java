@@ -77,6 +77,10 @@ public class BatchDispatchHandler extends BaseHandler
                         (agentTargetDirs != null ? agentTargetDirs.get(task.getTargetAgentId()) : null);
                 task.setTargetDir(agentTargetDir);
                 task.setPreserveDirStructure(preserveDirStructure != null && preserveDirStructure);
+                task.setSourceBaseDir(sourceBaseDir);
+                task.setPostAction((String) dispatchRequest.get("postAction"));
+                task.setBackupDir((String) dispatchRequest.get("backupDir"));
+                task.setBackupMode((String) dispatchRequest.getOrDefault("backupMode", "COPY"));
                 if (item.get("priority") != null) task.setPriority(((Number) item.get("priority")).intValue());
                 if (queueManager.enqueue(task))
                 {

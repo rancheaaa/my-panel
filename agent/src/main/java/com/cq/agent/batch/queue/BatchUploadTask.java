@@ -17,4 +17,9 @@ public class BatchUploadTask
     private int priority;
     private int retryCount;
     private long enqueueTime;
+
+    private String sourceBaseDir;
+    private String postAction;
+    private String backupDir;
+    private String backupMode;
 }

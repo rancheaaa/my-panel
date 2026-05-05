@@ -68,7 +68,8 @@ public class BatchScanScheduler {
     public void upsertTask(Long taskId, String cronExpression, Map<String, Object> scanConfig,
             String proxyBaseUrl, List<Map<String, Object>> targetAgents,
             Map<String, String> targetDirs, Integer preserveDirStructure,
-            Long maxBandwidthBytesPerSec) {
+            Long maxBandwidthBytesPerSec,
+            String postAction, String backupDir, String backupMode) {
         try {
             String key = String.valueOf(taskId);
 
@@ -81,6 +82,9 @@ public class BatchScanScheduler {
             config.targetDirs = targetDirs;
             config.preserveDirStructure = preserveDirStructure != null ? preserveDirStructure : 1;
             config.maxBandwidthBytesPerSec = maxBandwidthBytesPerSec;
+            config.postAction = postAction;
+            config.backupDir = backupDir;
+            config.backupMode = backupMode;
 
             configStore.put(key, config);
 
@@ -229,6 +233,9 @@ public class BatchScanScheduler {
                     dispatchRequest.put("agentTargetDirs", config.targetDirs);
                     dispatchRequest.put("preserveDirStructure", config.preserveDirStructure != null && config.preserveDirStructure == 1);
                     dispatchRequest.put("sourceBaseDir", baseDir);
+                    dispatchRequest.put("postAction", config.postAction);
+                    dispatchRequest.put("backupDir", config.backupDir);
+                    dispatchRequest.put("backupMode", config.backupMode != null ? config.backupMode : "COPY");
                     dispatchRequest.put("subtasks", subtasks);
 
                     String url = config.proxyBaseUrl + "/api/internal/batch/dispatch";
@@ -264,5 +271,8 @@ public class BatchScanScheduler {
         public Map<String, String> targetDirs;
         public Integer preserveDirStructure;
         public Long maxBandwidthBytesPerSec;
+        public String postAction;
+        public String backupDir;
+        public String backupMode;
     }
 }

@@ -53,6 +53,7 @@ public class BatchInternalController
     @PostMapping("/post-process-result")
     public Map<String, Object> receivePostProcessResult(@RequestBody Map<String, Object> result)
     {
+        progressAggregator.receivePostProcessResult(result);
         return Map.of("success", true);
     }
 }

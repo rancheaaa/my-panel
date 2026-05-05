@@ -88,10 +88,14 @@ public class BatchScanScheduleHandler extends BaseHandler {
                 }.getType());
         Number preserveDirStructure = (Number) body.get("preserveDirStructure");
         Number maxBandwidthBytesPerSec = (Number) body.get("maxBandwidthBytesPerSec");
+        String postAction = (String) body.get("postAction");
+        String backupDir = (String) body.get("backupDir");
+        String backupMode = (String) body.getOrDefault("backupMode", "COPY");
 
         scanScheduler.upsertTask(taskId, cronExpression, scanConfig, proxyBaseUrl, targetAgents, targetDirs,
                 preserveDirStructure != null ? preserveDirStructure.intValue() : 1,
-                maxBandwidthBytesPerSec != null ? maxBandwidthBytesPerSec.longValue() : null);
+                maxBandwidthBytesPerSec != null ? maxBandwidthBytesPerSec.longValue() : null,
+                postAction, backupDir, backupMode);
 
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("success", true);

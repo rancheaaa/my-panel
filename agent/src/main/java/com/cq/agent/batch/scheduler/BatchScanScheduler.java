@@ -204,8 +204,10 @@ public class BatchScanScheduler {
 
                     String baseDir = config.scanConfig != null ? (String) config.scanConfig.get("baseDir") : null;
                     List<Map<String, Object>> subtasks = new java.util.ArrayList<>();
+                    long subtaskSeq = 1;
                     for (var file : response.getResult().getFiles()) {
                         Map<String, Object> st = new java.util.LinkedHashMap<>();
+                        st.put("subtaskId", subtaskSeq++);
                         st.put("taskId", taskId);
                         st.put("filePath", file.getRelativePath());
                         st.put("fileName", file.getRelativePath().contains("/") ? file.getRelativePath().substring(file.getRelativePath().lastIndexOf('/') + 1) : file.getRelativePath());

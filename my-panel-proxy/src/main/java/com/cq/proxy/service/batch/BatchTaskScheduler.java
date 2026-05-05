@@ -258,6 +258,7 @@ public class BatchTaskScheduler
                                                        Map<String, String> agentDirMap)
     {
         List<Map<String, Object>> subtasks = new ArrayList<>();
+        long subtaskSeq = 1;
         for (Map<String, Object> file : scannedFiles)
         {
             String relativePath = String.valueOf(file.get("relativePath"));
@@ -265,6 +266,7 @@ public class BatchTaskScheduler
             for (String targetAgentId : targets)
             {
                 Map<String, Object> subtask = new LinkedHashMap<>();
+                subtask.put("subtaskId", subtaskSeq++);
                 subtask.put("taskId", taskId);
                 subtask.put("filePath", relativePath);
                 subtask.put("fileName", relativePath.contains("/") ? relativePath.substring(relativePath.lastIndexOf("/") + 1) : relativePath);
@@ -274,6 +276,12 @@ public class BatchTaskScheduler
                 subtask.put("priority", 5);
 
                 String targetApiUrl = resolveTargetAgentUrl(targetAgentId);
+                if (targetApiUrl == null)
+                {
+                    logger.warn("Skipping subtask for file={}, targetAgent[{}] - agent URL could not be resolved or agent is offline",
+                            relativePath, targetAgentId);
+                    continue;
+                }
                 subtask.put("targetAgentApiUrl", targetApiUrl);
 
                 subtasks.add(subtask);
@@ -287,16 +295,26 @@ public class BatchTaskScheduler
         try
         {
             AgentRegistry registry = agentRegistryMapper.selectById(agentId);
-            if (registry != null && registry.getNodeStatus() != null && registry.getNodeStatus() == 1)
+            if (registry == null)
             {
-                return "http://" + registry.getAgentIp() + ":" + registry.getAgentPort();
+                logger.warn("Target agent[{}] not found in agent_registry table", agentId);
+                return null;
             }
+            if (registry.getNodeStatus() == null || registry.getNodeStatus() != 1)
+            {
+                logger.warn("Target agent[{}] is offline (nodeStatus={}), ip={}, port={}",
+                        agentId, registry.getNodeStatus(), registry.getAgentIp(), registry.getAgentPort());
+                return null;
+            }
+            String url = "http://" + registry.getAgentIp() + ":" + registry.getAgentPort();
+            logger.info("Resolved target agent[{}] URL: {}", agentId, url);
+            return url;
         }
         catch (Exception e)
         {
             logger.warn("Failed to resolve API URL for agent {}: {}", agentId, e.getMessage());
+            return null;
         }
-        return null;
     }
 
     private Map<String, String> buildAgentDirMap(List<String> targetAgents, String targetDirs)

@@ -12,11 +12,8 @@ import com.cq.agent.batch.report.QueueSnapshotReport;
 import com.cq.agent.config.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
 import java.nio.file.Path;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -282,7 +279,7 @@ public class BatchAwareAgentUploader extends AgentUploader {
             java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
             body.put("taskId", task.getTaskId());
             body.put("successFiles", result.getSuccessFiles());
-            body.put("action", result.getAction() != null ? result.getAction() : task.getPostAction());
+            body.put("action", task.getPostAction());
             body.put("sourceBaseDir", task.getSourceBaseDir());
             body.put("backupDir", task.getBackupDir());
             body.put("backupMode", task.getBackupMode());

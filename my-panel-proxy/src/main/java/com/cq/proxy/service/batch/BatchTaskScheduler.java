@@ -1,19 +1,16 @@
 package com.cq.proxy.service.batch;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.cq.proxy.repository.entity.AgentRegistry;
+import com.cq.proxy.repository.mapper.AgentRegistryMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
+import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,30 +21,84 @@ import java.util.UUID;
 public class BatchTaskScheduler
 {
     private static final Logger logger = LoggerFactory.getLogger(BatchTaskScheduler.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final RoutingScheduler routingScheduler;
     private final JdbcTemplate jdbcTemplate;
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private final AgentRegistryMapper agentRegistryMapper;
 
     @Autowired
-    public BatchTaskScheduler(RoutingScheduler routingScheduler, JdbcTemplate jdbcTemplate)
+    public BatchTaskScheduler(RoutingScheduler routingScheduler, JdbcTemplate jdbcTemplate,
+                              AgentRegistryMapper agentRegistryMapper)
     {
         this.routingScheduler = routingScheduler;
         this.jdbcTemplate = jdbcTemplate;
+        this.agentRegistryMapper = agentRegistryMapper;
     }
 
-    @Transactional
-    public StartResult startTask(Long taskId, String sourceAgentApiUrl, Object scanRequest,
-                                  List<String> targetAgents, String transferMode,
-                                  String routingStrategy, String routingConfig,
-                                  Long maxBandwidthBytesPerSec,
+    private String resolveAgentApiUrl(String sourceAgentId, String fallbackUrl)
+    {
+        if (sourceAgentId != null && !sourceAgentId.isEmpty())
+        {
+            try
+            {
+                AgentRegistry agent = agentRegistryMapper.selectById(sourceAgentId);
+                if (agent != null)
+                {
+                    if (agent.getNodeStatus() != null && agent.getNodeStatus() == 1)
+                    {
+                        String url = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort();
+                        logger.info("Resolved agent[{}] URL from agent_registry: {}", sourceAgentId, url);
+                        return url;
+                    }
+                    else
+                    {
+                        logger.warn("Agent[{}] found in registry but offline (nodeStatus={}), trying fallback",
+                                sourceAgentId, agent.getNodeStatus());
+                    }
+                }
+                else
+                {
+                    logger.warn("Agent[{}] not found in agent_registry, trying fallback URL", sourceAgentId);
+                }
+            }
+            catch (Exception e)
+            {
+                logger.warn("Failed to resolve agent[{}] from agent_registry: {}", sourceAgentId, e.getMessage());
+            }
+        }
+
+        if (fallbackUrl != null && !fallbackUrl.isEmpty())
+        {
+            logger.info("Using fallback agent URL: {}", fallbackUrl);
+            return fallbackUrl;
+        }
+
+        throw new IllegalStateException("无法解析Agent地址: agentId=" + sourceAgentId + ", 无回退URL");
+    }
+
+    private AgentApi createAgentApiForUrl(String baseUrl)
+    {
+        RestClient scopedClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .build();
+        HttpServiceProxyFactory factory = HttpServiceProxyFactory
+                .builderFor(RestClientAdapter.create(scopedClient))
+                .build();
+        return factory.createClient(AgentApi.class);
+    }
+
+    public StartResult startTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl,
+                                  Object scanRequest, List<String> targetAgents,
+                                  String transferMode, String routingStrategy,
+                                  String routingConfig, Long maxBandwidthBytesPerSec,
                                   String targetDirs, Integer preserveDirStructure)
     {
+        String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
+        AgentApi agent = createAgentApiForUrl(resolvedUrl);
         try
         {
-            Map<String, Object> scanResponse = postToAgent(sourceAgentApiUrl + "/api/internal/batch/scan", scanRequest);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> scanResponse = (Map<String, Object>) agent.scan((Map<String, Object>) scanRequest);
             if (!Boolean.TRUE.equals(scanResponse.get("success")))
             {
                 return new StartResult(false, "扫描失败", scanResponse);
@@ -84,7 +135,7 @@ public class BatchTaskScheduler
                     totalFiles, totalSizeBytes, taskId);
 
             Map<String, Object> dispatchRequest = buildDispatchRequest(taskId, subtasks, maxBandwidthBytesPerSec, agentDirMap, preserveDirStructure);
-            Map<String, Object> dispatchResult = postToAgent(sourceAgentApiUrl + "/api/internal/batch/dispatch", dispatchRequest);
+            Map<String, Object> dispatchResult = (Map<String, Object>) agent.dispatch(dispatchRequest);
 
             return new StartResult(true, "Task started", Map.of(
                     "taskId", taskId, "scanResult", scanResult,
@@ -99,28 +150,36 @@ public class BatchTaskScheduler
             {
                 errorMsg = e.getClass().getSimpleName();
             }
-            if (e instanceof java.net.ConnectException)
-            {
-                errorMsg = "无法连接到源Agent(" + sourceAgentApiUrl + "): " + errorMsg;
-            }
             logger.error("Failed to start task {}: {}", taskId, errorMsg, e);
+            try
+            {
+                jdbcTemplate.update(
+                        "UPDATE batch_transfer_task SET status = 'FAILED' WHERE id = ?", taskId);
+            }
+            catch (Exception dbEx)
+            {
+                logger.error("Failed to update task {} status to FAILED: {}", taskId, dbEx.getMessage());
+            }
             return new StartResult(false, errorMsg, null);
         }
     }
 
-    public void pauseTask(Long taskId, String sourceAgentApiUrl)
+    public void pauseTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl)
     {
-        logger.info("Pause task {} on agent {}", taskId, sourceAgentApiUrl);
+        String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
+        logger.info("Pause task {} on agent {}", taskId, resolvedUrl);
     }
 
-    public void resumeTask(Long taskId, String sourceAgentApiUrl)
+    public void resumeTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl)
     {
-        logger.info("Resume task {} on agent {}", taskId, sourceAgentApiUrl);
+        String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
+        logger.info("Resume task {} on agent {}", taskId, resolvedUrl);
     }
 
-    public void cancelTask(Long taskId, String sourceAgentApiUrl)
+    public void cancelTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl)
     {
-        logger.info("Cancel task {} on agent {}", taskId, sourceAgentApiUrl);
+        String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
+        logger.info("Cancel task {} on agent {}", taskId, resolvedUrl);
     }
 
     private void persistSubtasks(Long taskId, List<Map<String, Object>> subtasks)
@@ -194,23 +253,6 @@ public class BatchTaskScheduler
             map.put(targetAgents.get(i), dirs[i].trim());
         }
         return map;
-    }
-
-    private Map<String, Object> postToAgent(String url, Object body) throws Exception
-    {
-        String json = OBJECT_MAPPER.writeValueAsString(body);
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .timeout(Duration.ofSeconds(60))
-                .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400)
-        {
-            throw new IllegalStateException("Agent接口调用失败, status=" + response.statusCode() + ", body=" + response.body());
-        }
-        return OBJECT_MAPPER.readValue(response.body(), new TypeReference<>() {});
     }
 
     private Map<String, Object> asMap(Object value)

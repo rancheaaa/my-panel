@@ -6,6 +6,9 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface AgentRegistryMapper {
 
+  @Select("SELECT * FROM agent_registry WHERE id = #{id} LIMIT 1")
+  AgentRegistry selectById(@Param("id") String id);
+
   @Select("SELECT * FROM agent_registry WHERE agent_ip = #{agentIp} AND agent_port = #{agentPort} LIMIT 1")
   AgentRegistry selectByIpPort(@Param("agentIp") String agentIp, @Param("agentPort") int agentPort);
 

@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.web.controller.batch;
 
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.enums.BusinessType;
+import com.cq.panel.admin.server.repository.domain.BatchTransferStatistics;
 import com.cq.panel.admin.server.repository.domain.BatchTransferSubtask;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.service.IBatchTransferSubtaskService;
@@ -50,12 +51,12 @@ public class BatchTransferController extends BaseController
     @Log(title = "批量传输任务", businessType = BusinessType.INSERT)
     @Operation(summary = "创建批量传输任务")
     @PostMapping
-    public Result<Void> add(@Validated @RequestBody BatchTaskCreateDTO dto)
+    public Result<Long> add(@Validated @RequestBody BatchTaskCreateDTO dto)
     {
         String operatorId = getOperatorId();
         String operatorName = getOperatorName();
-        batchTransferService.createTask(dto, operatorId, operatorName);
-        return Result.success();
+        Long taskId = batchTransferService.createTask(dto, operatorId, operatorName);
+        return Result.success(taskId);
     }
 
     @RequirePermission("batch:task:start")
@@ -96,9 +97,9 @@ public class BatchTransferController extends BaseController
 
     @RequirePermission("batch:task:cancel")
     @Log(title = "批量传输任务", businessType = BusinessType.UPDATE)
-    @Operation(summary = "取消批量传输任务")
-    @PutMapping("/{taskId}/cancel")
-    public Result<Void> cancel(@PathVariable Long taskId)
+    @Operation(summary = "停止批量传输任务")
+    @PutMapping("/{taskId}/stop")
+    public Result<Void> stop(@PathVariable Long taskId)
     {
         String operatorId = getOperatorId();
         String operatorName = getOperatorName();
@@ -167,6 +168,33 @@ public class BatchTransferController extends BaseController
         return Result.success(subtasks);
     }
 
+    @RequirePermission("batch:task:view")
+    @Operation(summary = "查询子任务统计摘要(从子任务实时计算)")
+    @GetMapping("/{taskId}/subtasks/summary")
+    public Result<BatchTaskDetailVO.SubtaskSummary> getSubtaskSummary(@PathVariable Long taskId)
+    {
+        BatchTaskDetailVO.SubtaskSummary summary = batchTransferService.getSubtaskSummary(taskId);
+        return Result.success(summary);
+    }
+
+    @RequirePermission("batch:task:view")
+    @Operation(summary = "查询传输统计信息(从统计表读取)")
+    @GetMapping("/{taskId}/statistics")
+    public Result<BatchTransferStatistics> getStatistics(@PathVariable Long taskId)
+    {
+        BatchTransferStatistics stats = batchTransferService.getStatistics(taskId);
+        return Result.success(stats);
+    }
+
+    @RequirePermission("batch:task:view")
+    @Operation(summary = "刷新并获取最新统计信息")
+    @PutMapping("/{taskId}/statistics/refresh")
+    public Result<BatchTransferStatistics> refreshStatistics(@PathVariable Long taskId)
+    {
+        BatchTransferStatistics stats = batchTransferService.refreshStatistics(taskId);
+        return Result.success(stats);
+    }
+
     @RequirePermission("batch:task:remove")
     @Log(title = "批量传输任务", businessType = BusinessType.DELETE)
     @Operation(summary = "删除批量传输任务")
@@ -192,7 +220,25 @@ public class BatchTransferController extends BaseController
         for (BatchTaskVO vo : voList)
         {
             vo.setStatusLabel(getStatusLabel(vo.getStatus()));
-            vo.setProgressPercent(calcProgress(vo.getTotalFiles(), vo.getTransferredFiles()));
+            try
+            {
+                BatchTaskDetailVO.SubtaskSummary summary = batchTransferService.getSubtaskSummary(vo.getId());
+                vo.setTotalSubtasks(summary.getTotalSubtasks());
+                vo.setCompletedSubtasks(summary.getCompletedCount());
+                vo.setFailedSubtasks(summary.getFailedCount());
+                vo.setRunningSubtasks(summary.getRunningCount());
+                vo.setQueuedSubtasks(summary.getQueuedCount());
+                vo.setSubtaskProgressPercent(summary.getProgressPercent());
+            }
+            catch (Exception e)
+            {
+                vo.setTotalSubtasks(0);
+                vo.setCompletedSubtasks(0);
+                vo.setFailedSubtasks(0);
+                vo.setRunningSubtasks(0);
+                vo.setQueuedSubtasks(0);
+                vo.setSubtaskProgressPercent(java.math.BigDecimal.ZERO);
+            }
         }
     }
 
@@ -221,15 +267,7 @@ public class BatchTransferController extends BaseController
         vo.setRoutingConfig(task.getRoutingConfig());
         vo.setTotalFiles(task.getTotalFiles());
         vo.setTotalSizeBytes(task.getTotalSizeBytes());
-        vo.setTransferredFiles(task.getTransferredFiles());
-        vo.setTransferredSizeBytes(task.getTransferredSizeBytes());
-        vo.setFailedFiles(task.getFailedFiles());
-        vo.setPostProcessFiles(task.getPostProcessFiles());
-        vo.setPostProcessFailed(task.getPostProcessFailed());
-        vo.setProgressPercent(calcProgress(task.getTotalFiles(), task.getTransferredFiles()));
         vo.setStartedAt(task.getStartedAt());
-        vo.setCompletedAt(task.getCompletedAt());
-        vo.setPostProcessedAt(task.getPostProcessedAt());
         vo.setCreateTime(task.getCreateTime());
         vo.setCreateBy(task.getCreateBy());
     }
@@ -237,19 +275,22 @@ public class BatchTransferController extends BaseController
     private void enrichDetailVO(BatchTaskDetailVO vo, BatchTransferTask task)
     {
         String s = task.getStatus();
-        vo.setCanPause("TRANSFERRING".equals(s) || "SCANNING".equals(s));
-        vo.setCanCancel(!"COMPLETED".equals(s) && !"CANCELLED".equals(s) && !"EXPIRED".equals(s));
-        vo.setCanConfig("PENDING".equals(s) || "PAUSED".equals(s) || "TRANSFERRING".equals(s));
-        vo.setCanDelete("COMPLETED".equals(s) || "CANCELLED".equals(s) || "FAILED".equals(s) || "EXPIRED".equals(s) || "PARTIAL_FAILED".equals(s));
-        vo.setCanRetry("PARTIAL_FAILED".equals(s) || "FAILED".equals(s));
-    }
+        vo.setCanStart(BatchTransferService.STATUS_DRAFT.equals(s) || BatchTransferService.STATUS_PAUSED.equals(s));
+        vo.setCanPause(BatchTransferService.STATUS_RUNNING.equals(s));
+        vo.setCanResume(BatchTransferService.STATUS_PAUSED.equals(s));
+        vo.setCanStop(!BatchTransferService.STATUS_STOPPED.equals(s));
+        vo.setCanDelete(BatchTransferService.STATUS_STOPPED.equals(s) || BatchTransferService.STATUS_DRAFT.equals(s));
+        vo.setCanConfig(BatchTransferService.STATUS_DRAFT.equals(s) || BatchTransferService.STATUS_PAUSED.equals(s));
 
-    private java.math.BigDecimal calcProgress(Integer total, Integer done)
-    {
-        if (total == null || total == 0 || done == null) return java.math.BigDecimal.ZERO;
-        return java.math.BigDecimal.valueOf(done)
-                .multiply(java.math.BigDecimal.valueOf(100))
-                .divide(java.math.BigDecimal.valueOf(total), 2, java.math.RoundingMode.HALF_UP);
+        try
+        {
+            vo.setSubtaskSummary(batchTransferService.getSubtaskSummary(task.getId()));
+            vo.setStatistics(batchTransferService.getStatistics(task.getId()));
+        }
+        catch (Exception e)
+        {
+            vo.setSubtaskSummary(new BatchTaskDetailVO.SubtaskSummary());
+        }
     }
 
     private String getStatusLabel(String status)
@@ -257,16 +298,10 @@ public class BatchTransferController extends BaseController
         if (status == null) return "";
         return switch (status)
         {
-            case "PENDING" -> "待启动";
-            case "SCANNING" -> "扫描中";
-            case "TRANSFERRING" -> "传输中";
-            case "PAUSED" -> "已暂停";
-            case "POST_PROCESSING" -> "后处理中";
-            case "COMPLETED" -> "已完成";
-            case "PARTIAL_FAILED" -> "部分失败";
-            case "FAILED" -> "失败";
-            case "CANCELLED" -> "已取消";
-            case "EXPIRED" -> "已过期";
+            case BatchTransferService.STATUS_DRAFT -> "草稿";
+            case BatchTransferService.STATUS_RUNNING -> "运行中";
+            case BatchTransferService.STATUS_PAUSED -> "已暂停";
+            case BatchTransferService.STATUS_STOPPED -> "已停止";
             default -> status;
         };
     }

@@ -7,16 +7,10 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum BatchTaskStatus {
 
-    PENDING("PENDING", "待启动"),
-    SCANNING("SCANNING", "扫描中"),
-    TRANSFERRING("TRANSFERRING", "传输中"),
+    DRAFT("DRAFT", "草稿"),
+    RUNNING("RUNNING", "运行中"),
     PAUSED("PAUSED", "已暂停"),
-    POST_PROCESSING("POST_PROCESSING", "后处理中"),
-    COMPLETED("COMPLETED", "已完成"),
-    PARTIAL_FAILED("PARTIAL_FAILED", "部分失败"),
-    FAILED("FAILED", "失败"),
-    CANCELLED("CANCELLED", "已取消"),
-    EXPIRED("EXPIRED", "已过期");
+    STOPPED("STOPPED", "已停止");
 
     private final String code;
     private final String description;
@@ -28,5 +22,25 @@ public enum BatchTaskStatus {
             }
         }
         throw new IllegalArgumentException("Unknown BatchTaskStatus code: " + code);
+    }
+
+    public boolean isStartable() {
+        return this == DRAFT || this == PAUSED;
+    }
+
+    public boolean isPausable() {
+        return this == RUNNING;
+    }
+
+    public boolean isResumable() {
+        return this == PAUSED;
+    }
+
+    public boolean isStoppable() {
+        return this == RUNNING || this == PAUSED || this == DRAFT;
+    }
+
+    public boolean isDeletable() {
+        return this == STOPPED || this == DRAFT;
     }
 }

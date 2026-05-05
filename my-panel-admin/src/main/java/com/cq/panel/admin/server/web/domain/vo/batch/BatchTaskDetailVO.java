@@ -1,6 +1,8 @@
 package com.cq.panel.admin.server.web.domain.vo.batch;
 
+import com.cq.panel.admin.server.repository.domain.BatchTransferStatistics;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -9,8 +11,7 @@ import java.util.List;
 
 @Data
 @Schema(description = "批量传输任务详情VO")
-public class BatchTaskDetailVO
-{
+public class BatchTaskDetailVO {
     @Schema(description = "任务ID")
     private Long id;
 
@@ -20,7 +21,7 @@ public class BatchTaskDetailVO
     @Schema(description = "任务描述")
     private String taskDescription;
 
-    @Schema(description = "任务状态码")
+    @Schema(description = "任务状态码 (DRAFT/RUNNING/PAUSED/STOPPED)")
     private String status;
 
     @Schema(description = "任务状态描述")
@@ -32,7 +33,7 @@ public class BatchTaskDetailVO
     @Schema(description = "源目录")
     private String sourceDir;
 
-    @Schema(description = "目标节点目录(分号分隔, 与targetAgents一一对应)")
+    @Schema(description = "目标目录(分号分隔)")
     private String targetDirs;
 
     @Schema(description = "是否保持目录结构")
@@ -74,99 +75,79 @@ public class BatchTaskDetailVO
     @Schema(description = "路由策略配置JSON")
     private String routingConfig;
 
-    @Schema(description = "待传输文件总数")
+    @Schema(description = "扫描到的文件总数")
     private Integer totalFiles;
 
-    @Schema(description = "待传输总大小(字节)")
+    @Schema(description = "扫描到的总大小(字节)")
     private Long totalSizeBytes;
 
-    @Schema(description = "已完成文件数")
-    private Integer transferredFiles;
+    @Schema(description = "子任务统计信息(实时计算)")
+    private SubtaskSummary subtaskSummary;
 
-    @Schema(description = "已传输大小(字节)")
-    private Long transferredSizeBytes;
-
-    @Schema(description = "失败文件数")
-    private Integer failedFiles;
-
-    @Schema(description = "已后处理文件数")
-    private Integer postProcessFiles;
-
-    @Schema(description = "后处理失败文件数")
-    private Integer postProcessFailed;
-
-    @Schema(description = "进度百分比")
-    private BigDecimal progressPercent;
-
-    @Schema(description = "当前速率(MB/s)")
-    private BigDecimal currentSpeedMBps;
-
-    @Schema(description = "预计剩余时间(分钟)")
-    private BigDecimal estimatedRemainingMin;
-
-    @Schema(description = "目标Agent级进度列表(三层进度中间层)")
-    private List<TargetProgress> targetProgress;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Schema(description = "开始时间")
-    private Date startedAt;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Schema(description = "完成时间")
-    private Date completedAt;
-
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Schema(description = "后处理完成时间")
-    private Date postProcessedAt;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "传输统计信息(来自统计表)")
+    private BatchTransferStatistics statistics;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")
     private Date createTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Schema(description = "开始运行时间")
+    private Date startedAt;
+
     @Schema(description = "创建人")
     private String createBy;
+
+    @Schema(description = "是否可启动")
+    private Boolean canStart;
 
     @Schema(description = "是否可暂停")
     private Boolean canPause;
 
-    @Schema(description = "是否可取消")
-    private Boolean canCancel;
+    @Schema(description = "是否可恢复")
+    private Boolean canResume;
 
-    @Schema(description = "是否可修改配置")
-    private Boolean canConfig;
+    @Schema(description = "是否可停止")
+    private Boolean canStop;
 
     @Schema(description = "是否可删除")
     private Boolean canDelete;
 
-    @Schema(description = "是否可重试")
-    private Boolean canRetry;
+    @Schema(description = "是否可修改配置")
+    private Boolean canConfig;
 
     @Data
-    @Schema(description = "目标Agent级聚合进度")
-    public static class TargetProgress
-    {
-        @Schema(description = "目标Agent ID")
-        private String targetAgentId;
-
-        @Schema(description = "目标Agent名称")
-        private String targetAgentName;
-
-        @Schema(description = "该目标的总子任务数")
+    @Schema(description = "子任务聚合统计")
+    public static class SubtaskSummary {
+        @Schema(description = "总子任务数")
         private Integer totalSubtasks;
 
-        @Schema(description = "该目标已完成子任务数")
-        private Integer completedSubtasks;
+        @Schema(description = "已完成数")
+        private Integer completedCount;
 
-        @Schema(description = "该目标失败子任务数")
-        private Integer failedSubtasks;
+        @Schema(description = "失败数")
+        private Integer failedCount;
 
-        @Schema(description = "该目标进度百分比")
+        @Schema(description = "运行中数")
+        private Integer runningCount;
+
+        @Schema(description = "排队中数")
+        private Integer queuedCount;
+
+        @Schema(description = "重试中数")
+        private Integer retryingCount;
+
+        @Schema(description = "已取消数")
+        private Integer cancelledCount;
+
+        @Schema(description = "整体进度百分比(0-100)")
         private BigDecimal progressPercent;
 
-        @Schema(description = "该目标已传输大小(字节)")
-        private Long transferredSizeBytes;
+        @Schema(description = "总大小(字节)")
+        private Long totalSizeBytes;
 
-        @Schema(description = "该目标当前速率(MB/s)")
-        private BigDecimal currentSpeedMBps;
+        @Schema(description = "已传输大小(字节)")
+        private Long transferredSizeBytes;
     }
 }

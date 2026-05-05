@@ -28,7 +28,7 @@ public class BatchTaskVO
     @Schema(description = "目标节点目录(分号分隔, 与targetAgents一一对应)")
     private String targetDirs;
 
-    @Schema(description = "任务状态码")
+    @Schema(description = "任务状态码 (DRAFT/RUNNING/PAUSED/STOPPED)")
     private String status;
 
     @Schema(description = "任务状态描述")
@@ -43,37 +43,37 @@ public class BatchTaskVO
     @Schema(description = "传输后操作")
     private String postTransferAction;
 
-    @Schema(description = "待传输文件总数")
+    @Schema(description = "扫描到的文件总数")
     private Integer totalFiles;
 
-    @Schema(description = "待传输总大小(字节)")
+    @Schema(description = "扫描到的总大小(字节)")
     private Long totalSizeBytes;
 
-    @Schema(description = "已完成文件数")
-    private Integer transferredFiles;
+    @Schema(description = "子任务总数")
+    private Integer totalSubtasks;
 
-    @Schema(description = "已传输大小(字节)")
-    private Long transferredSizeBytes;
+    @Schema(description = "已完成子任务数")
+    private Integer completedSubtasks;
 
-    @Schema(description = "失败文件数")
-    private Integer failedFiles;
+    @Schema(description = "失败子任务数")
+    private Integer failedSubtasks;
 
-    @Schema(description = "进度百分比")
-    private BigDecimal progressPercent;
+    @Schema(description = "运行中子任务数")
+    private Integer runningSubtasks;
 
-    @Schema(description = "当前速率(MB/s)")
-    private BigDecimal currentSpeedMBps;
+    @Schema(description = "排队中子任务数")
+    private Integer queuedSubtasks;
 
-    @Schema(description = "预计剩余时间(分钟)")
-    private BigDecimal estimatedRemainingMin;
+    @Schema(description = "子任务进度百分比(0-100)")
+    private BigDecimal subtaskProgressPercent;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "开始时间")
     private Date startedAt;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Schema(description = "完成时间")
-    private Date completedAt;
+    @Schema(description = "最后活动时间")
+    private Date lastActivityAt;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")

@@ -134,10 +134,9 @@ public class BatchMonitorController extends BaseController
         for (BatchTransferTask t : allTasks)
         {
             String s = t.getStatus();
-            if ("TRANSFERRING".equals(s) || "SCANNING".equals(s) || "POST_PROCESSING".equals(s)) activeCount++;
+            if ("RUNNING".equals(s)) activeCount++;
             if ("PAUSED".equals(s)) pausedCount++;
-            if ("COMPLETED".equals(s) && t.getCompletedAt() != null && t.getCompletedAt().after(todayStart)) completedToday++;
-            if (("FAILED".equals(s) || "PARTIAL_FAILED".equals(s)) && t.getCompletedAt() != null && t.getCompletedAt().after(todayStart)) failedToday++;
+            if ("STOPPED".equals(s) && t.getStartedAt() != null && t.getStartedAt().after(todayStart)) completedToday++;
         }
         taskOverview.setActive(activeCount);
         taskOverview.setPaused(pausedCount);
@@ -199,7 +198,7 @@ public class BatchMonitorController extends BaseController
                 summary.setTaskId(t.getId());
                 summary.setTaskName(t.getTaskName());
                 summary.setStatus(t.getStatus());
-                summary.setProgressPercent(calcProgress(t.getTotalFiles(), t.getTransferredFiles()));
+                summary.setProgressPercent(calcProgress(t.getTotalFiles(), t.getTotalFiles()));
                 summary.setSourceAgentId(t.getSourceAgentId());
                 summary.setCurrentSpeedMBps(BigDecimal.ZERO);
                 summary.setStartedAt(t.getStartedAt());

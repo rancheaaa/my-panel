@@ -701,34 +701,27 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
     `task_description` varchar(500) DEFAULT NULL COMMENT '任务描述',
     `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID',
     `source_dir` varchar(500) NOT NULL COMMENT '源目录绝对路径',
-    `target_dirs` varchar(2000) NOT NULL COMMENT '目标节点目录(分号分隔, 与target_agents一一对应, 例: /data/backup;/data/logs;/data/archive)',
-    `include_patterns` text DEFAULT NULL COMMENT '包含通配符(JSON数组), 设计类型:JSON',
-    `exclude_patterns` text DEFAULT NULL COMMENT '排除通配符(JSON数组), 设计类型:JSON',
+    `target_dirs` varchar(2000) NOT NULL COMMENT '目标节点目录(分号分隔, 与target_agents一一对应)',
+    `include_patterns` text DEFAULT NULL COMMENT '包含通配符(JSON数组)',
+    `exclude_patterns` text DEFAULT NULL COMMENT '排除通配符(JSON数组)',
     `scan_frequency_sec` int NOT NULL DEFAULT 300 COMMENT '扫描间隔(秒), 范围[60,86400]',
     `max_scan_files` int NOT NULL DEFAULT 10000 COMMENT '单次最大扫描文件数, 范围[100,100000]',
-    `target_agents` text NOT NULL COMMENT '目标Agent ID列表(JSON数组), 设计类型:JSON',
+    `target_agents` text NOT NULL COMMENT '目标Agent ID列表(JSON数组)',
     `max_bandwidth_kb_s` int DEFAULT NULL COMMENT '单任务最大带宽(KB/s), NULL表示不限制',
     `retry_enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用自动重试: 0-否 1-是',
     `retry_max_days` int NOT NULL DEFAULT 7 COMMENT '重试保留天数, 范围[1,30]',
     `retry_interval_min` int NOT NULL DEFAULT 30 COMMENT '重试间隔(分钟), 范围[5,1440]',
-    `post_transfer_action` varchar(20) NOT NULL DEFAULT 'NONE' COMMENT '传输后操作: NONE-无操作/DELETE-删除源文件/BACKUP-备份到指定目录, 设计类型:ENUM',
+    `post_transfer_action` varchar(20) NOT NULL DEFAULT 'NONE' COMMENT '传输后操作: NONE/DELETE/BACKUP',
     `backup_dir` varchar(500) DEFAULT NULL COMMENT '备份目录绝对路径(post_transfer_action=BACKUP时必填)',
-    `backup_mode` varchar(10) DEFAULT 'COPY' COMMENT '备份模式: COPY-复制保留原文件/MOVE-移动剪切原文件',
+    `backup_mode` varchar(10) DEFAULT 'COPY' COMMENT '备份模式: COPY/MOVE',
     `preserve_dir_structure` tinyint NOT NULL DEFAULT 1 COMMENT '是否保持原始目录结构: 0-否 1-是',
-    `transfer_mode` varchar(20) NOT NULL DEFAULT 'ONE_TO_MANY' COMMENT '传输模式: ONE_TO_ONE-一对一/ONE_TO_MANY-一对多广播, 设计类型:ENUM',
-    `routing_strategy` varchar(20) NOT NULL DEFAULT 'BROADCAST' COMMENT '路由策略: BROADCAST-广播/SINGLE-单机粘性/ROUND_ROBIN-轮询/REGION_BASED-区域路由/RANDOM-随机, 设计类型:ENUM',
-    `routing_config` text DEFAULT NULL COMMENT '路由策略配置JSON(REGION_BASED时必填), 设计类型:JSON',
-    `status` varchar(20) NOT NULL DEFAULT 'PENDING' COMMENT '任务状态: PENDING/SCANNING/TRANSFERRING/PAUSED/POST_PROCESSING/COMPLETED/PARTIAL_FAILED/FAILED/CANCELLED/EXPIRED, 设计类型:ENUM',
-    `total_files` int NOT NULL DEFAULT 0 COMMENT '待传输文件总数',
-    `total_size_bytes` bigint NOT NULL DEFAULT 0 COMMENT '待传输总大小(字节)',
-    `transferred_files` int NOT NULL DEFAULT 0 COMMENT '已完成文件数',
-    `transferred_size_bytes` bigint NOT NULL DEFAULT 0 COMMENT '已传输大小(字节)',
-    `failed_files` int NOT NULL DEFAULT 0 COMMENT '失败文件数',
-    `post_process_files` int NOT NULL DEFAULT 0 COMMENT '已后处理文件数(删除/备份成功)',
-    `post_process_failed` int NOT NULL DEFAULT 0 COMMENT '后处理失败文件数',
-    `started_at` datetime DEFAULT NULL COMMENT '开始执行时间',
-    `completed_at` datetime DEFAULT NULL COMMENT '传输完成时间',
-    `post_processed_at` datetime DEFAULT NULL COMMENT '后处理完成时间',
+    `transfer_mode` varchar(20) NOT NULL DEFAULT 'ONE_TO_MANY' COMMENT '传输模式: ONE_TO_ONE/ONE_TO_MANY',
+    `routing_strategy` varchar(20) NOT NULL DEFAULT 'BROADCAST' COMMENT '路由策略: BROADCAST/SINGLE/ROUND_ROBIN/REGION_BASED/RANDOM',
+    `routing_config` text DEFAULT NULL COMMENT '路由策略配置JSON(REGION_BASED时必填)',
+    `status` varchar(20) NOT NULL DEFAULT 'DRAFT' COMMENT '任务运行状态: DRAFT-草稿/RUNNING-运行中/PAUSED-已暂停/STOPPED-已停止',
+    `total_files` int NOT NULL DEFAULT 0 COMMENT '扫描到的文件总数(缓存)',
+    `total_size_bytes` bigint NOT NULL DEFAULT 0 COMMENT '扫描到的总大小(字节,缓存)',
+    `started_at` datetime DEFAULT NULL COMMENT '首次启动时间',
     `create_by` varchar(64) DEFAULT '' COMMENT '创建人用户ID',
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_by` varchar(64) DEFAULT '' COMMENT '更新人用户ID',
@@ -740,7 +733,80 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
     KEY `idx_source_agent` (`source_agent_id`),
     KEY `idx_create_by` (`create_by`),
     KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量文件传输任务表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量传输任务表(模板配置)';
+
+-- ----------------------------
+-- 批量传输统计表（用于监控和运维）
+-- 存储任务的实时聚合统计数据，从子任务表动态计算
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `batch_transfer_statistics` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `task_id` bigint NOT NULL COMMENT '关联的批量任务ID',
+    `snapshot_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '快照采集时间',
+
+    -- 子任务聚合统计
+    `total_subtasks` int NOT NULL DEFAULT 0 COMMENT '子任务总数',
+    `completed_count` int NOT NULL DEFAULT 0 COMMENT '已完成子任务数',
+    `failed_count` int NOT NULL DEFAULT 0 COMMENT '失败子任务数',
+    `running_count` int NOT NULL DEFAULT 0 COMMENT '运行中子任务数(SENDING状态)',
+    `queued_count` int NOT NULL DEFAULT 0 COMMENT '排队中子任务数(QUEUED状态)',
+    `retrying_count` int NOT NULL DEFAULT 0 COMMENT '重试中子任务数(RETRYING状态)',
+    `cancelled_count` int NOT NULL DEFAULT 0 COMMENT '已取消子任务数(CANCELLED状态)',
+
+    -- 传输数据统计
+    `total_size_bytes` bigint NOT NULL DEFAULT 0 COMMENT '待传输总大小(字节)',
+    `transferred_bytes` bigint NOT NULL DEFAULT 0 COMMENT '已传输字节数(已完成子任务累计)',
+    `transferred_files` int NOT NULL DEFAULT 0 COMMENT '已完成文件数',
+    `failed_files` int NOT NULL DEFAULT 0 COMMENT '失败文件数',
+    `remaining_bytes` bigint NOT NULL DEFAULT 0 COMMENT '剩余未传输字节数',
+    `progress_percent` decimal(5,2) NOT NULL DEFAULT 0.00 COMMENT '整体进度百分比(0-100)',
+
+    -- 速率和性能指标
+    `avg_speed_bytes_per_sec` bigint DEFAULT NULL COMMENT '平均传输速率(字节/秒)',
+    `peak_speed_bytes_per_sec` bigint DEFAULT NULL COMMENT '峰值传输速率(字节/秒)',
+    `current_speed_bytes_per_sec` bigint DEFAULT NULL COMMENT '当前瞬时速率(字节/秒)',
+
+    -- 时间统计
+    `started_at` datetime DEFAULT NULL COMMENT '任务开始时间(首次启动)',
+    `first_file_started_at` datetime DEFAULT NULL COMMENT '首个文件开始传输时间',
+    `last_activity_at` datetime DEFAULT NULL COMMENT '最后活动时间(最近一次子任务状态变更)',
+    `total_elapsed_ms` bigint DEFAULT NULL COMMENT '总耗时(毫秒,从started_at到现在)',
+    `avg_duration_per_file_ms` bigint DEFAULT NULL COMMENT '平均每文件耗时(毫秒)',
+
+    -- 后处理统计
+    `post_process_completed` int NOT NULL DEFAULT 0 COMMENT '后处理成功文件数',
+    `post_process_failed` int NOT NULL DEFAULT 0 COMMENT '后处理失败文件数',
+    `post_processed_at` datetime DEFAULT NULL COMMENT '后处理完成时间',
+
+    -- 重试统计
+    `total_retry_count` int NOT NULL DEFAULT 0 COMMENT '总重试次数(所有子任务累计)',
+    `successful_retry_count` int NOT NULL DEFAULT 0 COMMENT '重试成功次数',
+    `max_single_file_retries` int NOT NULL DEFAULT 0 COMMENT '单文件最大重试次数',
+    `avg_retry_count` decimal(5,2) DEFAULT NULL COMMENT '平均每失败文件重试次数',
+
+    -- 目标Agent分布统计(JSON)
+    `target_agent_stats` text DEFAULT NULL COMMENT '各目标Agent统计JSON, 例:[{"agentId":"xxx","agentName":"节点A","total":100,"completed":80,"failed":5,"running":10,"bytes":1073741824}]',
+
+    -- 错误分析
+    `error_type_distribution` text DEFAULT NULL COMMENT '错误类型分布JSON, 例:[{"code":"TIMEOUT","count":5,"pct":12.5}]',
+    `top_error_code` varchar(50) DEFAULT NULL COMMENT '最高频错误码',
+    `top_error_message` varchar(500) DEFAULT NULL COMMENT '最高频错误信息摘要',
+
+    -- 预估信息
+    `eta_seconds` int DEFAULT NULL COMMENT '预计剩余时间(秒,基于当前速度)',
+    `estimated_completion_at` datetime DEFAULT NULL COMMENT '预计完成时间',
+
+    -- 元数据
+    `data_version` int NOT NULL DEFAULT 1 COMMENT '数据版本号(用于乐观锁)',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_task_id` (`task_id`),
+    KEY `idx_snapshot_time` (`snapshot_time`),
+    KEY `idx_progress` (`progress_percent`),
+    KEY `idx_last_activity` (`last_activity_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量传输统计表(监控和运维用)';
 
 CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',

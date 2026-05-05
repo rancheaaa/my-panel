@@ -141,7 +141,7 @@ public class BatchTaskScheduler
                     "UPDATE batch_transfer_task SET total_files = ?, total_size_bytes = ?, status = 'RUNNING', started_at = NOW() WHERE id = ?",
                     totalFiles, totalSizeBytes, taskId);
 
-            Map<String, Object> dispatchRequest = buildDispatchRequest(taskId, subtasks, maxBandwidthBytesPerSec, agentDirMap, preserveDirStructure);
+            Map<String, Object> dispatchRequest = buildDispatchRequest(taskId, subtasks, maxBandwidthBytesPerSec, agentDirMap, preserveDirStructure, scanRequest);
             Map<String, Object> dispatchResult = restClient.post()
                     .uri("/api/internal/batch/dispatch")
                     .body(dispatchRequest)
@@ -200,6 +200,8 @@ public class BatchTaskScheduler
 
     private void persistSubtasks(Long taskId, List<Map<String, Object>> subtasks)
     {
+        int inserted = 0;
+        int updated = 0;
         for (Map<String, Object> subtask : subtasks)
         {
             String filePath = (String) subtask.get("filePath");
@@ -207,28 +209,45 @@ public class BatchTaskScheduler
             long fileSizeBytes = subtask.get("fileSizeBytes") instanceof Number ? ((Number) subtask.get("fileSizeBytes")).longValue() : 0L;
             String targetAgentId = (String) subtask.get("targetAgentId");
 
-            jdbcTemplate.update(
+            int rows = jdbcTemplate.update(
                     "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
                             "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
                             "retry_count, proxy_retry_count, create_time, update_time) " +
-                            "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW())",
+                            "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW()) " +
+                            "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
+                            "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW()",
                     taskId, filePath, fileName, fileSizeBytes, targetAgentId);
+            if (rows > 0)
+            {
+                inserted++;
+            }
+            else
+            {
+                updated++;
+            }
         }
-        logger.info("Persisted {} subtasks for task {}", subtasks.size(), taskId);
+        logger.info("Persisted subtasks for task {}: inserted={}, updated={}", taskId, inserted, updated);
     }
 
     private Map<String, Object> buildDispatchRequest(Long taskId,
                                                      List<Map<String, Object>> subtasks,
                                                      Long maxBandwidthBytesPerSec,
                                                      Map<String, String> agentDirMap,
-                                                     Integer preserveDirStructure)
+                                                     Integer preserveDirStructure,
+                                                     Object scanRequest)
     {
+        String sourceBaseDir = null;
+        if (scanRequest instanceof Map)
+        {
+            sourceBaseDir = (String) ((Map<?, ?>) scanRequest).get("baseDir");
+        }
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("dispatchId", "disp-" + UUID.randomUUID());
         request.put("taskId", taskId);
         request.put("maxBandwidthBytesPerSec", maxBandwidthBytesPerSec);
         request.put("agentTargetDirs", agentDirMap);
         request.put("preserveDirStructure", preserveDirStructure != null && preserveDirStructure == 1);
+        request.put("sourceBaseDir", sourceBaseDir);
         request.put("subtasks", subtasks);
         return request;
     }

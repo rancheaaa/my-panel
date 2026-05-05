@@ -202,13 +202,32 @@ public class BatchScanScheduler {
                     jobLog.info("[Cron] Task {} scanned {} files, dispatching...", taskId,
                             response.getResult().getTotalFiles());
 
+                    String baseDir = config.scanConfig != null ? (String) config.scanConfig.get("baseDir") : null;
+                    List<Map<String, Object>> subtasks = new java.util.ArrayList<>();
+                    for (var file : response.getResult().getFiles()) {
+                        Map<String, Object> st = new java.util.LinkedHashMap<>();
+                        st.put("taskId", taskId);
+                        st.put("filePath", file.getRelativePath());
+                        st.put("fileName", file.getRelativePath().contains("/") ? file.getRelativePath().substring(file.getRelativePath().lastIndexOf('/') + 1) : file.getRelativePath());
+                        st.put("fileSizeBytes", file.getSizeBytes());
+                        if (config.targetAgents != null) {
+                            for (Map<String, Object> agent : config.targetAgents) {
+                                Map<String, Object> subtaskCopy = new java.util.LinkedHashMap<>(st);
+                                subtaskCopy.put("targetAgentId", agent.get("agentId"));
+                                subtaskCopy.put("targetAgentApiUrl", agent.get("apiUrl"));
+                                subtasks.add(subtaskCopy);
+                            }
+                        }
+                    }
+
                     Map<String, Object> dispatchRequest = new java.util.LinkedHashMap<>();
+                    dispatchRequest.put("dispatchId", "cron-" + taskId + "-" + System.currentTimeMillis());
                     dispatchRequest.put("taskId", taskId);
-                    dispatchRequest.put("scanResult", response.getResult());
-                    dispatchRequest.put("targetAgents", config.targetAgents);
-                    dispatchRequest.put("targetDirs", config.targetDirs);
-                    dispatchRequest.put("preserveDirStructure", config.preserveDirStructure);
                     dispatchRequest.put("maxBandwidthBytesPerSec", config.maxBandwidthBytesPerSec);
+                    dispatchRequest.put("agentTargetDirs", config.targetDirs);
+                    dispatchRequest.put("preserveDirStructure", config.preserveDirStructure != null && config.preserveDirStructure == 1);
+                    dispatchRequest.put("sourceBaseDir", baseDir);
+                    dispatchRequest.put("subtasks", subtasks);
 
                     String url = config.proxyBaseUrl + "/api/internal/batch/dispatch";
                     java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()

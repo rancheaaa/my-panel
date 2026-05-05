@@ -405,15 +405,15 @@ public class BatchTransferService {
     }
 
     private void validateCreateTask(BatchTaskCreateDTO dto) {
-        String sourceDir = dto.getSourceDir();
+        String sourceDir = dto.getSourceDir().replaceAll("[/\\\\]+$", "");
         if (sourceDir.contains("..")) {
             throw new IllegalArgumentException("源目录路径不允许包含..");
         }
         if (!sourceDir.startsWith("/") && (sourceDir.length() < 2 || sourceDir.charAt(1) != ':')) {
             throw new IllegalArgumentException("源目录必须是绝对路径");
         }
-        if (sourceDir.endsWith("/") || sourceDir.endsWith("\\")) {
-            throw new IllegalArgumentException("源目录路径不能以分隔符结尾");
+        if (sourceDir.isEmpty()) {
+            throw new IllegalArgumentException("源目录不能为空");
         }
         String targetDirs = dto.getTargetDirs();
         if (targetDirs.contains("..")) {
@@ -425,12 +425,12 @@ public class BatchTransferService {
                     "目标目录数量(" + dirArr.length + ")必须与目标Agent数量(" + dto.getTargetAgents().size() + ")一致");
         }
         for (String dir : dirArr) {
-            String trimmedDir = dir.trim();
+            String trimmedDir = dir.trim().replaceAll("[/\\\\]+$", "");
             if (!trimmedDir.startsWith("/") && (trimmedDir.length() < 2 || trimmedDir.charAt(1) != ':')) {
                 throw new IllegalArgumentException("目标目录必须是绝对路径: " + trimmedDir);
             }
-            if (trimmedDir.endsWith("/") || trimmedDir.endsWith("\\")) {
-                throw new IllegalArgumentException("目标目录路径不能以分隔符结尾: " + trimmedDir);
+            if (trimmedDir.isEmpty()) {
+                throw new IllegalArgumentException("目标目录不能为空");
             }
         }
         if (dto.getTargetAgents() != null && dto.getTargetAgents().contains(dto.getSourceAgentId())) {

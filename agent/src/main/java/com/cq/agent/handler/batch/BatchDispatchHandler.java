@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -49,6 +50,7 @@ public class BatchDispatchHandler extends BaseHandler
         List<Map<String, Object>> subtasks = (List<Map<String, Object>>) dispatchRequest.get("subtasks");
         Map<String, String> agentTargetDirs = (Map<String, String>) dispatchRequest.get("agentTargetDirs");
         Boolean preserveDirStructure = (Boolean) dispatchRequest.get("preserveDirStructure");
+        String sourceBaseDir = (String) dispatchRequest.get("sourceBaseDir");
         List<Map<String, Object>> rejections = new ArrayList<>();
         int receivedCount = 0;
         int rejectedCount = 0;
@@ -63,6 +65,14 @@ public class BatchDispatchHandler extends BaseHandler
                 if (item.get("fileSizeBytes") != null) task.setFileSizeBytes(((Number) item.get("fileSizeBytes")).longValue());
                 task.setTargetAgentId((String) item.get("targetAgentId"));
                 task.setTargetAgentApiUrl((String) item.get("targetAgentApiUrl"));
+                if (sourceBaseDir != null && !sourceBaseDir.isBlank())
+                {
+                    String filePath = task.getFilePath();
+                    if (filePath != null && !filePath.isBlank())
+                    {
+                        task.setAbsolutePath(java.nio.file.Path.of(sourceBaseDir).resolve(filePath.replace('\\', '/')).toAbsolutePath().normalize().toString());
+                    }
+                }
                 String agentTargetDir = item.get("targetDir") != null ? (String) item.get("targetDir") :
                         (agentTargetDirs != null ? agentTargetDirs.get(task.getTargetAgentId()) : null);
                 task.setTargetDir(agentTargetDir);
@@ -92,13 +102,13 @@ public class BatchDispatchHandler extends BaseHandler
         }
         Object dispatchId = dispatchRequest.get("dispatchId");
         Object bandwidthLimit = dispatchRequest.get("maxBandwidthBytesPerSec");
-        sendSuccessResponse(ctx, request, Map.of(
-                "dispatchId", dispatchId,
-                "receivedCount", receivedCount,
-                "rejectedCount", rejectedCount,
-                "rejections", rejections,
-                "estimatedQueueDrainTimeSec", estimatedQueueDrainTimeSec,
-                "appliedBandwidthLimit", bandwidthLimit
-        ));
+        Map<String, Object> resultData = new HashMap<>();
+        resultData.put("dispatchId", dispatchId);
+        resultData.put("receivedCount", receivedCount);
+        resultData.put("rejectedCount", rejectedCount);
+        resultData.put("rejections", rejections);
+        resultData.put("estimatedQueueDrainTimeSec", estimatedQueueDrainTimeSec);
+        resultData.put("appliedBandwidthLimit", bandwidthLimit);
+        sendSuccessResponse(ctx, request, resultData);
     }
 }

@@ -1,5 +1,6 @@
 package com.cq.proxy.service.batch;
 
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
@@ -9,8 +10,8 @@ import java.util.Map;
 public interface AgentApi
 {
     @PostExchange("/scan")
-    Map<String, Object> scan(Map<String, Object> request);
+    Map<String, Object> scan(@RequestBody Map<String, Object> request);
 
     @PostExchange("/dispatch")
-    Map<String, Object> dispatch(Map<String, Object> request);
+    Map<String, Object> dispatch(@RequestBody Map<String, Object> request);
 }

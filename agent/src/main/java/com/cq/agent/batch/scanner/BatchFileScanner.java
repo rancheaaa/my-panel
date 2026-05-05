@@ -125,20 +125,41 @@ public class BatchFileScanner
         {
             throw new IllegalArgumentException("源目录不能为空");
         }
-        if (request.getBaseDir().contains(".."))
+        String baseDir = request.getBaseDir();
+        if (baseDir.contains(".."))
         {
             throw new IllegalArgumentException("源目录路径不允许包含..");
         }
-        Path p = Paths.get(request.getBaseDir());
-        if (!p.isAbsolute())
+
+        Path p;
+        try
         {
-            throw new IllegalArgumentException("源目录必须是绝对路径");
+            p = Paths.get(baseDir);
         }
+        catch (Exception e)
+        {
+            throw new IllegalArgumentException("源目录路径格式无效: " + baseDir + ", 错误: " + e.getMessage());
+        }
+
+        boolean isAbsolute = p.isAbsolute();
+        if (!isAbsolute && (baseDir.startsWith("/") || baseDir.startsWith("\\")))
+        {
+            isAbsolute = true;
+        }
+
+        if (!isAbsolute)
+        {
+            throw new IllegalArgumentException("源目录必须是绝对路径: " + baseDir);
+        }
+
         if (request.getMaxFiles() <= 0)
         {
             throw new IllegalArgumentException("maxFiles必须大于0");
         }
-        return p.toAbsolutePath().normalize();
+
+        Path normalized = p.toAbsolutePath().normalize();
+        logger.info("Scan baseDir resolved: {} -> {}", baseDir, normalized);
+        return normalized;
     }
 
     private String computeMd5(Path file) throws Exception

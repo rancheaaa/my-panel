@@ -113,7 +113,7 @@ const BatchTaskDetail = () => {
             <Statistic title="排队中" value={queuedCount} />
           </Col>
           <Col span={4}>
-            <Statistic title="失败" value={failedCount} valueStyle={{ failedCount > 0 ? '#cf1322' : undefined }} />
+            <Statistic title="失败" value={failedCount} valueStyle={{ color: failedCount > 0 ? '#cf1322' : undefined }} />
           </Col>
           <Col span={4}>
             <div style={{ paddingTop: 8 }}>

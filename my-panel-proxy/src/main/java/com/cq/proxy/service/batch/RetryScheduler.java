@@ -39,7 +39,7 @@ public class RetryScheduler
         String sql = "SELECT id, task_id, file_path, file_name, file_size_bytes, target_agent_id, " +
                 "retry_count, proxy_retry_count FROM batch_transfer_subtask " +
                 "WHERE status = 'FAILED' AND next_retry_after <= NOW() " +
-                "AND task_id IN (SELECT id FROM batch_transfer_task WHERE status = 'TRANSFERRING' AND retry_enabled = 1) " +
+                "AND task_id IN (SELECT id FROM batch_transfer_task WHERE status = 'RUNNING' AND retry_enabled = 1) " +
                 "LIMIT 100";
         List<Map<String, Object>> failedSubtasks = jdbcTemplate.queryForList(sql);
         if (failedSubtasks.isEmpty())

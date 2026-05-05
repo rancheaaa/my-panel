@@ -266,6 +266,8 @@ public class BatchTransferController extends BaseController
         vo.setRoutingStrategy(task.getRoutingStrategy());
         vo.setRoutingConfig(task.getRoutingConfig());
         vo.setTotalFiles(task.getTotalFiles());
+        vo.setScanFrequencySec(task.getScanFrequencySec());
+        vo.setScanCronExpression(task.getScanCronExpression());
         vo.setTotalSizeBytes(task.getTotalSizeBytes());
         vo.setStartedAt(task.getStartedAt());
         vo.setCreateTime(task.getCreateTime());

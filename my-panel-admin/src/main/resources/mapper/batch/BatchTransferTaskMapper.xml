@@ -8,12 +8,13 @@
         <result property="taskDescription"    column="task_description"    />
         <result property="sourceAgentId"    column="source_agent_id"    />
         <result property="sourceDir"    column="source_dir"    />
+        <result property="targetDirs"    column="target_dirs"    />
         <result property="includePatterns"    column="include_patterns"    />
         <result property="excludePatterns"    column="exclude_patterns"    />
         <result property="scanFrequencySec"    column="scan_frequency_sec"    />
+        <result property="scanCronExpression" column="scan_cron_expression" />
         <result property="maxScanFiles"    column="max_scan_files"    />
         <result property="targetAgents"    column="target_agents"    />
-        <result property="targetDirs"    column="target_dirs"    />
         <result property="maxBandwidthKbS"    column="max_bandwidth_kb_s"    />
         <result property="retryEnabled"    column="retry_enabled"    />
         <result property="retryMaxDays"    column="retry_max_days"    />
@@ -28,14 +29,7 @@
         <result property="status"    column="status"    />
         <result property="totalFiles"    column="total_files"    />
         <result property="totalSizeBytes"    column="total_size_bytes"    />
-        <result property="transferredFiles"    column="transferred_files"    />
-        <result property="transferredSizeBytes"    column="transferred_size_bytes"    />
-        <result property="failedFiles"    column="failed_files"    />
-        <result property="postProcessFiles"    column="post_process_files"    />
-        <result property="postProcessFailed"    column="post_process_failed"    />
         <result property="startedAt"    column="started_at"    />
-        <result property="completedAt"    column="completed_at"    />
-        <result property="postProcessedAt"    column="post_processed_at"    />
         <result property="deleted"    column="deleted"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -45,12 +39,13 @@
     </resultMap>
 
     <sql id="selectBatchTransferTaskVo">
-        select id, task_name, task_description, source_agent_id, source_dir, include_patterns, exclude_patterns,
-               scan_frequency_sec, max_scan_files, target_agents, target_dirs, max_bandwidth_kb_s, retry_enabled, retry_max_days,
-               retry_interval_min, post_transfer_action, backup_dir, backup_mode, preserve_dir_structure,
-               transfer_mode, routing_strategy, routing_config, status, total_files, total_size_bytes,
-               transferred_files, transferred_size_bytes, failed_files, post_process_files, post_process_failed,
-               started_at, completed_at, post_processed_at, deleted, create_by, create_time, update_by, update_time, remark
+        select id, task_name, task_description, source_agent_id, source_dir, target_dirs,
+               include_patterns, exclude_patterns, scan_frequency_sec, scan_cron_expression,
+               max_scan_files, target_agents, max_bandwidth_kb_s, retry_enabled, retry_max_days,
+               retry_interval_min, post_transfer_action, backup_dir, backup_mode,
+               preserve_dir_structure, transfer_mode, routing_strategy, routing_config,
+               status, total_files, total_size_bytes, started_at,
+               deleted, create_by, create_time, update_by, update_time, remark
         from batch_transfer_task
     </sql>
 
@@ -78,12 +73,13 @@
             <if test="taskDescription != null">task_description,</if>
             <if test="sourceAgentId != null and sourceAgentId != ''">source_agent_id,</if>
             <if test="sourceDir != null and sourceDir != ''">source_dir,</if>
+            <if test="targetDirs != null">target_dirs,</if>
             <if test="includePatterns != null">include_patterns,</if>
             <if test="excludePatterns != null">exclude_patterns,</if>
             <if test="scanFrequencySec != null">scan_frequency_sec,</if>
+            <if test="scanCronExpression != null">scan_cron_expression,</if>
             <if test="maxScanFiles != null">max_scan_files,</if>
             <if test="targetAgents != null">target_agents,</if>
-            <if test="targetDirs != null">target_dirs,</if>
             <if test="maxBandwidthKbS != null">max_bandwidth_kb_s,</if>
             <if test="retryEnabled != null">retry_enabled,</if>
             <if test="retryMaxDays != null">retry_max_days,</if>
@@ -96,6 +92,10 @@
             <if test="routingStrategy != null">routing_strategy,</if>
             <if test="routingConfig != null">routing_config,</if>
             <if test="status != null">status,</if>
+            <if test="totalFiles != null">total_files,</if>
+            <if test="totalSizeBytes != null">total_size_bytes,</if>
+            <if test="startedAt != null">started_at,</if>
+            <if test="deleted != null">deleted,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="remark != null">remark,</if>
@@ -105,12 +105,13 @@
             <if test="taskDescription != null">#{taskDescription},</if>
             <if test="sourceAgentId != null and sourceAgentId != ''">#{sourceAgentId},</if>
             <if test="sourceDir != null and sourceDir != ''">#{sourceDir},</if>
+            <if test="targetDirs != null">#{targetDirs},</if>
             <if test="includePatterns != null">#{includePatterns},</if>
             <if test="excludePatterns != null">#{excludePatterns},</if>
             <if test="scanFrequencySec != null">#{scanFrequencySec},</if>
+            <if test="scanCronExpression != null">#{scanCronExpression},</if>
             <if test="maxScanFiles != null">#{maxScanFiles},</if>
             <if test="targetAgents != null">#{targetAgents},</if>
-            <if test="targetDirs != null">#{targetDirs},</if>
             <if test="maxBandwidthKbS != null">#{maxBandwidthKbS},</if>
             <if test="retryEnabled != null">#{retryEnabled},</if>
             <if test="retryMaxDays != null">#{retryMaxDays},</if>
@@ -123,6 +124,10 @@
             <if test="routingStrategy != null">#{routingStrategy},</if>
             <if test="routingConfig != null">#{routingConfig},</if>
             <if test="status != null">#{status},</if>
+            <if test="totalFiles != null">#{totalFiles},</if>
+            <if test="totalSizeBytes != null">#{totalSizeBytes},</if>
+            <if test="startedAt != null">#{startedAt},</if>
+            <if test="deleted != null">#{deleted},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="remark != null">#{remark},</if>
@@ -136,12 +141,13 @@
             <if test="taskDescription != null">task_description = #{taskDescription},</if>
             <if test="sourceAgentId != null and sourceAgentId != ''">source_agent_id = #{sourceAgentId},</if>
             <if test="sourceDir != null and sourceDir != ''">source_dir = #{sourceDir},</if>
+            <if test="targetDirs != null">target_dirs = #{targetDirs},</if>
             <if test="includePatterns != null">include_patterns = #{includePatterns},</if>
             <if test="excludePatterns != null">exclude_patterns = #{excludePatterns},</if>
             <if test="scanFrequencySec != null">scan_frequency_sec = #{scanFrequencySec},</if>
+            <if test="scanCronExpression != null">scan_cron_expression = #{scanCronExpression},</if>
             <if test="maxScanFiles != null">max_scan_files = #{maxScanFiles},</if>
             <if test="targetAgents != null">target_agents = #{targetAgents},</if>
-            <if test="targetDirs != null">target_dirs = #{targetDirs},</if>
             <if test="maxBandwidthKbS != null">max_bandwidth_kb_s = #{maxBandwidthKbS},</if>
             <if test="retryEnabled != null">retry_enabled = #{retryEnabled},</if>
             <if test="retryMaxDays != null">retry_max_days = #{retryMaxDays},</if>
@@ -156,14 +162,8 @@
             <if test="status != null">status = #{status},</if>
             <if test="totalFiles != null">total_files = #{totalFiles},</if>
             <if test="totalSizeBytes != null">total_size_bytes = #{totalSizeBytes},</if>
-            <if test="transferredFiles != null">transferred_files = #{transferredFiles},</if>
-            <if test="transferredSizeBytes != null">transferred_size_bytes = #{transferredSizeBytes},</if>
-            <if test="failedFiles != null">failed_files = #{failedFiles},</if>
-            <if test="postProcessFiles != null">post_process_files = #{postProcessFiles},</if>
-            <if test="postProcessFailed != null">post_process_failed = #{postProcessFailed},</if>
             <if test="startedAt != null">started_at = #{startedAt},</if>
-            <if test="completedAt != null">completed_at = #{completedAt},</if>
-            <if test="postProcessedAt != null">post_processed_at = #{postProcessedAt},</if>
+            <if test="deleted != null">deleted = #{deleted},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
             <if test="remark != null">remark = #{remark},</if>

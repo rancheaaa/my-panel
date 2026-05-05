@@ -704,7 +704,8 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
     `target_dirs` varchar(2000) NOT NULL COMMENT '目标节点目录(分号分隔, 与target_agents一一对应)',
     `include_patterns` text DEFAULT NULL COMMENT '包含通配符(JSON数组)',
     `exclude_patterns` text DEFAULT NULL COMMENT '排除通配符(JSON数组)',
-    `scan_frequency_sec` int NOT NULL DEFAULT 300 COMMENT '扫描间隔(秒), 范围[60,86400]',
+    `scan_frequency_sec` int NOT NULL DEFAULT 300 COMMENT '扫描间隔(秒), 范围[60,86400], 仅cron为空时生效',
+    `scan_cron_expression` varchar(100) DEFAULT NULL COMMENT '定时扫描Cron表达式(6-7位), 如 "0 */5 * * * ?" 表示每5分钟扫描, 为空则使用scan_frequency_sec轮询',
     `max_scan_files` int NOT NULL DEFAULT 10000 COMMENT '单次最大扫描文件数, 范围[100,100000]',
     `target_agents` text NOT NULL COMMENT '目标Agent ID列表(JSON数组)',
     `max_bandwidth_kb_s` int DEFAULT NULL COMMENT '单任务最大带宽(KB/s), NULL表示不限制',
@@ -774,14 +775,14 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_statistics` (
     `avg_duration_per_file_ms` bigint DEFAULT NULL COMMENT '平均每文件耗时(毫秒)',
 
     -- 后处理统计
-    `post_process_completed` int NOT NULL DEFAULT 0 COMMENT '后处理成功文件数',
-    `post_process_failed` int NOT NULL DEFAULT 0 COMMENT '后处理失败文件数',
+    `post_process_completed` int DEFAULT NULL COMMENT '后处理成功文件数',
+    `post_process_failed` int DEFAULT NULL COMMENT '后处理失败文件数',
     `post_processed_at` datetime DEFAULT NULL COMMENT '后处理完成时间',
 
     -- 重试统计
     `total_retry_count` int NOT NULL DEFAULT 0 COMMENT '总重试次数(所有子任务累计)',
-    `successful_retry_count` int NOT NULL DEFAULT 0 COMMENT '重试成功次数',
-    `max_single_file_retries` int NOT NULL DEFAULT 0 COMMENT '单文件最大重试次数',
+    `successful_retry_count` int DEFAULT NULL COMMENT '重试成功次数',
+    `max_single_file_retries` int DEFAULT NULL COMMENT '单文件最大重试次数',
     `avg_retry_count` decimal(5,2) DEFAULT NULL COMMENT '平均每失败文件重试次数',
 
     -- 目标Agent分布统计(JSON)

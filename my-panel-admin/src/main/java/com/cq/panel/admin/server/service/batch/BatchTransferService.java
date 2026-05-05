@@ -76,6 +76,7 @@ public class BatchTransferService {
         }
         entity.setRetryEnabled(dto.getRetryEnabled() != null && dto.getRetryEnabled() ? 1 : 0);
         entity.setPreserveDirStructure(dto.getPreserveDirStructure() != null && dto.getPreserveDirStructure() ? 1 : 0);
+        entity.setScanCronExpression(dto.getScanCronExpression());
         entity.setStatus(STATUS_DRAFT);
         entity.setDeleted(0);
         entity.setTotalFiles(0);
@@ -109,6 +110,7 @@ public class BatchTransferService {
                 task.getMaxBandwidthKbS() != null ? task.getMaxBandwidthKbS() * 1024L : null);
         proxyRequest.put("targetDirs", task.getTargetDirs());
         proxyRequest.put("preserveDirStructure", task.getPreserveDirStructure());
+        proxyRequest.put("scanCronExpression", task.getScanCronExpression());
 
         String oldStatus = task.getStatus();
         task.setStatus(STATUS_RUNNING);

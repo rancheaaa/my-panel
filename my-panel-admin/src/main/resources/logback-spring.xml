@@ -115,7 +115,7 @@
 	<!-- Spring日志级别控制  -->
 	<logger name="org.springframework" level="warn" />
 
-	<root level="info">
+	<root level="debug">
 		<appender-ref ref="console" />
         <appender-ref ref="file_info" />
         <appender-ref ref="file_warn" />

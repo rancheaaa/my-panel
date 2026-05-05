@@ -25,6 +25,8 @@ public class BatchTransferTask
 
     private Integer scanFrequencySec;
 
+    private String scanCronExpression;
+
     private Integer maxScanFiles;
 
     private String targetAgents;

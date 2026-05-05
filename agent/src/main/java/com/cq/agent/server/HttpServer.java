@@ -140,4 +140,8 @@ public class HttpServer {
         }
     }
 
+    public HandlerFactory getHandlerFactory() {
+        return handlerFactory;
+    }
+
 }

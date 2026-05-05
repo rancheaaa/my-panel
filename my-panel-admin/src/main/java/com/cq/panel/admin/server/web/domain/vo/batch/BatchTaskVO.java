@@ -43,6 +43,9 @@ public class BatchTaskVO
     @Schema(description = "传输后操作")
     private String postTransferAction;
 
+    @Schema(description = "定时扫描Cron表达式")
+    private String scanCronExpression;
+
     @Schema(description = "扫描到的文件总数")
     private Integer totalFiles;
 

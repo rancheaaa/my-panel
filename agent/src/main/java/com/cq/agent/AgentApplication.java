@@ -2,6 +2,7 @@ package com.cq.agent;
 
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
+import com.cq.agent.handler.HandlerFactory;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
 import com.cq.agent.service.ChunkedTransferService;
@@ -58,6 +59,9 @@ public class AgentApplication {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown signal received");
             registryService.stop();
+            if (server.getHandlerFactory() != null && server.getHandlerFactory().getScanScheduler() != null) {
+                server.getHandlerFactory().getScanScheduler().shutdown();
+            }
             server.stop();
         }));
 

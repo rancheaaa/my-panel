@@ -10,6 +10,7 @@ import com.cq.agent.batch.scanner.BatchFileScanner;
 import com.cq.agent.batch.queue.BatchTransferQueueManager;
 import com.cq.agent.batch.postprocess.PostTransferHandler;
 import com.cq.agent.batch.report.ProxyReportClient;
+import com.cq.agent.batch.scheduler.BatchScanScheduler;
 import com.cq.agent.client.upload.BatchAwareAgentUploader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.service.ChunkedTransferService;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class HandlerFactory {
 
     private final Map<String, IRequestHandler> handlerMap = new HashMap<>();
+    private final BatchScanScheduler scanScheduler;
 
     public HandlerFactory(AgentConfig agentConfig, FileService fileService, ChunkedTransferService chunkedTransferService) {
         String apiPrefix = "/api/file";
@@ -68,9 +70,17 @@ public class HandlerFactory {
         PostTransferHandler postTransferHandler = new PostTransferHandler();
         ProxyReportClient proxyReportClient = buildProxyReportClient(agentConfig);
         BatchAwareAgentUploader batchUploader = new BatchAwareAgentUploader(agentConfig, queueManager, proxyReportClient);
+
+        try {
+            this.scanScheduler = new BatchScanScheduler(batchScanner, proxyReportClient, agentConfig.getFileBaseDirectory());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to init BatchScanScheduler: " + e.getMessage(), e);
+        }
+
         handlerMap.put(batchPrefix + "/scan", new BatchScanHandler(fileService, chunkedTransferService, batchScanner));
         handlerMap.put(batchPrefix + "/dispatch", new BatchDispatchHandler(fileService, chunkedTransferService, queueManager));
         handlerMap.put(batchPrefix + "/post-process", new BatchPostProcessHandler(fileService, chunkedTransferService, postTransferHandler));
+        handlerMap.put(batchPrefix + "/schedule", new BatchScanScheduleHandler(fileService, chunkedTransferService, scanScheduler));
     }
 
     private ProxyReportClient buildProxyReportClient(AgentConfig agentConfig)
@@ -84,5 +94,9 @@ public class HandlerFactory {
 
     public IRequestHandler getHandler(String path) {
         return handlerMap.get(path);
+    }
+
+    public BatchScanScheduler getScanScheduler() {
+        return scanScheduler;
     }
 }

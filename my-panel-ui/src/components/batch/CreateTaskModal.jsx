@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select, Row, Col, InputNumber, Switch, Button, Space, Card } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, Select, Row, Col, InputNumber, Switch, Button, Space, Card, Tooltip, Typography } from 'antd';
+import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import RegionConfigEditor from './RegionConfigEditor';
+import CronExpressionInput from './CronExpressionInput';
 
 const agentLabel = (a) => `${a.appId || 'unknown'}@${a.agentIp}`;
 
@@ -204,10 +205,25 @@ const CreateTaskModal = ({ visible, onOk, onCancel, agents = [] }) => {
           )}
         </Row>
         <Row gutter={16}>
-          <Col span={6}><Form.Item name="scanFrequencySec" label="扫描间隔(秒)"><InputNumber min={60} max={86400} style={{ width: '100%' }} /></Form.Item></Col>
-          <Col span={6}><Form.Item name="maxScanFiles" label="最大扫描数"><InputNumber min={100} max={100000} style={{ width: '100%' }} /></Form.Item></Col>
-          <Col span={6}><Form.Item name="retryEnabled" label="自动重试" valuePropName="checked"><Switch /></Form.Item></Col>
-          <Col span={6}><Form.Item name="preserveDirStructure" label="保持目录结构" valuePropName="checked"><Switch /></Form.Item></Col>
+          <Col span={8}>
+            <Form.Item
+              label={<span>扫描间隔(秒) <Tooltip title="仅Cron表达式为空时生效"><QuestionCircleOutlined /></Tooltip></span>}
+              name="scanFrequencySec">
+              <InputNumber min={60} max={86400} style={{ width: '100%' }} addonAfter="秒" />
+            </Form.Item>
+          </Col>
+          <Col span={16}>
+            <Form.Item
+              label={<span>Cron定时扫描 <Tooltip title="设置后Agent将按此Cron表达式自动定时扫描和传输，无需Proxy轮询触发"><QuestionCircleOutlined /></Tooltip></span>}
+              name="scanCronExpression">
+              <CronExpressionInput />
+            </Form.Item>
+          </Col>
+        </Row>
+        <Row gutter={16}>
+          <Col span={8}><Form.Item name="maxScanFiles" label="最大扫描数"><InputNumber min={100} max={100000} style={{ width: '100%' }} /></Form.Item></Col>
+          <Col span={8}><Form.Item name="retryEnabled" label="自动重试" valuePropName="checked"><Switch /></Form.Item></Col>
+          <Col span={8}><Form.Item name="preserveDirStructure" label="保持目录结构" valuePropName="checked"><Switch /></Form.Item></Col>
         </Row>
         <Row gutter={16}>
           <Col span={12}><Form.Item name="retryMaxDays" label="重试保留天数"><InputNumber min={1} max={30} style={{ width: '100%' }} /></Form.Item></Col>

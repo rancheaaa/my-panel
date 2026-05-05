@@ -75,11 +75,11 @@ public class ProgressAggregator
         {
             try
             {
-                updateTaskProgress(entry.getKey(), entry.getValue());
+                updateTaskStatistics(entry.getKey(), entry.getValue());
             }
             catch (Exception e)
             {
-                logger.error("Failed to update task {} progress: {}", entry.getKey(), e.getMessage());
+                logger.error("Failed to update task {} statistics: {}", entry.getKey(), e.getMessage());
             }
         }
     }
@@ -137,7 +137,7 @@ public class ProgressAggregator
         return summaries;
     }
 
-    private void updateTaskProgress(Long taskId, Map<String, Object> summary)
+    private void updateTaskStatistics(Long taskId, Map<String, Object> summary)
     {
         try
         {
@@ -145,41 +145,62 @@ public class ProgressAggregator
                     "SELECT COUNT(*) as total, " +
                             "SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed, " +
                             "SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed, " +
+                            "SUM(CASE WHEN status = 'SENDING' THEN 1 ELSE 0 END) as running, " +
+                            "SUM(CASE WHEN status = 'QUEUED' THEN 1 ELSE 0 END) as queued, " +
+                            "SUM(CASE WHEN status = 'RETRYING' THEN 1 ELSE 0 END) as retrying, " +
+                            "COALESCE(SUM(file_size_bytes), 0) as total_size_bytes, " +
                             "COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN file_size_bytes ELSE 0 END), 0) as transferred_bytes " +
                             "FROM batch_transfer_subtask WHERE task_id = ?", taskId);
+
             int total = ((Number) stats.get("total")).intValue();
             int completed = ((Number) stats.get("completed")).intValue();
             int failed = ((Number) stats.get("failed")).intValue();
+            int running = ((Number) stats.get("running")).intValue();
+            int queued = ((Number) stats.get("queued")).intValue();
+            int retrying = ((Number) stats.get("retrying")).intValue();
+            long totalSizeBytes = ((Number) stats.get("total_size_bytes")).longValue();
             long transferredBytes = ((Number) stats.get("transferred_bytes")).longValue();
 
-            String newStatus = null;
-            if (total > 0 && completed == total)
-            {
-                newStatus = "COMPLETED";
-            }
-            else if (total > 0 && (completed + failed) == total && failed > 0)
-            {
-                newStatus = "PARTIAL_FAILED";
-            }
+            BigDecimal progressPercent = total > 0
+                    ? BigDecimal.valueOf(completed * 100.0 / total).setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
 
-            if (newStatus != null)
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM batch_transfer_statistics WHERE task_id = ?",
+                    Integer.class, taskId);
+
+            if (exists != null && exists > 0)
             {
                 jdbcTemplate.update(
-                        "UPDATE batch_transfer_task SET transferred_files = ?, transferred_size_bytes = ?, " +
-                                "failed_files = ?, status = ?, completed_at = NOW() WHERE id = ?",
-                        completed, transferredBytes, failed, newStatus, taskId);
+                        "UPDATE batch_transfer_statistics SET " +
+                                "snapshot_time = NOW(), " +
+                                "total_subtasks = ?, completed_count = ?, failed_count = ?, running_count = ?, queued_count = ?, retrying_count = ?, " +
+                                "total_size_bytes = ?, transferred_bytes = ?, transferred_files = ?, failed_files = ?, " +
+                                "remaining_bytes = ?, progress_percent = ?, last_activity_at = NOW(), data_version = data_version + 1 " +
+                                "WHERE task_id = ?",
+                        total, completed, failed, running, queued, retrying,
+                        totalSizeBytes, transferredBytes, completed, failed,
+                        Math.max(0L, totalSizeBytes - transferredBytes),
+                        progressPercent, taskId);
             }
             else
             {
                 jdbcTemplate.update(
-                        "UPDATE batch_transfer_task SET transferred_files = ?, transferred_size_bytes = ?, " +
-                                "failed_files = ? WHERE id = ?",
-                        completed, transferredBytes, failed, taskId);
+                        "INSERT INTO batch_transfer_statistics " +
+                                "(task_id, snapshot_time, total_subtasks, completed_count, failed_count, running_count, queued_count, retrying_count, " +
+                                "total_size_bytes, transferred_bytes, transferred_files, failed_files, remaining_bytes, progress_percent, " +
+                                "started_at, last_activity_at, data_version, create_time, update_time) " +
+                                "VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1, NOW(), NOW())",
+                        taskId,
+                        total, completed, failed, running, queued, retrying,
+                        totalSizeBytes, transferredBytes, completed, failed,
+                        Math.max(0L, totalSizeBytes - transferredBytes),
+                        progressPercent);
             }
         }
         catch (Exception e)
         {
-            logger.error("Failed to update task {} aggregated progress: {}", taskId, e.getMessage());
+            logger.error("Failed to update task {} aggregated statistics: {}", taskId, e.getMessage());
         }
     }
 

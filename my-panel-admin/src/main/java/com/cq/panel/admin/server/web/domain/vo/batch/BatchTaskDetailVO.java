@@ -78,6 +78,12 @@ public class BatchTaskDetailVO {
     @Schema(description = "扫描到的文件总数")
     private Integer totalFiles;
 
+    @Schema(description = "扫描间隔(秒)")
+    private Integer scanFrequencySec;
+
+    @Schema(description = "定时扫描Cron表达式")
+    private String scanCronExpression;
+
     @Schema(description = "扫描到的总大小(字节)")
     private Long totalSizeBytes;
 

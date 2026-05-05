@@ -40,11 +40,12 @@ public class BatchAdminController
         String targetDirs = (String) request.get("targetDirs");
         Number preserveDirStructureNum = (Number) request.get("preserveDirStructure");
         Integer preserveDirStructure = preserveDirStructureNum != null ? preserveDirStructureNum.intValue() : 1;
+        String scanCronExpression = (String) request.get("scanCronExpression");
 
         BatchTaskScheduler.StartResult result = batchTaskScheduler.startTask(
                 taskId, sourceAgentId, sourceAgentApiUrl, scanRequest, targetAgents,
                 transferMode, routingStrategy, routingConfig, maxBandwidthBytesPerSec,
-                targetDirs, preserveDirStructure);
+                targetDirs, preserveDirStructure, scanCronExpression);
 
         return Map.of(
                 "success", result.success,

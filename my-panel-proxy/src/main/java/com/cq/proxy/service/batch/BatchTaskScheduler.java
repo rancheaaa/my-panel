@@ -85,7 +85,8 @@ public class BatchTaskScheduler
                                   Object scanRequest, List<String> targetAgents,
                                   String transferMode, String routingStrategy,
                                   String routingConfig, Long maxBandwidthBytesPerSec,
-                                  String targetDirs, Integer preserveDirStructure)
+                                  String targetDirs, Integer preserveDirStructure,
+                                  String scanCronExpression)
     {
         String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
         RestClient restClient = createRestClientForUrl(resolvedUrl);
@@ -104,7 +105,12 @@ public class BatchTaskScheduler
             {
                 return new StartResult(false, "扫描失败", scanResponse);
             }
-            Map<String, Object> scanResult = asMap(scanResponse.get("result"));
+            Map<String, Object> data = asMap(scanResponse.get("data"));
+            if (data == null)
+            {
+                return new StartResult(false, "扫描响应数据格式异常", scanResponse);
+            }
+            Map<String, Object> scanResult = asMap(data.get("result"));
             List<Map<String, Object>> files = asListOfMap(scanResult.get("files"));
             int totalFiles = files.size();
             long totalSizeBytes = files.stream()
@@ -114,7 +120,7 @@ public class BatchTaskScheduler
             if (files.isEmpty())
             {
                 jdbcTemplate.update(
-                        "UPDATE batch_transfer_task SET total_files = 0, total_size_bytes = 0, status = 'COMPLETED', completed_at = NOW() WHERE id = ?",
+                        "UPDATE batch_transfer_task SET total_files = 0, total_size_bytes = 0, status = 'STOPPED', started_at = NOW() WHERE id = ?",
                         taskId);
                 return new StartResult(true, "扫描完成，但没有匹配文件", Map.of(
                         "taskId", taskId, "scanResult", scanResult, "totalFiles", 0, "totalSizeBytes", 0L
@@ -132,7 +138,7 @@ public class BatchTaskScheduler
             persistSubtasks(taskId, subtasks);
 
             jdbcTemplate.update(
-                    "UPDATE batch_transfer_task SET total_files = ?, total_size_bytes = ?, status = 'TRANSFERRING' WHERE id = ?",
+                    "UPDATE batch_transfer_task SET total_files = ?, total_size_bytes = ?, status = 'RUNNING', started_at = NOW() WHERE id = ?",
                     totalFiles, totalSizeBytes, taskId);
 
             Map<String, Object> dispatchRequest = buildDispatchRequest(taskId, subtasks, maxBandwidthBytesPerSec, agentDirMap, preserveDirStructure);
@@ -141,6 +147,11 @@ public class BatchTaskScheduler
                     .body(dispatchRequest)
                     .retrieve()
                     .body(Map.class);
+
+            if (scanCronExpression != null && !scanCronExpression.isBlank())
+            {
+                pushScanScheduleToAgent(resolvedUrl, taskId, scanCronExpression, scanRequest, targetAgents, targetDirs, preserveDirStructure, maxBandwidthBytesPerSec);
+            }
 
             return new StartResult(true, "Task started", Map.of(
                     "taskId", taskId, "scanResult", scanResult,
@@ -159,7 +170,7 @@ public class BatchTaskScheduler
             try
             {
                 jdbcTemplate.update(
-                        "UPDATE batch_transfer_task SET status = 'FAILED' WHERE id = ?", taskId);
+                        "UPDATE batch_transfer_task SET status = 'STOPPED' WHERE id = ?", taskId);
             }
             catch (Exception dbEx)
             {
@@ -242,10 +253,31 @@ public class BatchTaskScheduler
                 subtask.put("targetAgentId", targetAgentId);
                 subtask.put("targetDir", agentDirMap.getOrDefault(targetAgentId, "/tmp"));
                 subtask.put("priority", 5);
+
+                String targetApiUrl = resolveTargetAgentUrl(targetAgentId);
+                subtask.put("targetAgentApiUrl", targetApiUrl);
+
                 subtasks.add(subtask);
             }
         }
         return subtasks;
+    }
+
+    private String resolveTargetAgentUrl(String agentId)
+    {
+        try
+        {
+            AgentRegistry registry = agentRegistryMapper.selectById(agentId);
+            if (registry != null && registry.getNodeStatus() != null && registry.getNodeStatus() == 1)
+            {
+                return "http://" + registry.getAgentIp() + ":" + registry.getAgentPort();
+            }
+        }
+        catch (Exception e)
+        {
+            logger.warn("Failed to resolve API URL for agent {}: {}", agentId, e.getMessage());
+        }
+        return null;
     }
 
     private Map<String, String> buildAgentDirMap(List<String> targetAgents, String targetDirs)
@@ -258,6 +290,48 @@ public class BatchTaskScheduler
             map.put(targetAgents.get(i), dirs[i].trim());
         }
         return map;
+    }
+
+    private void pushScanScheduleToAgent(String agentUrl, Long taskId, String cronExpression,
+                                          Object scanRequest, List<String> targetAgents,
+                                          String targetDirs, Integer preserveDirStructure,
+                                          Long maxBandwidthBytesPerSec)
+    {
+        try
+        {
+            List<Map<String, Object>> agentList = new java.util.ArrayList<>();
+            for (String agentId : targetAgents)
+            {
+                Map<String, Object> a = new LinkedHashMap<>();
+                a.put("agentId", agentId);
+                a.put("apiUrl", resolveTargetAgentUrl(agentId));
+                agentList.add(a);
+            }
+
+            Map<String, Object> scheduleRequest = new LinkedHashMap<>();
+            scheduleRequest.put("action", "upsert");
+            scheduleRequest.put("taskId", taskId);
+            scheduleRequest.put("cronExpression", cronExpression);
+            scheduleRequest.put("scanConfig", scanRequest);
+            scheduleRequest.put("proxyBaseUrl", "http://localhost:9876");
+            scheduleRequest.put("targetAgents", agentList);
+            scheduleRequest.put("targetDirs", buildAgentDirMap(targetAgents, targetDirs));
+            scheduleRequest.put("preserveDirStructure", preserveDirStructure);
+            scheduleRequest.put("maxBandwidthBytesPerSec", maxBandwidthBytesPerSec);
+
+            RestClient restClient = createRestClientForUrl(agentUrl);
+            Map<String, Object> result = restClient.post()
+                    .uri("/api/internal/batch/schedule")
+                    .body(scheduleRequest)
+                    .retrieve()
+                    .body(Map.class);
+
+            logger.info("Pushed scan schedule to agent[{}] for task {}: cron={}", agentUrl, taskId, cronExpression);
+        }
+        catch (Exception e)
+        {
+            logger.warn("Failed to push scan schedule to agent for task {}: {}", taskId, e.getMessage());
+        }
     }
 
     private Map<String, Object> asMap(Object value)

@@ -59,8 +59,13 @@ public class AgentApplication {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown signal received");
             registryService.stop();
-            if (server.getHandlerFactory() != null && server.getHandlerFactory().getScanScheduler() != null) {
-                server.getHandlerFactory().getScanScheduler().shutdown();
+            if (server.getHandlerFactory() != null) {
+                if (server.getHandlerFactory().getScanScheduler() != null) {
+                    server.getHandlerFactory().getScanScheduler().shutdown();
+                }
+                if (server.getHandlerFactory().getAgentUploader() != null) {
+                    server.getHandlerFactory().getAgentUploader().shutdownBatch();
+                }
             }
             server.stop();
         }));

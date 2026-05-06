@@ -186,3 +186,5 @@ Default accounts: admin/admin123, guest/guest123, cq/cq123456
 6、写设计文档时，尽量不要使用大段的真实java代码，可以多用流程图或时序图来描述，少量java枚举类或java bean或Java配置类可以直接用java描述，很短的逻辑可以用java描述，大段的代码千万不要直接贴java代码。
 7、markdown文件中的Mermaid图表的语法，确保与Typora 0.9.72 beta版本兼容
 8、sql新建的表都要有这几个字段（由谁创建、由谁更新、创建时间、更新时间），名称不要错了，create_by、update_by、create_time、update_time、remark。
+
+9、修改完java的代码，一定要mvn clean compile，修改了哪个模块编译哪个，确保修改的代码语法是对的。

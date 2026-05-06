@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, Card, Button, Space, Input, Select, Row, Col, message, Popconfirm, Tag, Progress, Tooltip, Statistic } from 'antd';
-import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, PlayCircleOutlined, PauseCircleOutlined, StopOutlined, EyeOutlined } from '@ant-design/icons';
-import { listBatchTasks, startBatchTask, pauseBatchTask, resumeBatchTask, stopBatchTask, deleteBatchTasks, createBatchTask } from '../../../api/batch/task';
+import { SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined, PlayCircleOutlined, PauseCircleOutlined, EditOutlined } from '@ant-design/icons';
+import { listBatchTasks, startBatchTask, pauseBatchTask, resumeBatchTask, deleteBatchTasks, createBatchTask, getBatchTaskDetail, updateBatchTaskConfig } from '../../../api/batch/task';
 import { listAgentRegistry } from '../../../api/agent';
 import CreateTaskModal from '../../../components/batch/CreateTaskModal';
+import UpdateTaskConfigModal from '../../../components/batch/UpdateTaskConfigModal';
+import TaskConfigDetailModal from '../../../components/batch/TaskConfigDetailModal';
+import { UnorderedListOutlined, InfoCircleOutlined } from '@ant-design/icons';
 
 const statusColorMap = {
   DRAFT: 'default', RUNNING: 'processing', PAUSED: 'warning', STOPPED: 'default'
@@ -22,6 +25,10 @@ const BatchTaskList = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [queryParams, setQueryParams] = useState({ pageNum: 1, pageSize: 10, status: undefined, keyword: undefined });
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [configModalVisible, setConfigModalVisible] = useState(false);
+  const [currentTaskConfig, setCurrentTaskConfig] = useState(null);
+  const [currentTaskId, setCurrentTaskId] = useState(null);
   const [agents, setAgents] = useState([]);
 
   const fetchData = async () => {
@@ -49,7 +56,6 @@ const BatchTaskList = () => {
   const handleStart = async (id) => { await startBatchTask(id); message.success('已启动'); fetchData(); };
   const handlePause = async (id) => { await pauseBatchTask(id); message.success('已暂停'); fetchData(); };
   const handleResume = async (id) => { await resumeBatchTask(id); message.success('已恢复'); fetchData(); };
-  const handleStop = async (id) => { await stopBatchTask(id); message.success('已停止'); fetchData(); };
   const handleDelete = async (ids) => { await deleteBatchTasks(ids); message.success('已删除'); fetchData(); };
 
   const handleCreate = async (values) => {
@@ -57,6 +63,37 @@ const BatchTaskList = () => {
     message.success('创建成功');
     setCreateModalVisible(false);
     fetchData();
+  };
+
+  const handleEditConfig = async (id) => {
+    try {
+      const res = await getBatchTaskDetail(id);
+      if (res.code === 200) {
+        setCurrentTaskId(id);
+        setCurrentTaskConfig(res.data);
+        setUpdateModalVisible(true);
+      }
+    } catch (e) { message.error('获取任务配置失败'); }
+  };
+
+  const handleConfigDetail = async (id) => {
+    try {
+      const res = await getBatchTaskDetail(id);
+      if (res.code === 200) {
+        setCurrentTaskId(id);
+        setCurrentTaskConfig(res.data);
+        setConfigModalVisible(true);
+      }
+    } catch (e) { message.error('获取任务配置失败'); }
+  };
+
+  const handleUpdateConfig = async (values) => {
+    try {
+      await updateBatchTaskConfig(currentTaskId, values);
+      message.success('修改配置成功');
+      setUpdateModalVisible(false);
+      fetchData();
+    } catch (e) { message.error('修改配置失败'); }
   };
 
   const columns = [
@@ -98,9 +135,9 @@ const BatchTaskList = () => {
       }
     },
     { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 170 },
-    { title: '操作', key: 'action', width: 260, fixed: 'right', render: (_, r) => (
+    { title: '操作', key: 'action', width: 420, fixed: 'right', render: (_, r) => (
       <Space size="small">
-        {(r.status === 'DRAFT' || r.status === 'PAUSED') && (
+        {r.status === 'DRAFT' && (
           <Button type="link" size="small" icon={<PlayCircleOutlined />} onClick={() => handleStart(r.id)}>启动</Button>
         )}
         {r.status === 'RUNNING' && (
@@ -109,12 +146,11 @@ const BatchTaskList = () => {
         {r.status === 'PAUSED' && (
           <Button type="link" size="small" icon={<PlayCircleOutlined />} onClick={() => handleResume(r.id)}>恢复</Button>
         )}
-        {r.status !== 'STOPPED' && (
-          <Popconfirm title="确认停止?" onConfirm={() => handleStop(r.id)}>
-            <Button type="link" size="small" danger icon={<StopOutlined />}>停止</Button>
-          </Popconfirm>
+        {(r.status === 'DRAFT' || r.status === 'PAUSED') && (
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditConfig(r.id)}>修改</Button>
         )}
-        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/batch/taskDetail?id=${r.id}`)}>详情</Button>
+        <Button type="link" size="small" icon={<InfoCircleOutlined />} onClick={() => handleConfigDetail(r.id)}>配置详情</Button>
+        <Button type="link" size="small" icon={<UnorderedListOutlined />} onClick={() => navigate(`/batch/subtaskDetail?taskId=${r.id}`)}>子任务详情</Button>
       </Space>
     )},
   ];
@@ -136,14 +172,15 @@ const BatchTaskList = () => {
         rowSelection={{
           selectedRowKeys,
           onChange: setSelectedRowKeys,
-          getCheckboxProps: (record) => ({
-            disabled: record.status !== 'STOPPED' && record.status !== 'DRAFT',
-          }),
         }}
         pagination={{ current: queryParams.pageNum, pageSize: queryParams.pageSize, total, onChange: (p, s) => setQueryParams(prev => ({...prev, pageNum: p, pageSize: s })) }}
       />
       <CreateTaskModal visible={createModalVisible} onOk={handleCreate}
         onCancel={() => setCreateModalVisible(false)} agents={agents} />
+      <UpdateTaskConfigModal visible={updateModalVisible} initialValues={currentTaskConfig}
+        onOk={handleUpdateConfig} onCancel={() => setUpdateModalVisible(false)} agents={agents} />
+      <TaskConfigDetailModal visible={configModalVisible} task={currentTaskConfig} agents={agents}
+        onCancel={() => setConfigModalVisible(false)} />
     </Card>
   );
 };

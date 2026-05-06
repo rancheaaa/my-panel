@@ -192,6 +192,38 @@ public class BatchTaskScheduler
     {
         String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
         logger.info("Cancel task {} on agent {}", taskId, resolvedUrl);
+        removeScanScheduleFromAgent(resolvedUrl, taskId);
+    }
+
+    public void updateTaskConfig(Long taskId, String sourceAgentId, String sourceAgentApiUrl,
+                                 Object scanRequest, List<String> targetAgents,
+                                 String targetDirs, Integer preserveDirStructure,
+                                 Long maxBandwidthBytesPerSec, String scanCronExpression)
+    {
+        String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
+        if (scanCronExpression != null && !scanCronExpression.isBlank()) {
+            pushScanScheduleToAgent(resolvedUrl, taskId, scanCronExpression, scanRequest, targetAgents, targetDirs, preserveDirStructure, maxBandwidthBytesPerSec);
+        } else {
+            removeScanScheduleFromAgent(resolvedUrl, taskId);
+        }
+    }
+
+    private void removeScanScheduleFromAgent(String agentUrl, Long taskId) {
+        try {
+            Map<String, Object> scheduleRequest = new java.util.LinkedHashMap<>();
+            scheduleRequest.put("action", "remove");
+            scheduleRequest.put("taskId", taskId);
+            
+            RestClient restClient = createRestClientForUrl(agentUrl);
+            restClient.post()
+                    .uri("/api/internal/batch/schedule")
+                    .body(scheduleRequest)
+                    .retrieve()
+                    .body(Map.class);
+            logger.info("Removed scan schedule from agent[{}] for task {}", agentUrl, taskId);
+        } catch (Exception e) {
+            logger.warn("Failed to remove scan schedule from agent for task {}: {}", taskId, e.getMessage());
+        }
     }
 
     private void persistSubtasks(Long taskId, List<Map<String, Object>> subtasks)
@@ -240,6 +272,18 @@ public class BatchTaskScheduler
             else
             {
                 updated++;
+            }
+            
+            try {
+                Long id = jdbcTemplate.queryForObject(
+                        "SELECT id FROM batch_transfer_subtask WHERE task_id=? AND file_path=? AND target_agent_id=? ORDER BY id DESC LIMIT 1",
+                        Long.class, taskId, filePath, targetAgentId);
+                if (id != null) {
+                    subtask.put("subtaskId", id);
+                    subtask.put("id", id);
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to query inserted subtask id for task {}, file {}, agent {}: {}", taskId, filePath, targetAgentId, e.getMessage());
             }
         }
         logger.info("Persisted subtasks for task {}: inserted={}, updated={}", taskId, inserted, updated);

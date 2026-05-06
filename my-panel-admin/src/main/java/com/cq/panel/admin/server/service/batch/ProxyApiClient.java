@@ -128,4 +128,19 @@ public class ProxyApiClient {
             throw new RuntimeException("Proxy取消任务失败: " + e.getMessage(), e);
         }
     }
+
+    public Map<String, Object> updateTaskConfig(Long taskId, Map<String, Object> request) {
+        logger.info("Sending update config request to proxy for task {}", taskId);
+        try {
+            return createRestClient()
+                    .put()
+                    .uri("/api/v1/batch/tasks/{taskId}/config", taskId)
+                    .body(request)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (Exception e) {
+            logger.error("Failed to update config for task {} via proxy: {}", taskId, e.getMessage(), e);
+            throw new RuntimeException("Proxy更新配置失败: " + e.getMessage(), e);
+        }
+    }
 }

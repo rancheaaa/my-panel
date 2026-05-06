@@ -719,7 +719,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
     `transfer_mode` varchar(20) NOT NULL DEFAULT 'ONE_TO_MANY' COMMENT '传输模式: ONE_TO_ONE/ONE_TO_MANY',
     `routing_strategy` varchar(20) NOT NULL DEFAULT 'BROADCAST' COMMENT '路由策略: BROADCAST/SINGLE/ROUND_ROBIN/REGION_BASED/RANDOM',
     `routing_config` text DEFAULT NULL COMMENT '路由策略配置JSON(REGION_BASED时必填)',
-    `status` varchar(20) NOT NULL DEFAULT 'DRAFT' COMMENT '任务运行状态: DRAFT-草稿/RUNNING-运行中/PAUSED-已暂停/STOPPED-已停止',
+    `status` varchar(20) NOT NULL DEFAULT 'DRAFT' COMMENT '任务运行状态: DRAFT-草稿/RUNNING-运行中/PAUSED-已暂停/',
     `total_files` int NOT NULL DEFAULT 0 COMMENT '扫描到的文件总数(缓存)',
     `total_size_bytes` bigint NOT NULL DEFAULT 0 COMMENT '扫描到的总大小(字节,缓存)',
     `started_at` datetime DEFAULT NULL COMMENT '首次启动时间',

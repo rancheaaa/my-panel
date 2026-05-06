@@ -13,21 +13,32 @@ const subtaskStatusLabel = {
 };
 
 const formatBytes = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B';
+  if (bytes == null || bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+const formatSpeedMB = (bytesPerSec) => {
+  if (bytesPerSec == null || bytesPerSec <= 0) return '-';
+  const mbps = bytesPerSec / (1024 * 1024);
+  if (mbps >= 1) return mbps.toFixed(2) + ' MB/s';
+  const kbps = bytesPerSec / 1024;
+  return kbps.toFixed(2) + ' KB/s';
+};
+
 const formatDuration = (ms) => {
-  if (!ms) return '-';
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
+  if (ms == null || ms < 0) return '-';
+  if (ms < 1000) return ms + 'ms';
+  const seconds = ms / 1000;
+  if (seconds < 60) return seconds.toFixed(1) + 's';
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m${seconds % 60}s`;
+  const remainSec = Math.floor(seconds % 60);
+  if (minutes < 60) return `${minutes}m${remainSec}s`;
   const hours = Math.floor(minutes / 60);
-  return `${hours}h${minutes % 60}m`;
+  const remainMin = minutes % 60;
+  return `${hours}h${remainMin}m`;
 };
 
 const formatTime = (t) => {
@@ -35,28 +46,50 @@ const formatTime = (t) => {
   try { return new Date(t).toLocaleString(); } catch { return t; }
 };
 
-const SubtaskTable = ({ subtasks = [], loading = false, onRetry }) => {
+const SubtaskTable = ({ subtasks = [], loading = false, onRetry, enrichedInfo }) => {
+  const sourceDir = enrichedInfo?.sourceDir || '-';
+  const sourceNodeName = enrichedInfo?.sourceNodeName || '-';
+  const targetAgentInfoMap = enrichedInfo?.targetAgentInfoMap || {};
+
+  const getTargetDir = (agentId) => {
+    if (!agentId || !targetAgentInfoMap[agentId]) return '-';
+    return targetAgentInfoMap[agentId].dir || '-';
+  };
+
+  const getTargetNodeName = (agentId) => {
+    if (!agentId || !targetAgentInfoMap[agentId]) return agentId || '-';
+    return targetAgentInfoMap[agentId].nodeName || agentId;
+  };
+
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
     { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 140, ellipsis: true },
-    { title: '相对路径', dataIndex: 'filePath', key: 'filePath', ellipsis: true,
-      render: v => <Tooltip title={v}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v}</span></Tooltip>
-    },
     { title: '大小', dataIndex: 'fileSizeBytes', key: 'fileSizeBytes', width: 90,
       render: v => v != null ? formatBytes(v) : '-'
     },
-    { title: 'MD5', dataIndex: 'fileMd5', key: 'fileMd5', width: 120, ellipsis: true,
-      render: v => v ? <Tooltip title={v}><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{v.substring(0, 12)}...</span></Tooltip> : '-'
-    },
-    { title: '修改时间', dataIndex: 'fileLastModified', key: 'fileLastModified', width: 150,
+    { title: '修改时间', dataIndex: 'fileLastModified', key: 'fileLastModified', width: 160,
       render: v => formatTime(v)
     },
-    { title: '目标Agent', dataIndex: 'targetAgentId', key: 'targetAgentId', width: 160, ellipsis: true },
+    { title: '发送节点', key: 'sourceNodeName', width: 120, ellipsis: true,
+      render: () => <Tooltip title={sourceNodeName}><span>{sourceNodeName}</span></Tooltip>
+    },
+    { title: '发送目录', key: 'sourceDir', width: 180, ellipsis: true,
+      render: () => <Tooltip title={sourceDir}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{sourceDir}</span></Tooltip>
+    },
+    { title: '接收节点', key: 'targetNodeName', width: 120, ellipsis: true,
+      render: (_, r) => {
+        const name = getTargetNodeName(r.targetAgentId);
+        return <Tooltip title={name}><span>{name}</span></Tooltip>;
+      }
+    },
+    { title: '接收目录', key: 'targetDir', width: 180, ellipsis: true,
+      render: (_, r) => {
+        const dir = getTargetDir(r.targetAgentId);
+        return <Tooltip title={dir}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{dir}</span></Tooltip>;
+      }
+    },
     { title: '状态', dataIndex: 'status', key: 'status', width: 90,
       render: s => <Tag color={subtaskStatusColorMap[s]}>{subtaskStatusLabel[s] || s}</Tag>
-    },
-    { title: '传输ID', dataIndex: 'transferId', key: 'transferId', width: 100, ellipsis: true,
-      render: v => v || '-'
     },
     { title: '传输进度', key: 'progress', width: 150,
       render: (_, r) => {
@@ -72,23 +105,29 @@ const SubtaskTable = ({ subtasks = [], loading = false, onRetry }) => {
         return <span style={{ color: '#999' }}>-</span>;
       }
     },
+    { title: '发送速率', dataIndex: 'speedBytesPerSec', key: 'speedBytesPerSec', width: 110,
+      render: v => formatSpeedMB(v)
+    },
+    { title: '耗时', dataIndex: 'durationMs', key: 'durationMs', width: 90,
+      render: v => formatDuration(v)
+    },
     { title: '已传字节', dataIndex: 'transferredBytes', key: 'transferredBytes', width: 95,
       render: v => v != null ? formatBytes(v) : '-'
     },
     { title: '分块进度', key: 'chunks', width: 100,
       render: (_, r) => (r.transferredChunks ?? 0) + '/' + (r.totalChunks ?? '-')
     },
-    { title: '速率', dataIndex: 'speedBytesPerSec', key: 'speedBytesPerSec', width: 95,
-      render: v => v != null && v > 0 ? formatBytes(v) + '/s' : '-'
+    { title: 'MD5', dataIndex: 'fileMd5', key: 'fileMd5', width: 120, ellipsis: true,
+      render: v => v ? <Tooltip title={v}><span style={{ fontFamily: 'monospace', fontSize: 11 }}>{v.substring(0, 12)}...</span></Tooltip> : '-'
     },
-    { title: '开始时间', dataIndex: 'startedAt', key: 'startedAt', width: 150,
+    { title: '传输ID', dataIndex: 'transferId', key: 'transferId', width: 100, ellipsis: true,
+      render: v => v || '-'
+    },
+    { title: '开始时间', dataIndex: 'startedAt', key: 'startedAt', width: 160,
       render: v => formatTime(v)
     },
-    { title: '完成时间', dataIndex: 'completedAt', key: 'completedAt', width: 150,
+    { title: '完成时间', dataIndex: 'completedAt', key: 'completedAt', width: 160,
       render: v => formatTime(v)
-    },
-    { title: '耗时', dataIndex: 'durationMs', key: 'durationMs', width: 80,
-      render: v => formatDuration(v)
     },
     { title: '错误码', dataIndex: 'errorCode', key: 'errorCode', width: 100, ellipsis: true,
       render: v => v || '-'
@@ -104,10 +143,10 @@ const SubtaskTable = ({ subtasks = [], loading = false, onRetry }) => {
         </Space>
       )
     },
-    { title: '上次重试', dataIndex: 'lastRetryAt', key: 'lastRetryAt', width: 150,
+    { title: '上次重试', dataIndex: 'lastRetryAt', key: 'lastRetryAt', width: 160,
       render: v => formatTime(v)
     },
-    { title: '下次重试', dataIndex: 'nextRetryAfter', key: 'nextRetryAfter', width: 150,
+    { title: '下次重试', dataIndex: 'nextRetryAfter', key: 'nextRetryAfter', width: 160,
       render: v => formatTime(v)
     },
     { title: '操作', key: 'action', width: 70, fixed: 'right',
@@ -125,7 +164,7 @@ const SubtaskTable = ({ subtasks = [], loading = false, onRetry }) => {
       loading={loading}
       pagination={{ pageSize: 20, size: 'small', showTotal: t => `共 ${t} 条` }}
       size="small"
-      scroll={{ x: 2600 }}
+      scroll={{ x: 3000 }}
     />
   );
 };

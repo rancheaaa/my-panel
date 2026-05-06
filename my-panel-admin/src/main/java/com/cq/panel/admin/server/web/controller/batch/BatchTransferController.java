@@ -2,9 +2,11 @@ package com.cq.panel.admin.server.web.controller.batch;
 
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.enums.BusinessType;
+import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.domain.BatchTransferStatistics;
 import com.cq.panel.admin.server.repository.domain.BatchTransferSubtask;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
+import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
 import com.cq.panel.admin.server.repository.service.IBatchTransferSubtaskService;
 import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.BatchTransferService;
@@ -25,6 +27,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "批量传输任务管理", description = "批量文件传输任务相关接口")
 @RestController
@@ -35,16 +38,19 @@ public class BatchTransferController extends BaseController
     private final IBatchTransferTaskService batchTransferTaskService;
     private final IBatchTransferSubtaskService batchTransferSubtaskService;
     private final BatchTransferConverter batchTransferConverter;
+    private final IAgentRegistryService agentRegistryService;
 
     public BatchTransferController(BatchTransferService batchTransferService,
                                    IBatchTransferTaskService batchTransferTaskService,
                                    IBatchTransferSubtaskService batchTransferSubtaskService,
-                                   BatchTransferConverter batchTransferConverter)
+                                   BatchTransferConverter batchTransferConverter,
+                                   IAgentRegistryService agentRegistryService)
     {
         this.batchTransferService = batchTransferService;
         this.batchTransferTaskService = batchTransferTaskService;
         this.batchTransferSubtaskService = batchTransferSubtaskService;
         this.batchTransferConverter = batchTransferConverter;
+        this.agentRegistryService = agentRegistryService;
     }
 
     @RequirePermission("batch:task:create")
@@ -92,18 +98,6 @@ public class BatchTransferController extends BaseController
         String operatorId = getOperatorId();
         String operatorName = getOperatorName();
         batchTransferService.resumeTask(taskId, operatorId, operatorName);
-        return Result.success();
-    }
-
-    @RequirePermission("batch:task:cancel")
-    @Log(title = "批量传输任务", businessType = BusinessType.UPDATE)
-    @Operation(summary = "停止批量传输任务")
-    @PutMapping("/{taskId}/stop")
-    public Result<Void> stop(@PathVariable Long taskId)
-    {
-        String operatorId = getOperatorId();
-        String operatorName = getOperatorName();
-        batchTransferService.cancelTask(taskId, operatorId, operatorName);
         return Result.success();
     }
 
@@ -162,10 +156,84 @@ public class BatchTransferController extends BaseController
     @RequirePermission("batch:task:view")
     @Operation(summary = "查询子任务列表")
     @GetMapping("/{taskId}/subtasks")
-    public Result<List<BatchTransferSubtask>> listSubtasks(@PathVariable Long taskId)
+    public Result<Map<String, Object>> listSubtasks(@PathVariable Long taskId)
     {
         List<BatchTransferSubtask> subtasks = batchTransferSubtaskService.selectByTaskId(taskId);
-        return Result.success(subtasks);
+
+        BatchTransferTask task = batchTransferTaskService.selectById(taskId);
+        if (task == null)
+        {
+            return Result.error("任务不存在");
+        }
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("subtasks", subtasks);
+
+        // 源目录和源节点名称
+        result.put("sourceDir", task.getSourceDir());
+        String sourceNodeName = resolveNodeName(task.getSourceAgentId());
+        result.put("sourceNodeName", sourceNodeName);
+
+        // 构建目标Agent -> {dir, nodeName} 映射
+        Map<String, Map<String, String>> targetAgentInfoMap = buildTargetAgentInfoMap(
+                task.getTargetAgents(), task.getTargetDirs());
+        result.put("targetAgentInfoMap", targetAgentInfoMap);
+
+        return Result.success(result);
+    }
+
+    private String resolveNodeName(String agentId)
+    {
+        if (agentId == null || agentId.isEmpty())
+        {
+            return agentId;
+        }
+        try
+        {
+            AgentRegistry agent = agentRegistryService.selectAgentRegistryById(agentId);
+            return agent != null && agent.getNodeName() != null ? agent.getNodeName() : agentId;
+        }
+        catch (Exception e)
+        {
+            return agentId;
+        }
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    private Map<String, Map<String, String>> buildTargetAgentInfoMap(String targetAgentsJson, String targetDirsStr)
+    {
+        Map<String, Map<String, String>> map = new java.util.LinkedHashMap<>();
+        if (targetAgentsJson == null || targetAgentsJson.isEmpty())
+        {
+            return map;
+        }
+
+        List<String> agentIds;
+        try
+        {
+            agentIds = JSON_MAPPER.readValue(targetAgentsJson, new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+        }
+        catch (Exception e)
+        {
+            return map;
+        }
+
+        String[] dirs = targetDirsStr != null ? targetDirsStr.split(";") : new String[0];
+
+        for (int i = 0; i < agentIds.size(); i++)
+        {
+            String agentId = agentIds.get(i);
+            String dir = i < dirs.length ? dirs[i] : "";
+            String nodeName = resolveNodeName(agentId);
+
+            Map<String, String> info = new java.util.LinkedHashMap<>();
+            info.put("dir", dir);
+            info.put("nodeName", nodeName);
+            map.put(agentId, info);
+        }
+
+        return map;
     }
 
     @RequirePermission("batch:task:view")
@@ -251,6 +319,7 @@ public class BatchTransferController extends BaseController
         vo.setStatusLabel(getStatusLabel(task.getStatus()));
         vo.setSourceAgentId(task.getSourceAgentId());
         vo.setSourceDir(task.getSourceDir());
+        vo.setTargetAgents(task.getTargetAgents());
         vo.setTargetDirs(task.getTargetDirs());
         vo.setPreserveDirStructure(task.getPreserveDirStructure());
         vo.setIncludePatterns(task.getIncludePatterns());
@@ -267,6 +336,7 @@ public class BatchTransferController extends BaseController
         vo.setRoutingConfig(task.getRoutingConfig());
         vo.setTotalFiles(task.getTotalFiles());
         vo.setScanFrequencySec(task.getScanFrequencySec());
+        vo.setMaxScanFiles(task.getMaxScanFiles());
         vo.setScanCronExpression(task.getScanCronExpression());
         vo.setTotalSizeBytes(task.getTotalSizeBytes());
         vo.setStartedAt(task.getStartedAt());
@@ -280,7 +350,6 @@ public class BatchTransferController extends BaseController
         vo.setCanStart(BatchTransferService.STATUS_DRAFT.equals(s) || BatchTransferService.STATUS_PAUSED.equals(s));
         vo.setCanPause(BatchTransferService.STATUS_RUNNING.equals(s));
         vo.setCanResume(BatchTransferService.STATUS_PAUSED.equals(s));
-        vo.setCanStop(!BatchTransferService.STATUS_STOPPED.equals(s));
         vo.setCanDelete(BatchTransferService.STATUS_STOPPED.equals(s) || BatchTransferService.STATUS_DRAFT.equals(s));
         vo.setCanConfig(BatchTransferService.STATUS_DRAFT.equals(s) || BatchTransferService.STATUS_PAUSED.equals(s));
 

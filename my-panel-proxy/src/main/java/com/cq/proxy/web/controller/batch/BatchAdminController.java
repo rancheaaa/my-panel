@@ -86,4 +86,27 @@ public class BatchAdminController
         batchTaskScheduler.cancelTask(taskId, sourceAgentId, sourceAgentApiUrl);
         return Map.of("success", true, "message", "Task cancelled");
     }
+
+    @Operation(summary = "更新批量传输任务配置")
+    @PutMapping("/tasks/{taskId}/config")
+    public Map<String, Object> updateTaskConfig(@PathVariable Long taskId, @RequestBody Map<String, Object> request)
+    {
+        logger.info("Admin request: update config for task {}", taskId);
+        String sourceAgentId = (String) request.get("sourceAgentId");
+        String sourceAgentApiUrl = (String) request.get("sourceAgentApiUrl");
+        @SuppressWarnings("unchecked")
+        java.util.List<String> targetAgents = (java.util.List<String>) request.get("targetAgents");
+        Object scanRequest = request.get("scanRequest");
+        Number maxBandwidth = (Number) request.get("maxBandwidthBytesPerSec");
+        Long maxBandwidthBytesPerSec = maxBandwidth != null ? maxBandwidth.longValue() : null;
+        String targetDirs = (String) request.get("targetDirs");
+        Number preserveDirStructureNum = (Number) request.get("preserveDirStructure");
+        Integer preserveDirStructure = preserveDirStructureNum != null ? preserveDirStructureNum.intValue() : 1;
+        String scanCronExpression = (String) request.get("scanCronExpression");
+
+        batchTaskScheduler.updateTaskConfig(taskId, sourceAgentId, sourceAgentApiUrl, scanRequest, targetAgents,
+                targetDirs, preserveDirStructure, maxBandwidthBytesPerSec, scanCronExpression);
+
+        return Map.of("success", true, "message", "Task config updated");
+    }
 }

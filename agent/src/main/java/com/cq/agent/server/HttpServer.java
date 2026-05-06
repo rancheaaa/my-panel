@@ -36,6 +36,7 @@ public class HttpServer {
 
     private final AgentConfig config;
     private final CommandExecutor commandExecutor;
+    @Getter
     private final HandlerFactory handlerFactory;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -138,10 +139,6 @@ public class HttpServer {
         if (serverChannel != null) {
             serverChannel.closeFuture().sync();
         }
-    }
-
-    public HandlerFactory getHandlerFactory() {
-        return handlerFactory;
     }
 
 }

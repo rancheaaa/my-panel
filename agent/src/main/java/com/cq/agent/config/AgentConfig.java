@@ -386,6 +386,13 @@ public class AgentConfig {
                 if (networkInterface.isLoopback() || !networkInterface.isUp()) {
                     continue;
                 }
+                
+                String displayName = networkInterface.getDisplayName().toLowerCase();
+                String name = networkInterface.getName().toLowerCase();
+                if (displayName.contains("docker") || name.contains("docker")) {
+                    continue;
+                }
+                
                 Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
                 while (inetAddresses.hasMoreElements()) {
                     InetAddress inetAddress = inetAddresses.nextElement();

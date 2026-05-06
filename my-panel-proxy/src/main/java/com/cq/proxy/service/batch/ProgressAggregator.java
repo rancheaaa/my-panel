@@ -114,8 +114,9 @@ public class ProgressAggregator
         {
             String errorCode = report.get("errorCode") != null ? String.valueOf(report.get("errorCode")) : "UNKNOWN";
             String errorMessage = report.get("errorMessage") != null ? String.valueOf(report.get("errorMessage")) : "";
-            Object transferredChunks = report.get("transferredChunks");
-            Object transferredBytes = report.get("transferredBytes");
+            Map<?, ?> progress = report.get("progress") instanceof Map ? (Map<?, ?>) report.get("progress") : null;
+            Object transferredChunks = progress != null ? progress.get("transferredChunks") : report.get("transferredChunks");
+            Object transferredBytes = progress != null ? progress.get("transferredBytes") : report.get("transferredBytes");
             sql.append(", error_code = ?, error_message = ?");
             if (transferredChunks != null) sql.append(", transferred_chunks = ?");
             if (transferredBytes != null) sql.append(", transferred_bytes = ?");
@@ -131,10 +132,14 @@ public class ProgressAggregator
         }
         else if ("SENDING".equals(status))
         {
-            Object transferredChunks = report.get("transferredChunks");
-            Object transferredBytes = report.get("transferredBytes");
-            Object speedBytesPerSec = report.get("speedBytesPerSec");
-            sql.append(", transferred_chunks = ?, transferred_bytes = ?, speed_bytes_per_sec = ?, started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status IN ('QUEUED','SENDING')");
+            Map<?, ?> progress = report.get("progress") instanceof Map ? (Map<?, ?>) report.get("progress") : null;
+            Map<?, ?> performance = report.get("performance") instanceof Map ? (Map<?, ?>) report.get("performance") : null;
+            
+            Object transferredChunks = progress != null ? progress.get("transferredChunks") : report.get("transferredChunks");
+            Object transferredBytes = progress != null ? progress.get("transferredBytes") : report.get("transferredBytes");
+            Object speedBytesPerSec = performance != null ? performance.get("currentSpeedBytesPerSec") : report.get("speedBytesPerSec");
+            
+            sql.append(", transferred_chunks = COALESCE(?, transferred_chunks), transferred_bytes = COALESCE(?, transferred_bytes), speed_bytes_per_sec = ?, started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status IN ('QUEUED','SENDING')");
             values = new Object[]{status, transferredChunks, transferredBytes, speedBytesPerSec, subtaskId};
         }
         else
@@ -212,7 +217,7 @@ public class ProgressAggregator
                                 "(task_id, snapshot_time, total_subtasks, completed_count, failed_count, running_count, queued_count, retrying_count, " +
                                 "total_size_bytes, transferred_bytes, transferred_files, failed_files, remaining_bytes, progress_percent, " +
                                 "started_at, last_activity_at, data_version, create_time, update_time) " +
-                                "VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1, NOW(), NOW())",
+                                "VALUES (?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1, NOW(), NOW())",
                         taskId,
                         total, completed, failed, running, queued, retrying,
                         totalSizeBytes, transferredBytes, completed, failed,

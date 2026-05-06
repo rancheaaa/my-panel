@@ -16,10 +16,6 @@ export function resumeBatchTask(taskId) {
   return request({ url: `/batch/tasks/${taskId}/resume`, method: 'put' });
 }
 
-export function stopBatchTask(taskId) {
-  return request({ url: `/batch/tasks/${taskId}/stop`, method: 'put' });
-}
-
 export function updateBatchTaskConfig(taskId, data) {
   return request({ url: `/batch/tasks/${taskId}/config`, method: 'put', data });
 }

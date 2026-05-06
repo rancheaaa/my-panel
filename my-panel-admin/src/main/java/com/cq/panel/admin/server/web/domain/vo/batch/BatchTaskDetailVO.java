@@ -33,6 +33,9 @@ public class BatchTaskDetailVO {
     @Schema(description = "源目录")
     private String sourceDir;
 
+    @Schema(description = "目标Agent ID列表(JSON格式)")
+    private String targetAgents;
+
     @Schema(description = "目标目录(分号分隔)")
     private String targetDirs;
 
@@ -81,6 +84,9 @@ public class BatchTaskDetailVO {
     @Schema(description = "扫描间隔(秒)")
     private Integer scanFrequencySec;
 
+    @Schema(description = "单次最大扫描文件数")
+    private Integer maxScanFiles;
+
     @Schema(description = "定时扫描Cron表达式")
     private String scanCronExpression;
 
@@ -113,9 +119,6 @@ public class BatchTaskDetailVO {
 
     @Schema(description = "是否可恢复")
     private Boolean canResume;
-
-    @Schema(description = "是否可停止")
-    private Boolean canStop;
 
     @Schema(description = "是否可删除")
     private Boolean canDelete;

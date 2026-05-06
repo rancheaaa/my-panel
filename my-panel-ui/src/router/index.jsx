@@ -53,6 +53,10 @@ const mainLayoutChildren = [
       element: loadComponent('batch/taskDetail/index')
   },
   {
+      path: '/batch/subtaskDetail',
+      element: loadComponent('batch/subtaskDetail/index')
+  },
+  {
     path: '*',
     element: <NotFound />,
   },

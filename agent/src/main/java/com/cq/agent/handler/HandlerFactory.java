@@ -1,6 +1,6 @@
 package com.cq.agent.handler;
 
-import com.cq.agent.batch.queue.BatchUploadTask;
+import com.cq.agent.config.AgentConfig;
 import com.cq.agent.handler.download.ChunkDownloadHandler;
 import com.cq.agent.handler.download.ChunkDownloadInfoHandler;
 import com.cq.agent.handler.upload.*;
@@ -9,25 +9,24 @@ import com.cq.agent.handler.batch.*;
 import com.cq.agent.batch.scanner.BatchFileScanner;
 import com.cq.agent.batch.queue.BatchTransferQueueManager;
 import com.cq.agent.batch.postprocess.PostTransferHandler;
-import com.cq.agent.batch.report.ProxyReportClient;
-import com.cq.agent.batch.scheduler.BatchScanScheduler;
-import com.cq.agent.client.upload.BatchAwareAgentUploader;
-import com.cq.agent.config.AgentConfig;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
 
+import com.cq.agent.client.upload.BatchAwareAgentUploader;
+import com.cq.agent.batch.report.ProxyReportClient;
+import com.cq.agent.batch.scheduler.BatchScanScheduler;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class HandlerFactory {
 
     private final Map<String, IRequestHandler> handlerMap = new HashMap<>();
     private final BatchScanScheduler scanScheduler;
+    private final BatchAwareAgentUploader agentUploader;
 
-    public HandlerFactory(AgentConfig agentConfig, FileService fileService, ChunkedTransferService chunkedTransferService) {
+    public HandlerFactory(AgentConfig config, FileService fileService, ChunkedTransferService chunkedTransferService) {
         String apiPrefix = "/api/file";
-        
+
         // File operations
         handlerMap.put(apiPrefix + "/syst", new SystHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/feat", new FeatHandler(fileService, chunkedTransferService));
@@ -68,28 +67,30 @@ public class HandlerFactory {
         BatchFileScanner batchScanner = new BatchFileScanner();
         BatchTransferQueueManager queueManager = new BatchTransferQueueManager(10000);
         PostTransferHandler postTransferHandler = new PostTransferHandler();
-        ProxyReportClient proxyReportClient = buildProxyReportClient(agentConfig);
-        BatchAwareAgentUploader batchUploader = new BatchAwareAgentUploader(agentConfig, queueManager, proxyReportClient);
-
-        try {
-            this.scanScheduler = new BatchScanScheduler(batchScanner, proxyReportClient, agentConfig.getFileBaseDirectory(), agentConfig.getServerPort());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to init BatchScanScheduler: " + e.getMessage(), e);
+        
+        String proxyBaseUrl = "http://localhost:9876";
+        if (config.getRegistryServerUrls() != null && !config.getRegistryServerUrls().isEmpty()) {
+            proxyBaseUrl = config.getRegistryServerUrls().get(0);
         }
-
+        ProxyReportClient proxyReportClient = new ProxyReportClient(proxyBaseUrl);
+        
+        this.agentUploader = new BatchAwareAgentUploader(config, queueManager, proxyReportClient);
+        
+        BatchScanScheduler tempScanScheduler = null;
+        try {
+            tempScanScheduler = new BatchScanScheduler(batchScanner, proxyReportClient, config.getFileBaseDirectory(), config.getServerPort());
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(HandlerFactory.class).error("Failed to initialize BatchScanScheduler", e);
+        }
+        this.scanScheduler = tempScanScheduler;
+        
         handlerMap.put(batchPrefix + "/scan", new BatchScanHandler(fileService, chunkedTransferService, batchScanner));
         handlerMap.put(batchPrefix + "/dispatch", new BatchDispatchHandler(fileService, chunkedTransferService, queueManager));
         handlerMap.put(batchPrefix + "/post-process", new BatchPostProcessHandler(fileService, chunkedTransferService, postTransferHandler));
-        handlerMap.put(batchPrefix + "/schedule", new BatchScanScheduleHandler(fileService, chunkedTransferService, scanScheduler));
-    }
-
-    private ProxyReportClient buildProxyReportClient(AgentConfig agentConfig)
-    {
-        List<String> registryServerUrls = agentConfig.getRegistryServerUrls();
-        String proxyBaseUrl = (registryServerUrls == null || registryServerUrls.isEmpty())
-                ? "http://127.0.0.1:9876"
-                : registryServerUrls.get(0);
-        return new ProxyReportClient(proxyBaseUrl);
+        
+        if (this.scanScheduler != null) {
+            handlerMap.put(batchPrefix + "/schedule", new BatchScanScheduleHandler(fileService, chunkedTransferService, this.scanScheduler));
+        }
     }
 
     public IRequestHandler getHandler(String path) {
@@ -98,5 +99,9 @@ public class HandlerFactory {
 
     public BatchScanScheduler getScanScheduler() {
         return scanScheduler;
+    }
+    
+    public BatchAwareAgentUploader getAgentUploader() {
+        return agentUploader;
     }
 }

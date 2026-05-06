@@ -5,6 +5,8 @@ import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSerializer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
@@ -22,7 +24,11 @@ public abstract class BaseHandler implements IRequestHandler {
     protected static final AttributeKey<String> TRACE_ID_KEY = AttributeKey.valueOf("traceId");
     protected static final AttributeKey<String> REQUEST_URI_KEY = AttributeKey.valueOf("requestUri");
 
-    protected static final Gson gson = new Gson();
+    protected static final Gson gson = new GsonBuilder()
+            .registerTypeAdapter(java.util.Date.class,
+                    (JsonSerializer<java.util.Date>) (src, typeOfSrc, context) ->
+                            new com.google.gson.JsonPrimitive(src.getTime()))
+            .create();
     protected final FileService fileService;
     protected final ChunkedTransferService chunkedTransferService;
 

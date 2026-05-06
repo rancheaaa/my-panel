@@ -7,13 +7,11 @@ import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.handler.BaseHandler;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
-import com.google.gson.Gson;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 
 public class BatchScanHandler extends BaseHandler
 {
-    private static final Gson gson = new Gson();
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BatchScanHandler.class);
     private final BatchFileScanner scanner;
 

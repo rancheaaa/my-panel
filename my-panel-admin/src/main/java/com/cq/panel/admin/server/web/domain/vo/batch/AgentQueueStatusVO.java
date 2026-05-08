@@ -52,6 +52,9 @@ public class AgentQueueStatusVO
     @Schema(description = "堵塞等级: NORMAL/WARNING/CRITICAL")
     private String congestionLevel;
 
+    @Schema(description = "堵塞原因")
+    private String congestionReason;
+
     @Schema(description = "是否堵塞")
     private Integer isCongested;
 

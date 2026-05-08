@@ -1,5 +1,6 @@
 package com.cq.panel.admin.server.service.batch;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cq.panel.admin.server.common.enums.OperationType;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.domain.BatchTransferOperationLog;
@@ -27,6 +28,7 @@ import java.util.*;
 @Service
 public class BatchTransferService {
     private static final Logger logger = LoggerFactory.getLogger(BatchTransferService.class);
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
     public static final String STATUS_DRAFT = "DRAFT";
     public static final String STATUS_RUNNING = "RUNNING";
@@ -319,6 +321,46 @@ public class BatchTransferService {
         stats.setStartedAt(task != null ? task.getStartedAt() : null);
         stats.setLastActivityAt(new Date());
 
+        // 速度指标
+        List<BatchTransferSubtask> completedWithSpeed = subtasks.stream()
+                .filter(s -> "COMPLETED".equals(s.getStatus()) && s.getSpeedBytesPerSec() != null && s.getSpeedBytesPerSec() > 0)
+                .toList();
+        if (!completedWithSpeed.isEmpty()) {
+            long avgSpeed = (long) completedWithSpeed.stream()
+                    .mapToLong(BatchTransferSubtask::getSpeedBytesPerSec)
+                    .average().orElse(0);
+            long peakSpeed = completedWithSpeed.stream()
+                    .mapToLong(BatchTransferSubtask::getSpeedBytesPerSec)
+                    .max().orElse(0);
+            stats.setAvgSpeedBytesPerSec(avgSpeed);
+            stats.setPeakSpeedBytesPerSec(peakSpeed);
+        }
+
+        // 时间指标
+        List<BatchTransferSubtask> completedWithTime = subtasks.stream()
+                .filter(s -> "COMPLETED".equals(s.getStatus()) && s.getStartedAt() != null)
+                .toList();
+        if (!completedWithTime.isEmpty()) {
+            Date firstStarted = completedWithTime.stream()
+                    .map(BatchTransferSubtask::getStartedAt)
+                    .filter(java.util.Objects::nonNull)
+                    .min(Date::compareTo).orElse(null);
+            stats.setFirstFileStartedAt(firstStarted);
+        }
+        if (task != null && task.getStartedAt() != null) {
+            stats.setTotalElapsedMs(System.currentTimeMillis() - task.getStartedAt().getTime());
+        }
+        List<BatchTransferSubtask> completedWithDuration = subtasks.stream()
+                .filter(s -> "COMPLETED".equals(s.getStatus()) && s.getDurationMs() != null && s.getDurationMs() > 0)
+                .toList();
+        if (!completedWithDuration.isEmpty()) {
+            long avgDuration = (long) completedWithDuration.stream()
+                    .mapToLong(BatchTransferSubtask::getDurationMs)
+                    .average().orElse(0);
+            stats.setAvgDurationPerFileMs(avgDuration);
+        }
+
+        // 重试统计
         long totalRetry = subtasks.stream()
                 .filter(s -> s.getRetryCount() != null)
                 .mapToInt(BatchTransferSubtask::getRetryCount)
@@ -342,6 +384,45 @@ public class BatchTransferService {
                     .mapToInt(BatchTransferSubtask::getRetryCount)
                     .average().orElse(0);
             stats.setAvgRetryCount(BigDecimal.valueOf(avg).setScale(2, BigDecimal.ROUND_HALF_UP));
+        }
+
+        // 错误分布
+        Map<String, Long> errorDist = subtasks.stream()
+                .filter(s -> "FAILED".equals(s.getStatus()) && s.getErrorCode() != null && !s.getErrorCode().isEmpty())
+                .collect(java.util.stream.Collectors.groupingBy(
+                        BatchTransferSubtask::getErrorCode, java.util.stream.Collectors.counting()));
+        if (!errorDist.isEmpty()) {
+            try { stats.setErrorTypeDistribution(JSON_MAPPER.writeValueAsString(errorDist)); } catch (Exception ignored) {}
+            Map.Entry<String, Long> topError = errorDist.entrySet().stream()
+                    .max(Map.Entry.comparingByValue()).orElse(null);
+            if (topError != null) {
+                stats.setTopErrorCode(topError.getKey());
+                // 取该错误码对应的最新errorMessage
+                subtasks.stream()
+                        .filter(s -> "FAILED".equals(s.getStatus()) && topError.getKey().equals(s.getErrorCode())
+                                && s.getErrorMessage() != null && !s.getErrorMessage().isEmpty())
+                        .findFirst()
+                        .ifPresent(s -> stats.setTopErrorMessage(s.getErrorMessage()));
+            }
+        }
+
+        // 按目标Agent统计
+        Map<String, Map<String, Object>> agentStats = subtasks.stream()
+                .filter(s -> s.getTargetAgentId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        BatchTransferSubtask::getTargetAgentId,
+                        java.util.stream.Collectors.collectingAndThen(
+                                java.util.stream.Collectors.toList(),
+                                list -> {
+                                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                                    m.put("total", list.size());
+                                    m.put("completed", list.stream().filter(s -> "COMPLETED".equals(s.getStatus())).count());
+                                    m.put("failed", list.stream().filter(s -> "FAILED".equals(s.getStatus())).count());
+                                    m.put("totalBytes", list.stream().mapToLong(s -> s.getFileSizeBytes() != null ? s.getFileSizeBytes() : 0).sum());
+                                    return m;
+                                })));
+        if (!agentStats.isEmpty()) {
+            try { stats.setTargetAgentStats(JSON_MAPPER.writeValueAsString(agentStats)); } catch (Exception ignored) {}
         }
 
         BatchTransferStatistics existing = statisticsService.selectByTaskId(taskId);

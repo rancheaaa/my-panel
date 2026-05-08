@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Statistic, Tag, Spin, Table, Progress } from 'antd';
-import { getBatchDashboard } from '../../../api/batch/monitor';
+import { Row, Col, Card, Statistic, Tag, Spin, Table, Progress, Button, message } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
+import { getBatchDashboard, resolveBatchAlert } from '../../../api/batch/monitor';
 import AlertList from '../../../components/batch/AlertList';
 
 const healthColorMap = { HEALTHY: 'green', WARNING: 'orange', CRITICAL: 'red', OFFLINE: 'default' };
@@ -25,6 +26,14 @@ const BatchDashboard = () => {
 
   useEffect(() => { fetchDashboard(); }, []);
 
+  const handleResolveAlert = async (alertId) => {
+    try {
+      await resolveBatchAlert(alertId, '手动解决');
+      message.success('已标记解决');
+      fetchDashboard();
+    } catch (e) { message.error('操作失败'); }
+  };
+
   const overview = dashboard?.overview;
   const agents = overview?.agents;
   const tasks = overview?.tasks;
@@ -35,6 +44,9 @@ const BatchDashboard = () => {
 
   return (
     <Spin spinning={loading}>
+      <Row justify="end" style={{ marginBottom: 8 }}>
+        <Button icon={<ReloadOutlined />} onClick={fetchDashboard} loading={loading}>刷新</Button>
+      </Row>
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={4}><Card><Statistic title="已注册Agent" value={agents?.totalRegistered || 0} /></Card></Col>
         <Col span={4}><Card><Statistic title="在线Agent" value={agents?.online || 0} valueStyle={{ color: '#52c41a' }} /></Card></Col>
@@ -76,7 +88,7 @@ const BatchDashboard = () => {
         </Col>
       </Row>
 
-      <AlertList alerts={alerts} loading={loading} />
+      <AlertList alerts={alerts} loading={loading} onResolve={handleResolveAlert} />
     </Spin>
   );
 };

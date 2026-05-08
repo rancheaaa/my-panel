@@ -98,16 +98,20 @@ public class ProgressAggregator
         if ("COMPLETED".equals(status))
         {
             String transferId = report.get("transferId") != null ? String.valueOf(report.get("transferId")) : null;
-            sql.append(", completed_at = COALESCE(completed_at, NOW()), transferred_chunks = total_chunks, transferred_bytes = file_size_bytes");
-            sql.append(", started_at = COALESCE(started_at, NOW()), duration_ms = TIMESTAMPDIFF(MICROSECOND, COALESCE(started_at, NOW()), NOW()) / 1000");
+            Map<?, ?> compProgress = report.get("progress") instanceof Map ? (Map<?, ?>) report.get("progress") : null;
+            Object compTotalChunks = compProgress != null ? compProgress.get("totalChunks") : report.get("totalChunks");
+            Object compTransferredChunks = compProgress != null ? compProgress.get("transferredChunks") : report.get("transferredChunks");
+            sql.append(", completed_at = COALESCE(completed_at, NOW()), started_at = COALESCE(started_at, create_time, NOW())");
+            sql.append(", transferred_chunks = COALESCE(?, total_chunks, 0), total_chunks = COALESCE(?, total_chunks, 0), transferred_bytes = file_size_bytes");
+            sql.append(", duration_ms = TIMESTAMPDIFF(SECOND, COALESCE(started_at, create_time, NOW()), NOW()) * 1000");
             if (transferId != null && !transferId.isBlank() && !"-".equals(transferId)) {
                 sql.append(", transfer_id = ?");
             }
             sql.append(" WHERE id = ? AND status IN ('QUEUED','SENDING','RETRYING','COMPLETED')");
             if (transferId != null && !transferId.isBlank() && !"-".equals(transferId)) {
-                values = new Object[]{status, transferId, subtaskId};
+                values = new Object[]{status, compTransferredChunks, compTotalChunks, transferId, subtaskId};
             } else {
-                values = new Object[]{status, subtaskId};
+                values = new Object[]{status, compTransferredChunks, compTotalChunks, subtaskId};
             }
         }
         else if ("FAILED".equals(status))
@@ -134,13 +138,14 @@ public class ProgressAggregator
         {
             Map<?, ?> progress = report.get("progress") instanceof Map ? (Map<?, ?>) report.get("progress") : null;
             Map<?, ?> performance = report.get("performance") instanceof Map ? (Map<?, ?>) report.get("performance") : null;
-            
+
             Object transferredChunks = progress != null ? progress.get("transferredChunks") : report.get("transferredChunks");
             Object transferredBytes = progress != null ? progress.get("transferredBytes") : report.get("transferredBytes");
+            Object totalChunks = progress != null ? progress.get("totalChunks") : report.get("totalChunks");
             Object speedBytesPerSec = performance != null ? performance.get("currentSpeedBytesPerSec") : report.get("speedBytesPerSec");
-            
-            sql.append(", transferred_chunks = COALESCE(?, transferred_chunks), transferred_bytes = COALESCE(?, transferred_bytes), speed_bytes_per_sec = ?, started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status IN ('QUEUED','SENDING')");
-            values = new Object[]{status, transferredChunks, transferredBytes, speedBytesPerSec, subtaskId};
+
+            sql.append(", transferred_chunks = COALESCE(?, transferred_chunks), total_chunks = COALESCE(?, total_chunks), transferred_bytes = COALESCE(?, transferred_bytes), speed_bytes_per_sec = COALESCE(?, speed_bytes_per_sec), started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status IN ('QUEUED','SENDING')");
+            values = new Object[]{status, transferredChunks, totalChunks, transferredBytes, speedBytesPerSec, subtaskId};
         }
         else
         {

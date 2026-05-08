@@ -57,6 +57,14 @@ const mainLayoutChildren = [
       element: loadComponent('batch/subtaskDetail/index')
   },
   {
+      path: '/batch/queueMonitor',
+      element: loadComponent('batch/queueMonitor/index')
+  },
+  {
+      path: '/batch/batchDashboard',
+      element: loadComponent('batch/dashboard/index')
+  },
+  {
     path: '*',
     element: <NotFound />,
   },

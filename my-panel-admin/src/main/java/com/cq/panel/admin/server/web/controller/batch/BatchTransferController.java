@@ -26,6 +26,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import java.util.List;
 import java.util.Map;
 
@@ -39,18 +41,21 @@ public class BatchTransferController extends BaseController
     private final IBatchTransferSubtaskService batchTransferSubtaskService;
     private final BatchTransferConverter batchTransferConverter;
     private final IAgentRegistryService agentRegistryService;
+    private final JdbcTemplate jdbcTemplate;
 
     public BatchTransferController(BatchTransferService batchTransferService,
                                    IBatchTransferTaskService batchTransferTaskService,
                                    IBatchTransferSubtaskService batchTransferSubtaskService,
                                    BatchTransferConverter batchTransferConverter,
-                                   IAgentRegistryService agentRegistryService)
+                                   IAgentRegistryService agentRegistryService,
+                                   JdbcTemplate jdbcTemplate)
     {
         this.batchTransferService = batchTransferService;
         this.batchTransferTaskService = batchTransferTaskService;
         this.batchTransferSubtaskService = batchTransferSubtaskService;
         this.batchTransferConverter = batchTransferConverter;
         this.agentRegistryService = agentRegistryService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @RequirePermission("batch:task:create")
@@ -178,6 +183,27 @@ public class BatchTransferController extends BaseController
         Map<String, Map<String, String>> targetAgentInfoMap = buildTargetAgentInfoMap(
                 task.getTargetAgents(), task.getTargetDirs());
         result.put("targetAgentInfoMap", targetAgentInfoMap);
+
+        // 查询Agent侧传输状态, 以subtaskId为key
+        try
+        {
+            List<Map<String, Object>> agentStates = jdbcTemplate.queryForList(
+                    "SELECT * FROM batch_transfer_agent_state WHERE task_id = ?", taskId);
+            Map<Long, Map<String, Object>> agentStateMap = new java.util.LinkedHashMap<>();
+            for (Map<String, Object> state : agentStates)
+            {
+                Object subtaskIdObj = state.get("subtask_id");
+                if (subtaskIdObj instanceof Number)
+                {
+                    agentStateMap.put(((Number) subtaskIdObj).longValue(), state);
+                }
+            }
+            result.put("agentStateMap", agentStateMap);
+        }
+        catch (Exception e)
+        {
+            result.put("agentStateMap", Map.of());
+        }
 
         return Result.success(result);
     }

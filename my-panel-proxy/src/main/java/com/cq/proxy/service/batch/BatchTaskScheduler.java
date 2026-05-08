@@ -229,7 +229,6 @@ public class BatchTaskScheduler
     private void persistSubtasks(Long taskId, List<Map<String, Object>> subtasks)
     {
         int inserted = 0;
-        int updated = 0;
         for (Map<String, Object> subtask : subtasks)
         {
             String filePath = (String) subtask.get("filePath");
@@ -243,50 +242,34 @@ public class BatchTaskScheduler
                     new java.sql.Timestamp(((Date) lastModObj).getTime()) :
                     (lastModObj instanceof Number ? new java.sql.Timestamp(((Number) lastModObj).longValue()) : null);
 
-            int rows;
             if (fileMd5 != null || fileLastModified != null) {
-                rows = jdbcTemplate.update(
+                jdbcTemplate.update(
                         "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
                                 "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
                                 "retry_count, proxy_retry_count, create_time, update_time, file_md5, file_last_modified) " +
-                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?) " +
-                                "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
-                                "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW(), " +
-                                "file_md5 = COALESCE(?, file_md5), file_last_modified = COALESCE(?, file_last_modified)",
-                        taskId, filePath, fileName, fileSizeBytes, targetAgentId, fileMd5, fileLastModified,
-                        fileMd5, fileLastModified);
+                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?)",
+                        taskId, filePath, fileName, fileSizeBytes, targetAgentId, fileMd5, fileLastModified);
             } else {
-                rows = jdbcTemplate.update(
+                jdbcTemplate.update(
                         "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
                                 "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
                                 "retry_count, proxy_retry_count, create_time, update_time) " +
-                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW()) " +
-                                "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
-                                "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW()",
+                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW())",
                         taskId, filePath, fileName, fileSizeBytes, targetAgentId);
             }
-            if (rows > 0)
-            {
-                inserted++;
-            }
-            else
-            {
-                updated++;
-            }
-            
+            inserted++;
+
             try {
-                Long id = jdbcTemplate.queryForObject(
-                        "SELECT id FROM batch_transfer_subtask WHERE task_id=? AND file_path=? AND target_agent_id=? ORDER BY id DESC LIMIT 1",
-                        Long.class, taskId, filePath, targetAgentId);
-                if (id != null) {
+                Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+                if (id != null && id > 0) {
                     subtask.put("subtaskId", id);
                     subtask.put("id", id);
                 }
             } catch (Exception e) {
-                logger.warn("Failed to query inserted subtask id for task {}, file {}, agent {}: {}", taskId, filePath, targetAgentId, e.getMessage());
+                logger.warn("Failed to get inserted subtask id for task {}, file {}, agent {}: {}", taskId, filePath, targetAgentId, e.getMessage());
             }
         }
-        logger.info("Persisted subtasks for task {}: inserted={}, updated={}", taskId, inserted, updated);
+        logger.info("Persisted subtasks for task {}: inserted={}", taskId, inserted);
     }
 
     private Map<String, Object> buildDispatchRequest(Long taskId,

@@ -343,6 +343,13 @@ public class BatchAwareAgentUploader extends AgentUploader {
                 logger.warn("Failed to report queue snapshot: {}", e.getMessage());
             }
         }, 10, 10, TimeUnit.SECONDS);
+        snapshotReporter.scheduleAtFixedRate(() -> {
+            try {
+                reportAgentTransferState();
+            } catch (Exception e) {
+                logger.warn("Failed to report agent transfer state: {}", e.getMessage());
+            }
+        }, 15, 15, TimeUnit.SECONDS);
     }
 
     private void reportQueueSnapshot() {
@@ -376,6 +383,46 @@ public class BatchAwareAgentUploader extends AgentUploader {
                 .sorted()
                 .toList());
         proxyReportClient.reportQueueSnapshot(snapshot);
+    }
+
+    private void reportAgentTransferState() {
+        java.util.List<UploadTask> tasks = getAllInflightTasks();
+        if (tasks.isEmpty()) {
+            return;
+        }
+        java.util.List<java.util.Map<String, Object>> transfers = new java.util.ArrayList<>(tasks.size());
+        for (UploadTask task : tasks) {
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("transferId", task.getTransferId());
+            m.put("localFilePath", task.getLocalFilePath());
+            m.put("fileName", extractFileName(task.getLocalFilePath()));
+            m.put("remoteTargetPath", task.getRemoteTargetPath());
+            m.put("status", task.getStatus() != null ? task.getStatus().name() : "UNKNOWN");
+            m.put("totalSize", task.getTotalSize());
+            m.put("chunkSize", task.getChunkSize());
+            m.put("totalChunks", task.getTotalChunks());
+            m.put("transferredChunks", task.getUploadChunksCount() != null ? task.getUploadChunksCount().get() : 0);
+            m.put("retryCount", task.getRetryCount());
+            m.put("exceptionDesc", task.getExceptionDesc());
+            m.put("createTime", task.getCreateTime());
+            m.put("updateTime", task.getUpdateTime());
+            m.put("enqueuedTime", task.getEnqueuedTime());
+            m.put("initUploadStartTime", task.getInitUploadStartTime());
+            m.put("initUploadEndTime", task.getInitUploadEndTime());
+            m.put("uploadChunksStartTime", task.getUploadChunksStartTime());
+            m.put("uploadChunksEndTime", task.getUploadChunksEndTime());
+            m.put("mergeChunksStartTime", task.getMergeChunksStartTime());
+            m.put("mergeChunksEndTime", task.getMergeChunksEndTime());
+            m.put("uploadSuccessTime", task.getUploadSuccessTime());
+            transfers.add(m);
+        }
+        proxyReportClient.asyncReportAgentState(agentConfig.getAgentId(), transfers);
+    }
+
+    private static String extractFileName(String path) {
+        if (path == null) return null;
+        int idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        return idx >= 0 ? path.substring(idx + 1) : path;
     }
 
     private void markTaskActive(Long taskId) {

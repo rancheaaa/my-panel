@@ -45,24 +45,12 @@ const mainLayoutChildren = [
       element: loadComponent('arch/architectureEdit/index')
   },
   {
-      path: '/batch/taskList',
-      element: loadComponent('batch/taskList/index')
-  },
-  {
       path: '/batch/taskDetail',
-      element: loadComponent('batch/taskDetail/index')
+      element: loadComponent('batch/taskDetail')
   },
   {
       path: '/batch/subtaskDetail',
-      element: loadComponent('batch/subtaskDetail/index')
-  },
-  {
-      path: '/batch/queueMonitor',
-      element: loadComponent('batch/queueMonitor/index')
-  },
-  {
-      path: '/batch/batchDashboard',
-      element: loadComponent('batch/dashboard/index')
+      element: loadComponent('batch/subtaskDetail')
   },
   {
     path: '*',

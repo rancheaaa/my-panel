@@ -27,3 +27,11 @@ export function resolveBatchAlert(alertId, data) {
 export function getOperationLogs(params) {
   return request({ url: '/batch/monitor/operation-logs', method: 'get', params });
 }
+
+export function getAgentStates(params) {
+  return request({ url: '/batch/monitor/agent-states', method: 'get', params });
+}
+
+export function getStatisticsList(params) {
+  return request({ url: '/batch/monitor/statistics', method: 'get', params });
+}

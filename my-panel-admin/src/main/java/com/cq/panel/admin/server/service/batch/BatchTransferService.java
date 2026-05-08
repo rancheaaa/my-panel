@@ -20,7 +20,6 @@ import com.cq.panel.admin.server.web.domain.vo.batch.BatchTaskDetailVO.SubtaskSu
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.*;
@@ -74,7 +73,7 @@ public class BatchTransferService {
         }
         entity.setRetryEnabled(dto.getRetryEnabled() != null && dto.getRetryEnabled() ? 1 : 0);
         entity.setPreserveDirStructure(dto.getPreserveDirStructure() != null && dto.getPreserveDirStructure() ? 1 : 0);
-        entity.setScanCronExpression(dto.getScanCronExpression());
+        entity.setScanCronExpression(convertFrequencyToCron(entity.getScanFrequencySec()));
         entity.setStatus(STATUS_DRAFT);
         entity.setDeleted(0);
         entity.setTotalFiles(0);
@@ -204,11 +203,13 @@ public class BatchTransferService {
         if (dto.getPostTransferAction() != null) task.setPostTransferAction(dto.getPostTransferAction());
         if (dto.getBackupDir() != null) task.setBackupDir(dto.getBackupDir());
         if (dto.getBackupMode() != null) task.setBackupMode(dto.getBackupMode());
-        if (dto.getScanCronExpression() != null) task.setScanCronExpression(dto.getScanCronExpression());
         if (dto.getPreserveDirStructure() != null) task.setPreserveDirStructure(dto.getPreserveDirStructure() ? 1 : 0);
         if (dto.getRetryMaxDays() != null) task.setRetryMaxDays(dto.getRetryMaxDays());
-        
-        if (dto.getScanFrequencySec() != null) task.setScanFrequencySec(dto.getScanFrequencySec());
+
+        if (dto.getScanFrequencySec() != null) {
+            task.setScanFrequencySec(dto.getScanFrequencySec());
+            task.setScanCronExpression(convertFrequencyToCron(dto.getScanFrequencySec()));
+        }
         if (dto.getMaxScanFiles() != null) task.setMaxScanFiles(dto.getMaxScanFiles());
         if (dto.getMaxBandwidthKbS() != null) task.setMaxBandwidthKbS(dto.getMaxBandwidthKbS());
         if (dto.getRetryEnabled() != null) task.setRetryEnabled(dto.getRetryEnabled() ? 1 : 0);
@@ -527,13 +528,7 @@ public class BatchTransferService {
         if (dto.getTargetAgents() != null && dto.getTargetAgents().contains(dto.getSourceAgentId())) {
             throw new IllegalArgumentException("发送节点和接收节点不能是同一个 (" + dto.getSourceAgentId() + ")");
         }
-        
-        if (dto.getScanCronExpression() != null && !dto.getScanCronExpression().trim().isEmpty()) {
-            if (!CronExpression.isValidExpression(dto.getScanCronExpression())) {
-                throw new IllegalArgumentException("Cron表达式格式不正确");
-            }
-        }
-        
+
         String targetDirs = dto.getTargetDirs();
         if (targetDirs.contains("..")) {
             throw new IllegalArgumentException("目标目录路径不允许包含..");
@@ -543,7 +538,7 @@ public class BatchTransferService {
             throw new IllegalArgumentException(
                     "目标目录数量(" + dirArr.length + ")必须与目标Agent数量(" + dto.getTargetAgents().size() + ")一致");
         }
-        
+
         if (dto.getTargetAgents() != null) {
             for (int i = 0; i < dto.getTargetAgents().size(); i++) {
                 String targetAgentId = dto.getTargetAgents().get(i);
@@ -579,15 +574,9 @@ public class BatchTransferService {
         if (dto.getSourceAgentId() != null && dto.getSourceDir() != null) {
             validatePathByOs(dto.getSourceDir(), dto.getSourceAgentId(), "源目录");
         }
-        
+
         if (dto.getTargetAgents() != null && dto.getTargetAgents().contains(dto.getSourceAgentId())) {
             throw new IllegalArgumentException("发送节点和接收节点不能是同一个 (" + dto.getSourceAgentId() + ")");
-        }
-        
-        if (dto.getScanCronExpression() != null && !dto.getScanCronExpression().trim().isEmpty()) {
-            if (!CronExpression.isValidExpression(dto.getScanCronExpression())) {
-                throw new IllegalArgumentException("Cron表达式格式不正确");
-            }
         }
         
         if (dto.getTargetDirs() != null) {
@@ -699,14 +688,32 @@ public class BatchTransferService {
 
     private String buildConfigSnapshot(BatchTransferTask task) {
         return String.format(
-                "{\"scanFrequencySec\":%d,\"maxScanFiles\":%d,\"maxBandwidthKbS\":%s,\"retryEnabled\":%d,\"retryIntervalMin\":%d,\"taskName\":\"%s\",\"sourceDir\":\"%s\",\"transferMode\":\"%s\",\"routingStrategy\":\"%s\"}",
-                task.getScanFrequencySec(), task.getMaxScanFiles(),
+                "{\"scanFrequencySec\":%d,\"scanCronExpression\":\"%s\",\"maxScanFiles\":%d,\"maxBandwidthKbS\":%s,\"retryEnabled\":%d,\"retryIntervalMin\":%d,\"taskName\":\"%s\",\"sourceDir\":\"%s\",\"transferMode\":\"%s\",\"routingStrategy\":\"%s\"}",
+                task.getScanFrequencySec(),
+                task.getScanCronExpression() != null ? task.getScanCronExpression() : "",
+                task.getMaxScanFiles(),
                 task.getMaxBandwidthKbS() != null ? task.getMaxBandwidthKbS() : "null",
                 task.getRetryEnabled(), task.getRetryIntervalMin(),
                 task.getTaskName() != null ? task.getTaskName().replace("\"", "\\\"") : "",
                 task.getSourceDir() != null ? task.getSourceDir().replace("\"", "\\\"") : "",
                 task.getTransferMode() != null ? task.getTransferMode() : "",
                 task.getRoutingStrategy() != null ? task.getRoutingStrategy() : "");
+    }
+
+    // 将扫描间隔(秒)转换为Spring Cron表达式(6位: 秒 分 时 日 月 周)
+    static String convertFrequencyToCron(Integer frequencySec) {
+        if (frequencySec == null || frequencySec <= 0) {
+            return "0 */5 * * * ?";
+        }
+        if (frequencySec < 60) {
+            return "0 * * * * ?";
+        }
+        int minutes = frequencySec / 60;
+        if (frequencySec % 60 == 0 && minutes <= 1440) {
+            if (minutes == 1) return "0 * * * * ?";
+            return "0 */" + minutes + " * * * ?";
+        }
+        return "0 */" + minutes + " * * * ?";
     }
 
     private String toJsonString(Object obj) {

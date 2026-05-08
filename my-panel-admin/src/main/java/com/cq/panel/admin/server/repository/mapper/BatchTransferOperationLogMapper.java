@@ -10,4 +10,6 @@ public interface BatchTransferOperationLogMapper
     int insertBatchTransferOperationLog(BatchTransferOperationLog entity);
 
     List<BatchTransferOperationLog> selectByTaskId(Long taskId);
+
+    List<BatchTransferOperationLog> selectList(BatchTransferOperationLog query);
 }

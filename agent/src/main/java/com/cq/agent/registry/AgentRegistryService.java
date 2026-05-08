@@ -145,27 +145,30 @@ public class AgentRegistryService {
     }
 
     /**
-     * 发送心跳
+     * 发送心跳，如果未注册或心跳失败则尝试重新注册
      */
     public void heartbeat() {
         if (!isRegistered()) {
-            logger.debug("Agent is not registered, skipping heartbeat");
+            logger.info("Agent is not registered, attempting to register...");
+            register();
             return;
         }
-        
+
         try {
             String agentIp = config.getAgentIp();
             int agentPort = actualPort > 0 ? actualPort : config.getServerPort();
-            
+
             boolean success = registryClient.heartbeat(agentIp, agentPort);
-            
+
             if (success) {
                 logger.debug("Heartbeat sent successfully");
             } else {
-                logger.warn("Heartbeat failed, will try to re-register");
+                logger.warn("Heartbeat failed, attempting to re-register...");
+                register();
             }
         } catch (Exception e) {
-            logger.error("Heartbeat failed with exception", e);
+            logger.error("Heartbeat failed with exception, attempting to re-register...", e);
+            register();
         }
     }
 

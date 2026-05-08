@@ -180,8 +180,26 @@ public class BatchTransferController extends BaseController
         result.put("sourceNodeName", sourceNodeName);
 
         // 构建目标Agent -> {dir, nodeName} 映射
+        // 优先使用任务配置中的targetAgents，如果为空则从子任务中提取实际的targetAgentId
         Map<String, Map<String, String>> targetAgentInfoMap = buildTargetAgentInfoMap(
                 task.getTargetAgents(), task.getTargetDirs());
+
+        // 如果targetAgentInfoMap为空或子任务中的agentId不在map中，则补充从子任务中提取的agentId
+        if (targetAgentInfoMap.isEmpty() || subtasks != null)
+        {
+            for (BatchTransferSubtask subtask : subtasks)
+            {
+                String agentId = subtask.getTargetAgentId();
+                if (agentId != null && !agentId.isEmpty() && !targetAgentInfoMap.containsKey(agentId))
+                {
+                    String nodeName = resolveNodeName(agentId);
+                    Map<String, String> info = new java.util.LinkedHashMap<>();
+                    info.put("dir", "-");
+                    info.put("nodeName", nodeName);
+                    targetAgentInfoMap.put(agentId, info);
+                }
+            }
+        }
         result.put("targetAgentInfoMap", targetAgentInfoMap);
 
         // 查询Agent侧传输状态, 以subtaskId为key

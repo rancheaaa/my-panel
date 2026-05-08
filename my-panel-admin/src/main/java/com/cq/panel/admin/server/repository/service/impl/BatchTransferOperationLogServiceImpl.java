@@ -28,4 +28,10 @@ public class BatchTransferOperationLogServiceImpl implements IBatchTransferOpera
     {
         return batchTransferOperationLogMapper.selectByTaskId(taskId);
     }
+
+    @Override
+    public List<BatchTransferOperationLog> selectList(BatchTransferOperationLog query)
+    {
+        return batchTransferOperationLogMapper.selectList(query);
+    }
 }

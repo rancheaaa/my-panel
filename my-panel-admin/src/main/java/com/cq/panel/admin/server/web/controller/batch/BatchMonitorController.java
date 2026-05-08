@@ -1,13 +1,7 @@
 package com.cq.panel.admin.server.web.controller.batch;
 
-import com.cq.panel.admin.server.repository.domain.AgentQueueSnapshot;
-import com.cq.panel.admin.server.repository.domain.AgentRegistry;
-import com.cq.panel.admin.server.repository.domain.BatchAlertEvent;
-import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
-import com.cq.panel.admin.server.repository.service.IAgentQueueSnapshotService;
-import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
-import com.cq.panel.admin.server.repository.service.IBatchAlertEventService;
-import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.repository.domain.*;
+import com.cq.panel.admin.server.repository.service.*;
 import com.cq.panel.admin.server.service.batch.BatchTransferService;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.web.converter.batch.BatchTransferConverter;
@@ -17,6 +11,7 @@ import com.cq.panel.admin.server.web.domain.vo.batch.AgentQueueStatusVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.BatchAlertEventVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.BatchDashboardVO;
 import com.cq.panel.authlite.annotation.RequirePermission;
+import com.github.pagehelper.PageInfo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,6 +32,9 @@ public class BatchMonitorController extends BaseController
     private final BatchTransferConverter batchTransferConverter;
     private final JdbcTemplate jdbcTemplate;
     private final BatchTransferService batchTransferService;
+    private final IBatchTransferAgentStateService agentStateService;
+    private final IBatchTransferOperationLogService operationLogService;
+    private final IBatchTransferStatisticsService statisticsService;
 
     public BatchMonitorController(IAgentQueueSnapshotService agentQueueSnapshotService,
                                   IBatchAlertEventService batchAlertEventService,
@@ -44,7 +42,10 @@ public class BatchMonitorController extends BaseController
                                   IAgentRegistryService agentRegistryService,
                                   BatchTransferConverter batchTransferConverter,
                                   JdbcTemplate jdbcTemplate,
-                                  BatchTransferService batchTransferService)
+                                  BatchTransferService batchTransferService,
+                                  IBatchTransferAgentStateService agentStateService,
+                                  IBatchTransferOperationLogService operationLogService,
+                                  IBatchTransferStatisticsService statisticsService)
     {
         this.agentQueueSnapshotService = agentQueueSnapshotService;
         this.batchAlertEventService = batchAlertEventService;
@@ -53,6 +54,9 @@ public class BatchMonitorController extends BaseController
         this.batchTransferConverter = batchTransferConverter;
         this.jdbcTemplate = jdbcTemplate;
         this.batchTransferService = batchTransferService;
+        this.agentStateService = agentStateService;
+        this.operationLogService = operationLogService;
+        this.statisticsService = statisticsService;
     }
 
     @RequirePermission("batch:monitor:view")
@@ -350,25 +354,53 @@ public class BatchMonitorController extends BaseController
     }
 
     @RequirePermission("batch:monitor:view")
-    @Operation(summary = "查询操作日志")
+    @Operation(summary = "查询操作日志(分页)")
     @GetMapping("/operation-logs")
-    public Result<List<Map<String, Object>>> getOperationLogs(
+    public Result<PageVO<BatchTransferOperationLog>> getOperationLogs(
             @RequestParam(required = false) Long taskId,
-            @RequestParam(defaultValue = "50") int limit)
+            @RequestParam(required = false) String operationType,
+            @RequestParam(required = false) String operatorName,
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "20") int pageSize)
     {
-        List<Map<String, Object>> logs;
-        if (taskId != null)
-        {
-            logs = jdbcTemplate.queryForList(
-                    "SELECT * FROM batch_transfer_operation_log WHERE task_id = ? ORDER BY operation_time DESC LIMIT ?",
-                    taskId, limit);
-        }
-        else
-        {
-            logs = jdbcTemplate.queryForList(
-                    "SELECT * FROM batch_transfer_operation_log ORDER BY operation_time DESC LIMIT ?", limit);
-        }
-        return Result.success(logs);
+        startPage();
+        BatchTransferOperationLog query = new BatchTransferOperationLog();
+        query.setTaskId(taskId);
+        query.setOperationType(operationType);
+        query.setOperatorName(operatorName);
+        List<BatchTransferOperationLog> list = operationLogService.selectList(query);
+        return Result.success(new PageVO<>(list, new PageInfo<>(list).getTotal()));
+    }
+
+    @RequirePermission("batch:monitor:view")
+    @Operation(summary = "查询Agent传输状态列表(分页)")
+    @GetMapping("/agent-states")
+    public Result<PageVO<BatchTransferAgentState>> getAgentStates(
+            @RequestParam(required = false) String agentId,
+            @RequestParam(required = false) Long taskId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "20") int pageSize)
+    {
+        startPage();
+        BatchTransferAgentState query = new BatchTransferAgentState();
+        query.setAgentId(agentId);
+        query.setTaskId(taskId);
+        query.setStatus(status);
+        List<BatchTransferAgentState> list = agentStateService.selectList(query);
+        return Result.success(new PageVO<>(list, new PageInfo<>(list).getTotal()));
+    }
+
+    @RequirePermission("batch:monitor:view")
+    @Operation(summary = "查询所有任务传输统计(分页)")
+    @GetMapping("/statistics")
+    public Result<PageVO<BatchTransferStatistics>> getStatisticsList(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "20") int pageSize)
+    {
+        startPage();
+        List<BatchTransferStatistics> list = statisticsService.selectList(new BatchTransferStatistics());
+        return Result.success(new PageVO<>(list, new PageInfo<>(list).getTotal()));
     }
 
     private Date getTodayStart()

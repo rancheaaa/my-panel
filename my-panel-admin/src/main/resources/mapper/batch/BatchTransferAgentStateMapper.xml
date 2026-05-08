@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.BatchTransferAgentStateMapper">
+
+    <resultMap type="BatchTransferAgentState" id="BatchTransferAgentStateResult">
+        <result property="id" column="id"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="subtaskId" column="subtask_id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="filePath" column="file_path"/>
+        <result property="fileName" column="file_name"/>
+        <result property="remoteTargetPath" column="remote_target_path"/>
+        <result property="status" column="status"/>
+        <result property="totalSize" column="total_size"/>
+        <result property="chunkSize" column="chunk_size"/>
+        <result property="totalChunks" column="total_chunks"/>
+        <result property="transferredChunks" column="transferred_chunks"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="exceptionDesc" column="exception_desc"/>
+        <result property="senderNodeName" column="sender_node_name"/>
+        <result property="receiverNodeName" column="receiver_node_name"/>
+        <result property="taskName" column="task_name"/>
+        <result property="createTimeStr" column="create_time_str"/>
+        <result property="updateTimeStr" column="update_time_str"/>
+        <result property="enqueuedTime" column="enqueued_time"/>
+        <result property="initUploadStartTime" column="init_upload_start_time"/>
+        <result property="initUploadEndTime" column="init_upload_end_time"/>
+        <result property="uploadChunksStartTime" column="upload_chunks_start_time"/>
+        <result property="uploadChunksEndTime" column="upload_chunks_end_time"/>
+        <result property="mergeChunksStartTime" column="merge_chunks_start_time"/>
+        <result property="mergeChunksEndTime" column="merge_chunks_end_time"/>
+        <result property="uploadSuccessTime" column="upload_success_time"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <select id="selectList" parameterType="BatchTransferAgentState" resultMap="BatchTransferAgentStateResult">
+        select s.*,
+               sender.node_name as sender_node_name,
+               receiver.node_name as receiver_node_name,
+               task.task_name as task_name
+        from batch_transfer_agent_state s
+        left join agent_registry sender on sender.id = s.agent_id
+        left join batch_transfer_subtask sub on sub.id = s.subtask_id
+        left join agent_registry receiver on receiver.id = sub.target_agent_id
+        left join batch_transfer_task task on task.id = s.task_id
+        <where>
+            <if test="agentId != null and agentId != ''">and s.agent_id = #{agentId}</if>
+            <if test="taskId != null">and s.task_id = #{taskId}</if>
+            <if test="status != null and status != ''">and s.status = #{status}</if>
+        </where>
+        order by s.update_time desc
+    </select>
+
+    <select id="selectByTaskId" parameterType="Long" resultMap="BatchTransferAgentStateResult">
+        select s.*,
+               sender.node_name as sender_node_name,
+               receiver.node_name as receiver_node_name,
+               task.task_name as task_name
+        from batch_transfer_agent_state s
+        left join agent_registry sender on sender.id = s.agent_id
+        left join batch_transfer_subtask sub on sub.id = s.subtask_id
+        left join agent_registry receiver on receiver.id = sub.target_agent_id
+        left join batch_transfer_task task on task.id = s.task_id
+        where s.task_id = #{taskId}
+        order by s.update_time desc
+    </select>
+
+    <select id="selectByTransferId" parameterType="String" resultMap="BatchTransferAgentStateResult">
+        select * from batch_transfer_agent_state where transfer_id = #{transferId}
+    </select>
+
+</mapper>

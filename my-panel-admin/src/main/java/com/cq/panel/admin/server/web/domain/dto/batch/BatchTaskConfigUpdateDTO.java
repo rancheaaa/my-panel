@@ -52,9 +52,6 @@ public class BatchTaskConfigUpdateDTO
     @Schema(description = "备份模式")
     private String backupMode;
 
-    @Schema(description = "定时扫描Cron表达式")
-    private String scanCronExpression;
-
     @Schema(description = "是否保持目录结构")
     private Boolean preserveDirStructure;
 

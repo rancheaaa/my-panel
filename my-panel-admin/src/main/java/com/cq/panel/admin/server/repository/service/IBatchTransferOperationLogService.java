@@ -8,4 +8,6 @@ public interface IBatchTransferOperationLogService
     int insert(BatchTransferOperationLog entity);
 
     List<BatchTransferOperationLog> selectByTaskId(Long taskId);
+
+    List<BatchTransferOperationLog> selectList(BatchTransferOperationLog query);
 }

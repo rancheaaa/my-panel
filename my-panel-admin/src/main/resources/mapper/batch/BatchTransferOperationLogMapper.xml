@@ -34,4 +34,14 @@
         order by operation_time desc
     </select>
 
+    <select id="selectList" parameterType="BatchTransferOperationLog" resultMap="BatchTransferOperationLogResult">
+        select * from batch_transfer_operation_log
+        <where>
+            <if test="taskId != null">and task_id = #{taskId}</if>
+            <if test="operationType != null and operationType != ''">and operation_type = #{operationType}</if>
+            <if test="operatorName != null and operatorName != ''">and operator_name like concat('%', #{operatorName}, '%')</if>
+        </where>
+        order by operation_time desc
+    </select>
+
 </mapper>

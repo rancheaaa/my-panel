@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, Row, Col, InputNumber, Switch, Button, Space, Card, Tooltip, Typography } from 'antd';
 import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import RegionConfigEditor from './RegionConfigEditor';
-import CronExpressionInput from './CronExpressionInput';
 
 const agentLabel = (a) => `${a.appId || 'unknown'}@${a.agentIp}`;
 
@@ -207,16 +206,9 @@ const CreateTaskModal = ({ visible, onOk, onCancel, agents = [] }) => {
         <Row gutter={16}>
           <Col span={8}>
             <Form.Item
-              label={<span>扫描间隔(秒) <Tooltip title="仅Cron表达式为空时生效"><QuestionCircleOutlined /></Tooltip></span>}
+              label={<span>扫描间隔(秒) <Tooltip title="系统将自动转换为Cron表达式供Agent定时扫描"><QuestionCircleOutlined /></Tooltip></span>}
               name="scanFrequencySec">
               <InputNumber min={60} max={86400} style={{ width: '100%' }} addonAfter="秒" />
-            </Form.Item>
-          </Col>
-          <Col span={16}>
-            <Form.Item
-              label={<span>Cron定时扫描 <Tooltip title="设置后Agent将按此Cron表达式自动定时扫描和传输，无需Proxy轮询触发"><QuestionCircleOutlined /></Tooltip></span>}
-              name="scanCronExpression">
-              <CronExpressionInput />
             </Form.Item>
           </Col>
         </Row>

@@ -38,12 +38,8 @@ public class BatchTaskCreateDTO
 
     @Min(60)
     @Max(86400)
-    @Schema(description = "扫描间隔(秒), 仅cron为空时生效")
+    @Schema(description = "扫描间隔(秒), 系统自动转换为Cron表达式")
     private Integer scanFrequencySec = 300;
-
-    @Size(max = 100)
-    @Schema(description = "定时扫描Cron表达式, 如 \"0 */5 * * * ?\" 表示每5分钟扫描. 为空则使用scanFrequencySec轮询")
-    private String scanCronExpression;
 
     @Min(100)
     @Max(100000)

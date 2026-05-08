@@ -41,9 +41,9 @@
                receiver.node_name as receiver_node_name,
                task.task_name as task_name
         from batch_transfer_agent_state s
-        left join agent_registry sender on sender.id = s.agent_id
+        left join agent_registry sender on sender.id = s.agent_id COLLATE utf8mb4_unicode_ci
         left join batch_transfer_subtask sub on sub.id = s.subtask_id
-        left join agent_registry receiver on receiver.id = sub.target_agent_id
+        left join agent_registry receiver on receiver.id = sub.target_agent_id COLLATE utf8mb4_unicode_ci
         left join batch_transfer_task task on task.id = s.task_id
         <where>
             <if test="agentId != null and agentId != ''">and s.agent_id = #{agentId}</if>
@@ -59,9 +59,9 @@
                receiver.node_name as receiver_node_name,
                task.task_name as task_name
         from batch_transfer_agent_state s
-        left join agent_registry sender on sender.id = s.agent_id
+        left join agent_registry sender on sender.id = s.agent_id COLLATE utf8mb4_unicode_ci
         left join batch_transfer_subtask sub on sub.id = s.subtask_id
-        left join agent_registry receiver on receiver.id = sub.target_agent_id
+        left join agent_registry receiver on receiver.id = sub.target_agent_id COLLATE utf8mb4_unicode_ci
         left join batch_transfer_task task on task.id = s.task_id
         where s.task_id = #{taskId}
         order by s.update_time desc

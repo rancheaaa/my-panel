@@ -734,7 +734,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
     KEY `idx_source_agent` (`source_agent_id`),
     KEY `idx_create_by` (`create_by`),
     KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量传输任务表(模板配置)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输任务表(模板配置)';
 
 -- ----------------------------
 -- 批量传输统计表（用于监控和运维）
@@ -807,7 +807,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_statistics` (
     KEY `idx_snapshot_time` (`snapshot_time`),
     KEY `idx_progress` (`progress_percent`),
     KEY `idx_last_activity` (`last_activity_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量传输统计表(监控和运维用)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输统计表(监控和运维用)';
 
 CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -845,7 +845,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     KEY `idx_target_status` (`target_agent_id`, `status`),
     KEY `idx_status_retry` (`status`, `next_retry_after`),
     KEY `idx_transfer_id` (`transfer_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量子任务表(文件×目标Agent的笛卡尔积)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量子任务表(文件×目标Agent的笛卡尔积)';
 
 CREATE TABLE IF NOT EXISTS `batch_transfer_agent_state` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -881,7 +881,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_agent_state` (
     KEY `idx_task_id` (`task_id`),
     KEY `idx_subtask_id` (`subtask_id`),
     KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent侧传输状态表(由Agent定期上报)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent侧传输状态表(由Agent定期上报)';
 
 CREATE TABLE IF NOT EXISTS `agent_queue_snapshot` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -912,7 +912,7 @@ CREATE TABLE IF NOT EXISTS `agent_queue_snapshot` (
     PRIMARY KEY (`id`),
     KEY `idx_agent_time` (`agent_id`, `snapshot_time`),
     KEY `idx_congestion` (`is_congested`, `congestion_level`, `snapshot_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Agent队列状态快照表(用于监控和趋势分析)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent队列状态快照表(用于监控和趋势分析)';
 
 CREATE TABLE IF NOT EXISTS `batch_transfer_operation_log` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -934,7 +934,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_operation_log` (
     KEY `idx_operator` (`operator_id`),
     KEY `idx_operation_time` (`operation_time`),
     KEY `idx_type_time` (`operation_type`, `operation_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量传输操作审计日志表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输操作审计日志表';
 
 CREATE TABLE IF NOT EXISTS `batch_alert_event` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -961,4 +961,4 @@ CREATE TABLE IF NOT EXISTS `batch_alert_event` (
     KEY `idx_agent_task` (`agent_id`, `task_id`),
     KEY `idx_category_time` (`alert_category`, `create_time`),
     KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量传输告警事件表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输告警事件表';

@@ -1,16 +1,13 @@
 package com.cq.proxy.web.controller.batch;
 
 import com.cq.proxy.service.batch.ProgressAggregator;
-import com.cq.proxy.service.batch.QueueMonitor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -21,14 +18,12 @@ public class BatchInternalController
 {
     private static final Logger logger = LoggerFactory.getLogger(BatchInternalController.class);
     private final ProgressAggregator progressAggregator;
-    private final QueueMonitor queueMonitor;
     private final JdbcTemplate jdbcTemplate;
 
-    public BatchInternalController(ProgressAggregator progressAggregator, QueueMonitor queueMonitor,
+    public BatchInternalController(ProgressAggregator progressAggregator,
                                    JdbcTemplate jdbcTemplate)
     {
         this.progressAggregator = progressAggregator;
-        this.queueMonitor = queueMonitor;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -37,33 +32,6 @@ public class BatchInternalController
     public Map<String, Object> receiveProgress(@RequestBody Map<String, Object> report)
     {
         progressAggregator.receiveSubtaskProgress(report);
-        return Map.of("success", true);
-    }
-
-    @Operation(summary = "批量进度上报")
-    @PostMapping("/progress/batch")
-    public Map<String, Object> receiveBatchProgress(@RequestBody java.util.List<Map<String, Object>> reports)
-    {
-        for (Map<String, Object> report : reports)
-        {
-            progressAggregator.receiveSubtaskProgress(report);
-        }
-        return Map.of("success", true, "count", reports.size());
-    }
-
-    @Operation(summary = "接收队列快照")
-    @PostMapping("/queue/snapshot")
-    public Map<String, Object> receiveQueueSnapshot(@RequestBody Map<String, Object> snapshot)
-    {
-        queueMonitor.receiveSnapshot(snapshot);
-        return Map.of("success", true);
-    }
-
-    @Operation(summary = "接收后处理结果")
-    @PostMapping("/post-process-result")
-    public Map<String, Object> receivePostProcessResult(@RequestBody Map<String, Object> result)
-    {
-        progressAggregator.receivePostProcessResult(result);
         return Map.of("success", true);
     }
 
@@ -90,32 +58,39 @@ public class BatchInternalController
             List<Map<String, Object>> persisted = new java.util.ArrayList<>();
             for (Map<String, Object> st : subtasks)
             {
+                String sourceAgentId = st.get("sourceAgentId") != null ? String.valueOf(st.get("sourceAgentId")) : null;
+                String sourceAgentName = st.get("sourceAgentName") != null ? String.valueOf(st.get("sourceAgentName")) : null;
+                String targetAgentId = st.get("targetAgentId") != null ? String.valueOf(st.get("targetAgentId")) : null;
+                String targetAgentName = st.get("targetAgentName") != null ? String.valueOf(st.get("targetAgentName")) : null;
+                String sourcePath = st.get("sourcePath") != null ? String.valueOf(st.get("sourcePath")) : null;
+                String targetPath = st.get("targetPath") != null ? String.valueOf(st.get("targetPath")) : null;
                 String filePath = st.get("filePath") != null ? String.valueOf(st.get("filePath")) : null;
                 String fileName = st.get("fileName") != null ? String.valueOf(st.get("fileName")) :
                         (filePath != null && filePath.contains("/") ? filePath.substring(filePath.lastIndexOf('/') + 1) : filePath);
                 long fileSizeBytes = st.get("fileSizeBytes") instanceof Number ? ((Number) st.get("fileSizeBytes")).longValue() : 0L;
-                String targetAgentId = st.get("targetAgentId") != null ? String.valueOf(st.get("targetAgentId")) : null;
                 Object fileMd5Obj = st.get("fileMd5");
                 String fileMd5 = fileMd5Obj != null ? String.valueOf(fileMd5Obj) : null;
                 Object fileLastModifiedObj = st.get("fileLastModified");
-                java.sql.Timestamp fileLastModified = fileLastModifiedObj instanceof Date ?
-                        new java.sql.Timestamp(((Date) fileLastModifiedObj).getTime()) :
+                java.sql.Timestamp fileLastModified = fileLastModifiedObj instanceof java.util.Date ?
+                        new java.sql.Timestamp(((java.util.Date) fileLastModifiedObj).getTime()) :
                         (fileLastModifiedObj instanceof Number ? new java.sql.Timestamp(((Number) fileLastModifiedObj).longValue()) : null);
 
                 int rows = jdbcTemplate.update(
-                        "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
-                                "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
+                        "INSERT INTO batch_transfer_subtask (task_id, source_agent_id, source_agent_name, " +
+                                "target_agent_id, target_agent_name, source_path, target_path, file_name, file_size_bytes, " +
+                                "status, transferred_chunks, total_chunks, transferred_bytes, " +
                                 "retry_count, proxy_retry_count, create_time, update_time, file_md5, file_last_modified) " +
-                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?) " +
                                 "ON DUPLICATE KEY UPDATE status='QUEUED', transferred_chunks=0, total_chunks=0, " +
                                 "transferred_bytes=0, retry_count=0, proxy_retry_count=0, update_time=NOW(), " +
                                 "file_md5 = COALESCE(?, file_md5), file_last_modified = COALESCE(?, file_last_modified)",
-                        taskId, filePath, fileName, fileSizeBytes, targetAgentId, fileMd5, fileLastModified,
+                        taskId, sourceAgentId, sourceAgentName, targetAgentId, targetAgentName,
+                        sourcePath, targetPath, fileName, fileSizeBytes, fileMd5, fileLastModified,
                         fileMd5, fileLastModified);
 
                 Long id = rows > 0 ? jdbcTemplate.queryForObject(
-                        "SELECT id FROM batch_transfer_subtask WHERE task_id=? AND file_path=? AND target_agent_id=? ORDER BY id DESC LIMIT 1",
-                        Long.class, taskId, filePath, targetAgentId) : null;
+                        "SELECT id FROM batch_transfer_subtask WHERE task_id=? AND source_path=? AND target_agent_id=? ORDER BY id DESC LIMIT 1",
+                        Long.class, taskId, sourcePath, targetAgentId) : null;
 
                 Map<String, Object> persistedSt = new java.util.LinkedHashMap<>(st);
                 persistedSt.put("id", id);

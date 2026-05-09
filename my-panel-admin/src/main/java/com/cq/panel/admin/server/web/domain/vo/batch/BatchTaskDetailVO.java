@@ -1,8 +1,6 @@
 package com.cq.panel.admin.server.web.domain.vo.batch;
 
-import com.cq.panel.admin.server.repository.domain.BatchTransferStatistics;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -95,10 +93,6 @@ public class BatchTaskDetailVO {
 
     @Schema(description = "子任务统计信息(实时计算)")
     private SubtaskSummary subtaskSummary;
-
-    @JsonInclude(JsonInclude.Include.NON_NULL)
-    @Schema(description = "传输统计信息(来自统计表)")
-    private BatchTransferStatistics statistics;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Schema(description = "创建时间")

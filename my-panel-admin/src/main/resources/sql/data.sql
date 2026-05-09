@@ -482,13 +482,9 @@ INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`,
 (3007, '配置修改', 3001, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:update', '#', 'admin', NOW(), '', NULL, ''),
 (3008, '手动重试', 3001, 7, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:retry', '#', 'admin', NOW(), '', NULL, ''),
 (3009, '任务删除', 3001, 8, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:remove', '#', 'admin', NOW(), '', NULL, ''),
-(3010, '队列监控', 3000, 2, 'queueMonitor', 'batch/queueMonitor/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'DashboardOutlined', 'admin', NOW(), '', NULL, ''),
-(3011, '传输仪表盘', 3000, 3, 'batchDashboard', 'batch/dashboard/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'FundOutlined', 'admin', NOW(), '', NULL, ''),
-(3012, '传输统计', 3000, 4, 'statistics', 'batch/statistics/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'BarChartOutlined', 'admin', NOW(), '', NULL, ''),
-(3013, 'Agent状态', 3000, 5, 'agentState', 'batch/agentState/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'CloudSyncOutlined', 'admin', NOW(), '', NULL, ''),
-(3014, '操作日志', 3000, 6, 'operationLog', 'batch/operationLog/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'FileTextOutlined', 'admin', NOW(), '', NULL, ''),
-(3015, '任务详情', 3000, 7, 'taskDetail', 'batch/taskDetail/index', NULL, '', 1, 0, 'C', '0', '1', 'batch:task:view', '#', 'admin', NOW(), '', NULL, '隐藏路由,不在菜单显示'),
-(3016, '子任务详情', 3000, 8, 'subtaskDetail', 'batch/subtaskDetail/index', NULL, '', 1, 0, 'C', '0', '1', 'batch:task:view', '#', 'admin', NOW(), '', NULL, '隐藏路由,不在菜单显示');
+(3014, '操作日志', 3000, 2, 'operationLog', 'batch/operationLog/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:monitor:view', 'FileTextOutlined', 'admin', NOW(), '', NULL, ''),
+(3015, '任务详情', 3000, 3, 'taskDetail', 'batch/taskDetail/index', NULL, '', 1, 0, 'C', '0', '1', 'batch:task:view', '#', 'admin', NOW(), '', NULL, '隐藏路由,不在菜单显示'),
+(3016, '子任务详情', 3000, 4, 'subtaskDetail', 'batch/subtaskDetail/index', NULL, '', 1, 0, 'C', '0', '1', 'batch:task:view', '#', 'admin', NOW(), '', NULL, '隐藏路由,不在菜单显示');
 
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(1, 3000), (1, 3001), (1, 3002), (1, 3003), (1, 3004), (1, 3005), (1, 3006), (1, 3007), (1, 3008), (1, 3009), (1, 3010), (1, 3011), (1, 3012), (1, 3013), (1, 3014), (1, 3015), (1, 3016);
+(1, 3000), (1, 3001), (1, 3002), (1, 3003), (1, 3004), (1, 3005), (1, 3006), (1, 3007), (1, 3008), (1, 3009), (1, 3014), (1, 3015), (1, 3016);

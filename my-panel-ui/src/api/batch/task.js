@@ -40,14 +40,4 @@ export function listSubtasks(taskId, params) {
   return request({ url: `/batch/tasks/${taskId}/subtasks`, method: 'get', params });
 }
 
-export function getSubtaskSummary(taskId) {
-  return request({ url: `/batch/tasks/${taskId}/subtasks/summary`, method: 'get' });
-}
 
-export function getTaskStatistics(taskId) {
-  return request({ url: `/batch/tasks/${taskId}/statistics`, method: 'get' });
-}
-
-export function refreshTaskStatistics(taskId) {
-  return request({ url: `/batch/tasks/${taskId}/statistics/refresh`, method: 'put' });
-}

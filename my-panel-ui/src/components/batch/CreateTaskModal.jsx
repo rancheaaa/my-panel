@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, Row, Col, InputNumber, Switch, Button, Space, Card, Tooltip, Typography } from 'antd';
 import { PlusOutlined, DeleteOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import RegionConfigEditor from './RegionConfigEditor';
 
 const agentLabel = (a) => `${a.appId || 'unknown'}@${a.agentIp}`;
 
@@ -179,11 +178,6 @@ const CreateTaskModal = ({ visible, onOk, onCancel, agents = [] }) => {
             <InputNumber min={1} placeholder="不限" style={{ width: '100%' }} />
           </Form.Item></Col>
         </Row>
-        {routingStrategy === 'REGION_BASED' && (
-          <Form.Item name="routingConfig" label="区域路由配置" rules={[{ required: true, message: '区域路由必须配置' }]}>
-            <RegionConfigEditor />
-          </Form.Item>
-        )}
         <Row gutter={16}>
           <Col span={8}><Form.Item name="postTransferAction" label="传输后操作">
             <Select>

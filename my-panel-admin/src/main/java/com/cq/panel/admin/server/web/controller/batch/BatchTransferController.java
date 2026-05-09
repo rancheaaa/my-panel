@@ -3,7 +3,6 @@ package com.cq.panel.admin.server.web.controller.batch;
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
-import com.cq.panel.admin.server.repository.domain.BatchTransferStatistics;
 import com.cq.panel.admin.server.repository.domain.BatchTransferSubtask;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
@@ -26,8 +25,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.jdbc.core.JdbcTemplate;
-
 import java.util.List;
 import java.util.Map;
 
@@ -41,21 +38,18 @@ public class BatchTransferController extends BaseController
     private final IBatchTransferSubtaskService batchTransferSubtaskService;
     private final BatchTransferConverter batchTransferConverter;
     private final IAgentRegistryService agentRegistryService;
-    private final JdbcTemplate jdbcTemplate;
 
     public BatchTransferController(BatchTransferService batchTransferService,
                                    IBatchTransferTaskService batchTransferTaskService,
                                    IBatchTransferSubtaskService batchTransferSubtaskService,
                                    BatchTransferConverter batchTransferConverter,
-                                   IAgentRegistryService agentRegistryService,
-                                   JdbcTemplate jdbcTemplate)
+                                   IAgentRegistryService agentRegistryService)
     {
         this.batchTransferService = batchTransferService;
         this.batchTransferTaskService = batchTransferTaskService;
         this.batchTransferSubtaskService = batchTransferSubtaskService;
         this.batchTransferConverter = batchTransferConverter;
         this.agentRegistryService = agentRegistryService;
-        this.jdbcTemplate = jdbcTemplate;
     }
 
     @RequirePermission("batch:task:create")
@@ -174,54 +168,41 @@ public class BatchTransferController extends BaseController
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("subtasks", subtasks);
 
-        // 源目录和源节点名称
+        // sourceAgentName直接从subtask获取
+        String sourceNodeName = (subtasks != null && !subtasks.isEmpty() && subtasks.get(0).getSourceAgentName() != null)
+                ? subtasks.get(0).getSourceAgentName() : task.getSourceAgentId();
         result.put("sourceDir", task.getSourceDir());
-        String sourceNodeName = resolveNodeName(task.getSourceAgentId());
         result.put("sourceNodeName", sourceNodeName);
 
-        // 构建目标Agent -> {dir, nodeName} 映射
-        // 优先使用任务配置中的targetAgents，如果为空则从子任务中提取实际的targetAgentId
+        // targetAgentInfoMap: dir信息仍来自task配置，nodeName从subtask获取
         Map<String, Map<String, String>> targetAgentInfoMap = buildTargetAgentInfoMap(
                 task.getTargetAgents(), task.getTargetDirs());
-
-        // 如果targetAgentInfoMap为空或子任务中的agentId不在map中，则补充从子任务中提取的agentId
-        if (targetAgentInfoMap.isEmpty() || subtasks != null)
+        if (subtasks != null)
         {
             for (BatchTransferSubtask subtask : subtasks)
             {
                 String agentId = subtask.getTargetAgentId();
-                if (agentId != null && !agentId.isEmpty() && !targetAgentInfoMap.containsKey(agentId))
+                if (agentId != null && !agentId.isEmpty())
                 {
-                    String nodeName = resolveNodeName(agentId);
-                    Map<String, String> info = new java.util.LinkedHashMap<>();
-                    info.put("dir", "-");
-                    info.put("nodeName", nodeName);
-                    targetAgentInfoMap.put(agentId, info);
+                    if (!targetAgentInfoMap.containsKey(agentId))
+                    {
+                        Map<String, String> info = new java.util.LinkedHashMap<>();
+                        info.put("dir", "-");
+                        info.put("nodeName", subtask.getTargetAgentName() != null ? subtask.getTargetAgentName() : agentId);
+                        targetAgentInfoMap.put(agentId, info);
+                    }
+                    else
+                    {
+                        Map<String, String> info = targetAgentInfoMap.get(agentId);
+                        if (info.get("nodeName") == null || info.get("nodeName").equals("-"))
+                        {
+                            info.put("nodeName", subtask.getTargetAgentName() != null ? subtask.getTargetAgentName() : agentId);
+                        }
+                    }
                 }
             }
         }
         result.put("targetAgentInfoMap", targetAgentInfoMap);
-
-        // 查询Agent侧传输状态, 以subtaskId为key
-        try
-        {
-            List<Map<String, Object>> agentStates = jdbcTemplate.queryForList(
-                    "SELECT * FROM batch_transfer_agent_state WHERE task_id = ?", taskId);
-            Map<Long, Map<String, Object>> agentStateMap = new java.util.LinkedHashMap<>();
-            for (Map<String, Object> state : agentStates)
-            {
-                Object subtaskIdObj = state.get("subtask_id");
-                if (subtaskIdObj instanceof Number)
-                {
-                    agentStateMap.put(((Number) subtaskIdObj).longValue(), state);
-                }
-            }
-            result.put("agentStateMap", agentStateMap);
-        }
-        catch (Exception e)
-        {
-            result.put("agentStateMap", Map.of());
-        }
 
         return Result.success(result);
     }
@@ -287,24 +268,6 @@ public class BatchTransferController extends BaseController
     {
         BatchTaskDetailVO.SubtaskSummary summary = batchTransferService.getSubtaskSummary(taskId);
         return Result.success(summary);
-    }
-
-    @RequirePermission("batch:task:view")
-    @Operation(summary = "查询传输统计信息(从统计表读取)")
-    @GetMapping("/{taskId}/statistics")
-    public Result<BatchTransferStatistics> getStatistics(@PathVariable Long taskId)
-    {
-        BatchTransferStatistics stats = batchTransferService.getStatistics(taskId);
-        return Result.success(stats);
-    }
-
-    @RequirePermission("batch:task:view")
-    @Operation(summary = "刷新并获取最新统计信息")
-    @PutMapping("/{taskId}/statistics/refresh")
-    public Result<BatchTransferStatistics> refreshStatistics(@PathVariable Long taskId)
-    {
-        BatchTransferStatistics stats = batchTransferService.refreshStatistics(taskId);
-        return Result.success(stats);
     }
 
     @RequirePermission("batch:task:remove")
@@ -400,7 +363,6 @@ public class BatchTransferController extends BaseController
         try
         {
             vo.setSubtaskSummary(batchTransferService.getSubtaskSummary(task.getId()));
-            vo.setStatistics(batchTransferService.getStatistics(task.getId()));
         }
         catch (Exception e)
         {

@@ -3,9 +3,12 @@ package com.cq.agent.batch.queue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Deque;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -35,6 +38,7 @@ public class BatchTransferQueueManager
     private final LongAdder failedCount = new LongAdder();
     private final Deque<Long> processedTimestamps = new ArrayDeque<>();
     private final ScheduledExecutorService retryScheduler;
+    private final Set<Long> pausedTaskIds = ConcurrentHashMap.newKeySet();
 
     public BatchTransferQueueManager(int capacity)
     {
@@ -93,20 +97,63 @@ public class BatchTransferQueueManager
 
     public BatchUploadTask dequeue(long timeoutMs) throws InterruptedException
     {
-        BatchUploadTask task = sendQueue.poll(Math.max(0L, timeoutMs), TimeUnit.MILLISECONDS);
-        if (task != null)
+        long deadline = System.currentTimeMillis() + Math.max(0L, timeoutMs);
+        while (System.currentTimeMillis() < deadline)
         {
+            long remaining = deadline - System.currentTimeMillis();
+            if (remaining <= 0) break;
+            BatchUploadTask task = sendQueue.poll(remaining, TimeUnit.MILLISECONDS);
+            if (task == null)
+            {
+                return null;
+            }
+            if (task.getTaskId() != null && pausedTaskIds.contains(task.getTaskId()))
+            {
+                sendQueue.offer(task);
+                Thread.sleep(50);
+                continue;
+            }
             sendQueueSize.decrementAndGet();
             long waitTime = System.currentTimeMillis() - task.getEnqueueTime();
             totalWaitTimeMs.add(Math.max(0L, waitTime));
             totalDequeued.increment();
+            return task;
         }
-        return task;
+        return null;
     }
 
-    public BatchUploadTask peek()
+    public void pauseTask(Long taskId)
     {
-        return sendQueue.peek();
+        if (taskId != null)
+        {
+            pausedTaskIds.add(taskId);
+            logger.info("Task {} paused in queue manager", taskId);
+        }
+    }
+
+    public void resumeTask(Long taskId)
+    {
+        if (taskId != null)
+        {
+            pausedTaskIds.remove(taskId);
+            logger.info("Task {} resumed in queue manager", taskId);
+        }
+    }
+
+    public void cancelTask(Long taskId)
+    {
+        if (taskId == null)
+        {
+            return;
+        }
+        pausedTaskIds.remove(taskId);
+        sendQueue.removeIf(task -> taskId.equals(task.getTaskId()));
+        logger.info("Task {} cancelled, removed from queue", taskId);
+    }
+
+    public boolean isPaused(Long taskId)
+    {
+        return taskId != null && pausedTaskIds.contains(taskId);
     }
 
     public void enqueueForRetry(BatchUploadTask task, long delayMs)
@@ -178,11 +225,6 @@ public class BatchTransferQueueManager
     public int getSendQueueDepth()
     {
         return sendQueue.size();
-    }
-
-    public int getRetryQueueDepth()
-    {
-        return retryQueue.size();
     }
 
     public void close()

@@ -5,10 +5,8 @@ import com.cq.agent.batch.postprocess.PostTransferHandler;
 import com.cq.agent.batch.postprocess.PostProcessResult;
 import com.cq.agent.batch.queue.BatchTransferQueueManager;
 import com.cq.agent.batch.queue.BatchUploadTask;
-import com.cq.agent.batch.queue.QueueMetrics;
 import com.cq.agent.batch.report.ProgressReport;
 import com.cq.agent.batch.report.ProxyReportClient;
-import com.cq.agent.batch.report.QueueSnapshotReport;
 import com.cq.agent.config.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,8 +17,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BatchAwareAgentUploader extends AgentUploader {
@@ -31,7 +27,6 @@ public class BatchAwareAgentUploader extends AgentUploader {
     private final BatchTransferQueueManager queueManager;
     private final ProxyReportClient proxyReportClient;
     private final ExecutorService batchWorkerPool;
-    private final ScheduledExecutorService snapshotReporter;
     private final Map<Long, AtomicInteger> activeTaskCounters = new ConcurrentHashMap<>();
     private volatile boolean running = true;
     private volatile Long appliedBandwidthLimitBytesPerSec;
@@ -48,13 +43,7 @@ public class BatchAwareAgentUploader extends AgentUploader {
             thread.setDaemon(true);
             return thread;
         });
-        this.snapshotReporter = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread thread = new Thread(r, "batch-queue-reporter");
-            thread.setDaemon(true);
-            return thread;
-        });
         startWorkers();
-        startSnapshotReporter();
     }
 
     public void applyBandwidthLimit(Long maxBandwidthBytesPerSec) {
@@ -77,7 +66,6 @@ public class BatchAwareAgentUploader extends AgentUploader {
 
     public void shutdownBatch() {
         running = false;
-        snapshotReporter.shutdownNow();
         batchWorkerPool.shutdownNow();
         queueManager.close();
         super.shutdown();
@@ -280,29 +268,9 @@ public class BatchAwareAgentUploader extends AgentUploader {
             logger.info("Post process done, subtaskId={}, taskId={}, action={}, success={}, failed={}",
                     batchTask.getSubtaskId(), batchTask.getTaskId(), postAction,
                     result.getSuccessCount(), result.getFailedCount());
-
-            reportPostProcessResult(batchTask, result);
         } catch (Exception e) {
             logger.error("Post process failed, subtaskId={}, taskId={}, action={}, error={}",
                     batchTask.getSubtaskId(), batchTask.getTaskId(), postAction, e.getMessage());
-        }
-    }
-
-    private void reportPostProcessResult(BatchUploadTask task, PostProcessResult result) {
-        try {
-            java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-            body.put("taskId", task.getTaskId());
-            body.put("successFiles", result.getSuccessFiles());
-            body.put("action", task.getPostAction());
-            body.put("sourceBaseDir", task.getSourceBaseDir());
-            body.put("backupDir", task.getBackupDir());
-            body.put("backupMode", task.getBackupMode());
-            body.put("successCount", result.getSuccessCount());
-            body.put("failedCount", result.getFailedCount());
-            body.put("durationMs", result.getDurationMs());
-            proxyReportClient.reportPostProcessResult(task.getTaskId(), body);
-        } catch (Exception e) {
-            logger.warn("Failed to report post-process result for subtaskId={}: {}", task.getSubtaskId(), e.getMessage());
         }
     }
 
@@ -333,96 +301,6 @@ public class BatchAwareAgentUploader extends AgentUploader {
         report.setPerformance(performanceInfo);
         report.setTimestamp(new Date());
         return report;
-    }
-
-    private void startSnapshotReporter() {
-        snapshotReporter.scheduleAtFixedRate(() -> {
-            try {
-                reportQueueSnapshot();
-            } catch (Exception e) {
-                logger.warn("Failed to report queue snapshot: {}", e.getMessage());
-            }
-        }, 10, 10, TimeUnit.SECONDS);
-        snapshotReporter.scheduleAtFixedRate(() -> {
-            try {
-                reportAgentTransferState();
-            } catch (Exception e) {
-                logger.warn("Failed to report agent transfer state: {}", e.getMessage());
-            }
-        }, 15, 15, TimeUnit.SECONDS);
-    }
-
-    private void reportQueueSnapshot() {
-        QueueMetrics metrics = queueManager.getMetrics();
-        QueueSnapshotReport snapshot = new QueueSnapshotReport();
-        snapshot.setAgentId(agentConfig.getAgentId());
-        snapshot.setSnapshotTime(new Date());
-
-        QueueSnapshotReport.QueueInfo sendQueue = new QueueSnapshotReport.QueueInfo();
-        sendQueue.setDepth(metrics.getSendQueueDepth());
-        sendQueue.setPeakDepth(metrics.getSendQueuePeakDepth());
-        sendQueue.setCapacity(metrics.getSendQueueCapacity());
-        sendQueue.setAvgWaitTimeMs(metrics.getSendQueueAvgWaitMs());
-        snapshot.setSendQueue(sendQueue);
-
-        QueueSnapshotReport.QueueInfo retryQueue = new QueueSnapshotReport.QueueInfo();
-        retryQueue.setDepth(metrics.getRetryQueueDepth());
-        retryQueue.setPeakDepth(metrics.getRetryQueuePeakDepth());
-        retryQueue.setCapacity(metrics.getRetryQueueCapacity());
-        retryQueue.setNextScheduleTime(metrics.getRetryNextScheduleTime());
-        snapshot.setRetryQueue(retryQueue);
-
-        QueueSnapshotReport.ProcessingStats processingStats = new QueueSnapshotReport.ProcessingStats();
-        processingStats.setCompletedLast1Min((int) Math.round(metrics.getProcessingRatePerSec() * 60));
-        processingStats.setFailedLast1Min(0);
-        processingStats.setAvgProcessTimeMs(metrics.getSendQueueAvgWaitMs());
-        snapshot.setProcessingStats(processingStats);
-        snapshot.setActiveTasks(activeTaskCounters.entrySet().stream()
-                .filter(entry -> entry.getValue().get() > 0)
-                .map(Map.Entry::getKey)
-                .sorted()
-                .toList());
-        proxyReportClient.reportQueueSnapshot(snapshot);
-    }
-
-    private void reportAgentTransferState() {
-        java.util.List<UploadTask> tasks = getAllInflightTasks();
-        if (tasks.isEmpty()) {
-            return;
-        }
-        java.util.List<java.util.Map<String, Object>> transfers = new java.util.ArrayList<>(tasks.size());
-        for (UploadTask task : tasks) {
-            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("transferId", task.getTransferId());
-            m.put("localFilePath", task.getLocalFilePath());
-            m.put("fileName", extractFileName(task.getLocalFilePath()));
-            m.put("remoteTargetPath", task.getRemoteTargetPath());
-            m.put("status", task.getStatus() != null ? task.getStatus().name() : "UNKNOWN");
-            m.put("totalSize", task.getTotalSize());
-            m.put("chunkSize", task.getChunkSize());
-            m.put("totalChunks", task.getTotalChunks());
-            m.put("transferredChunks", task.getUploadChunksCount() != null ? task.getUploadChunksCount().get() : 0);
-            m.put("retryCount", task.getRetryCount());
-            m.put("exceptionDesc", task.getExceptionDesc());
-            m.put("createTime", task.getCreateTime());
-            m.put("updateTime", task.getUpdateTime());
-            m.put("enqueuedTime", task.getEnqueuedTime());
-            m.put("initUploadStartTime", task.getInitUploadStartTime());
-            m.put("initUploadEndTime", task.getInitUploadEndTime());
-            m.put("uploadChunksStartTime", task.getUploadChunksStartTime());
-            m.put("uploadChunksEndTime", task.getUploadChunksEndTime());
-            m.put("mergeChunksStartTime", task.getMergeChunksStartTime());
-            m.put("mergeChunksEndTime", task.getMergeChunksEndTime());
-            m.put("uploadSuccessTime", task.getUploadSuccessTime());
-            transfers.add(m);
-        }
-        proxyReportClient.asyncReportAgentState(agentConfig.getAgentId(), transfers);
-    }
-
-    private static String extractFileName(String path) {
-        if (path == null) return null;
-        int idx = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
-        return idx >= 0 ? path.substring(idx + 1) : path;
     }
 
     private void markTaskActive(Long taskId) {

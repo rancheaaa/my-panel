@@ -129,7 +129,12 @@ public class BatchTaskScheduler
             Map<String, List<String>> resolvedTargets = routingScheduler.resolveTargets(
                     filePaths, targetAgents, transferMode, routingStrategy, routingConfig);
             Map<String, String> agentDirMap = buildAgentDirMap(targetAgents, targetDirs);
-            List<Map<String, Object>> subtasks = generateSubtasks(taskId, files, resolvedTargets, agentDirMap);
+            String sourceDir = null;
+            if (scanRequest instanceof Map)
+            {
+                sourceDir = (String) ((Map<?, ?>) scanRequest).get("baseDir");
+            }
+            List<Map<String, Object>> subtasks = generateSubtasks(taskId, sourceAgentId, sourceDir, files, resolvedTargets, agentDirMap, preserveDirStructure);
 
             persistSubtasks(taskId, subtasks);
 
@@ -180,19 +185,44 @@ public class BatchTaskScheduler
     {
         String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
         logger.info("Pause task {} on agent {}", taskId, resolvedUrl);
+        sendTaskControlToAgent(resolvedUrl, "pause", taskId);
     }
 
     public void resumeTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl)
     {
         String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
         logger.info("Resume task {} on agent {}", taskId, resolvedUrl);
+        sendTaskControlToAgent(resolvedUrl, "resume", taskId);
     }
 
     public void cancelTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl)
     {
         String resolvedUrl = resolveAgentApiUrl(sourceAgentId, sourceAgentApiUrl);
         logger.info("Cancel task {} on agent {}", taskId, resolvedUrl);
+        sendTaskControlToAgent(resolvedUrl, "cancel", taskId);
         removeScanScheduleFromAgent(resolvedUrl, taskId);
+    }
+
+    private void sendTaskControlToAgent(String agentUrl, String action, Long taskId)
+    {
+        try
+        {
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("action", action);
+            request.put("taskId", taskId);
+
+            RestClient restClient = createRestClientForUrl(agentUrl);
+            restClient.post()
+                    .uri("/api/internal/batch/task-control")
+                    .body(request)
+                    .retrieve()
+                    .body(Map.class);
+            logger.info("Sent {} command to agent[{}] for task {}", action, agentUrl, taskId);
+        }
+        catch (Exception e)
+        {
+            logger.warn("Failed to send {} command to agent[{}] for task {}: {}", action, agentUrl, taskId, e.getMessage());
+        }
     }
 
     public void updateTaskConfig(Long taskId, String sourceAgentId, String sourceAgentApiUrl,
@@ -232,7 +262,11 @@ public class BatchTaskScheduler
         for (Map<String, Object> subtask : subtasks)
         {
             String filePath = (String) subtask.get("filePath");
-            String fileName = filePath.contains("/") ? filePath.substring(filePath.lastIndexOf("/") + 1) : filePath;
+            String fileName = (String) subtask.get("fileName");
+            if (fileName == null)
+            {
+                fileName = filePath.contains("/") ? filePath.substring(filePath.lastIndexOf("/") + 1) : filePath;
+            }
             long fileSizeBytes = subtask.get("fileSizeBytes") instanceof Number ? ((Number) subtask.get("fileSizeBytes")).longValue() : 0L;
             String targetAgentId = (String) subtask.get("targetAgentId");
             Object md5Obj = subtask.get("fileMd5");
@@ -244,18 +278,34 @@ public class BatchTaskScheduler
 
             if (fileMd5 != null || fileLastModified != null) {
                 jdbcTemplate.update(
-                        "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
-                                "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
+                        "INSERT INTO batch_transfer_subtask (task_id, source_agent_id, source_agent_name, " +
+                                "target_agent_id, target_agent_name, source_path, target_path, file_name, file_size_bytes, " +
+                                "status, transferred_chunks, total_chunks, transferred_bytes, " +
                                 "retry_count, proxy_retry_count, create_time, update_time, file_md5, file_last_modified) " +
-                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?)",
-                        taskId, filePath, fileName, fileSizeBytes, targetAgentId, fileMd5, fileLastModified);
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW(), ?, ?)",
+                        taskId,
+                        subtask.get("sourceAgentId"),
+                        subtask.get("sourceAgentName"),
+                        targetAgentId,
+                        subtask.get("targetAgentName"),
+                        subtask.get("sourcePath"),
+                        subtask.get("targetPath"),
+                        fileName, fileSizeBytes, fileMd5, fileLastModified);
             } else {
                 jdbcTemplate.update(
-                        "INSERT INTO batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, " +
-                                "target_agent_id, status, transferred_chunks, total_chunks, transferred_bytes, " +
+                        "INSERT INTO batch_transfer_subtask (task_id, source_agent_id, source_agent_name, " +
+                                "target_agent_id, target_agent_name, source_path, target_path, file_name, file_size_bytes, " +
+                                "status, transferred_chunks, total_chunks, transferred_bytes, " +
                                 "retry_count, proxy_retry_count, create_time, update_time) " +
-                                "VALUES (?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW())",
-                        taskId, filePath, fileName, fileSizeBytes, targetAgentId);
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'QUEUED', 0, 0, 0, 0, 0, NOW(), NOW())",
+                        taskId,
+                        subtask.get("sourceAgentId"),
+                        subtask.get("sourceAgentName"),
+                        targetAgentId,
+                        subtask.get("targetAgentName"),
+                        subtask.get("sourcePath"),
+                        subtask.get("targetPath"),
+                        fileName, fileSizeBytes);
             }
             inserted++;
 
@@ -309,10 +359,16 @@ public class BatchTaskScheduler
     }
 
     private List<Map<String, Object>> generateSubtasks(Long taskId,
+                                                       String sourceAgentId,
+                                                       String sourceDir,
                                                        List<Map<String, Object>> scannedFiles,
                                                        Map<String, List<String>> resolvedTargets,
-                                                       Map<String, String> agentDirMap)
+                                                       Map<String, String> agentDirMap,
+                                                       Integer preserveDirStructure)
     {
+        String sourceAgentName = lookupAgentName(sourceAgentId);
+        Map<String, String> targetAgentNameCache = new LinkedHashMap<>();
+
         List<Map<String, Object>> subtasks = new ArrayList<>();
         long subtaskSeq = 1;
         for (Map<String, Object> file : scannedFiles)
@@ -321,16 +377,24 @@ public class BatchTaskScheduler
             List<String> targets = resolvedTargets.getOrDefault(relativePath, List.of());
             for (String targetAgentId : targets)
             {
+                String fileName = relativePath.contains("/") ? relativePath.substring(relativePath.lastIndexOf("/") + 1) : relativePath;
+                String targetDir = agentDirMap.getOrDefault(targetAgentId, "/tmp");
+
                 Map<String, Object> subtask = new LinkedHashMap<>();
                 subtask.put("subtaskId", subtaskSeq++);
                 subtask.put("taskId", taskId);
+                subtask.put("sourceAgentId", sourceAgentId);
+                subtask.put("sourceAgentName", sourceAgentName);
+                subtask.put("targetAgentId", targetAgentId);
+                subtask.put("targetAgentName", targetAgentNameCache.computeIfAbsent(targetAgentId, this::lookupAgentName));
                 subtask.put("filePath", relativePath);
-                subtask.put("fileName", relativePath.contains("/") ? relativePath.substring(relativePath.lastIndexOf("/") + 1) : relativePath);
+                subtask.put("fileName", fileName);
+                subtask.put("sourcePath", buildSourcePath(sourceDir, relativePath));
+                subtask.put("targetPath", buildTargetPath(targetDir, relativePath, fileName, preserveDirStructure));
                 subtask.put("fileSizeBytes", file.get("sizeBytes"));
                 if (file.get("md5") != null) subtask.put("fileMd5", String.valueOf(file.get("md5")));
                 if (file.get("lastModified") != null) subtask.put("fileLastModified", file.get("lastModified"));
-                subtask.put("targetAgentId", targetAgentId);
-                subtask.put("targetDir", agentDirMap.getOrDefault(targetAgentId, "/tmp"));
+                subtask.put("targetDir", targetDir);
                 subtask.put("priority", 5);
 
                 String targetApiUrl = resolveTargetAgentUrl(targetAgentId);
@@ -385,6 +449,39 @@ public class BatchTaskScheduler
             map.put(targetAgents.get(i), dirs[i].trim());
         }
         return map;
+    }
+
+    private String lookupAgentName(String agentId)
+    {
+        if (agentId == null) return null;
+        try
+        {
+            Map<String, Object> row = jdbcTemplate.queryForMap("SELECT node_name FROM agent_registry WHERE id = ?", agentId);
+            return (String) row.get("node_name");
+        }
+        catch (Exception e)
+        {
+            logger.debug("Failed to lookup agent name for {}: {}", agentId, e.getMessage());
+            return agentId;
+        }
+    }
+
+    private String buildSourcePath(String sourceDir, String relativePath)
+    {
+        if (sourceDir == null || sourceDir.isEmpty()) return relativePath;
+        if (sourceDir.endsWith("/")) return sourceDir + relativePath;
+        return sourceDir + "/" + relativePath;
+    }
+
+    private String buildTargetPath(String targetDir, String relativePath, String fileName, Integer preserveDirStructure)
+    {
+        if (targetDir == null) targetDir = "/tmp";
+        String base = targetDir.endsWith("/") ? targetDir : targetDir + "/";
+        if (preserveDirStructure != null && preserveDirStructure == 1)
+        {
+            return base + relativePath;
+        }
+        return base + (fileName != null ? fileName : relativePath);
     }
 
     private void pushScanScheduleToAgent(String agentUrl, Long taskId, String cronExpression,

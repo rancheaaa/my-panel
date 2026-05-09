@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BatchScanScheduler {
     private static final Logger log = LoggerFactory.getLogger(BatchScanScheduler.class);
@@ -30,6 +32,7 @@ public class BatchScanScheduler {
     private final PersistentMap<String, ScanConfig> configStore;
     private final String dataDir;
     private final int localPort;
+    private final Set<Long> pausedTaskIds = ConcurrentHashMap.newKeySet();
 
     public BatchScanScheduler(BatchFileScanner scanner, ProxyReportClient reportClient, String dataDir, int localPort)
             throws SchedulerException, RocksDBException {
@@ -142,6 +145,24 @@ public class BatchScanScheduler {
         return configStore.get(String.valueOf(taskId));
     }
 
+    public void pauseTask(Long taskId) {
+        if (taskId != null) {
+            pausedTaskIds.add(taskId);
+            log.info("Task {} paused in scan scheduler", taskId);
+        }
+    }
+
+    public void resumeTask(Long taskId) {
+        if (taskId != null) {
+            pausedTaskIds.remove(taskId);
+            log.info("Task {} resumed in scan scheduler", taskId);
+        }
+    }
+
+    public boolean isPaused(Long taskId) {
+        return taskId != null && pausedTaskIds.contains(taskId);
+    }
+
     private void restoreAllJobs() {
         List<Map.Entry<String, ScanConfig>> entries = configStore.entrySet();
         for (Map.Entry<String, ScanConfig> entry : entries) {
@@ -198,6 +219,11 @@ public class BatchScanScheduler {
                     context.getScheduler().deleteJob(context.getJobDetail().getKey());
                 } catch (Exception ignored) {
                 }
+                return;
+            }
+
+            if (scheduler.isPaused(taskId)) {
+                jobLog.info("[Cron] Task {} is paused, skipping scan", taskId);
                 return;
             }
 

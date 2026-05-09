@@ -50,47 +50,6 @@ public class ProxyReportClient
         }, reportExecutor);
     }
 
-    public void reportQueueSnapshot(QueueSnapshotReport snapshot)
-    {
-        try
-        {
-            postApi("/api/internal/batch/queue/snapshot", snapshot);
-        }
-        catch (Exception e)
-        {
-            logger.warn("Failed to report queue snapshot: {}", e.getMessage());
-        }
-    }
-
-    public void reportPostProcessResult(Long taskId, Object result)
-    {
-        try
-        {
-            postApi("/api/internal/batch/post-process-result", result);
-        }
-        catch (Exception e)
-        {
-            logger.warn("Failed to report post-process result for task {}: {}", taskId, e.getMessage());
-        }
-    }
-
-    public void asyncReportAgentState(String agentId, java.util.List<java.util.Map<String, Object>> transfers)
-    {
-        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-        body.put("agentId", agentId);
-        body.put("transfers", transfers);
-        CompletableFuture.runAsync(() -> {
-            try
-            {
-                postApi("/api/v1/batch/agent-state", body);
-            }
-            catch (Exception e)
-            {
-                logger.warn("Failed to report agent state: {}", e.getMessage());
-            }
-        }, reportExecutor);
-    }
-
     private void postApi(String endpoint, Object body) throws Exception
     {
         String json = gson.toJson(body);

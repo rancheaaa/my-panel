@@ -36,7 +36,8 @@ public class RetryScheduler
     @Transactional
     public void scanAndRedispatch()
     {
-        String sql = "SELECT id, task_id, file_path, file_name, file_size_bytes, target_agent_id, " +
+        String sql = "SELECT id, task_id, source_agent_id, source_agent_name, source_path, target_path, " +
+                "file_name, file_size_bytes, target_agent_id, target_agent_name, " +
                 "retry_count, proxy_retry_count FROM batch_transfer_subtask " +
                 "WHERE status = 'FAILED' AND next_retry_after <= NOW() " +
                 "AND task_id IN (SELECT id FROM batch_transfer_task WHERE status = 'RUNNING' AND retry_enabled = 1) " +
@@ -52,7 +53,6 @@ public class RetryScheduler
         {
             Long subtaskId = ((Number) subtask.get("id")).longValue();
             Long taskId = ((Number) subtask.get("task_id")).longValue();
-            String filePath = (String) subtask.get("file_path");
             String targetAgentId = (String) subtask.get("target_agent_id");
             try
             {
@@ -76,11 +76,16 @@ public class RetryScheduler
                 Map<String, Object> retryItem = new java.util.LinkedHashMap<>();
                 retryItem.put("subtaskId", subtaskId);
                 retryItem.put("taskId", taskId);
-                retryItem.put("filePath", filePath);
+                retryItem.put("filePath", subtask.get("source_path"));
                 retryItem.put("fileName", subtask.get("file_name"));
                 retryItem.put("fileSizeBytes", subtask.get("file_size_bytes"));
                 retryItem.put("targetAgentId", targetAgentId);
                 retryItem.put("targetDir", agentTargetDir);
+                retryItem.put("sourceAgentId", subtask.get("source_agent_id"));
+                retryItem.put("sourceAgentName", subtask.get("source_agent_name"));
+                retryItem.put("targetAgentName", subtask.get("target_agent_name"));
+                retryItem.put("sourcePath", subtask.get("source_path"));
+                retryItem.put("targetPath", subtask.get("target_path"));
                 retryItem.put("priority", 5);
                 Map<String, Object> dispatchRequest = new java.util.LinkedHashMap<>();
                 dispatchRequest.put("dispatchId", "retry-" + subtaskId);

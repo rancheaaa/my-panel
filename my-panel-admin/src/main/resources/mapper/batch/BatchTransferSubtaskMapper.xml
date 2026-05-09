@@ -5,12 +5,16 @@
     <resultMap type="BatchTransferSubtask" id="BatchTransferSubtaskResult">
         <result property="id"    column="id"    />
         <result property="taskId"    column="task_id"    />
-        <result property="filePath"    column="file_path"    />
+        <result property="sourceAgentId"    column="source_agent_id"    />
+        <result property="sourceAgentName"    column="source_agent_name"    />
+        <result property="targetAgentId"    column="target_agent_id"    />
+        <result property="targetAgentName"    column="target_agent_name"    />
+        <result property="sourcePath"    column="source_path"    />
+        <result property="targetPath"    column="target_path"    />
         <result property="fileName"    column="file_name"    />
         <result property="fileSizeBytes"    column="file_size_bytes"    />
         <result property="fileMd5"    column="file_md5"    />
         <result property="fileLastModified"    column="file_last_modified"    />
-        <result property="targetAgentId"    column="target_agent_id"    />
         <result property="status"    column="status"    />
         <result property="transferId"    column="transfer_id"    />
         <result property="transferredChunks"    column="transferred_chunks"    />
@@ -35,8 +39,9 @@
     </resultMap>
 
     <sql id="selectBatchTransferSubtaskVo">
-        select id, task_id, file_path, file_name, file_size_bytes, file_md5, file_last_modified,
-               target_agent_id, status, transfer_id, transferred_chunks, total_chunks, transferred_bytes,
+        select id, task_id, source_agent_id, source_agent_name, target_agent_id, target_agent_name,
+               source_path, target_path, file_name, file_size_bytes, file_md5, file_last_modified,
+               status, transfer_id, transferred_chunks, total_chunks, transferred_bytes,
                speed_bytes_per_sec, started_at, completed_at, duration_ms, error_code, error_message,
                error_stack_trace, retry_count, proxy_retry_count, last_retry_at, next_retry_after,
                create_by, create_time, update_by, update_time, remark
@@ -82,24 +87,32 @@
         insert into batch_transfer_subtask
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="taskId != null">task_id,</if>
-            <if test="filePath != null and filePath != ''">file_path,</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">source_agent_id,</if>
+            <if test="sourceAgentName != null and sourceAgentName != ''">source_agent_name,</if>
+            <if test="targetAgentId != null and targetAgentId != ''">target_agent_id,</if>
+            <if test="targetAgentName != null and targetAgentName != ''">target_agent_name,</if>
+            <if test="sourcePath != null and sourcePath != ''">source_path,</if>
+            <if test="targetPath != null and targetPath != ''">target_path,</if>
             <if test="fileName != null and fileName != ''">file_name,</if>
             <if test="fileSizeBytes != null">file_size_bytes,</if>
             <if test="fileMd5 != null">file_md5,</if>
             <if test="fileLastModified != null">file_last_modified,</if>
-            <if test="targetAgentId != null and targetAgentId != ''">target_agent_id,</if>
             <if test="status != null">status,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="taskId != null">#{taskId},</if>
-            <if test="filePath != null and filePath != ''">#{filePath},</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">#{sourceAgentId},</if>
+            <if test="sourceAgentName != null and sourceAgentName != ''">#{sourceAgentName},</if>
+            <if test="targetAgentId != null and targetAgentId != ''">#{targetAgentId},</if>
+            <if test="targetAgentName != null and targetAgentName != ''">#{targetAgentName},</if>
+            <if test="sourcePath != null and sourcePath != ''">#{sourcePath},</if>
+            <if test="targetPath != null and targetPath != ''">#{targetPath},</if>
             <if test="fileName != null and fileName != ''">#{fileName},</if>
             <if test="fileSizeBytes != null">#{fileSizeBytes},</if>
             <if test="fileMd5 != null">#{fileMd5},</if>
             <if test="fileLastModified != null">#{fileLastModified},</if>
-            <if test="targetAgentId != null and targetAgentId != ''">#{targetAgentId},</if>
             <if test="status != null">#{status},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -107,10 +120,12 @@
     </insert>
 
     <insert id="batchInsertSubtasks" parameterType="java.util.List">
-        insert into batch_transfer_subtask (task_id, file_path, file_name, file_size_bytes, file_md5, file_last_modified, target_agent_id, status, create_time)
+        insert into batch_transfer_subtask (task_id, source_agent_id, source_agent_name, target_agent_id, target_agent_name,
+            source_path, target_path, file_name, file_size_bytes, file_md5, file_last_modified, status, create_time)
         values
         <foreach item="item" collection="list" separator=",">
-            (#{item.taskId}, #{item.filePath}, #{item.fileName}, #{item.fileSizeBytes}, #{item.fileMd5}, #{item.fileLastModified}, #{item.targetAgentId}, #{item.status}, #{item.createTime})
+            (#{item.taskId}, #{item.sourceAgentId}, #{item.sourceAgentName}, #{item.targetAgentId}, #{item.targetAgentName},
+             #{item.sourcePath}, #{item.targetPath}, #{item.fileName}, #{item.fileSizeBytes}, #{item.fileMd5}, #{item.fileLastModified}, #{item.status}, #{item.createTime})
         </foreach>
     </insert>
 

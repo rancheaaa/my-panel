@@ -1,12 +1,7 @@
 package com.cq.panel.admin.server.web.converter.batch;
 
-import com.cq.panel.admin.server.repository.domain.BatchAlertEvent;
-import com.cq.panel.admin.server.repository.domain.BatchTransferSubtask;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.web.domain.dto.batch.BatchTaskCreateDTO;
-import com.cq.panel.admin.server.web.domain.dto.batch.BatchTaskQueryDTO;
-import com.cq.panel.admin.server.web.domain.vo.batch.BatchAlertEventVO;
-import com.cq.panel.admin.server.web.domain.vo.batch.BatchSubtaskVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.BatchTaskVO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -26,19 +21,7 @@ public interface BatchTransferConverter
     @Mapping(target = "preserveDirStructure", source = "preserveDirStructure", qualifiedByName = "booleanToInteger")
     BatchTransferTask toEntity(BatchTaskCreateDTO dto);
 
-    BatchTransferTask toEntity(BatchTaskQueryDTO query);
-
-    BatchTaskVO toVO(BatchTransferTask entity);
-
     List<BatchTaskVO> toVOList(List<BatchTransferTask> list);
-
-    BatchSubtaskVO toSubtaskVO(BatchTransferSubtask entity);
-
-    List<BatchSubtaskVO> toSubtaskVOList(List<BatchTransferSubtask> list);
-
-    BatchAlertEventVO toAlertVO(BatchAlertEvent entity);
-
-    List<BatchAlertEventVO> toAlertVOList(List<BatchAlertEvent> list);
 
     @Named("listToString")
     default String listToString(List<String> list)

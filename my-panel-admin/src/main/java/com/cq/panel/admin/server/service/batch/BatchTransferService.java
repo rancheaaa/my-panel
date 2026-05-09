@@ -1,15 +1,12 @@
 package com.cq.panel.admin.server.service.batch;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cq.panel.admin.server.common.enums.OperationType;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.domain.BatchTransferOperationLog;
-import com.cq.panel.admin.server.repository.domain.BatchTransferStatistics;
 import com.cq.panel.admin.server.repository.domain.BatchTransferSubtask;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
 import com.cq.panel.admin.server.repository.service.IBatchTransferOperationLogService;
-import com.cq.panel.admin.server.repository.service.IBatchTransferStatisticsService;
 import com.cq.panel.admin.server.repository.service.IBatchTransferSubtaskService;
 import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
 import com.cq.panel.admin.server.web.converter.batch.BatchTransferConverter;
@@ -27,7 +24,6 @@ import java.util.*;
 @Service
 public class BatchTransferService {
     private static final Logger logger = LoggerFactory.getLogger(BatchTransferService.class);
-    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
     public static final String STATUS_DRAFT = "DRAFT";
     public static final String STATUS_RUNNING = "RUNNING";
@@ -37,7 +33,6 @@ public class BatchTransferService {
     private final IBatchTransferTaskService batchTransferTaskService;
     private final IBatchTransferSubtaskService batchTransferSubtaskService;
     private final IBatchTransferOperationLogService batchTransferOperationLogService;
-    private final IBatchTransferStatisticsService statisticsService;
     private final IAgentRegistryService agentRegistryService;
     private final ProxyApiClient proxyApiClient;
     private final BatchTransferConverter batchTransferConverter;
@@ -45,14 +40,12 @@ public class BatchTransferService {
     public BatchTransferService(IBatchTransferTaskService batchTransferTaskService,
             IBatchTransferSubtaskService batchTransferSubtaskService,
             IBatchTransferOperationLogService batchTransferOperationLogService,
-            IBatchTransferStatisticsService statisticsService,
             IAgentRegistryService agentRegistryService,
             ProxyApiClient proxyApiClient,
             BatchTransferConverter batchTransferConverter) {
         this.batchTransferTaskService = batchTransferTaskService;
         this.batchTransferSubtaskService = batchTransferSubtaskService;
         this.batchTransferOperationLogService = batchTransferOperationLogService;
-        this.statisticsService = statisticsService;
         this.agentRegistryService = agentRegistryService;
         this.proxyApiClient = proxyApiClient;
         this.batchTransferConverter = batchTransferConverter;
@@ -125,7 +118,6 @@ public class BatchTransferService {
                 throw new RuntimeException("Proxy启动任务失败: " + result.get("message"));
             }
             updateTaskFromProxyResult(taskId, result);
-            refreshStatistics(taskId);
             logOperation(taskId, OperationType.START, oldStatus, STATUS_RUNNING, operatorId, operatorName);
         } catch (Exception e) {
             logger.error("Failed to start task {} via proxy: {}", taskId, e.getMessage(), e);
@@ -153,7 +145,6 @@ public class BatchTransferService {
                     e.getMessage());
         }
         batchTransferTaskService.updateStatus(taskId, STATUS_PAUSED);
-        refreshStatistics(taskId);
         logOperation(taskId, OperationType.PAUSE, oldStatus, STATUS_PAUSED, operatorId, operatorName);
     }
 
@@ -174,7 +165,6 @@ public class BatchTransferService {
                     e.getMessage());
         }
         batchTransferTaskService.updateStatus(taskId, STATUS_RUNNING);
-        refreshStatistics(taskId);
         logOperation(taskId, OperationType.RESUME, STATUS_PAUSED, STATUS_RUNNING, operatorId, operatorName);
     }
 
@@ -251,7 +241,6 @@ public class BatchTransferService {
         }
         
         batchTransferSubtaskService.updateStatus(subtaskId, "QUEUED");
-        refreshStatistics(taskId);
         logOperation(taskId, OperationType.MANUAL_RETRY, null, "subtaskId=" + subtaskId, operatorId, operatorName);
     }
 
@@ -275,14 +264,6 @@ public class BatchTransferService {
         return computeSubtaskSummary(taskId, subtasks);
     }
 
-    public BatchTransferStatistics getStatistics(Long taskId) {
-        BatchTransferStatistics stats = statisticsService.selectByTaskId(taskId);
-        if (stats == null) {
-            stats = refreshStatistics(taskId);
-        }
-        return stats;
-    }
-
     public void deleteTasks(Long[] ids) {
         for (Long id : ids) {
             BatchTransferTask task = batchTransferTaskService.selectById(id);
@@ -291,150 +272,6 @@ public class BatchTransferService {
             }
         }
         batchTransferTaskService.deleteByIds(ids);
-        statisticsService.deleteByTaskIds(ids);
-    }
-
-    public BatchTransferStatistics refreshStatistics(Long taskId) {
-        List<BatchTransferSubtask> subtasks = batchTransferSubtaskService.selectByTaskId(taskId);
-        SubtaskSummary summary = computeSubtaskSummary(taskId, subtasks);
-
-        BatchTransferTask task = batchTransferTaskService.selectById(taskId);
-
-        BatchTransferStatistics stats = new BatchTransferStatistics();
-        stats.setTaskId(taskId);
-        stats.setSnapshotTime(new Date());
-
-        stats.setTotalSubtasks(summary.getTotalSubtasks());
-        stats.setCompletedCount(summary.getCompletedCount());
-        stats.setFailedCount(summary.getFailedCount());
-        stats.setRunningCount(summary.getRunningCount());
-        stats.setQueuedCount(summary.getQueuedCount());
-        stats.setRetryingCount(summary.getRetryingCount());
-        stats.setCancelledCount(summary.getCancelledCount());
-
-        stats.setTotalSizeBytes(summary.getTotalSizeBytes());
-        stats.setTransferredBytes(summary.getTransferredSizeBytes());
-        stats.setTransferredFiles(summary.getCompletedCount());
-        stats.setFailedFiles(summary.getFailedCount());
-        stats.setRemainingBytes(summary.getTotalSizeBytes() - summary.getTransferredSizeBytes());
-        stats.setProgressPercent(summary.getProgressPercent());
-
-        stats.setStartedAt(task != null ? task.getStartedAt() : null);
-        stats.setLastActivityAt(new Date());
-
-        // 速度指标
-        List<BatchTransferSubtask> completedWithSpeed = subtasks.stream()
-                .filter(s -> "COMPLETED".equals(s.getStatus()) && s.getSpeedBytesPerSec() != null && s.getSpeedBytesPerSec() > 0)
-                .toList();
-        if (!completedWithSpeed.isEmpty()) {
-            long avgSpeed = (long) completedWithSpeed.stream()
-                    .mapToLong(BatchTransferSubtask::getSpeedBytesPerSec)
-                    .average().orElse(0);
-            long peakSpeed = completedWithSpeed.stream()
-                    .mapToLong(BatchTransferSubtask::getSpeedBytesPerSec)
-                    .max().orElse(0);
-            stats.setAvgSpeedBytesPerSec(avgSpeed);
-            stats.setPeakSpeedBytesPerSec(peakSpeed);
-        }
-
-        // 时间指标
-        List<BatchTransferSubtask> completedWithTime = subtasks.stream()
-                .filter(s -> "COMPLETED".equals(s.getStatus()) && s.getStartedAt() != null)
-                .toList();
-        if (!completedWithTime.isEmpty()) {
-            Date firstStarted = completedWithTime.stream()
-                    .map(BatchTransferSubtask::getStartedAt)
-                    .filter(java.util.Objects::nonNull)
-                    .min(Date::compareTo).orElse(null);
-            stats.setFirstFileStartedAt(firstStarted);
-        }
-        if (task != null && task.getStartedAt() != null) {
-            stats.setTotalElapsedMs(System.currentTimeMillis() - task.getStartedAt().getTime());
-        }
-        List<BatchTransferSubtask> completedWithDuration = subtasks.stream()
-                .filter(s -> "COMPLETED".equals(s.getStatus()) && s.getDurationMs() != null && s.getDurationMs() > 0)
-                .toList();
-        if (!completedWithDuration.isEmpty()) {
-            long avgDuration = (long) completedWithDuration.stream()
-                    .mapToLong(BatchTransferSubtask::getDurationMs)
-                    .average().orElse(0);
-            stats.setAvgDurationPerFileMs(avgDuration);
-        }
-
-        // 重试统计
-        long totalRetry = subtasks.stream()
-                .filter(s -> s.getRetryCount() != null)
-                .mapToInt(BatchTransferSubtask::getRetryCount)
-                .sum();
-        int proxyRetrySum = subtasks.stream()
-                .filter(s -> s.getProxyRetryCount() != null)
-                .mapToInt(BatchTransferSubtask::getProxyRetryCount)
-                .sum();
-        stats.setTotalRetryCount((int) totalRetry + proxyRetrySum);
-
-        int failedWithRetries = (int) subtasks.stream()
-                .filter(s -> "FAILED".equals(s.getStatus()) && s.getRetryCount() != null && s.getRetryCount() > 0)
-                .count();
-        stats.setMaxSingleFileRetries(failedWithRetries > 0
-                ? subtasks.stream().filter(s -> "FAILED".equals(s.getStatus()) && s.getRetryCount() != null)
-                        .mapToInt(BatchTransferSubtask::getRetryCount).max().orElse(0)
-                : 0);
-        if (failedWithRetries > 0) {
-            double avg = subtasks.stream()
-                    .filter(s -> "FAILED".equals(s.getStatus()) && s.getRetryCount() != null)
-                    .mapToInt(BatchTransferSubtask::getRetryCount)
-                    .average().orElse(0);
-            stats.setAvgRetryCount(BigDecimal.valueOf(avg).setScale(2, BigDecimal.ROUND_HALF_UP));
-        }
-
-        // 错误分布
-        Map<String, Long> errorDist = subtasks.stream()
-                .filter(s -> "FAILED".equals(s.getStatus()) && s.getErrorCode() != null && !s.getErrorCode().isEmpty())
-                .collect(java.util.stream.Collectors.groupingBy(
-                        BatchTransferSubtask::getErrorCode, java.util.stream.Collectors.counting()));
-        if (!errorDist.isEmpty()) {
-            try { stats.setErrorTypeDistribution(JSON_MAPPER.writeValueAsString(errorDist)); } catch (Exception ignored) {}
-            Map.Entry<String, Long> topError = errorDist.entrySet().stream()
-                    .max(Map.Entry.comparingByValue()).orElse(null);
-            if (topError != null) {
-                stats.setTopErrorCode(topError.getKey());
-                // 取该错误码对应的最新errorMessage
-                subtasks.stream()
-                        .filter(s -> "FAILED".equals(s.getStatus()) && topError.getKey().equals(s.getErrorCode())
-                                && s.getErrorMessage() != null && !s.getErrorMessage().isEmpty())
-                        .findFirst()
-                        .ifPresent(s -> stats.setTopErrorMessage(s.getErrorMessage()));
-            }
-        }
-
-        // 按目标Agent统计
-        Map<String, Map<String, Object>> agentStats = subtasks.stream()
-                .filter(s -> s.getTargetAgentId() != null)
-                .collect(java.util.stream.Collectors.groupingBy(
-                        BatchTransferSubtask::getTargetAgentId,
-                        java.util.stream.Collectors.collectingAndThen(
-                                java.util.stream.Collectors.toList(),
-                                list -> {
-                                    Map<String, Object> m = new java.util.LinkedHashMap<>();
-                                    m.put("total", list.size());
-                                    m.put("completed", list.stream().filter(s -> "COMPLETED".equals(s.getStatus())).count());
-                                    m.put("failed", list.stream().filter(s -> "FAILED".equals(s.getStatus())).count());
-                                    m.put("totalBytes", list.stream().mapToLong(s -> s.getFileSizeBytes() != null ? s.getFileSizeBytes() : 0).sum());
-                                    return m;
-                                })));
-        if (!agentStats.isEmpty()) {
-            try { stats.setTargetAgentStats(JSON_MAPPER.writeValueAsString(agentStats)); } catch (Exception ignored) {}
-        }
-
-        BatchTransferStatistics existing = statisticsService.selectByTaskId(taskId);
-        if (existing != null) {
-            stats.setId(existing.getId());
-            stats.setDataVersion(existing.getDataVersion() != null ? existing.getDataVersion() + 1 : 1);
-            statisticsService.updateByTaskId(stats);
-        } else {
-            statisticsService.insert(stats);
-        }
-        return stats;
     }
 
     private SubtaskSummary computeSubtaskSummary(Long taskId, List<BatchTransferSubtask> subtasks) {

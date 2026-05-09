@@ -88,6 +88,8 @@ public class HandlerFactory {
         handlerMap.put(batchPrefix + "/dispatch", new BatchDispatchHandler(fileService, chunkedTransferService, queueManager));
         handlerMap.put(batchPrefix + "/post-process", new BatchPostProcessHandler(fileService, chunkedTransferService, postTransferHandler));
         
+        handlerMap.put(batchPrefix + "/task-control", new BatchTaskControlHandler(fileService, chunkedTransferService, queueManager, this.scanScheduler));
+
         if (this.scanScheduler != null) {
             handlerMap.put(batchPrefix + "/schedule", new BatchScanScheduleHandler(fileService, chunkedTransferService, this.scanScheduler));
         }

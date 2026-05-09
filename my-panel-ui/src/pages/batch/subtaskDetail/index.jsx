@@ -15,7 +15,6 @@ const SubtaskDetail = () => {
   const [task, setTask] = useState(null);
   const [subtasks, setSubtasks] = useState([]);
   const [enrichedInfo, setEnrichedInfo] = useState(null);
-  const [agentStateMap, setAgentStateMap] = useState({});
   const [loading, setLoading] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -36,11 +35,9 @@ const SubtaskDetail = () => {
             sourceNodeName: data.sourceNodeName,
             targetAgentInfoMap: data.targetAgentInfoMap || {}
           });
-          setAgentStateMap(data.agentStateMap || {});
         } else {
           setSubtasks(data?.rows || data || []);
           setEnrichedInfo(null);
-          setAgentStateMap({});
         }
       }
     } catch {
@@ -125,7 +122,6 @@ const SubtaskDetail = () => {
           loading={loading}
           onRetry={handleRetry}
           enrichedInfo={enrichedInfo}
-          agentStateMap={agentStateMap}
         />
       </Card>
     </div>

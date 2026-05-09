@@ -736,88 +736,19 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输任务表(模板配置)';
 
--- ----------------------------
--- 批量传输统计表（用于监控和运维）
--- 存储任务的实时聚合统计数据，从子任务表动态计算
--- ----------------------------
-CREATE TABLE IF NOT EXISTS `batch_transfer_statistics` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `task_id` bigint NOT NULL COMMENT '关联的批量任务ID',
-    `snapshot_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '快照采集时间',
-
-    -- 子任务聚合统计
-    `total_subtasks` int NOT NULL DEFAULT 0 COMMENT '子任务总数',
-    `completed_count` int NOT NULL DEFAULT 0 COMMENT '已完成子任务数',
-    `failed_count` int NOT NULL DEFAULT 0 COMMENT '失败子任务数',
-    `running_count` int NOT NULL DEFAULT 0 COMMENT '运行中子任务数(SENDING状态)',
-    `queued_count` int NOT NULL DEFAULT 0 COMMENT '排队中子任务数(QUEUED状态)',
-    `retrying_count` int NOT NULL DEFAULT 0 COMMENT '重试中子任务数(RETRYING状态)',
-    `cancelled_count` int NOT NULL DEFAULT 0 COMMENT '已取消子任务数(CANCELLED状态)',
-
-    -- 传输数据统计
-    `total_size_bytes` bigint NOT NULL DEFAULT 0 COMMENT '待传输总大小(字节)',
-    `transferred_bytes` bigint NOT NULL DEFAULT 0 COMMENT '已传输字节数(已完成子任务累计)',
-    `transferred_files` int NOT NULL DEFAULT 0 COMMENT '已完成文件数',
-    `failed_files` int NOT NULL DEFAULT 0 COMMENT '失败文件数',
-    `remaining_bytes` bigint NOT NULL DEFAULT 0 COMMENT '剩余未传输字节数',
-    `progress_percent` decimal(5,2) NOT NULL DEFAULT 0.00 COMMENT '整体进度百分比(0-100)',
-
-    -- 速率和性能指标
-    `avg_speed_bytes_per_sec` bigint DEFAULT NULL COMMENT '平均传输速率(字节/秒)',
-    `peak_speed_bytes_per_sec` bigint DEFAULT NULL COMMENT '峰值传输速率(字节/秒)',
-    `current_speed_bytes_per_sec` bigint DEFAULT NULL COMMENT '当前瞬时速率(字节/秒)',
-
-    -- 时间统计
-    `started_at` datetime DEFAULT NULL COMMENT '任务开始时间(首次启动)',
-    `first_file_started_at` datetime DEFAULT NULL COMMENT '首个文件开始传输时间',
-    `last_activity_at` datetime DEFAULT NULL COMMENT '最后活动时间(最近一次子任务状态变更)',
-    `total_elapsed_ms` bigint DEFAULT NULL COMMENT '总耗时(毫秒,从started_at到现在)',
-    `avg_duration_per_file_ms` bigint DEFAULT NULL COMMENT '平均每文件耗时(毫秒)',
-
-    -- 后处理统计
-    `post_process_completed` int DEFAULT NULL COMMENT '后处理成功文件数',
-    `post_process_failed` int DEFAULT NULL COMMENT '后处理失败文件数',
-    `post_processed_at` datetime DEFAULT NULL COMMENT '后处理完成时间',
-
-    -- 重试统计
-    `total_retry_count` int NOT NULL DEFAULT 0 COMMENT '总重试次数(所有子任务累计)',
-    `successful_retry_count` int DEFAULT NULL COMMENT '重试成功次数',
-    `max_single_file_retries` int DEFAULT NULL COMMENT '单文件最大重试次数',
-    `avg_retry_count` decimal(5,2) DEFAULT NULL COMMENT '平均每失败文件重试次数',
-
-    -- 目标Agent分布统计(JSON)
-    `target_agent_stats` text DEFAULT NULL COMMENT '各目标Agent统计JSON, 例:[{"agentId":"xxx","agentName":"节点A","total":100,"completed":80,"failed":5,"running":10,"bytes":1073741824}]',
-
-    -- 错误分析
-    `error_type_distribution` text DEFAULT NULL COMMENT '错误类型分布JSON, 例:[{"code":"TIMEOUT","count":5,"pct":12.5}]',
-    `top_error_code` varchar(50) DEFAULT NULL COMMENT '最高频错误码',
-    `top_error_message` varchar(500) DEFAULT NULL COMMENT '最高频错误信息摘要',
-
-    -- 预估信息
-    `eta_seconds` int DEFAULT NULL COMMENT '预计剩余时间(秒,基于当前速度)',
-    `estimated_completion_at` datetime DEFAULT NULL COMMENT '预计完成时间',
-
-    -- 元数据
-    `data_version` int NOT NULL DEFAULT 1 COMMENT '数据版本号(用于乐观锁)',
-    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
-    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_task_id` (`task_id`),
-    KEY `idx_snapshot_time` (`snapshot_time`),
-    KEY `idx_progress` (`progress_percent`),
-    KEY `idx_last_activity` (`last_activity_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输统计表(监控和运维用)';
-
 CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `task_id` bigint NOT NULL COMMENT '关联的批量任务ID',
-    `file_path` varchar(1000) NOT NULL COMMENT '文件相对路径(相对于sourceDir)',
+    `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID',
+    `source_agent_name` varchar(100) DEFAULT NULL COMMENT '源节点名称(Proxy补全)',
+    `target_agent_id` varchar(50) NOT NULL COMMENT '目标Agent ID',
+    `target_agent_name` varchar(100) DEFAULT NULL COMMENT '目标节点名称(Proxy补全)',
+    `source_path` varchar(1000) NOT NULL COMMENT '源文件完整路径(sourceDir+relativePath)',
+    `target_path` varchar(1000) NOT NULL COMMENT '目标文件完整路径(targetDir+relativePath)',
     `file_name` varchar(255) NOT NULL COMMENT '文件名(纯文件名,不含路径)',
     `file_size_bytes` bigint NOT NULL COMMENT '文件大小(字节)',
     `file_md5` char(32) DEFAULT NULL COMMENT '文件MD5校验值(32位十六进制)',
     `file_last_modified` datetime DEFAULT NULL COMMENT '文件最后修改时间',
-    `target_agent_id` varchar(50) NOT NULL COMMENT '目标Agent ID',
     `status` varchar(20) NOT NULL DEFAULT 'QUEUED' COMMENT '子任务状态: QUEUED/SENDING/COMPLETED/FAILED/RETRYING/CANCELLED, 设计类型:ENUM',
     `transfer_id` varchar(100) DEFAULT NULL COMMENT '底层分块传输会话ID(关联AgentUploader的transferId)',
     `transferred_chunks` int NOT NULL DEFAULT 0 COMMENT '已传输的分块数',
@@ -840,79 +771,12 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
-    KEY `idx_task_file_target` (`task_id`, `file_path`(255), `target_agent_id`),
+    KEY `idx_task_source_target` (`task_id`, `source_path`(255), `target_agent_id`),
     KEY `idx_task_id` (`task_id`),
     KEY `idx_target_status` (`target_agent_id`, `status`),
     KEY `idx_status_retry` (`status`, `next_retry_after`),
     KEY `idx_transfer_id` (`transfer_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量子任务表(文件×目标Agent的笛卡尔积)';
-
-CREATE TABLE IF NOT EXISTS `batch_transfer_agent_state` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `agent_id` varchar(50) NOT NULL COMMENT 'Agent ID(来源Agent)',
-    `transfer_id` varchar(100) NOT NULL COMMENT '传输会话ID',
-    `subtask_id` bigint DEFAULT NULL COMMENT '关联的子任务ID',
-    `task_id` bigint DEFAULT NULL COMMENT '关联的批量任务ID',
-    `file_path` varchar(1000) DEFAULT NULL COMMENT '本地文件路径',
-    `file_name` varchar(255) DEFAULT NULL COMMENT '文件名',
-    `remote_target_path` varchar(1000) DEFAULT NULL COMMENT '远程目标路径',
-    `status` varchar(30) NOT NULL DEFAULT 'PREPARED' COMMENT 'Agent侧传输状态',
-    `total_size` bigint NOT NULL DEFAULT 0 COMMENT '文件大小(字节)',
-    `chunk_size` int NOT NULL DEFAULT 0 COMMENT '分块大小(字节)',
-    `total_chunks` int NOT NULL DEFAULT 0 COMMENT '总分块数',
-    `transferred_chunks` int NOT NULL DEFAULT 0 COMMENT '已传输分块数',
-    `retry_count` int NOT NULL DEFAULT 0 COMMENT '重试次数',
-    `exception_desc` text DEFAULT NULL COMMENT '错误描述',
-    `create_time_str` varchar(30) DEFAULT NULL COMMENT '任务创建时间(Agent侧)',
-    `update_time_str` varchar(30) DEFAULT NULL COMMENT '最后更新时间(Agent侧)',
-    `enqueued_time` varchar(30) DEFAULT NULL COMMENT '入队时间',
-    `init_upload_start_time` varchar(30) DEFAULT NULL COMMENT '初始化上传开始时间',
-    `init_upload_end_time` varchar(30) DEFAULT NULL COMMENT '初始化上传结束时间',
-    `upload_chunks_start_time` varchar(30) DEFAULT NULL COMMENT '分块上传开始时间',
-    `upload_chunks_end_time` varchar(30) DEFAULT NULL COMMENT '分块上传结束时间',
-    `merge_chunks_start_time` varchar(30) DEFAULT NULL COMMENT '合并分块开始时间',
-    `merge_chunks_end_time` varchar(30) DEFAULT NULL COMMENT '合并分块结束时间',
-    `upload_success_time` varchar(30) DEFAULT NULL COMMENT '上传成功时间',
-    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_transfer_id` (`transfer_id`),
-    KEY `idx_agent_id` (`agent_id`),
-    KEY `idx_task_id` (`task_id`),
-    KEY `idx_subtask_id` (`subtask_id`),
-    KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent侧传输状态表(由Agent定期上报)';
-
-CREATE TABLE IF NOT EXISTS `agent_queue_snapshot` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `agent_id` varchar(50) NOT NULL COMMENT 'Agent ID',
-    `task_id` bigint DEFAULT NULL COMMENT '关联的任务ID(NULL=全局快照)',
-    `send_queue_depth` int NOT NULL DEFAULT 0 COMMENT '当前发送队列深度',
-    `send_queue_peak_depth` int NOT NULL DEFAULT 0 COMMENT '发送队列历史峰值深度',
-    `send_queue_capacity` int NOT NULL DEFAULT 10000 COMMENT '发送队列容量上限',
-    `send_queue_utilization_pct` decimal(5,2) NOT NULL DEFAULT 0.00 COMMENT '发送队列使用率(百分比)',
-    `send_queue_avg_wait_ms` bigint NOT NULL DEFAULT 0 COMMENT '发送队列平均等待时间(毫秒)',
-    `retry_queue_depth` int NOT NULL DEFAULT 0 COMMENT '当前重试队列深度',
-    `retry_queue_peak_depth` int NOT NULL DEFAULT 0 COMMENT '重试队列历史峰值深度',
-    `retry_queue_capacity` int NOT NULL DEFAULT 5000 COMMENT '重试队列容量上限',
-    `retry_next_schedule_time` datetime DEFAULT NULL COMMENT '最近一次计划重试时间',
-    `processing_rate_per_sec` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '处理速率(文件/秒, 过去1分钟滑动平均)',
-    `success_rate_pct` decimal(5,2) NOT NULL DEFAULT 100.00 COMMENT '成功率(百分比, 过去1小时)',
-    `congestion_level` varchar(20) NOT NULL DEFAULT 'NORMAL' COMMENT '堵塞等级: NORMAL/WARNING/CRITICAL, 设计类型:ENUM',
-    `is_congested` tinyint NOT NULL DEFAULT 0 COMMENT '是否处于堵塞状态: 0-否 1-是',
-    `congestion_reason` varchar(500) DEFAULT NULL COMMENT '堵塞原因描述',
-    `error_distribution` text DEFAULT NULL COMMENT '错误原因分布, 例:[{"code":"TIMEOUT","count":5}], 设计类型:JSON',
-    `longest_waiting_tasks` text DEFAULT NULL COMMENT '等待时间最长的Top5任务, 设计类型:JSON',
-    `snapshot_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '快照采集时间',
-    `create_by` varchar(64) DEFAULT '' COMMENT '创建人(系统自动)',
-    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by` varchar(64) DEFAULT '' COMMENT '更新人(系统自动)',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
-    PRIMARY KEY (`id`),
-    KEY `idx_agent_time` (`agent_id`, `snapshot_time`),
-    KEY `idx_congestion` (`is_congested`, `congestion_level`, `snapshot_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent队列状态快照表(用于监控和趋势分析)';
 
 CREATE TABLE IF NOT EXISTS `batch_transfer_operation_log` (
     `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -935,30 +799,3 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_operation_log` (
     KEY `idx_operation_time` (`operation_time`),
     KEY `idx_type_time` (`operation_type`, `operation_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输操作审计日志表';
-
-CREATE TABLE IF NOT EXISTS `batch_alert_event` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `agent_id` varchar(50) DEFAULT NULL COMMENT '相关Agent ID',
-    `task_id` bigint DEFAULT NULL COMMENT '相关任务ID',
-    `alert_level` varchar(20) NOT NULL COMMENT '告警级别: INFO/WARNING/ERROR/CRITICAL, 设计类型:ENUM',
-    `alert_category` varchar(30) NOT NULL COMMENT '告警分类: QUEUE_CONGESTION-队列堵塞/TASK_FAILURE-任务失败/TASK_PARTIAL_FAIL-部分失败/BANDWIDTH_EXCEEDED-带宽超限/AGENT_OFFLINE-Agent离线/SCAN_ERROR-扫描错误/RETRY_EXHAUSTED-重试耗尽/POST_TRANSFER_PARTIAL_FAIL-后处理部分失败, 设计类型:ENUM',
-    `alert_title` varchar(200) NOT NULL COMMENT '告警标题',
-    `alert_message` text NOT NULL COMMENT '告警详细消息',
-    `metrics_snapshot` text DEFAULT NULL COMMENT '触发告警时的关键指标快照, 设计类型:JSON',
-    `is_resolved` tinyint NOT NULL DEFAULT 0 COMMENT '是否已解决: 0-未解决 1-已解决',
-    `resolved_by` varchar(50) DEFAULT NULL COMMENT '解决人',
-    `resolved_at` datetime DEFAULT NULL COMMENT '解决时间',
-    `resolution_note` varchar(500) DEFAULT NULL COMMENT '解决方案备注',
-    `notification_sent` tinyint NOT NULL DEFAULT 0 COMMENT '是否已发送通知: 0-未发送 1-已发送',
-    `notification_channels` text DEFAULT NULL COMMENT '通知渠道, 例:["email","webhook","sms"], 设计类型:JSON',
-    `create_by` varchar(64) DEFAULT '' COMMENT '创建人(系统自动)',
-    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '告警触发时间',
-    `update_by` varchar(64) DEFAULT '' COMMENT '更新人',
-    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
-    PRIMARY KEY (`id`),
-    KEY `idx_level_resolved` (`alert_level`, `is_resolved`),
-    KEY `idx_agent_task` (`agent_id`, `task_id`),
-    KEY `idx_category_time` (`alert_category`, `create_time`),
-    KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输告警事件表';

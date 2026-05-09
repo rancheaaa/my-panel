@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, Row, Col, InputNumber, Switch, Button, Space, Card, Tooltip } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
-import RegionConfigEditor from './RegionConfigEditor';
 
 const parseJsonSafe = (str) => {
   if (!str) return null;
@@ -160,11 +159,6 @@ const TaskConfigDetailModal = ({ visible, onCancel, task, agents = [] }) => {
             <InputNumber style={{ width: '100%' }} />
           </Form.Item></Col>
         </Row>
-        {routingStrategy === 'REGION_BASED' && (
-          <Form.Item name="routingConfig" label="区域路由配置">
-            <RegionConfigEditor disabled />
-          </Form.Item>
-        )}
         <Row gutter={16}>
           <Col span={8}><Form.Item name="postTransferAction" label="传输后操作">
             <Select>

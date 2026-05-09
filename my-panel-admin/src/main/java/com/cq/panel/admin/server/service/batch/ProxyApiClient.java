@@ -111,24 +111,6 @@ public class ProxyApiClient {
         }
     }
 
-    public Map<String, Object> cancelTask(Long taskId, String sourceAgentId, String sourceAgentApiUrl) {
-        logger.info("Sending cancel task request to proxy for task {}", taskId);
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("sourceAgentId", sourceAgentId);
-        body.put("sourceAgentApiUrl", sourceAgentApiUrl);
-        try {
-            return createRestClient()
-                    .put()
-                    .uri("/api/v1/batch/tasks/{taskId}/cancel", taskId)
-                    .body(body)
-                    .retrieve()
-                    .body(Map.class);
-        } catch (Exception e) {
-            logger.error("Failed to cancel task {} via proxy: {}", taskId, e.getMessage(), e);
-            throw new RuntimeException("Proxy取消任务失败: " + e.getMessage(), e);
-        }
-    }
-
     public Map<String, Object> updateTaskConfig(Long taskId, Map<String, Object> request) {
         logger.info("Sending update config request to proxy for task {}", taskId);
         try {

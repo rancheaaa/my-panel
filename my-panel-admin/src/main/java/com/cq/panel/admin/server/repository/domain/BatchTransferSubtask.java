@@ -14,12 +14,16 @@ public class BatchTransferSubtask extends BaseEntity
 
     private Long id;
     private Long taskId;
-    private String filePath;
+    private String sourceAgentId;
+    private String sourceAgentName;
+    private String targetAgentId;
+    private String targetAgentName;
+    private String sourcePath;
+    private String targetPath;
     private String fileName;
     private Long fileSizeBytes;
     private String fileMd5;
     private Date fileLastModified;
-    private String targetAgentId;
     private String status;
     private String transferId;
     private Integer transferredChunks;

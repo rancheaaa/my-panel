@@ -688,3 +688,95 @@ CREATE TABLE IF NOT EXISTS `monitor_alert_event` (
 
 -- 分区建议（MySQL生产环境可启用，H2无需启用）：
 -- ALTER TABLE monitor_metric_sample PARTITION BY RANGE (TO_DAYS(sample_time)) (...)
+
+-- =============================
+-- 批量传输功能相关表
+-- =============================
+
+-- 批量传输任务表(模板配置)
+CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `task_name` varchar(200) NOT NULL COMMENT '任务名称',
+    `task_description` varchar(500) DEFAULT NULL COMMENT '任务描述',
+    `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID',
+    `source_agent_name` varchar(100) NOT NULL COMMENT '源节点名称',
+    `source_dir` varchar(500) NOT NULL COMMENT '源目录绝对路径',
+    `target_dirs` varchar(2000) NOT NULL COMMENT '目标节点目录(分号分隔)',
+    `include_patterns` text DEFAULT NULL COMMENT '包含通配符(JSON数组)',
+    `exclude_patterns` text DEFAULT NULL COMMENT '排除通配符(JSON数组)',
+    `scan_cron_expression` varchar(100) DEFAULT NULL COMMENT '定时扫描Cron表达式(6-7位), 如 "0 */5 * * * ?" 表示每5分钟扫描',
+    `max_scan_files` int NOT NULL DEFAULT 10000 COMMENT '单次最大扫描文件数, 范围[1,100000]',
+    `target_agent_ids` text NOT NULL COMMENT '目标Agent ID列表(JSON数组)',
+    `target_agent_names` text NOT NULL COMMENT '目标节点名称列表(JSON数组, 格式: user@ip:port, 与target_agent_ids一一对应, Admin创建任务时必填)',
+    `retry_enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用自动重试: 0-否 1-是',
+    `retry_max_days` int NOT NULL DEFAULT 7 COMMENT '重试保留天数, 范围[1,30]',
+    `retry_interval_min` int NOT NULL DEFAULT 30 COMMENT '首次重试间隔(分钟), 范围[5,1440]',
+    `max_retry_count` int NOT NULL DEFAULT 10 COMMENT '单个子任务最大重试次数, 范围[1,100]',
+    `retry_backoff_type` varchar(20) NOT NULL DEFAULT 'EXPONENTIAL' COMMENT '重试退避策略: LINEAR(线性)/EXPONENTIAL(指数退避,推荐)',
+    `post_transfer_action` varchar(20) NOT NULL DEFAULT 'NONE' COMMENT '传输后操作: NONE/DELETE/BACKUP',
+    `backup_dir` varchar(500) DEFAULT NULL COMMENT '备份目录绝对路径(post_transfer_action=BACKUP时必填)',
+    `backup_mode` varchar(10) DEFAULT 'COPY' COMMENT '备份模式: COPY/MOVE',
+    `preserve_dir_structure` tinyint NOT NULL DEFAULT 1 COMMENT '是否保持原始目录结构: 0-否 1-是',
+    `transfer_mode` varchar(20) NOT NULL DEFAULT 'ONE_TO_MANY' COMMENT '传输模式: ONE_TO_ONE/ONE_TO_MANY',
+    `routing_strategy` varchar(20) NOT NULL DEFAULT 'BROADCAST' COMMENT '路由策略: BROADCAST/ROUND_ROBIN/REGION_BASED/RANDOM',
+    `routing_config` text DEFAULT NULL COMMENT '路由策略配置JSON(REGION_BASED时必填)',
+    `status` varchar(20) NOT NULL DEFAULT 'READY' COMMENT '任务运行状态: READY-就绪(已配置)/RUNNING-运行中/PAUSED-已暂停',
+    `started_at` datetime DEFAULT NULL COMMENT '首次启动时间',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建人用户ID',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新人用户ID',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标志: 0-未删除 1-已删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_source_agent` (`source_agent_id`),
+    KEY `idx_create_by` (`create_by`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输任务表(模板配置)';
+
+-- 批量传输子任务实例表(每个文件的每次传输)
+CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `task_id` bigint NOT NULL COMMENT '关联的任务ID(外键)',
+    `source_file_path` varchar(1000) NOT NULL COMMENT '源文件绝对路径',
+    `target_agent_id` varchar(50) NOT NULL COMMENT '目标Agent ID',
+    `target_dir` varchar(500) NOT NULL COMMENT '目标目录绝对路径',
+    `status` varchar(20) NOT NULL DEFAULT 'QUEUED' COMMENT '子任务状态: QUEUED-排队中/SENDING-传输中/COMPLETED-已完成/FAILED-失败/RETRYING-重试中',
+    `transferred_chunks` int NOT NULL DEFAULT 0 COMMENT '已传输分片数',
+    `total_chunks` int NOT NULL DEFAULT 0 COMMENT '总分片数(-1表示未知)',
+    `transferred_bytes` bigint NOT NULL DEFAULT 0 COMMENT '已传输字节数',
+    `total_bytes` bigint NOT NULL DEFAULT 0 COMMENT '总字节数(-1表示未知)',
+    `error_message` text DEFAULT NULL COMMENT '失败错误信息',
+    `retry_count` int NOT NULL DEFAULT 0 COMMENT '当前重试次数',
+    `next_retry_at` datetime DEFAULT NULL COMMENT '下次重试时间',
+    `transfer_id` varchar(100) DEFAULT NULL COMMENT 'Agent端传输会话ID(用于断点续传)',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_task_source_target` (`task_id`, `target_agent_id`, `status`),
+    KEY `idx_task_id` (`task_id`),
+    KEY `idx_target_status` (`target_agent_id`, `status`),
+    KEY `idx_status_retry` (`status`, `retry_count`),
+    KEY `idx_transfer_id` (`transfer_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输子任务实例表(每个文件的每次传输)';
+
+-- 批量同步事件队列表(Admin-Proxy异步通信)
+CREATE TABLE IF NOT EXISTS `batch_sync_event` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `event_type` varchar(30) NOT NULL COMMENT '事件类型: TASK_CREATED/TASK_UPDATED/TASK_DELETED/TASK_STATUS_CHANGED',
+    `task_id` bigint DEFAULT NULL COMMENT '关联的任务ID',
+    `source_agent_id` varchar(50) DEFAULT NULL COMMENT '源Agent ID(用于路由)',
+    `payload` text NOT NULL COMMENT '事件负载数据(JSON格式, 包含完整任务/状态配置)',
+    `status` varchar(20) NOT NULL DEFAULT 'PENDING' COMMENT '事件处理状态: PENDING-待处理/PROCESSING-处理中/COMPLETED-已完成/FAILED-失败',
+    `retry_count` int NOT NULL DEFAULT 0 COMMENT '重试次数',
+    `error_message` text DEFAULT NULL COMMENT '错误信息',
+    `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `processed_at` datetime DEFAULT NULL COMMENT '处理完成时间',
+    `expire_at` datetime DEFAULT NULL COMMENT '过期时间(超时未处理的PENDING事件标记为FAILED)',
+    PRIMARY KEY (`id`),
+    KEY `idx_status_created` (`status`, `created_at`),
+    KEY `idx_task_id` (`task_id`),
+    KEY `idx_source_agent` (`source_agent_id`),
+    KEY `idx_expire_at` (`expire_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量同步事件队列表(Admin-Proxy异步通信)';

@@ -475,45 +475,51 @@ INSERT IGNORE INTO `arch_diagram` (`id`, `diagram_name`, `diagram_description`, 
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2300, '批量文件传输', 0, 7, 'batch', NULL, NULL, '', 1, 0, 'M', '0', '0', '', 'SendOutlined', 'admin', NOW(), '', NULL, '批量文件传输目录');
 
--- 15.2 二级菜单：任务管理页面
+-- 15.2 二级菜单：任务列表页面
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
-(2301, '任务管理', 2300, 1, 'task-manage', 'batch/index', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:list', 'FileOutlined', 'admin', NOW(), '', NULL, '批量传输任务管理菜单');
+(2301, '任务列表', 2300, 1, 'task-list', 'batch/TaskListPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:list', 'UnorderedListOutlined', 'admin', NOW(), '', NULL, '批量传输任务列表菜单');
 
--- 15.3 三级按钮：任务操作权限
+-- 15.3 二级菜单：创建任务页面
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(2320, '创建任务', 2300, 2, 'task-create', 'batch/TaskCreatePage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:add', 'PlusCircleOutlined', 'admin', NOW(), '', NULL, '创建批量传输任务菜单');
+
+-- 15.4 二级菜单：统计面板页面
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(2330, '统计面板', 2300, 3, 'statistics', 'batch/StatisticsPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:statistics', 'BarChartOutlined', 'admin', NOW(), '', NULL, '批量传输统计面板菜单');
+
+-- 15.5 三级按钮：任务列表操作权限
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2302, '任务查询', 2301, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:query', '#', 'admin', NOW(), '', NULL, ''),
-(2303, '任务新增', 2301, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:add', '#', 'admin', NOW(), '', NULL, ''),
-(2304, '任务修改', 2301, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:edit', '#', 'admin', NOW(), '', NULL, ''),
-(2305, '任务删除', 2301, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:remove', '#', 'admin', NOW(), '', NULL, ''),
-(2306, '任务导出', 2301, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:export', '#', 'admin', NOW(), '', NULL, ''),
-(2307, '任务启动', 2301, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:start', '#', 'admin', NOW(), '', NULL, ''),
-(2308, '任务暂停', 2301, 7, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:pause', '#', 'admin', NOW(), '', NULL, ''),
-(2309, '任务恢复', 2301, 8, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:resume', '#', 'admin', NOW(), '', NULL, ''),
-(2310, '任务停止', 2301, 9, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:stop', '#', 'admin', NOW(), '', NULL, '');
+(2303, '任务删除', 2301, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:remove', '#', 'admin', NOW(), '', NULL, ''),
+(2304, '任务导出', 2301, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:export', '#', 'admin', NOW(), '', NULL, ''),
+(2305, '任务启动', 2301, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:start', '#', 'admin', NOW(), '', NULL, ''),
+(2306, '任务暂停', 2301, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:pause', '#', 'admin', NOW(), '', NULL, ''),
+(2307, '任务恢复', 2301, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:resume', '#', 'admin', NOW(), '', NULL, ''),
+(2308, '任务停止', 2301, 7, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:stop', '#', 'admin', NOW(), '', NULL, '');
 
--- 15.4 为超级管理员角色(role_id=1)分配批量文件传输菜单权限
+-- 15.6 为超级管理员角色(role_id=1)分配批量文件传输完整权限
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 (1, 2300),
 (1, 2301),
+(1, 2320),
+(1, 2330),
 (1, 2302),
 (1, 2303),
 (1, 2304),
 (1, 2305),
 (1, 2306),
 (1, 2307),
-(1, 2308),
-(1, 2309),
-(1, 2310);
+(1, 2308);
 
--- 15.5 为开发角色(role_id=4)分配批量文件传输菜单权限（只读+基本操作）
+-- 15.7 为开发角色(role_id=4)分配批量文件传输基本权限（列表查看+创建+基本操作）
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 (4, 2300),
 (4, 2301),
+(4, 2320),
+(4, 2330),
 (4, 2302),
 (4, 2303),
-(4, 2304),
 (4, 2305),
+(4, 2306),
 (4, 2307),
-(4, 2308),
-(4, 2309),
-(4, 2310);
+(4, 2308);

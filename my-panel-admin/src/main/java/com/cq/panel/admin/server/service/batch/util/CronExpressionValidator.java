@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.service.batch.util;
 
+import org.springframework.stereotype.Component;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,6 +11,7 @@ import java.util.regex.Pattern;
  * 用于验证Quartz格式的Cron表达式（6位或7位），
  * 提供友好的错误消息和详细的验证结果。
  */
+@Component
 public class CronExpressionValidator {
 
     private static final int[] MAX_VALUES = {59, 23, 31, 12, 7};

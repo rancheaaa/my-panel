@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.service.batch.util;
 
+import org.springframework.stereotype.Component;
+
 import java.io.File;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -11,6 +13,7 @@ import java.util.*;
  * 用于检测两个批量传输任务的文件匹配范围是否存在重叠，
  * 防止同一文件被多个任务重复传输。
  */
+@Component
 public class WildcardConflictDetector {
 
     private static final Set<String> DANGEROUS_PATTERNS = Set.of(

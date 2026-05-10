@@ -1,5 +1,7 @@
 package com.cq.panel.admin.server.service.batch.util;
 
+import org.springframework.stereotype.Component;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
  * 用于将BatchTransferTask实体序列化为JSON格式（用于Agent本地配置持久化），
  * 支持字段过滤、格式转换和特殊字符处理。
  */
+@Component
 public class BatchConfigSerializer {
 
     private final ObjectMapper objectMapper;

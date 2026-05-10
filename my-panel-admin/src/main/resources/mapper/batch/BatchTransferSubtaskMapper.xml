@@ -21,7 +21,7 @@
         <result property="updateTime" column="update_time"/>
     </resultMap>
 
-    <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferSubtask">
+    <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferSubtask" useGeneratedKeys="true" keyProperty="id">
         insert into batch_transfer_subtask (
             task_id, source_file_path, target_agent_id, target_dir, status,
             transferred_chunks, total_chunks, transferred_bytes, total_bytes,
@@ -62,7 +62,7 @@
     <update id="updateStatus">
         update batch_transfer_subtask 
         set status = #{status},
-            <if test="error != null">error_message = #{error},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
             <if test="status == 'RETRYING'">retry_count = retry_count + 1,</if>
             update_time = now()
         where id = #{id}

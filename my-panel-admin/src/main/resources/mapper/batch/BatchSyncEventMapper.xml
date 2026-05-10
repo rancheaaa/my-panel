@@ -16,13 +16,13 @@
         <result property="expireAt" column="expire_at"/>
     </resultMap>
 
-    <insert id="insertEvent" parameterType="com.cq.panel.admin.server.repository.domain.BatchSyncEvent">
+    <insert id="insertEvent" parameterType="com.cq.panel.admin.server.repository.domain.BatchSyncEvent" useGeneratedKeys="true" keyProperty="id">
         insert into batch_sync_event (
             event_type, task_id, source_agent_id, payload, status,
             retry_count, error_message, created_at, expire_at
         ) values (
             #{eventType}, #{taskId}, #{sourceAgentId}, #{payload}, 'PENDING',
-            0, null, now(), date_add(now(), interval 24 hour)
+            0, null, now(), DATE_ADD(now(), INTERVAL 24 HOUR)
         )
     </insert>
 

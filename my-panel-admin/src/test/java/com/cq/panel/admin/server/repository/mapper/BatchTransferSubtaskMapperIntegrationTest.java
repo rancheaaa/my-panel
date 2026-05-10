@@ -278,6 +278,7 @@ class BatchTransferSubtaskMapperIntegrationTest {
         newSubtask.setTotalChunks(50);
         newSubtask.setTransferredBytes(0L);
         newSubtask.setTotalBytes(5242880L);
+        newSubtask.setRetryCount(0);  // ✅ 必填字段
         newSubtask.setCreateTime(new Date());
         newSubtask.setUpdateTime(new Date());
         
@@ -322,6 +323,11 @@ class BatchTransferSubtaskMapperIntegrationTest {
         subtask.setTargetAgentId(targetAgent);
         subtask.setTargetDir("/backup/batch");
         subtask.setStatus("QUEUED");
+        subtask.setTransferredChunks(0);  // ✅ 必填字段
+        subtask.setTotalChunks(100);  // ✅ 必填字段
+        subtask.setTransferredBytes(0L);  // ✅ 必填字段
+        subtask.setTotalBytes(10485760L);  // ✅ 必填字段
+        subtask.setRetryCount(0);  // ✅ 必填字段
         subtask.setCreateTime(new Date());
         subtask.setUpdateTime(new Date());
         return subtask;
@@ -378,8 +384,11 @@ class BatchTransferSubtaskMapperIntegrationTest {
         tempSubtask.setTargetAgentId("agent-001");
         tempSubtask.setTargetDir("/test/target");
         tempSubtask.setStatus("SENDING");
-        tempSubtask.setTransferredChunks(80);
-        tempSubtask.setTotalChunks(100);
+        tempSubtask.setTransferredChunks(80);  // ✅ 必填
+        tempSubtask.setTotalChunks(100);  // ✅ 必填
+        tempSubtask.setTransferredBytes(8388608L);  // ✅ 必填
+        tempSubtask.setTotalBytes(10485760L);  // ✅ 必填
+        tempSubtask.setRetryCount(0);  // ✅ 必填
         tempSubtask.setCreateTime(new Date());
         tempSubtask.setUpdateTime(new Date());
         

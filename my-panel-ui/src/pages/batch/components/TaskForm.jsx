@@ -1,8 +1,65 @@
 import React from 'react';
-import { Form, Input, Select, Button, InputNumber, Switch, Card, Collapse, Divider } from 'antd';
+import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag } from 'antd';
+import {
+  FileTextOutlined,
+  CloudServerOutlined,
+  ClusterOutlined,
+  FilterOutlined,
+  ScheduleOutlined,
+  ReloadOutlined,
+  ToolOutlined,
+  SendOutlined,
+  InfoCircleOutlined,
+  CheckCircleOutlined,
+  QuestionCircleOutlined
+} from '@ant-design/icons';
 
 const { TextArea } = Input;
-const { Panel } = Collapse;
+
+const sectionStyle = {
+  borderRadius: 12,
+  marginBottom: 20,
+  border: '1px solid #f0f0f0',
+  transition: 'all 0.3s ease',
+  overflow: 'hidden'
+};
+
+const headerStyle = (icon, color) => ({
+  background: `linear-gradient(135deg, ${color}11 0%, ${color}22 100%)`,
+  padding: '16px 24px',
+  borderBottom: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10
+});
+
+const titleStyle = {
+  margin: 0,
+  fontSize: 15,
+  fontWeight: 600,
+  color: '#1f1f1f',
+  letterSpacing: '-0.2px'
+};
+
+const iconStyle = (color) => ({
+  fontSize: 18,
+  color: color,
+  background: `${color}18`,
+  padding: 8,
+  borderRadius: 8,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+});
+
+const formItemStyle = {
+  marginBottom: 18
+};
+
+const inputStyle = {
+  borderRadius: 8,
+  height: 40
+};
 
 const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
   const [form] = Form.useForm();
@@ -21,138 +78,336 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
   };
 
   return (
-    <Form form={form} layout="vertical" initialValues={initialValues} onFinish={onFinish}>
-      <Collapse defaultActiveKey={['basic', 'source', 'target', 'file', 'schedule', 'retry', 'post', 'advanced']}>
-
+    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={initialValues}
+        onFinish={onFinish}
+        requiredMark={false}
+        size="large"
+        style={{ marginTop: 8 }}
+      >
         {/* 基本信息 */}
-        <Panel header="基本信息" key="basic">
-          <Form.Item label="任务名称" name="taskName" rules={[{ required: true, message: '请输入任务名称' }]}>
-            <Input placeholder="例如: 日志文件备份任务" maxLength={100} />
+        <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+          <div style={headerStyle('#1890ff', FileTextOutlined)}>
+            <span style={iconStyle('#1890ff')}>
+              <FileTextOutlined />
+            </span>
+            <span style={titleStyle}>基本信息</span>
+            <Tag color="blue" style={{ marginLeft: 'auto', fontSize: 12 }}>必填</Tag>
+          </div>
+          <Row gutter={24}>
+            <Col span={16}>
+              <Form.Item
+                label={<span>任务名称 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                name="taskName"
+                rules={[{ required: true, message: '请输入任务名称' }]}
+                style={formItemStyle}
+              >
+                <Input
+                  placeholder="例如: 生产环境日志文件备份任务"
+                  maxLength={100}
+                  showCount
+                  prefix={<FileTextOutlined style={{ color: '#bfbfbf' }} />}
+                  style={inputStyle}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label="任务描述" name="taskDescription" style={formItemStyle}>
+            <TextArea
+              rows={3}
+              placeholder="简要描述此任务的用途和注意事项..."
+              maxLength={500}
+              showCount
+              style={{ borderRadius: 8 }}
+            />
           </Form.Item>
-          <Form.Item label="任务描述" name="taskDescription">
-            <TextArea rows={3} placeholder="输入任务描述信息（可选）" maxLength={500} />
-          </Form.Item>
-        </Panel>
+        </Card>
 
-        {/* 源节点配置 */}
-        <Panel header="源节点配置" key="source">
-          <Form.Item label="源Agent ID" name="sourceAgentId" rules={[{ required: true, message: '请输入源Agent ID' }]}>
-            <Input placeholder="例如: agent-001" />
-          </Form.Item>
-          <Form.Item label="源目录绝对路径" name="sourceDir" rules={[{ required: true, message: '请输入源目录路径' }]}>
-            <Input placeholder="例如: /var/log/app 或 D:\logs\app" />
-          </Form.Item>
-        </Panel>
+        {/* 源节点 & 目标节点 - 并排布局 */}
+        <Row gutter={20}>
+          <Col span={12}>
+            <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+              <div style={headerStyle('#52c41a', CloudServerOutlined)}>
+                <span style={iconStyle('#52c41a')}>
+                  <CloudServerOutlined />
+                </span>
+                <span style={titleStyle}>源节点配置</span>
+                <Tooltip title="文件来源">
+                  <InfoCircleOutlined style={{ marginLeft: 6, color: '#8c8c8c', cursor: 'pointer' }} />
+                </Tooltip>
+              </div>
+              <Form.Item
+                label={<><CloudServerOutlined style={{ marginRight: 6 }} />源 Agent ID<span style={{ color: '#ff4d4f' }}>*</span></>}
+                name="sourceAgentId"
+                rules={[{ required: true, message: '请输入源Agent ID' }]}
+                style={formItemStyle}
+              >
+                <Input placeholder="agent-001" style={inputStyle} />
+              </Form.Item>
+              <Form.Item
+                label={<><FilterOutlined style={{ marginRight: 6 }} />源目录路径<span style={{ color: '#ff4d4f' }}>*</span></>}
+                name="sourceDir"
+                rules={[{ required: true, message: '请输入源目录路径' }]}
+                style={formItemStyle}
+              >
+                <Input placeholder="/var/log/app 或 D:\logs\app" style={inputStyle} addonBefore={<QuestionCircleOutlined />} />
+              </Form.Item>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+              <div style={headerStyle('#722ed1', ClusterOutlined)}>
+                <span style={iconStyle('#722ed1')}>
+                  <ClusterOutlined />
+                </span>
+                <span style={titleStyle}>目标节点配置</span>
+                <Tooltip title="传输目标">
+                  <InfoCircleOutlined style={{ marginLeft: 6, color: '#8c8c8c', cursor: 'pointer' }} />
+                </Tooltip>
+              </div>
+              <Form.Item
+                label={<><ClusterOutlined style={{ marginRight: 6 }} />目标 Agent 列表<span style={{ color: '#ff4d4f' }}>*</span></>}
+                name="targetAgentIds"
+                rules={[{ required: true, message: '请至少添加一个目标Agent' }]}
+                style={formItemStyle}
+              >
+                <Select
+                  mode="tags"
+                  placeholder="输入Agent ID后按回车添加"
+                  tokenSeparators={[',']}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+              <Form.Item
+                label={<><FilterOutlined style={{ marginRight: 6 }} />目标目录<span style={{ color: '#ff4d4f' }}>*</span></>}
+                name="targetDirs"
+                rules={[{ required: true, message: '请输入至少一个目标目录' }]}
+                style={formItemStyle}
+              >
+                <TextArea
+                  rows={3}
+                  placeholder={'每行一个目标目录\n/backup/node-01/logs\n/backup/node-02/logs'}
+                  style={{ borderRadius: 8 }}
+                />
+              </Form.Item>
+            </Card>
+          </Col>
+        </Row>
 
-        {/* 目标节点配置 */}
-        <Panel header="目标节点配置" key="target">
-          <Form.Item label="目标Agent ID列表" name="targetAgentIds" rules={[{ required: true, message: '请至少选择一个目标Agent' }]}>
-            <Select mode="tags" placeholder="输入或选择目标Agent ID，按回车添加" />
-          </Form.Item>
-          <Form.Item label="目标目录(每行一个)" name="targetDirs" rules={[{ required: true, message: '请输入至少一个目标目录' }]}>
-            <TextArea rows={4} placeholder={"每行一个目标目录\n例如:\n/backup/app-001/logs\n/backup/app-002/logs"} />
-          </Form.Item>
-          <Form.Item label="传输模式" name="transferMode" initialValue="ONE_TO_MANY">
-            <Select>
-              <Select.Option value="ONE_TO_ONE">一对一（每个目标独立）</Select.Option>
-              <Select.Option value="ONE_TO_MANY">一对多（广播到所有目标）</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="路由策略" name="routingStrategy" initialValue="ROUND_ROBIN">
-            <Select>
-              <Select.Option value="ROUND_ROBIN">轮询</Select.Option>
-              <Select.Option value="RANDOM">随机</Select.Option>
-              <Select.Option value="REGION_BASED">区域优先</Select.Option>
-              <Select.Option value="BROADCAST">广播</Select.Option>
-            </Select>
-          </Form.Item>
-        </Panel>
+        {/* 传输策略 */}
+        <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+          <div style={headerStyle('#fa8c16', ToolOutlined)}>
+            <span style={iconStyle('#fa8c16')}>
+              <ToolOutlined />
+            </span>
+            <span style={titleStyle}>传输策略</span>
+          </div>
+          <Row gutter={24}>
+            <Col span={8}>
+              <Form.Item label="传输模式" name="transferMode" initialValue="ONE_TO_MANY" style={formItemStyle}>
+                <Select style={inputStyle}>
+                  <Select.Option value="ONE_TO_ONE">一对一独立</Select.Option>
+                  <Select.Option value="ONE_TO_MANY">一对多广播</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="路由策略" name="routingStrategy" initialValue="ROUND_ROBIN" style={formItemStyle}>
+                <Select style={inputStyle}>
+                  <Select.Option value="ROUND_ROBIN"><Tag color="blue">轮询</Tag></Select.Option>
+                  <Select.Option value="RANDOM"><Tag color="geekblue">随机</Tag></Select.Option>
+                  <Select.Option value="REGION_BASED"><Tag color="purple">区域优先</Tag></Select.Option>
+                  <Select.Option value="BROADCAST"><Tag color="orange">广播</Tag></Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="保持目录结构" name="preserveDirStructure" valuePropName="checked" initialValue={true} style={{ ...formItemStyle, paddingTop: 7 }}>
+                <Switch checkedChildren="保持" unCheckedChildren="扁平" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
 
         {/* 文件匹配规则 */}
-        <Panel header="文件匹配规则" key="file">
-          <Form.Item label="包含模式(通配符)" name="includePatterns">
-            <Select mode="tags" placeholder="输入文件匹配模式，如 *.log, *.txt" tokenSeparators={[',']} />
-          </Form.Item>
-          <Form.Item label="排除模式(通配符)" name="excludePatterns">
-            <Select mode="tags" placeholder="输入排除模式，如 temp*, *.tmp" tokenSeparators={[',']} />
-          </Form.Item>
-          <Form.Item label="单次最大扫描文件数" name="maxScanFiles" initialValue={1000}>
-            <InputNumber min={1} max={100000} style={{ width: '100%' }} placeholder="限制单次扫描的文件数量上限" />
-          </Form.Item>
-          <Form.Item label="保持原始目录结构" name="preserveDirStructure" valuePropName="checked" initialValue={true}>
-            <Switch checkedChildren="是" unCheckedChildren="否" />
-          </Form.Item>
-        </Panel>
+        <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+          <div style={headerStyle('#13c2c2', FilterOutlined)}>
+            <span style={iconStyle('#13c2c2')}>
+              <FilterOutlined />
+            </span>
+            <span style={titleStyle}>文件匹配规则</span>
+          </div>
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item label="包含模式" name="includePatterns" style={formItemStyle}>
+                <Select mode="tags" placeholder="*.log, *.txt" tokenSeparators={[',']} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="排除模式" name="excludePatterns" style={formItemStyle}>
+                <Select mode="tags" placeholder="temp*, *.tmp" tokenSeparators={[',']} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item label="最大扫描文件数" name="maxScanFiles" initialValue={1000} style={formItemStyle}>
+                <InputNumber min={1} max={100000} style={{ width: '100%', height: 40 }} addonAfter="个" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
 
-        {/* 定时调度 */}
-        <Panel header="定时调度" key="schedule">
-          <Form.Item label="Cron表达式" name="scanCronExpression">
-            <Input placeholder="例如: 0 0 2 * * ? (每天凌晨2点) 或留空表示手动触发" />
-          </Form.Item>
-        </Panel>
-
-        {/* 重试策略 */}
-        <Panel header="重试策略" key="retry">
-          <Form.Item label="启用自动重试" name="retryEnabled" valuePropName="checked" initialValue={true}>
-            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
-          </Form.Item>
-          <Form.Item label="最大重试次数" name="maxRetryCount" initialValue={3}>
-            <InputNumber min={0} max={10} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="首次重试间隔(分钟)" name="retryIntervalMin" initialValue={5}>
-            <InputNumber min={1} max={60} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label="重试保留天数" name="retryMaxDays" initialValue={7}>
-            <InputNumber min={1} max={30} style={{ width: '100%' }} placeholder="失败记录保留天数" />
-          </Form.Item>
-          <Form.Item label="退避策略" name="retryBackoffType" initialValue="EXPONENTIAL">
-            <Select>
-              <Select.Option value="LINEAR">线性退避 (固定间隔)</Select.Option>
-              <Select.Option value="EXPONENTIAL">指数退避 (间隔递增)</Select.Option>
-            </Select>
-          </Form.Item>
-        </Panel>
+        {/* 定时调度 & 重试 - 并排布局 */}
+        <Row gutter={20}>
+          <Col span={12}>
+            <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+              <div style={headerStyle('#eb2f96', ScheduleOutlined)}>
+                <span style={iconStyle('#eb2f96')}>
+                  <ScheduleOutlined />
+                </span>
+                <span style={titleStyle}>定时调度</span>
+                <Tag color="magenta" style={{ marginLeft: 'auto', fontSize: 12 }}>可选</Tag>
+              </div>
+              <Form.Item label="Cron 表达式" name="scanCronExpression" style={formItemStyle}>
+                <Input
+                  placeholder="0 0 2 * * ? (每天凌晨2点)"
+                  style={inputStyle}
+                  suffix={
+                    <Tooltip title="留空则仅手动触发">
+                      <QuestionCircleOutlined style={{ color: '#bfbfbf' }} />
+                    </Tooltip>
+                  }
+                />
+              </Form.Item>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+              <div style={headerStyle('#fa541c', ReloadOutlined)}>
+                <span style={iconStyle('#fa541c')}>
+                  <ReloadOutlined />
+                </span>
+                <span style={titleStyle}>重试策略</span>
+                <Form.Item name="retryEnabled" valuePropName="checked" initialValue={true} noStyle style={{ marginLeft: 'auto', marginBottom: 0 }}>
+                  <Switch size="small" checkedChildren="开" unCheckedChildren="关" />
+                </Form.Item>
+              </div>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item label="最大次数" name="maxRetryCount" initialValue={3} style={{ ...formItemStyle, marginBottom: 14 }}>
+                    <InputNumber min={0} max={10} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="间隔(分)" name="retryIntervalMin" initialValue={5} style={{ ...formItemStyle, marginBottom: 14 }}>
+                    <InputNumber min={1} max={60} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={12}>
+                <Col span={12}>
+                  <Form.Item label="保留天数" name="retryMaxDays" initialValue={7} style={{ ...formItemStyle, marginBottom: 14 }}>
+                    <InputNumber min={1} max={30} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="退避方式" name="retryBackoffType" initialValue="EXPONENTIAL" style={{ ...formItemStyle, marginBottom: 14 }}>
+                    <Select size="middle" style={{ width: '100%' }}>
+                      <Select.Option value="LINEAR">线性</Select.Option>
+                      <Select.Option value="EXPONENTIAL">指数</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+          </Col>
+        </Row>
 
         {/* 传输后操作 */}
-        <Panel header="传输后操作" key="post">
-          <Form.Item label="传输成功后的操作" name="postTransferAction" initialValue="NONE">
-            <Select>
-              <Select.Option value="NONE">无操作</Select.Option>
-              <Select.Option value="DELETE">删除源文件</Select.Option>
-              <Select.Option value="BACKUP">备份源文件</Select.Option>
-            </Select>
+        <Card style={sectionStyle} styles={{ body: { padding: '24px' }}}>
+          <div style={headerStyle('#2f54eb', SendOutlined)}>
+            <span style={iconStyle('#2f54eb')}>
+              <SendOutlined />
+            </span>
+            <span style={titleStyle}>传输后操作</span>
+          </div>
+          <Row gutter={24}>
+            <Col span={8}>
+              <Form.Item label="成功后的操作" name="postTransferAction" initialValue="NONE" style={formItemStyle}>
+                <Select style={inputStyle}>
+                  <Select.Option value="NONE">无操作</Select.Option>
+                  <Select.Option value="DELETE"><span style={{ color: '#ff4d4f' }}>删除源文件</span></Select.Option>
+                  <Select.Option value="BACKUP">备份源文件</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.postTransferAction !== cur.postTransferAction}>
+            {({ getFieldValue }) =>
+              getFieldValue('postTransferAction') === 'BACKUP' && (
+                <Card
+                  size="small"
+                  style={{
+                    background: '#fff7e6',
+                    border: '1px solid #ffd591',
+                    borderRadius: 8,
+                    marginTop: 12
+                  }}
+                >
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item label="备份目录" name="backupDir" rules={[{ required: true, message: '' }]} style={{ marginBottom: 8 }}>
+                        <Input placeholder="/backup/archive" size="middle" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="备份模式" name="backupMode" initialValue="COPY" style={{ marginBottom: 8 }}>
+                        <Select size="middle" style={{ width: '100%' }}>
+                          <Select.Option value="COPY">复制</Select.Option>
+                          <Select.Option value="MOVE">移动</Select.Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
+              )
+            }
           </Form.Item>
-          {(
-            <Form.Item noStyle shouldUpdate={(prev, cur) => prev.postTransferAction !== cur.postTransferAction}>
-              {({ getFieldValue }) =>
-                getFieldValue('postTransferAction') === 'BACKUP' && (
-                  <>
-                    <Form.Item label="备份目录" name="backupDir" rules={[{ required: true, message: '请输入备份目录' }]}>
-                      <Input placeholder="例如: /backup/archive" />
-                    </Form.Item>
-                    <Form.Item label="备份模式" name="backupMode" initialValue="COPY">
-                      <Select>
-                        <Select.Option value="COPY">复制</Select.Option>
-                        <Select.Option value="MOVE">移动</Select.Option>
-                      </Select>
-                    </Form.Item>
-                  </>
-                )
-              }
-            </Form.Item>
-          )}
-        </Panel>
+        </Card>
 
-      </Collapse>
-
-      <Divider />
-
-      <Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading} block size="large">
-          提交创建
-        </Button>
-      </Form.Item>
-    </Form>
+        {/* 提交按钮区域 */}
+        <div style={{
+          textAlign: 'center',
+          paddingTop: 28,
+          paddingBottom: 8
+        }}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            size="large"
+            icon={<CheckCircleOutlined />}
+            style={{
+              minWidth: 200,
+              height: 48,
+              borderRadius: 10,
+              fontSize: 16,
+              fontWeight: 600,
+              boxShadow: '0 4px 14px rgba(24, 144, 255, 0.35)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            创建任务
+          </Button>
+        </div>
+      </Form>
+    </div>
   );
 };
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag } from 'antd';
+import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag, Space } from 'antd';
 import {
   FileTextOutlined,
   CloudServerOutlined,
@@ -11,7 +11,9 @@ import {
   SendOutlined,
   InfoCircleOutlined,
   CheckCircleOutlined,
-  QuestionCircleOutlined
+  QuestionCircleOutlined,
+  PlusOutlined,
+  MinusCircleOutlined
 } from '@ant-design/icons';
 
 const { TextArea } = Input;
@@ -70,7 +72,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
       includePatterns: JSON.stringify(values.includePatterns || []),
       excludePatterns: JSON.stringify(values.excludePatterns || []),
       targetAgentIds: JSON.stringify(values.targetAgentIds || []),
-      targetDirs: values.targetDirs?.split('\n').filter(Boolean).join(';') || '',
+      targetDirs: values.targetDirs?.filter(Boolean).join(';') || '',
       retryEnabled: values.retryEnabled ? 1 : 0,
       preserveDirStructure: values.preserveDirStructure ? 1 : 0
     };
@@ -183,15 +185,53 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
               </Form.Item>
               <Form.Item
                 label={<><FilterOutlined style={{ marginRight: 6 }} />目标目录<span style={{ color: '#ff4d4f' }}>*</span></>}
-                name="targetDirs"
-                rules={[{ required: true, message: '请输入至少一个目标目录' }]}
                 style={formItemStyle}
+                required
               >
-                <TextArea
-                  rows={3}
-                  placeholder={'每行一个目标目录\n/backup/node-01/logs\n/backup/node-02/logs'}
-                  style={{ borderRadius: 8 }}
-                />
+                <Form.List name="targetDirs" initialValue={['']}>
+                  {(fields, { add, remove }) => (
+                    <div>
+                      {fields.map(({ key, name, ...restField }) => (
+                        <Space key={key} align="baseline" style={{ display: 'flex', width: '100%', marginBottom: 8 }} wrap>
+                          <Form.Item
+                            {...restField}
+                            name={name}
+                            rules={[{ required: true, message: '请输入目标目录路径' }]}
+                            noStyle
+                          >
+                            <Input
+                              placeholder="/backup/node-01/logs"
+                              style={{ flex: 1, borderRadius: 8, height: 40 }}
+                              addonBefore={<ClusterOutlined style={{ color: '#722ed1', fontSize: 14 }} />}
+                            />
+                          </Form.Item>
+                          {fields.length > 1 && (
+                            <MinusCircleOutlined
+                              onClick={() => remove(name)}
+                              style={{ fontSize: 18, color: '#ff4d4f', cursor: 'pointer', flexShrink: 0 }}
+                            />
+                          )}
+                        </Space>
+                      ))}
+                      <Button
+                        type="dashed"
+                        onClick={() => add('')}
+                        block
+                        icon={<PlusOutlined />}
+                        style={{
+                          borderRadius: 8,
+                          borderStyle: 'dashed',
+                          borderColor: '#722ed1',
+                          color: '#722ed1',
+                          height: 38,
+                          marginTop: fields.length > 0 ? 0 : 0
+                        }}
+                      >
+                        添加目标目录
+                      </Button>
+                    </div>
+                  )}
+                </Form.List>
               </Form.Item>
             </Card>
           </Col>

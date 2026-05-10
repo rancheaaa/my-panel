@@ -71,8 +71,8 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
       ...values,
       includePatterns: JSON.stringify(values.includePatterns || []),
       excludePatterns: JSON.stringify(values.excludePatterns || []),
-      targetAgentIds: JSON.stringify(values.targetAgentIds || []),
-      targetDirs: values.targetDirs?.filter(Boolean).join(';') || '',
+      targetAgentIds: values.targets?.map(t => t.agentId).filter(Boolean),
+      targetDirs: values.targets?.map(t => t.dir).filter(Boolean).join(';') || '',
       retryEnabled: values.retryEnabled ? 1 : 0,
       preserveDirStructure: values.preserveDirStructure ? 1 : 0
     };
@@ -166,73 +166,105 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                   <ClusterOutlined />
                 </span>
                 <span style={titleStyle}>目标节点配置</span>
-                <Tooltip title="传输目标">
+                <Tooltip title="每个目标节点包含Agent ID和对应的接收目录">
                   <InfoCircleOutlined style={{ marginLeft: 6, color: '#8c8c8c', cursor: 'pointer' }} />
                 </Tooltip>
               </div>
-              <Form.Item
-                label={<><ClusterOutlined style={{ marginRight: 6 }} />目标 Agent 列表<span style={{ color: '#ff4d4f' }}>*</span></>}
-                name="targetAgentIds"
-                rules={[{ required: true, message: '请至少添加一个目标Agent' }]}
-                style={formItemStyle}
-              >
-                <Select
-                  mode="tags"
-                  placeholder="输入Agent ID后按回车添加"
-                  tokenSeparators={[',']}
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-              <Form.Item
-                label={<><FilterOutlined style={{ marginRight: 6 }} />目标目录<span style={{ color: '#ff4d4f' }}>*</span></>}
-                style={formItemStyle}
-                required
-              >
-                <Form.List name="targetDirs" initialValue={['']}>
-                  {(fields, { add, remove }) => (
-                    <div>
-                      {fields.map(({ key, name, ...restField }) => (
-                        <Space key={key} align="baseline" style={{ display: 'flex', width: '100%', marginBottom: 8 }} wrap>
+
+              <Form.List name="targets" initialValue={[{ agentId: '', dir: '' }]}>
+                {(fields, { add, remove }) => (
+                  <div>
+                    {fields.map(({ key, name, ...restField }) => (
+                      <div
+                        key={key}
+                        style={{
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'flex-start',
+                          marginBottom: fields.length > 1 ? 12 : 0,
+                          padding: 12,
+                          background: key % 2 === 0 ? '#fafafe' : '#ffffff',
+                          borderRadius: 8,
+                          border: '1px solid #f0f0f8'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0ff'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = key % 2 === 0 ? '#fafafe' : '#ffffff'}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>Agent ID</div>
                           <Form.Item
                             {...restField}
-                            name={name}
-                            rules={[{ required: true, message: '请输入目标目录路径' }]}
+                            name={[name, 'agentId']}
+                            rules={[{ required: true, message: '' }]}
                             noStyle
                           >
                             <Input
-                              placeholder="/backup/node-01/logs"
-                              style={{ flex: 1, borderRadius: 8, height: 40 }}
-                              addonBefore={<ClusterOutlined style={{ color: '#722ed1', fontSize: 14 }} />}
+                              placeholder="agent-002"
+                              size="middle"
+                              style={{ borderRadius: 6, height: 36 }}
+                              prefix={<CloudServerOutlined style={{ color: '#722ed1', fontSize: 13 }} />}
                             />
                           </Form.Item>
-                          {fields.length > 1 && (
+                        </div>
+                        <div
+                          style={{
+                            width: 28,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#bfbfbf',
+                            paddingTop: 22,
+                            flexShrink: 0,
+                            fontSize: 16
+                          }}
+                        >
+                          →
+                        </div>
+                        <div style={{ flex: 2 }}>
+                          <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>接收目录</div>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'dir']}
+                            rules={[{ required: true, message: '' }]}
+                            noStyle
+                          >
+                            <Input
+                              placeholder="/backup/node-02/logs"
+                              size="middle"
+                              style={{ borderRadius: 6, height: 36 }}
+                              prefix={<FilterOutlined style={{ color: '#722ed1', fontSize: 13 }} />}
+                            />
+                          </Form.Item>
+                        </div>
+                        {fields.length > 1 && (
+                          <div style={{ paddingTop: 20, flexShrink: 0, paddingLeft: 4 }}>
                             <MinusCircleOutlined
                               onClick={() => remove(name)}
-                              style={{ fontSize: 18, color: '#ff4d4f', cursor: 'pointer', flexShrink: 0 }}
+                              style={{ fontSize: 18, color: '#ff4d4f', cursor: 'pointer' }}
                             />
-                          )}
-                        </Space>
-                      ))}
-                      <Button
-                        type="dashed"
-                        onClick={() => add('')}
-                        block
-                        icon={<PlusOutlined />}
-                        style={{
-                          borderRadius: 8,
-                          borderStyle: 'dashed',
-                          borderColor: '#722ed1',
-                          color: '#722ed1',
-                          height: 38,
-                          marginTop: fields.length > 0 ? 0 : 0
-                        }}
-                      >
-                        添加目标目录
-                      </Button>
-                    </div>
-                  )}
-                </Form.List>
-              </Form.Item>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="dashed"
+                      onClick={() => add({ agentId: '', dir: '' })}
+                      block
+                      icon={<PlusOutlined />}
+                      style={{
+                        borderRadius: 8,
+                        borderStyle: 'dashed',
+                        borderColor: '#722ed1',
+                        color: '#722ed1',
+                        height: 38,
+                        marginTop: 12
+                      }}
+                    >
+                      添加目标节点
+                    </Button>
+                  </div>
+                )}
+              </Form.List>
             </Card>
           </Col>
         </Row>

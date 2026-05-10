@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.cq.panel.admin.server.repository.domain.BatchTransferSubtask">
+        <id property="id" column="id"/>
+        <result property="taskId" column="task_id"/>
+        <result property="sourceFilePath" column="source_file_path"/>
+        <result property="targetAgentId" column="target_agent_id"/>
+        <result property="targetDir" column="target_dir"/>
+        <result property="status" column="status"/>
+        <result property="transferredChunks" column="transferred_chunks"/>
+        <result property="totalChunks" column="total_chunks"/>
+        <result property="transferredBytes" column="transferred_bytes"/>
+        <result property="totalBytes" column="total_bytes"/>
+        <result property="errorMessage" column="error_message"/>
+        <result property="retryCount" column="retry_count"/>
+        <result property="nextRetryAt" column="next_retry_at"/>
+        <result property="transferId" column="transfer_id"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferSubtask">
+        insert into batch_transfer_subtask (
+            task_id, source_file_path, target_agent_id, target_dir, status,
+            transferred_chunks, total_chunks, transferred_bytes, total_bytes,
+            error_message, retry_count, next_retry_at, transfer_id, create_time, update_time
+        ) values (
+            #{taskId}, #{sourceFilePath}, #{targetAgentId}, #{targetDir}, #{status},
+            #{transferredChunks}, #{totalChunks}, #{transferredBytes}, #{totalBytes},
+            #{errorMessage}, #{retryCount}, #{nextRetryAt}, #{transferId}, now(), now()
+        )
+    </insert>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        insert into batch_transfer_subtask (
+            task_id, source_file_path, target_agent_id, target_dir, status,
+            transferred_chunks, total_chunks, transferred_bytes, total_bytes,
+            error_message, retry_count, next_retry_at, transfer_id, create_time, update_time
+        ) values
+        <foreach collection="list" item="item" separator=",">
+            (#{item.taskId}, #{item.sourceFilePath}, #{item.targetAgentId}, #{item.targetDir}, #{item.status},
+             #{item.transferredChunks}, #{item.totalChunks}, #{item.transferredBytes}, #{item.totalBytes},
+             #{item.errorMessage}, #{item.retryCount}, #{item.nextRetryAt}, #{item.transferId}, now(), now())
+        </foreach>
+    </insert>
+
+    <select id="selectByTaskIdAndStatus" resultMap="BaseResultMap">
+        select * from batch_transfer_subtask where task_id = #{taskId} and status = #{status}
+        order by create_time asc
+    </select>
+
+    <update id="updateProgress">
+        update batch_transfer_subtask 
+        set transferred_chunks = #{transferredChunks}, 
+            transferred_bytes = #{transferredBytes},
+            update_time = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        update batch_transfer_subtask 
+        set status = #{status},
+            <if test="error != null">error_message = #{error},</if>
+            <if test="status == 'RETRYING'">retry_count = retry_count + 1,</if>
+            update_time = now()
+        where id = #{id}
+    </update>
+
+</mapper>

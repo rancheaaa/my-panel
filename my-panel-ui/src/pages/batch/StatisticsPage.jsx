@@ -1,5 +1,5 @@
 import React from 'react';
-import StatisticsTab from '../components/StatisticsTab';
+import StatisticsTab from './components/StatisticsTab';
 
 const StatisticsPage = () => {
   return (

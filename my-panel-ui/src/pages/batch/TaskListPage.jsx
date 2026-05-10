@@ -1,5 +1,5 @@
 import React from 'react';
-import TaskListTab from '../components/TaskListTab';
+import TaskListTab from './components/TaskListTab';
 
 const TaskListPage = () => {
   return (

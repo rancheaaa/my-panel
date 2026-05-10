@@ -1,5 +1,5 @@
 import React from 'react';
-import CreateEditTab from '../components/CreateEditTab';
+import CreateEditTab from './components/CreateEditTab';
 
 const TaskCreatePage = () => {
   return (

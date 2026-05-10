@@ -46,6 +46,7 @@ my-panel-ui/npm-debug.log*
 my-panel-ui/yarn-debug.log*
 my-panel-ui/yarn-error.log*
 my-panel-ui/pnpm-debug.log*
+my-panel-ui/coverage
 
 node_modules
 package-lock.json

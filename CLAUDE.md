@@ -178,6 +178,8 @@ Default accounts: admin/admin123, guest/guest123, cq/cq123456
 
 ## Project Rules
 
+0、第一原则，不要过度设计，以TDD为原则，测试驱动开发，写新功能前先写测试案例（可以使用mockito或者真实连接到数据库），测试案例要全，边界条件要全，测试覆盖率、通过率要100%，surefire通过，只有测试案例都通过了，编写git commit提交信息，才能开发下一个。
+
 1、进入cmd，使用bash可以进入wsl Debian系统，root跟默认用户的密码是!Cq199606，必要进入wsl的linux系统执行一些命令或者调试。
 2、开发是在windows上进行的，admin的日志文件在E:\tmp\my-panel\admin\logs\admin，proxy的日志在E:\tmp\my-panel\admin\logs\proxy，agent日志在E:\tmp\my-panel\admin\logs\agent
 3、由于是在开发阶段，任何新建表都要放在schema.sql中，任何初始化sql插入都要放在data.sql中，不要使用alt加或者改表结构，直接重建，有新表时我会手动删除现有数据库。

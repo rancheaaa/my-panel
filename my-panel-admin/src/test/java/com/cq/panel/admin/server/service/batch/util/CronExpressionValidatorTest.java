@@ -135,7 +135,7 @@ class CronExpressionValidatorTest {
         
         @Test
         @DisplayName("8. 友好错误消息")
-        void testErrorMessage_friendly() {
+        void testErrorMessage_friendly2() {
             String invalidCron = "99 99 99 99 99 99";
             String error = validator.getErrorMessage(invalidCron);
             

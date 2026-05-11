@@ -210,6 +210,14 @@ public class QuartzTaskScheduler {
         }
     }
 
+    /**
+     * 获取底层Quartz Scheduler实例
+     * 用于高级调度操作（如延迟重试）
+     */
+    public Scheduler getScheduler() {
+        return quartzScheduler;
+    }
+
     // ==================== 内部方法 ====================
 
     private String getJobName(Long taskId) {

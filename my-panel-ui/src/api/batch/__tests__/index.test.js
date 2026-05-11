@@ -102,54 +102,54 @@ describe('Batch API', () => {
     expect(result).toEqual(mockResponse);
   });
 
-  test('startTask should call POST /batch/task/:id/start', async () => {
+  test('startTask should call PUT /batch/task/:id/start', async () => {
     const mockResponse = { code: 200, msg: '启动成功' };
     request.mockResolvedValue(mockResponse);
 
     const result = await batchApi.startTask(1);
-    
+
     expect(request).toHaveBeenCalledWith({
       url: '/batch/task/1/start',
-      method: 'post'
+      method: 'put'
     });
     expect(result).toEqual(mockResponse);
   });
 
-  test('pauseTask should call POST /batch/task/:id/pause', async () => {
+  test('pauseTask should call PUT /batch/task/:id/pause', async () => {
     const mockResponse = { code: 200, msg: '暂停成功' };
     request.mockResolvedValue(mockResponse);
 
     const result = await batchApi.pauseTask(1);
-    
+
     expect(request).toHaveBeenCalledWith({
       url: '/batch/task/1/pause',
-      method: 'post'
+      method: 'put'
     });
     expect(result).toEqual(mockResponse);
   });
 
-  test('resumeTask should call POST /batch/task/:id/resume', async () => {
+  test('resumeTask should call PUT /batch/task/:id/resume', async () => {
     const mockResponse = { code: 200, msg: '恢复成功' };
     request.mockResolvedValue(mockResponse);
 
     const result = await batchApi.resumeTask(1);
-    
+
     expect(request).toHaveBeenCalledWith({
       url: '/batch/task/1/resume',
-      method: 'post'
+      method: 'put'
     });
     expect(result).toEqual(mockResponse);
   });
 
-  test('stopTask should call POST /batch/task/:id/stop', async () => {
+  test('stopTask should call DELETE /batch/task/:id/stop', async () => {
     const mockResponse = { code: 200, msg: '停止成功' };
     request.mockResolvedValue(mockResponse);
 
     const result = await batchApi.stopTask(1);
-    
+
     expect(request).toHaveBeenCalledWith({
       url: '/batch/task/1/stop',
-      method: 'post'
+      method: 'delete'
     });
     expect(result).toEqual(mockResponse);
   });

@@ -3,7 +3,9 @@
     "allow": [
       "Bash(mvn compile *)",
       "Bash(npx eslint *)",
-      "Bash(mvn clean *)"
+      "Bash(mvn clean *)",
+      "Bash(npm run *)",
+      "Bash(mvn test *)"
     ]
   }
 }

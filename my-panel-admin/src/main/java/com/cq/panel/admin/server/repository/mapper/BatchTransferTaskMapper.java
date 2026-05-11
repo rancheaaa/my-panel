@@ -35,6 +35,13 @@ public interface BatchTransferTaskMapper {
     List<BatchTransferTask> selectList(BatchTransferTask query);
 
     /**
+     * 分页查询列表
+     */
+    List<BatchTransferTask> selectPageList(@Param("query") BatchTransferTask query,
+                                            @Param("offset") int offset,
+                                            @Param("limit") int limit);
+
+    /**
      * 逻辑删除
      */
     int deleteById(@Param("id") Long id);

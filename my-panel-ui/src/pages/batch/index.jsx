@@ -1,33 +1,14 @@
-import React from 'react';
-import { Tabs } from 'antd';
-import TaskListTab from './components/TaskListTab';
-import CreateEditTab from './components/CreateEditTab';
-import StatisticsTab from './components/StatisticsTab';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const BatchTransferPage = () => {
-  const items = [
-    {
-      key: 'list',
-      label: '任务列表',
-      children: <TaskListTab />
-    },
-    {
-      key: 'create',
-      label: '创建/编辑',
-      children: <CreateEditTab />
-    },
-    {
-      key: 'statistics',
-      label: '统计面板',
-      children: <StatisticsTab />
-    }
-  ];
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    navigate('batch/task-list');
+  }, [navigate]);
 
-  return (
-    <div style={{ padding: '24px' }}>
-      <Tabs defaultActiveKey="list" items={items} size="large" />
-    </div>
-  );
+  return null;
 };
 
 export default BatchTransferPage;

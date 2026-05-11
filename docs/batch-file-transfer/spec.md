@@ -331,7 +331,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
 
 ```sql
 CREATE TABLE IF NOT EXISTS `batch_sync_event` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '事件ID',
+	`id` bigint NOT NULL AUTO_INCREMENT COMMENT '事件ID',
     `event_type` varchar(20) NOT NULL COMMENT '事件类型: TASK_CREATED/TASK_UPDATED/TASK_DELETED/TASK_STATUS_CHANGED',
     `task_id` bigint NOT NULL COMMENT '关联的任务ID',
     `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID(冗余存储,便于快速查询)',
@@ -342,11 +342,14 @@ CREATE TABLE IF NOT EXISTS `batch_sync_event` (
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '事件创建时间',
     `processed_at` datetime DEFAULT NULL COMMENT '事件处理完成时间',
     `expire_at` datetime DEFAULT NULL COMMENT '事件过期时间(超过此时间未处理则标记为FAILED)',
+    `started_at` datetime DEFAULT NULL COMMENT '事件开始处理时间',
+    `next_retry_at` datetime DEFAULT NULL COMMENT '下次可重试时间',
     PRIMARY KEY (`id`),
     KEY `idx_status_created` (`status`, `created_at`),
     KEY `idx_task_id` (`task_id`),
     KEY `idx_source_agent` (`source_agent_id`),
-    KEY `idx_expire_at` (`expire_at`)
+    KEY `idx_expire_at` (`expire_at`),
+    KEY `idx_next_retry` (`next_retry_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量任务配置同步事件队列';
 ```
 

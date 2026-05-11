@@ -30,9 +30,10 @@ public class StartupLoader {
     public List<BatchTransferTaskConfig> load() {
         log.info("🚀 开始加载本地配置...");
         
-        List<TaskMetaInfo> metaList = configFileManager.loadAllTaskMeta();
+        TaskMetaInfo metaInfo = configFileManager.loadMetaInfo();
+        List<TaskMetaInfo.TaskMeta> metaList = metaInfo.getTasks();
         
-        if (metaList.isEmpty()) {
+        if (metaList == null || metaList.isEmpty()) {
             log.info("✅ 首次启动: 空配置，等待Proxy推送");
             return List.of();
         }

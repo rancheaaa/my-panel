@@ -222,11 +222,23 @@ class AgentUploaderTest {
     }
 
     private PersistentMap<String, UploadTask> getTaskInflightMap(AgentUploader uploader) throws Exception {
-        Field field = AgentUploader.class.getDeclaredField("taskInflightMap");
+        Field field = findFieldInHierarchy(AgentUploader.class, "taskInflightMap");
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
         PersistentMap<String, UploadTask> map = (PersistentMap<String, UploadTask>) field.get(uploader);
         return map;
+    }
+
+    private Field findFieldInHierarchy(Class<?> clazz, String fieldName) throws NoSuchFieldException {
+        Class<?> current = clazz;
+        while (current != null) {
+            try {
+                return current.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException e) {
+                current = current.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException("Field " + fieldName + " not found in hierarchy of " + clazz.getName());
     }
 
     static class TestUploadListener implements UploadListener {

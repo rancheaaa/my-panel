@@ -48,22 +48,22 @@ class ProgressReporterTest {
     // ==================== 2. 上报失败 - 回退到本地 ====================
 
     @Test
-    @DisplayName("2. reportProgress() 失败 - 回退到本地持久化")
+    @DisplayName("2. reportProgressWithRetry() 失败 - 回退到本地持久化")
     void testReportProgress_failure_fallbackToLocal() throws Exception {
         AtomicInteger fallbackCount = new AtomicInteger(0);
-        
-        progressReporter.setHttpClient((url, data) -> false); // 模拟失败
-        
+
+        progressReporter.setHttpClient((url, data) -> false); // 模拟4xx失败
+
         progressReporter.setFallbackHandler(event -> {
             fallbackCount.incrementAndGet();
             assertEquals(2L, event.getSubtaskId().longValue());
         });
-        
-        boolean result = progressReporter.reportProgress(2L, 30, 100);
-        
+
+        boolean result = progressReporter.reportProgressWithRetry(2L, 30, 100, 3);
+
         assertFalse(result, "上报应失败");
         assertTrue(fallbackCount.get() >= 1, "失败后应至少回退到本地1次");
-        
+
         System.out.println("✅ 上报失败回退: subtask=2, fallbackCount=" + fallbackCount.get());
     }
 

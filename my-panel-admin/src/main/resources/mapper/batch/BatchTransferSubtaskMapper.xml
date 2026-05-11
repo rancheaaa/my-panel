@@ -5,44 +5,88 @@
     <resultMap id="BaseResultMap" type="com.cq.panel.admin.server.repository.domain.BatchTransferSubtask">
         <id property="id" column="id"/>
         <result property="taskId" column="task_id"/>
-        <result property="sourceFilePath" column="source_file_path"/>
+        <result property="sourceAgentId" column="source_agent_id"/>
+        <result property="sourceAgentName" column="source_agent_name"/>
         <result property="targetAgentId" column="target_agent_id"/>
-        <result property="targetDir" column="target_dir"/>
+        <result property="targetAgentName" column="target_agent_name"/>
+        <result property="sourcePath" column="source_path"/>
+        <result property="targetPath" column="target_path"/>
+        <result property="fileName" column="file_name"/>
+        <result property="fileSizeBytes" column="file_size_bytes"/>
+        <result property="fileLastModified" column="file_last_modified"/>
         <result property="status" column="status"/>
+        <result property="transferId" column="transfer_id"/>
         <result property="transferredChunks" column="transferred_chunks"/>
         <result property="totalChunks" column="total_chunks"/>
         <result property="transferredBytes" column="transferred_bytes"/>
-        <result property="totalBytes" column="total_bytes"/>
+        <result property="speedBytesPerSec" column="speed_bytes_per_sec"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="completedAt" column="completed_at"/>
+        <result property="durationMs" column="duration_ms"/>
+        <result property="errorCode" column="error_code"/>
         <result property="errorMessage" column="error_message"/>
+        <result property="errorStackTrace" column="error_stack_trace"/>
         <result property="retryCount" column="retry_count"/>
-        <result property="nextRetryAt" column="next_retry_at"/>
-        <result property="transferId" column="transfer_id"/>
+        <result property="lastRetryAt" column="last_retry_at"/>
+        <result property="nextRetryAfter" column="next_retry_after"/>
+        <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
         <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
     </resultMap>
+
+    <sql id="queryCondition">
+        <where>
+            <if test="taskId != null">AND task_id = #{taskId}</if>
+            <if test="status != null and status != ''">AND status = #{status}</if>
+            <if test="sourcePath != null and sourcePath != ''">
+                AND source_path LIKE CONCAT('%', #{sourcePath}, '%')
+            </if>
+            <if test="targetAgentId != null and targetAgentId != ''">
+                AND target_agent_id LIKE CONCAT('%', #{targetAgentId}, '%')
+            </if>
+        </where>
+    </sql>
 
     <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferSubtask" useGeneratedKeys="true" keyProperty="id">
         insert into batch_transfer_subtask (
-            task_id, source_file_path, target_agent_id, target_dir, status,
-            transferred_chunks, total_chunks, transferred_bytes, total_bytes,
-            error_message, retry_count, next_retry_at, transfer_id, create_time, update_time
+            task_id, source_agent_id, source_agent_name, target_agent_id, target_agent_name,
+            source_path, target_path, file_name, file_size_bytes, file_last_modified,
+            status, transfer_id, transferred_chunks, total_chunks, transferred_bytes,
+            speed_bytes_per_sec, started_at, completed_at, duration_ms,
+            error_code, error_message, error_stack_trace,
+            retry_count, last_retry_at, next_retry_after,
+            create_by, create_time, update_by, update_time, remark
         ) values (
-            #{taskId}, #{sourceFilePath}, #{targetAgentId}, #{targetDir}, #{status},
-            #{transferredChunks}, #{totalChunks}, #{transferredBytes}, #{totalBytes},
-            #{errorMessage}, #{retryCount}, #{nextRetryAt}, #{transferId}, now(), now()
+            #{taskId}, #{sourceAgentId}, #{sourceAgentName}, #{targetAgentId}, #{targetAgentName},
+            #{sourcePath}, #{targetPath}, #{fileName}, #{fileSizeBytes}, #{fileLastModified},
+            #{status}, #{transferId}, #{transferredChunks}, #{totalChunks}, #{transferredBytes},
+            #{speedBytesPerSec}, #{startedAt}, #{completedAt}, #{durationMs},
+            #{errorCode}, #{errorMessage}, #{errorStackTrace},
+            #{retryCount}, #{lastRetryAt}, #{nextRetryAfter},
+            #{createBy}, now(), #{updateBy}, now(), #{remark}
         )
     </insert>
 
     <insert id="batchInsert" parameterType="java.util.List">
         insert into batch_transfer_subtask (
-            task_id, source_file_path, target_agent_id, target_dir, status,
-            transferred_chunks, total_chunks, transferred_bytes, total_bytes,
-            error_message, retry_count, next_retry_at, transfer_id, create_time, update_time
+            task_id, source_agent_id, source_agent_name, target_agent_id, target_agent_name,
+            source_path, target_path, file_name, file_size_bytes, file_last_modified,
+            status, transfer_id, transferred_chunks, total_chunks, transferred_bytes,
+            speed_bytes_per_sec, started_at, completed_at, duration_ms,
+            error_code, error_message, error_stack_trace,
+            retry_count, last_retry_at, next_retry_after,
+            create_by, create_time, update_by, update_time, remark
         ) values
         <foreach collection="list" item="item" separator=",">
-            (#{item.taskId}, #{item.sourceFilePath}, #{item.targetAgentId}, #{item.targetDir}, #{item.status},
-             #{item.transferredChunks}, #{item.totalChunks}, #{item.transferredBytes}, #{item.totalBytes},
-             #{item.errorMessage}, #{item.retryCount}, #{item.nextRetryAt}, #{item.transferId}, now(), now())
+            (#{item.taskId}, #{item.sourceAgentId}, #{item.sourceAgentName}, #{item.targetAgentId}, #{item.targetAgentName},
+             #{item.sourcePath}, #{item.targetPath}, #{item.fileName}, #{item.fileSizeBytes}, #{item.fileLastModified},
+             #{item.status}, #{item.transferId}, #{item.transferredChunks}, #{item.totalChunks}, #{item.transferredBytes},
+             #{item.speedBytesPerSec}, #{item.startedAt}, #{item.completedAt}, #{item.durationMs},
+             #{item.errorCode}, #{item.errorMessage}, #{item.errorStackTrace},
+             #{item.retryCount}, #{item.lastRetryAt}, #{item.nextRetryAfter},
+             #{item.createBy}, now(), #{item.updateBy}, now(), #{item.remark})
         </foreach>
     </insert>
 
@@ -51,21 +95,45 @@
         order by create_time asc
     </select>
 
+    <select id="selectPageList" resultMap="BaseResultMap">
+        select * from batch_transfer_subtask
+        <include refid="queryCondition"/>
+        order by create_time desc
+        limit #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        select count(*) from batch_transfer_subtask
+        <include refid="queryCondition"/>
+    </select>
+
     <update id="updateProgress">
         update batch_transfer_subtask 
         set transferred_chunks = #{transferredChunks}, 
             transferred_bytes = #{transferredBytes},
+            speed_bytes_per_sec = #{speedBytesPerSec},
             update_time = now()
         where id = #{id}
     </update>
 
     <update id="updateStatus">
-        update batch_transfer_subtask 
+        update batch_transfer_subtask
         set status = #{status},
+            <if test="errorCode != null">error_code = #{errorCode},</if>
             <if test="errorMessage != null">error_message = #{errorMessage},</if>
-            <if test="status == 'RETRYING'">retry_count = retry_count + 1,</if>
+            <if test="errorStackTrace != null">error_stack_trace = #{errorStackTrace},</if>
+            <if test="status == 'COMPLETED'">completed_at = now(), duration_ms = #{durationMs},</if>
+            <if test="status == 'RETRYING' or status == 'FAILED'">retry_count = retry_count + 1,</if>
+            <if test="status == 'RETRYING'">last_retry_at = now(), next_retry_after = #{nextRetryAfter},</if>
             update_time = now()
         where id = #{id}
     </update>
+
+    <select id="countByTaskIdGroupByStatus" resultType="java.util.Map">
+        select status, count(*) as count
+        from batch_transfer_subtask
+        where task_id = #{taskId}
+        group by status
+    </select>
 
 </mapper>

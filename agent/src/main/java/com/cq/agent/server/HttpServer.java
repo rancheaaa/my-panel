@@ -1,5 +1,8 @@
  package com.cq.agent.server;
 
+import com.cq.agent.batch.config.ConfigChangeListener;
+import com.cq.agent.batch.config.ConfigFileManager;
+import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.handler.FileHandler;
@@ -49,10 +52,12 @@ public class HttpServer {
     @Getter
     private int actualPort;
 
-    public HttpServer(AgentConfig config, CommandExecutor commandExecutor, FileService fileService, ChunkedTransferService chunkedTransferService) {
+    public HttpServer(AgentConfig config, CommandExecutor commandExecutor, FileService fileService,
+                      ChunkedTransferService chunkedTransferService, ConfigFileManager configFileManager,
+                      ConfigChangeListener configChangeListener, BatchTaskSchedulerManager taskSchedulerManager) {
         this.config = config;
         this.commandExecutor = commandExecutor;
-        this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService);
+        this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService, configFileManager, configChangeListener, taskSchedulerManager);
     }
 
     /**

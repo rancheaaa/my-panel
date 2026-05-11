@@ -1,5 +1,10 @@
 package com.cq.agent.handler;
 
+import com.cq.agent.batch.config.ConfigChangeListener;
+import com.cq.agent.batch.config.ConfigFileManager;
+import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
+import com.cq.agent.handler.batch.BatchConfigReceiveHandler;
+import com.cq.agent.handler.batch.BatchTaskControlHandler;
 import com.cq.agent.handler.download.ChunkDownloadHandler;
 import com.cq.agent.handler.download.ChunkDownloadInfoHandler;
 import com.cq.agent.handler.upload.*;
@@ -14,7 +19,9 @@ public class HandlerFactory {
 
     private final Map<String, IRequestHandler> handlerMap = new HashMap<>();
 
-    public HandlerFactory(FileService fileService, ChunkedTransferService chunkedTransferService) {
+    public HandlerFactory(FileService fileService, ChunkedTransferService chunkedTransferService,
+                          ConfigFileManager configFileManager, ConfigChangeListener configChangeListener,
+                          BatchTaskSchedulerManager taskSchedulerManager) {
         String apiPrefix = "/api/file";
         
         // File operations
@@ -51,6 +58,12 @@ public class HandlerFactory {
         handlerMap.put(apiPrefix + "/chunk/sessions", new ChunkSessionsHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/chunk/download/info", new ChunkDownloadInfoHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/chunk/download", new ChunkDownloadHandler(fileService, chunkedTransferService));
+
+        // Batch config receive
+        handlerMap.put("/api/batch/task/config", new BatchConfigReceiveHandler(fileService, chunkedTransferService, configFileManager, configChangeListener));
+        
+        // Batch task control (pause/resume/delete)
+        handlerMap.put("/api/batch/task/control", new BatchTaskControlHandler(taskSchedulerManager));
     }
 
     public IRequestHandler getHandler(String path) {

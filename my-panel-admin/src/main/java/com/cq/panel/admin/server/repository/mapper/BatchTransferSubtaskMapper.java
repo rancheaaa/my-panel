@@ -8,8 +8,6 @@ import java.util.List;
 
 /**
  * 批量传输子任务Mapper接口
- * 
- * @author cq
  */
 @Mapper
 public interface BatchTransferSubtaskMapper {
@@ -33,20 +31,52 @@ public interface BatchTransferSubtaskMapper {
     );
 
     /**
+     * 分页查询子任务列表（支持条件过滤）
+     */
+    List<BatchTransferSubtask> selectPageList(
+        @Param("taskId") Long taskId,
+        @Param("status") String status,
+        @Param("sourcePath") String sourcePath,
+        @Param("targetAgentId") String targetAgentId,
+        @Param("offset") Integer offset,
+        @Param("limit") Integer limit
+    );
+
+    /**
+     * 统计符合条件的记录数
+     */
+    long countByCondition(
+        @Param("taskId") Long taskId,
+        @Param("status") String status,
+        @Param("sourcePath") String sourcePath,
+        @Param("targetAgentId") String targetAgentId
+    );
+
+    /**
      * 更新进度（部分字段更新）
      */
     int updateProgress(
         @Param("id") Long id, 
         @Param("transferredChunks") Integer chunks, 
-        @Param("transferredBytes") Long bytes
+        @Param("transferredBytes") Long bytes,
+        @Param("speedBytesPerSec") Long speedBytesPerSec
     );
 
     /**
-     * 更新状态
+     * 更新状态（支持多种状态变更场景）
      */
     int updateStatus(
-        @Param("id") Long id, 
-        @Param("status") String status, 
-        @Param("errorMessage") String error
+        @Param("id") Long id,
+        @Param("status") String status,
+        @Param("errorCode") String errorCode,
+        @Param("errorMessage") String errorMessage,
+        @Param("errorStackTrace") String errorStackTrace,
+        @Param("durationMs") Long durationMs,
+        @Param("nextRetryAfter") java.util.Date nextRetryAfter
     );
+
+    /**
+     * 按任务ID统计各状态的子任务数量
+     */
+    List<java.util.Map<String, Object>> countByTaskIdGroupByStatus(@Param("taskId") Long taskId);
 }

@@ -1,5 +1,6 @@
 package com.cq.proxy.config;
 
+import com.cq.panel.common.loadbalancer.SimpleHttpClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -28,6 +29,11 @@ public class ProxyBeansConfig {
     return Caffeine.newBuilder()
         .maximumSize(properties.maximumSize())
         .expireAfterWrite(properties.expireAfterWriteSeconds(), TimeUnit.SECONDS);
+  }
+
+  @Bean
+  public SimpleHttpClient simpleHttpClient() {
+    return new SimpleHttpClient(5000, 5000);
   }
 }
 

@@ -70,6 +70,28 @@
         <set>
             <if test="taskName != null">task_name = #{taskName},</if>
             <if test="taskDescription != null">task_description = #{taskDescription},</if>
+            <if test="sourceAgentId != null">source_agent_id = #{sourceAgentId},</if>
+            <if test="sourceAgentName != null">source_agent_name = #{sourceAgentName},</if>
+            <if test="sourceDir != null">source_dir = #{sourceDir},</if>
+            <if test="targetDirs != null">target_dirs = #{targetDirs},</if>
+            <if test="includePatterns != null">include_patterns = #{includePatterns},</if>
+            <if test="excludePatterns != null">exclude_patterns = #{excludePatterns},</if>
+            <if test="scanCronExpression != null">scan_cron_expression = #{scanCronExpression},</if>
+            <if test="maxScanFiles != null">max_scan_files = #{maxScanFiles},</if>
+            <if test="targetAgentIds != null">target_agent_ids = #{targetAgentIds},</if>
+            <if test="targetAgentNames != null">target_agent_names = #{targetAgentNames},</if>
+            <if test="retryEnabled != null">retry_enabled = #{retryEnabled},</if>
+            <if test="retryMaxDays != null">retry_max_days = #{retryMaxDays},</if>
+            <if test="retryIntervalMin != null">retry_interval_min = #{retryIntervalMin},</if>
+            <if test="maxRetryCount != null">max_retry_count = #{maxRetryCount},</if>
+            <if test="retryBackoffType != null">retry_backoff_type = #{retryBackoffType},</if>
+            <if test="postTransferAction != null">post_transfer_action = #{postTransferAction},</if>
+            <if test="backupDir != null">backup_dir = #{backupDir},</if>
+            <if test="backupMode != null">backup_mode = #{backupMode},</if>
+            <if test="preserveDirStructure != null">preserve_dir_structure = #{preserveDirStructure},</if>
+            <if test="transferMode != null">transfer_mode = #{transferMode},</if>
+            <if test="routingStrategy != null">routing_strategy = #{routingStrategy},</if>
+            <if test="routingConfig != null">routing_config = #{routingConfig},</if>
             <if test="status != null">status = #{status},</if>
             <if test="startedAt != null">started_at = #{startedAt},</if>
             update_by = #{updateBy},
@@ -94,6 +116,19 @@
             <if test="createBy != null and createBy != ''">and create_by = #{createBy}</if>
         </where>
         order by create_time desc
+    </select>
+
+    <select id="selectPageList" resultMap="BaseResultMap">
+        select <include refid="selectColumns"/>
+        from batch_transfer_task
+        <where>
+            deleted = 0
+            <if test="query.status != null and query.status != ''">and status = #{query.status}</if>
+            <if test="query.sourceAgentId != null and query.sourceAgentId != ''">and source_agent_id = #{query.sourceAgentId}</if>
+            <if test="query.createBy != null and query.createBy != ''">and create_by = #{query.createBy}</if>
+        </where>
+        order by create_time desc
+        limit #{offset}, #{limit}
     </select>
 
     <update id="deleteById">

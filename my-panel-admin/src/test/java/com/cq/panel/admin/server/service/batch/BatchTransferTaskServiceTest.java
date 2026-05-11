@@ -3,6 +3,7 @@ package com.cq.panel.admin.server.service.batch;
 import com.cq.panel.admin.server.repository.domain.BatchSyncEvent;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
+import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
 import com.cq.panel.admin.server.service.batch.impl.BatchTransferTaskServiceImpl;
@@ -31,6 +32,9 @@ class BatchTransferTaskServiceTest {
     private BatchTransferTaskMapper taskMapper;
 
     @Mock
+    private BatchTransferSubtaskMapper subtaskMapper;
+
+    @Mock
     private BatchSyncEventMapper eventMapper;
 
     private WildcardConflictDetector conflictDetector;
@@ -49,6 +53,7 @@ class BatchTransferTaskServiceTest {
 
         taskService = new BatchTransferTaskServiceImpl(
             taskMapper,
+            subtaskMapper,
             eventMapper,
             conflictDetector,
             cronValidator,
@@ -83,7 +88,9 @@ class BatchTransferTaskServiceTest {
     @Test
     @DisplayName("2. 通配符冲突 - 抛出异常")
     void testCreateTask_withConflict_throwsException() {
-        when(taskMapper.selectList(any())).thenReturn(Arrays.asList(createExistingTask()));
+        BatchTransferTask existing = createExistingTask();
+        existing.setSourceAgentId("agent-003");
+        when(taskMapper.selectList(any())).thenReturn(Arrays.asList(existing));
 
         BatchTransferTaskDTO dto = createValidDTO("冲突任务");
         dto.setSourceDir("/var/log/app");
@@ -224,7 +231,7 @@ class BatchTransferTaskServiceTest {
         when(taskMapper.updateById(any())).thenReturn(1);
 
         BatchTransferTaskDTO dto = createValidDTO("更新后的任务名");
-        taskService.updateTask(1L, dto);
+        taskService.updateTask(1L, dto, "test-user");
 
         ArgumentCaptor<BatchTransferTask> captor = ArgumentCaptor.forClass(BatchTransferTask.class);
         verify(taskMapper).updateById(captor.capture());
@@ -236,18 +243,20 @@ class BatchTransferTaskServiceTest {
     @Test
     @DisplayName("10. 更新后检测到新冲突")
     void testUpdateTask_newConflict_detected() {
-        when(taskMapper.selectById(anyLong())).thenReturn(createExistingTask());
-        when(taskMapper.selectList(any())).thenReturn(Arrays.asList(
-            createExistingTaskWithId(2L),
-            createExistingTaskWithId(3L)
-        ));
+        BatchTransferTask existing = createExistingTask();
+        when(taskMapper.selectById(anyLong())).thenReturn(existing);
+        BatchTransferTask conflict1 = createExistingTaskWithId(2L);
+        conflict1.setSourceAgentId("agent-003");
+        BatchTransferTask conflict2 = createExistingTaskWithId(3L);
+        conflict2.setSourceAgentId("agent-003");
+        when(taskMapper.selectList(any())).thenReturn(Arrays.asList(conflict1, conflict2));
 
         BatchTransferTaskDTO dto = createValidDTO("冲突更新任务");
         dto.setSourceDir("/var/log/app");
         dto.setIncludePatterns(Arrays.asList("*.log"));
 
         assertThrows(IllegalStateException.class, () ->
-            taskService.updateTask(1L, dto)
+            taskService.updateTask(1L, dto, "test-user")
         );
         
         System.out.println("✅ 更新冲突检测正常");
@@ -260,7 +269,7 @@ class BatchTransferTaskServiceTest {
         when(taskMapper.updateById(any())).thenReturn(1);
 
         BatchTransferTaskDTO dto = createValidDTO("事件测试任务");
-        taskService.updateTask(1L, dto);
+        taskService.updateTask(1L, dto, "test-user");
 
         ArgumentCaptor<BatchSyncEvent> eventCaptor = ArgumentCaptor.forClass(BatchSyncEvent.class);
         verify(eventMapper).insertEvent(eventCaptor.capture());
@@ -324,24 +333,22 @@ class BatchTransferTaskServiceTest {
     }
 
     @Test
-    @DisplayName("15. RUNNING/PAUSED → READY 停止任务")
-    void testStop_to_READY() {
+    @DisplayName("15. RUNNING/PAUSED → deleted=1 停止任务(逻辑删除)")
+    void testStop_to_deleted() {
         for (String status : Arrays.asList("RUNNING", "PAUSED")) {
             BatchTransferTask task = createExistingTask();
             task.setStatus(status);
             when(taskMapper.selectById(anyLong())).thenReturn(task);
-            when(taskMapper.updateById(any())).thenReturn(1);
+            when(taskMapper.deleteById(anyLong())).thenReturn(1);
 
             taskService.stopTask(1L);
 
-            ArgumentCaptor<BatchTransferTask> captor = ArgumentCaptor.forClass(BatchTransferTask.class);
-            verify(taskMapper, atLeastOnce()).updateById(captor.capture());
-            assertEquals("READY", captor.getValue().getStatus());
-            
-            reset(taskMapper);  // 重置Mock以便下次循环
+            verify(taskMapper).deleteById(1L);
+
+            reset(taskMapper);
         }
-        
-        System.out.println("✅ 状态转换: RUNNING/PAUSED → READY");
+
+        System.out.println("✅ 停止任务: RUNNING/PAUSED → deleted=1 (逻辑删除)");
     }
 
     @Test

@@ -1,18 +1,20 @@
 import { renderHook, act } from '@testing-library/react';
 
 jest.mock('../../../../api/batch', () => ({
-  getTaskList: jest.fn(),
-  createTask: jest.fn(),
-  updateTask: jest.fn(),
-  deleteTasks: jest.fn(),
-  startTask: jest.fn(),
-  pauseTask: jest.fn(),
-  resumeTask: jest.fn(),
-  stopTask: jest.fn()
+  batchApi: {
+    getTaskList: jest.fn(),
+    createTask: jest.fn(),
+    updateTask: jest.fn(),
+    deleteTasks: jest.fn(),
+    startTask: jest.fn(),
+    pauseTask: jest.fn(),
+    resumeTask: jest.fn(),
+    stopTask: jest.fn()
+  }
 }));
 
 import { useBatchTasks } from '../useBatchTasks';
-import * as batchApi from '../../../../api/batch';
+import { batchApi } from '../../../../api/batch';
 
 describe('useBatchTasks', () => {
   beforeEach(() => {

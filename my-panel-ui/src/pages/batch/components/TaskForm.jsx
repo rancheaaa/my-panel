@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag, Space } from 'antd';
 import {
   FileTextOutlined,
@@ -13,8 +13,11 @@ import {
   CheckCircleOutlined,
   QuestionCircleOutlined,
   PlusOutlined,
-  MinusCircleOutlined
+  MinusCircleOutlined,
+  SearchOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
+import { listAgentRegistry } from '../../../api/agent';
 
 const { TextArea } = Input;
 
@@ -63,17 +66,56 @@ const inputStyle = {
 
 const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
   const [form] = Form.useForm();
+  const [agentList, setAgentList] = useState([]);
+
+  const loadAgentList = async () => {
+    try {
+      const res = await listAgentRegistry({ pageNum: 1, pageSize: 1000 });
+      if (res.data?.rows) {
+        setAgentList(res.data.rows);
+      }
+    } catch (error) {
+      console.error('加载Agent列表失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadAgentList();
+  }, []);
 
   const onFinish = (values) => {
+    console.log('📝 表单提交 - 原始值:', values);
+    console.log('📋 targets 数组:', values.targets);
+
+    const targetAgentIds = values.targets?.map(t => t.agentId).filter(Boolean) || [];
+    const targetDirs = values.targets?.map(t => t.dir).filter(Boolean).join(';') || '';
+
+    const sourceAgent = agentList.find(a => a.id === values.sourceAgentId);
+    const sourceAgentName = sourceAgent?.nodeName || (sourceAgent?.agentIp && sourceAgent?.agentPort ? `${sourceAgent.agentIp}:${sourceAgent.agentPort}` : '');
+
+    const targetAgentNames = values.targets?.map(t => {
+      const agent = agentList.find(a => a.id === t.agentId);
+      return agent?.nodeName || (agent?.agentIp && agent?.agentPort ? `${agent.agentIp}:${agent.agentPort}` : '');
+    }).filter(Boolean) || [];
+
+    console.log('✅ 提取的 sourceAgentName:', sourceAgentName);
+    console.log('✅ 提取的 targetAgentIds:', targetAgentIds);
+    console.log('✅ 提取的 targetAgentNames:', targetAgentNames);
+    console.log('✅ 提取的 targetDirs:', targetDirs);
+
     const data = {
       ...values,
-      includePatterns: JSON.stringify(values.includePatterns || []),
-      excludePatterns: JSON.stringify(values.excludePatterns || []),
-      targetAgentIds: values.targets?.map(t => t.agentId).filter(Boolean),
-      targetDirs: values.targets?.map(t => t.dir).filter(Boolean).join(';') || '',
+      includePatterns: values.includePatterns || [],
+      excludePatterns: values.excludePatterns || [],
+      sourceAgentName,
+      targetAgentIds,
+      targetAgentNames,
+      targetDirs,
       retryEnabled: values.retryEnabled ? 1 : 0,
       preserveDirStructure: values.preserveDirStructure ? 1 : 0
     };
+
+    console.log('📤 最终提交到后端的数据:', data);
     onSubmit(data);
   };
 
@@ -103,31 +145,51 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
           </Form.Item>
         </Card>
 
-        {/* 第二行：源节点 + 目标节点 并排 */}
+        {/* 第二行：源节点 + 目标节点 并排（各占50%） */}
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#52c41a')}>
                 <span style={iconStyle('#52c41a')}><CloudServerOutlined /></span>
                 <span style={titleStyle}>源节点</span>
                 <Tooltip title="文件来源"><InfoCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c', cursor: 'pointer', fontSize: 13 }} /></Tooltip>
               </div>
-              <Form.Item label="Agent ID" name="sourceAgentId" rules={[{ required: true }]} style={formItemStyle}>
-                <Input placeholder="agent-001" style={inputStyle} prefix={<CloudServerOutlined style={{ color: '#52c41a', fontSize: 13 }} />} />
+              <Form.Item label="源节点" name="sourceAgentId" rules={[{ required: true, message: '请选择源节点' }]} style={formItemStyle}>
+                <Select
+                  showSearch
+                  placeholder="搜索并选择源节点 (例如: root@172.17.0.1:7777)"
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  style={inputStyle}
+                >
+                  {agentList.map(agent => (
+                    <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
+                      <Space size="small">
+                        <CloudServerOutlined style={{ color: '#52c41a' }} />
+                        <span style={{ fontWeight: 500 }}>{agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}</span>
+                        {agent.nodeStatus === 1 && <Tag color="green" style={{ fontSize: 10, marginLeft: 4 }}>在线</Tag>}
+                        {agent.nodeStatus === 0 && <Tag color="red" style={{ fontSize: 10, marginLeft: 4 }}>离线</Tag>}
+                        {agent.osType && <Tag color="blue" style={{ fontSize: 10 }}>{agent.osType}</Tag>}
+                      </Space>
+                    </Select.Option>
+                  ))}
+                </Select>
               </Form.Item>
               <Form.Item label="源目录" name="sourceDir" rules={[{ required: true }]} style={formItemStyle}>
                 <Input placeholder="/var/log/app" style={inputStyle} prefix={<FilterOutlined style={{ color: '#52c41a', fontSize: 13 }} />} />
               </Form.Item>
             </Card>
           </Col>
-          <Col span={16}>
+          <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#722ed1')}>
                 <span style={iconStyle('#722ed1')}><ClusterOutlined /></span>
                 <span style={titleStyle}>目标节点</span>
                 <Tooltip title="每个目标包含Agent ID与接收目录"><InfoCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c', cursor: 'pointer', fontSize: 13 }} /></Tooltip>
               </div>
-              <Form.List name="targets" initialValue={[{ agentId: '', dir: '' }]}>
+              <Form.List name="targets" initialValue={[{ agentId: undefined, dir: undefined }]}>
                 {(fields, { add, remove }) => (
                   <div>
                     {fields.map(({ key, name, ...restField }) => (
@@ -141,13 +203,34 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                       onMouseLeave={(e) => e.currentTarget.style.background = key % 2 === 0 ? '#fafafe' : '#fff'}
                       >
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>Agent ID</div>
-                          <Form.Item {...restField} name={[name, 'agentId']} rules={[{ required: true }]} noStyle>
-                            <Input placeholder="agent-002" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<CloudServerOutlined style={{ color: '#722ed1', fontSize: 12 }} />} />
+                          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>目标节点</div>
+                          <Form.Item {...restField} name={[name, 'agentId']} rules={[{ required: true, message: '请选择目标节点' }]} noStyle>
+                            <Select
+                              showSearch
+                              placeholder="搜索并选择目标节点 (例如: root@172.17.0.1:7777)"
+                              optionFilterProp="label"
+                              filterOption={(input, option) =>
+                                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                              }
+                              size="small"
+                              style={{ width: '100%', borderRadius: 5, height: 30 }}
+                            >
+                              {agentList.map(agent => (
+                                <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
+                                  <Space size="small">
+                                    <CloudServerOutlined style={{ color: '#722ed1', fontSize: 12 }} />
+                                    <span style={{ fontWeight: 500 }}>{agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}</span>
+                                    {agent.nodeStatus === 1 && <Tag color="green" style={{ fontSize: 10 }}>在线</Tag>}
+                                    {agent.nodeStatus === 0 && <Tag color="red" style={{ fontSize: 10 }}>离线</Tag>}
+                                    {agent.osType && <Tag color="blue" style={{ fontSize: 10 }}>{agent.osType}</Tag>}
+                                  </Space>
+                                </Select.Option>
+                              ))}
+                            </Select>
                           </Form.Item>
                         </div>
                         <div style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d9d9d9', paddingTop: 17, flexShrink: 0, fontSize: 14 }}>→</div>
-                        <div style={{ flex: 2.5, minWidth: 0 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>接收目录</div>
                           <Form.Item {...restField} name={[name, 'dir']} rules={[{ required: true }]} noStyle>
                             <Input placeholder="/backup/node-02/logs" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<FilterOutlined style={{ color: '#722ed1', fontSize: 12 }} />} />
@@ -160,7 +243,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                         )}
                       </div>
                     ))}
-                    <Button type="dashed" onClick={() => add({ agentId: '', dir: '' })} block icon={<PlusOutlined />} size="small"
+                    <Button type="dashed" onClick={() => add({ agentId: undefined, dir: undefined })} block icon={<PlusOutlined />} size="small"
                       style={{ borderRadius: 6, borderColor: '#722ed1', color: '#722ed1', height: 32, marginTop: 8 }}>
                       添加目标节点
                     </Button>
@@ -171,9 +254,9 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
           </Col>
         </Row>
 
-        {/* 第三行：传输策略 + 文件匹配 规则 合并为一个宽行 */}
+        {/* 第三行：传输策略 + 文件匹配规则（各占50%） */}
         <Row gutter={16}>
-          <Col span={9}>
+          <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#fa8c16')}>
                 <span style={iconStyle('#fa8c16')}><ToolOutlined /></span>
@@ -197,7 +280,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
               </Form.Item>
             </Card>
           </Col>
-          <Col span={15}>
+          <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#13c2c2')}>
                 <span style={iconStyle('#13c2c2')}><FilterOutlined /></span>
@@ -218,22 +301,85 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
           </Col>
         </Row>
 
-        {/* 第四行：定时调度 + 重试 + 传输后操作 三栏并列 */}
+        {/* 第四行：定时调度 + 重试策略（各占50%） */}
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#eb2f96')}>
                 <span style={iconStyle('#eb2f96')}><ScheduleOutlined /></span>
                 <span style={titleStyle}>定时调度</span>
                 <Tag color="magenta" style={{ marginLeft: 'auto', fontSize: 11 }}>可选</Tag>
               </div>
-              <Form.Item label="Cron 表达式" name="scanCronExpression" style={{ ...formItemStyle, marginBottom: 0 }}>
-                <Input placeholder="0 0 2 * * ?" style={inputStyle}
-                  suffix={<Tooltip title="留空则手动触发"><QuestionCircleOutlined style={{ color: '#bfbfbf', fontSize: 13 }} /></Tooltip>} />
+              <Form.Item label="执行频率" name="scanCronExpression" style={{ ...formItemStyle, marginBottom: 0 }}>
+                <Select
+                  placeholder="选择执行频率（留空则手动触发）"
+                  allowClear
+                  style={inputStyle}
+                  optionLabelProp="label"
+                >
+                  <Select.OptGroup label="常用间隔">
+                    <Select.Option value="0 */1 * * * ?" label={<Space><ClockCircleOutlined />每隔 1 分钟</Space>}>
+                      <div><strong>每隔 1 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */1 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 */5 * * * ?" label={<Space><ClockCircleOutlined />每隔 5 分钟</Space>}>
+                      <div><strong>每隔 5 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */5 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 */10 * * * ?" label={<Space><ClockCircleOutlined />每隔 10 分钟</Space>}>
+                      <div><strong>每隔 10 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */10 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 */30 * * * ?" label={<Space><ClockCircleOutlined />每隔 30 分钟</Space>}>
+                      <div><strong>每隔 30 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */30 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 */1 * * ?" label={<Space><ClockCircleOutlined />每隔 1 小时</Space>}>
+                      <div><strong>每隔 1 小时</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 */1 * * ?</div>
+                    </Select.Option>
+                  </Select.OptGroup>
+                  <Select.OptGroup label="每日定时">
+                    <Select.Option value="0 0 0 * * ?" label={<Space><ClockCircleOutlined />每天 00:00</Space>}>
+                      <div><strong>每天 00:00 (午夜)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 0 * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 2 * * ?" label={<Space><ClockCircleOutlined />每天 02:00</Space>}>
+                      <div><strong>每天 02:00 (凌晨)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 12 * * ?" label={<Space><ClockCircleOutlined />每天 12:00</Space>}>
+                      <div><strong>每天 12:00 (中午)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 12 * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 18 * * ?" label={<Space><ClockCircleOutlined />每天 18:00</Space>}>
+                      <div><strong>每天 18:00 (傍晚)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 18 * * ?</div>
+                    </Select.Option>
+                  </Select.OptGroup>
+                  <Select.OptGroup label="每周定时">
+                    <Select.Option value="0 0 2 ? * MON" label={<Space><ClockCircleOutlined />每周一 02:00</Space>}>
+                      <div><strong>每周一 02:00</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * MON</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 2 ? * SUN" label={<Space><ClockCircleOutlined />每周日 02:00</Space>}>
+                      <div><strong>每周日 02:00</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * SUN</div>
+                    </Select.Option>
+                  </Select.OptGroup>
+                </Select>
               </Form.Item>
+              <div style={{ marginTop: 6, padding: '6px 10px', background: '#fafafa', borderRadius: 4, border: '1px solid #f0f0f0' }}>
+                <Tooltip title="选择预设频率后自动生成Cron表达式，留空表示手动触发任务">
+                  <span style={{ fontSize: 11.5, color: '#8c8c8c' }}>
+                    <InfoCircleOutlined style={{ marginRight: 4 }} />
+                    选择预设频率自动生成Cron表达式，也可留空手动触发
+                  </span>
+                </Tooltip>
+              </div>
             </Card>
           </Col>
-          <Col span={10}>
+          <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#fa541c')}>
                 <span style={iconStyle('#fa541c')}><ReloadOutlined /></span>
@@ -258,12 +404,16 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
               </Form.Item>
             </Card>
           </Col>
-          <Col span={6}>
-            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-              <div style={headerStyle('#2f54eb')}>
-                <span style={iconStyle('#2f54eb')}><SendOutlined /></span>
-                <span style={titleStyle}>传输后操作</span>
-              </div>
+        </Row>
+
+        {/* 第五行：传输后操作（全宽） */}
+        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+          <div style={headerStyle('#2f54eb')}>
+            <span style={iconStyle('#2f54eb')}><SendOutlined /></span>
+            <span style={titleStyle}>传输后操作</span>
+          </div>
+          <Row gutter={16}>
+            <Col span={12}>
               <Form.Item label="成功后操作" name="postTransferAction" initialValue="NONE" style={formItemStyle}>
                 <Select size="small" style={inputStyle}>
                   <Select.Option value="NONE">无操作</Select.Option>
@@ -271,23 +421,27 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                   <Select.Option value="BACKUP">备份源文件</Select.Option>
                 </Select>
               </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item noStyle shouldUpdate={(prev, cur) => prev.postTransferAction !== cur.postTransferAction}>
                 {({ getFieldValue }) =>
                   getFieldValue('postTransferAction') === 'BACKUP' && (
-                    <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6, padding: '8px 10px', marginTop: 4 }}>
-                      <Form.Item label="备份目录" name="backupDir" rules={[{ required: true }]} style={{ marginBottom: 6 }}>
-                        <Input placeholder="/backup/archive" size="small" />
-                      </Form.Item>
-                      <Form.Item label="备份模式" name="backupMode" initialValue="COPY" style={{ marginBottom: 0 }}>
-                        <Select size="small" style={{ width: '100%' }}><Select.Option value="COPY">复制</Select.Option><Select.Option value="MOVE">移动</Select.Option></Select>
-                      </Form.Item>
+                    <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6, padding: '10px 14px' }}>
+                      <Row gutter={12}>
+                        <Col span={12}><Form.Item label="备份目录" name="backupDir" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
+                          <Input placeholder="/backup/archive" size="small" />
+                        </Form.Item></Col>
+                        <Col span={12}><Form.Item label="备份模式" name="backupMode" initialValue="COPY" style={{ marginBottom: 0 }}>
+                          <Select size="small" style={{ width: '100%' }}><Select.Option value="COPY">复制</Select.Option><Select.Option value="MOVE">移动</Select.Option></Select>
+                        </Form.Item></Col>
+                      </Row>
                     </div>
                   )
                 }
               </Form.Item>
-            </Card>
-          </Col>
-        </Row>
+            </Col>
+          </Row>
+        </Card>
 
         {/* 提交按钮 */}
         <div style={{ textAlign: 'center', paddingTop: 16, paddingBottom: 4 }}>

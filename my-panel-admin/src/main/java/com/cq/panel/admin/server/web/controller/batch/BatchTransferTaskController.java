@@ -42,7 +42,7 @@ public class BatchTransferTaskController extends BaseController {
     @PostMapping
     public Result<Long> create(@Validated @RequestBody BatchTransferTaskDTO dto) {
         try {
-            Long taskId = batchTransferTaskService.createTask(dto, getUserId().toString());
+            Long taskId = batchTransferTaskService.createTask(dto, getUsername());
             return Result.success(taskId);
         } catch (IllegalArgumentException e) {
             return Result.error("参数错误: " + e.getMessage());
@@ -64,7 +64,7 @@ public class BatchTransferTaskController extends BaseController {
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId,
             @Validated @RequestBody BatchTransferTaskDTO dto) {
         try {
-            batchTransferTaskService.updateTask(taskId, dto);
+            batchTransferTaskService.updateTask(taskId, dto, getUsername());
             return Result.success();
         } catch (IllegalArgumentException e) {
             return Result.error("参数错误: " + e.getMessage());
@@ -123,14 +123,30 @@ public class BatchTransferTaskController extends BaseController {
     }
 
     /**
-     * 获取任务统计信息
+     * 获取全局任务统计信息
      */
-    @Operation(summary = "获取任务统计", description = "获取各状态的任务数量统计")
+    @Operation(summary = "获取全局任务统计", description = "获取各状态的任务数量统计")
     @RequirePermission("batch:task:list")
     @GetMapping("/statistics")
     public Result<Map<String, Object>> statistics() {
         Map<String, Object> stats = batchTransferTaskService.getStatistics();
         return Result.success(stats);
+    }
+
+    /**
+     * 获取单个任务的统计信息（含子任务状态分布）
+     */
+    @Operation(summary = "获取单任务统计", description = "获取指定任务的子任务状态分布统计")
+    @RequirePermission("batch:task:statistics")
+    @GetMapping("/{taskId}/statistics")
+    public Result<Map<String, Object>> taskStatistics(
+            @Parameter(description = "任务ID", required = true) @PathVariable Long taskId) {
+        try {
+            Map<String, Object> stats = batchTransferTaskService.getTaskStatistics(taskId);
+            return Result.success(stats);
+        } catch (IllegalArgumentException e) {
+            return Result.error("参数错误: " + e.getMessage());
+        }
     }
 
     // ==================== 状态管理接口 ====================
@@ -141,7 +157,7 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "启动任务", description = "将READY或PAUSED状态的任务启动为RUNNING")
     @Log(title = "批量传输任务-启动", businessType = BusinessType.UPDATE)
     @RequirePermission("batch:task:start")
-    @PostMapping("/{taskId}/start")
+    @PutMapping("/{taskId}/start")
     public Result<Void> start(
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId) {
         try {
@@ -160,7 +176,7 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "暂停任务", description = "将RUNNING状态的任务暂停为PAUSED")
     @Log(title = "批量传输任务-暂停", businessType = BusinessType.UPDATE)
     @RequirePermission("batch:task:pause")
-    @PostMapping("/{taskId}/pause")
+    @PutMapping("/{taskId}/pause")
     public Result<Void> pause(
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId) {
         try {
@@ -179,7 +195,7 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "恢复任务", description = "将PAUSED状态的任务恢复为RUNNING")
     @Log(title = "批量传输任务-恢复", businessType = BusinessType.UPDATE)
     @RequirePermission("batch:task:resume")
-    @PostMapping("/{taskId}/resume")
+    @PutMapping("/{taskId}/resume")
     public Result<Void> resume(
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId) {
         try {
@@ -198,7 +214,7 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "停止任务", description = "将RUNNING或PAUSED状态的任务停止为READY")
     @Log(title = "批量传输任务-停止", businessType = BusinessType.UPDATE)
     @RequirePermission("batch:task:stop")
-    @PostMapping("/{taskId}/stop")
+    @DeleteMapping("/{taskId}/stop")
     public Result<Void> stop(
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId) {
         try {

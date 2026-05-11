@@ -40,6 +40,8 @@ public class ConfigChangeListener {
         
         if (!versionManager.acceptVersion(taskId, newVersion)) {
             log.debug("版本未变化: taskId={}, version={}", taskId, newVersion);
+            // 幂等：即使版本相同，也保存配置（确保持久化）
+            configFileManager.saveTaskConfig(newConfig);
             return false;
         }
         
@@ -74,13 +76,15 @@ public class ConfigChangeListener {
             changed = true;
         }
         
+        // 无论内容是否变化，version已更新，都要保存配置（热更新场景）
         if (changed) {
             saveAndNotify(newConfig, "CONFIG_UPDATED");
         } else {
-            log.debug("版本变化但内容相同: taskId={}", taskId);
+            log.debug("版本更新但内容相同，仍保存配置: taskId={}", taskId);
+            configFileManager.saveTaskConfig(newConfig);
         }
         
-        return changed;
+        return true;
     }
 
     // ==================== 事件注册方法 ====================

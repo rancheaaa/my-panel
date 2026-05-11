@@ -68,7 +68,7 @@ export const batchApi = {
   startTask(taskId) {
     return request({
       url: `/batch/task/${taskId}/start`,
-      method: 'post'
+      method: 'put'
     });
   },
 
@@ -78,7 +78,7 @@ export const batchApi = {
   pauseTask(taskId) {
     return request({
       url: `/batch/task/${taskId}/pause`,
-      method: 'post'
+      method: 'put'
     });
   },
 
@@ -88,17 +88,17 @@ export const batchApi = {
   resumeTask(taskId) {
     return request({
       url: `/batch/task/${taskId}/resume`,
-      method: 'post'
+      method: 'put'
     });
   },
 
   /**
-   * 停止任务
+   * 停止任务（逻辑删除）
    */
   stopTask(taskId) {
     return request({
       url: `/batch/task/${taskId}/stop`,
-      method: 'post'
+      method: 'delete'
     });
   },
 

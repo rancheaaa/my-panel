@@ -477,15 +477,11 @@ INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`,
 
 -- 15.2 二级菜单：任务列表页面
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
-(2301, '任务列表', 2300, 1, 'task-list', 'batch/TaskListPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:list', 'UnorderedListOutlined', 'admin', NOW(), '', NULL, '批量传输任务列表菜单');
+(2301, '任务列表', 2300, 1, 'batch/task-list', 'batch/TaskListPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:list', 'UnorderedListOutlined', 'admin', NOW(), '', NULL, '批量传输任务列表菜单');
 
--- 15.3 二级菜单：创建任务页面
+-- 15.3 二级菜单：统计面板页面
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
-(2320, '创建任务', 2300, 2, 'task-create', 'batch/TaskCreatePage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:add', 'PlusCircleOutlined', 'admin', NOW(), '', NULL, '创建批量传输任务菜单');
-
--- 15.4 二级菜单：统计面板页面
-INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
-(2330, '统计面板', 2300, 3, 'statistics', 'batch/StatisticsPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:statistics', 'BarChartOutlined', 'admin', NOW(), '', NULL, '批量传输统计面板菜单');
+(2330, '统计面板', 2300, 2, 'batch/statistics', 'batch/StatisticsPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:statistics', 'BarChartOutlined', 'admin', NOW(), '', NULL, '批量传输统计面板菜单');
 
 -- 15.5 三级按钮：任务列表操作权限
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
@@ -495,13 +491,15 @@ INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`,
 (2305, '任务启动', 2301, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:start', '#', 'admin', NOW(), '', NULL, ''),
 (2306, '任务暂停', 2301, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:pause', '#', 'admin', NOW(), '', NULL, ''),
 (2307, '任务恢复', 2301, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:resume', '#', 'admin', NOW(), '', NULL, ''),
-(2308, '任务停止', 2301, 7, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:stop', '#', 'admin', NOW(), '', NULL, '');
+(2308, '任务停止', 2301, 7, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:stop', '#', 'admin', NOW(), '', NULL, ''),
+(2309, '任务新增', 2301, 8, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:add', '#', 'admin', NOW(), '', NULL, ''),
+(2310, '任务修改', 2301, 9, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:edit', '#', 'admin', NOW(), '', NULL, ''),
+(2311, '任务统计', 2301, 10, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:statistics', '#', 'admin', NOW(), '', NULL, '');
 
 -- 15.6 为超级管理员角色(role_id=1)分配批量文件传输完整权限
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 (1, 2300),
 (1, 2301),
-(1, 2320),
 (1, 2330),
 (1, 2302),
 (1, 2303),
@@ -509,17 +507,40 @@ INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 (1, 2305),
 (1, 2306),
 (1, 2307),
-(1, 2308);
+(1, 2308),
+(1, 2309),
+(1, 2310),
+(1, 2311);
 
 -- 15.7 为开发角色(role_id=4)分配批量文件传输基本权限（列表查看+创建+基本操作）
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 (4, 2300),
 (4, 2301),
-(4, 2320),
 (4, 2330),
 (4, 2302),
 (4, 2303),
 (4, 2305),
 (4, 2306),
 (4, 2307),
-(4, 2308);
+(4, 2308),
+(4, 2309),
+(4, 2310),
+(4, 2311);
+
+-- 15.4 二级菜单：传输明细页面
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(2340, '传输明细', 2300, 3, 'batch/subtask', 'batch/SubtaskListPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:subtask:list', 'FileTextOutlined', 'admin', NOW(), '', NULL, '批量传输文件传输明细菜单');
+
+-- 15.9 三级按钮：传输明细操作权限
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(2341, '子任务查询', 2340, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:subtask:query', '#', 'admin', NOW(), '', NULL, ''),
+(2342, '子任务列表', 2340, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:subtask:list', '#', 'admin', NOW(), '', NULL, '');
+
+-- 15.8 更新角色权限：添加传输明细页面及新增按钮权限
+INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(1, 2340),
+(1, 2341),
+(1, 2342),
+(4, 2340),
+(4, 2341),
+(4, 2342);

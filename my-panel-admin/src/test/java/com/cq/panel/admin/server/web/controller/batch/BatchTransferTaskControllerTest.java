@@ -41,8 +41,9 @@ class BatchTransferTaskControllerTest {
         // 使用spy包装控制器以支持mock getUserId()
         controller = spy(controller);
         
-        // Mock getUserId()返回固定值，避免SecurityUtils依赖
+        // Mock getUserId()/getUsername()返回固定值，避免SecurityUtils依赖
         doReturn(1L).when(controller).getUserId();
+        doReturn("test-user").when(controller).getUsername();
 
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .build();
@@ -102,7 +103,7 @@ class BatchTransferTaskControllerTest {
     @Test
     @DisplayName("4. PUT /batch/task/{id} - 更新任务成功")
     void testUpdate_success() throws Exception {
-        doNothing().when(batchTransferTaskService).updateTask(anyLong(), any(BatchTransferTaskDTO.class));
+        doNothing().when(batchTransferTaskService).updateTask(anyLong(), any(BatchTransferTaskDTO.class), anyString());
 
         mockMvc.perform(put("/batch/task/1")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +111,7 @@ class BatchTransferTaskControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
-        verify(batchTransferTaskService, times(1)).updateTask(eq(1L), any(BatchTransferTaskDTO.class));
+        verify(batchTransferTaskService, times(1)).updateTask(eq(1L), any(BatchTransferTaskDTO.class), anyString());
         System.out.println("✅ 更新任务API成功");
     }
 
@@ -196,11 +197,11 @@ class BatchTransferTaskControllerTest {
     // ==================== Task 3.2: 状态管理接口测试 ====================
 
     @Test
-    @DisplayName("10. POST /batch/task/{id}/start - 启动任务成功")
+    @DisplayName("10. PUT /batch/task/{id}/start - 启动任务成功")
     void testStart_success() throws Exception {
         doNothing().when(batchTransferTaskService).startTask(1L);
 
-        mockMvc.perform(post("/batch/task/1/start"))
+        mockMvc.perform(put("/batch/task/1/start"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
@@ -209,11 +210,11 @@ class BatchTransferTaskControllerTest {
     }
 
     @Test
-    @DisplayName("11. POST /batch/task/{id}/pause - 暂停任务成功")
+    @DisplayName("11. PUT /batch/task/{id}/pause - 暂停任务成功")
     void testPause_success() throws Exception {
         doNothing().when(batchTransferTaskService).pauseTask(1L);
 
-        mockMvc.perform(post("/batch/task/1/pause"))
+        mockMvc.perform(put("/batch/task/1/pause"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
@@ -222,11 +223,11 @@ class BatchTransferTaskControllerTest {
     }
 
     @Test
-    @DisplayName("12. POST /batch/task/{id}/resume - 恢复任务成功")
+    @DisplayName("12. PUT /batch/task/{id}/resume - 恢复任务成功")
     void testResume_success() throws Exception {
         doNothing().when(batchTransferTaskService).resumeTask(1L);
 
-        mockMvc.perform(post("/batch/task/1/resume"))
+        mockMvc.perform(put("/batch/task/1/resume"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
@@ -235,11 +236,11 @@ class BatchTransferTaskControllerTest {
     }
 
     @Test
-    @DisplayName("13. POST /batch/task/{id}/stop - 停止任务成功")
+    @DisplayName("13. DELETE /batch/task/{id}/stop - 停止任务成功")
     void testStop_success() throws Exception {
         doNothing().when(batchTransferTaskService).stopTask(1L);
 
-        mockMvc.perform(post("/batch/task/1/stop"))
+        mockMvc.perform(delete("/batch/task/1/stop"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
@@ -253,7 +254,7 @@ class BatchTransferTaskControllerTest {
         doThrow(new IllegalStateException("任务已在运行中: 1"))
             .when(batchTransferTaskService).startTask(1L);
 
-        mockMvc.perform(post("/batch/task/1/start"))
+        mockMvc.perform(put("/batch/task/1/start"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(500))
             .andExpect(jsonPath("$.msg").value("任务已在运行中: 1"));

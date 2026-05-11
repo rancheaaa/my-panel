@@ -1,5 +1,9 @@
 package com.cq.agent;
 
+import com.cq.agent.batch.config.ConfigChangeListener;
+import com.cq.agent.batch.config.ConfigFileManager;
+import com.cq.agent.batch.config.VersionManager;
+import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.registry.AgentRegistryService;
@@ -49,17 +53,58 @@ public class AgentApplication {
             return;
         }
 
-        HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService);
+        // Initialize batch config management
+        String batchConfigDir = Path.of(config.getFileBaseDirectory(), "batch-config").toString();
+        ConfigFileManager configFileManager = new ConfigFileManager(batchConfigDir);
+        VersionManager versionManager = new VersionManager();
+        ConfigChangeListener configChangeListener = new ConfigChangeListener(configFileManager, versionManager);
+
+        // Initialize batch task scheduler manager (Quartz)
+        BatchTaskSchedulerManager taskSchedulerManager;
+        try {
+            taskSchedulerManager = new BatchTaskSchedulerManager(configFileManager);
+        } catch (Exception e) {
+            logger.error("Failed to initialize BatchTaskSchedulerManager: {}", e.getMessage(), e);
+            System.exit(1);
+            return;
+        }
+
+        // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
+        configChangeListener.onCronChange(taskId -> {
+            BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
+            if (taskConfig != null) {
+                taskSchedulerManager.updateTask(taskConfig);
+            }
+        });
+        configChangeListener.onAnyChange(ctx -> {
+            if ("NEW_TASK".equals(ctx.field)) {
+                BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
+                if (taskConfig != null && "RUNNING".equals(taskConfig.getStatus())) {
+                    taskSchedulerManager.startTask(taskConfig);
+                }
+            } else if ("CONFIG_UPDATED".equals(ctx.field)) {
+                BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
+                if (taskConfig != null) {
+                    taskSchedulerManager.updateTask(taskConfig);
+                }
+            }
+        });
+
+        // Start all RUNNING tasks from local config
+        taskSchedulerManager.startAllRunningTasks();
+
+        HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService, configFileManager, configChangeListener, taskSchedulerManager);
         
         // Initialize registry service
         AgentRegistryService registryService = new AgentRegistryService(config);
 
         // Add shutdown hook
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            logger.info("Shutdown signal received");
-            registryService.stop();
-            server.stop();
-        }));
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                logger.info("Shutdown signal received");
+                registryService.stop();
+                taskSchedulerManager.shutdown();
+                server.stop();
+            }));
 
         try {
             server.start();

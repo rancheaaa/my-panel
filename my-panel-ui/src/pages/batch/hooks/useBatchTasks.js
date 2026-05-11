@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import * as batchApi from '../../../api/batch';
+import { batchApi } from '../../../api/batch';
 
 export function useBatchTasks() {
   const [tasks, setTasks] = useState([]);

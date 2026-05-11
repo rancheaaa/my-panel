@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Row, Col, Statistic, Progress, Tag, Tooltip, Space } from 'antd';
+import { Card, Row, Col, Statistic, Progress, Tag, Tooltip, Space, Button } from 'antd';
 import {
   FileOutlined,
   PlayCircleOutlined,
@@ -127,7 +127,7 @@ const StatisticsTab = () => {
                 hoverable
                 style={{
                   borderRadius: 10,
-                  borderLeft: `4px solid ${isZero ? '#d9d9d9 : cfg.color}`,
+                  borderLeft: '4px solid ' + (isZero ? '#d9d9d9' : cfg.color),
                   transition: 'all 0.25s ease',
                   cursor: 'default'
                 }}

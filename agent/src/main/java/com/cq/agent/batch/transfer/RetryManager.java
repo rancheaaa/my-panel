@@ -12,7 +12,10 @@ import java.util.function.Function;
 /**
  * 重试管理器
  * 管理文件传输失败后的重试逻辑
- * 支持指数退避、最大重试次数、成功清除
+ * 符合spec.md设计要求：
+ * - 指数退避：首次等待intervalMin分钟，后续每次翻倍（上限2小时）
+ * - 最大重试次数控制
+ * - 支持重试执行器调度
  */
 public class RetryManager {
 
@@ -21,18 +24,24 @@ public class RetryManager {
     private final int maxRetries;
     private final long initialDelayMs;
     private final long maxDelayMs;
-    
+
     private final Map<Long, AtomicInteger> retryCountMap = new ConcurrentHashMap<>();
-    
+
     private Function<Long, Long> retryExecutor;
 
-    public RetryManager(int maxRetries, long initialDelaySeconds, long maxDelaySeconds) {
+    /**
+     * 构造函数
+     * @param maxRetries 最大重试次数
+     * @param intervalMin 首次重试等待时间（分钟）
+     * @param maxDelayHours 最大退避时间（小时）
+     */
+    public RetryManager(int maxRetries, long intervalMin, long maxDelayHours) {
         this.maxRetries = maxRetries;
-        this.initialDelayMs = initialDelaySeconds * 1000;
-        this.maxDelayMs = maxDelaySeconds * 1000;
-        
-        log.info("✅ 重试管理器初始化: max={}, initial={}s, max={}s", 
-            maxRetries, initialDelaySeconds, maxDelaySeconds);
+        this.initialDelayMs = TimeUnit.MINUTES.toMillis(intervalMin);
+        this.maxDelayMs = TimeUnit.HOURS.toMillis(maxDelayHours);
+
+        log.info("✅ 重试管理器初始化: maxRetries={}, initialDelay={}min, maxDelay={}h",
+            maxRetries, intervalMin, maxDelayHours);
     }
 
     /**
@@ -50,39 +59,40 @@ public class RetryManager {
      */
     public boolean shouldRetry(Long subtaskId, String error) {
         AtomicInteger count = retryCountMap.computeIfAbsent(subtaskId, k -> new AtomicInteger(0));
-        
+
         int current = count.incrementAndGet();
-        
+
         if (current > maxRetries) {
-            log.warn("❌ 达到最大重试次数: subtaskId={}, max={}, error={}", 
+            log.warn("❌ 达到最大重试次数: subtaskId={}, max={}, error={}",
                 subtaskId, maxRetries, error);
             return false;
         }
-        
+
         if (retryExecutor != null) {
             long delay = calculateNextRetryDelay(subtaskId, current);
             Long nextRetryAt = retryExecutor.apply(subtaskId);
-            
-            log.info("🔄 调度重试: subtaskId={}, attempt={}/{}, delay={}ms, nextAt={}", 
+
+            log.info("🔄 调度重试: subtaskId={}, attempt={}/{}, delay={}ms, nextAt={}",
                 subtaskId, current, maxRetries, delay, nextRetryAt);
         } else {
-            log.info("🔄 应重试: subtaskId={}, attempt={}/{}, error={}", 
+            log.info("🔄 应重试: subtaskId={}, attempt={}/{}, error={}",
                 subtaskId, current, maxRetries, error);
         }
-        
+
         return true;
     }
 
     /**
      * 计算下次重试延迟（指数退避）
+     * 首次等待intervalMin分钟，后续每次翻倍，上限2小时
      */
     public long calculateNextRetryDelay(Long subtaskId, int attempt) {
         long delay = (long) (initialDelayMs * Math.pow(2, attempt - 1));
-        
+
         if (delay > maxDelayMs) {
             delay = maxDelayMs;
         }
-        
+
         return delay;
     }
 

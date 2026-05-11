@@ -17,12 +17,13 @@ public class ProgressBuffer {
 
     private static final Logger log = LoggerFactory.getLogger(ProgressBuffer.class);
 
-    public static final int MAX_SIZE = 10;
+    public static final int MAX_SIZE = 500;
     public static final long FLUSH_INTERVAL_MS = 1000;
 
     private final List<ProgressEvent> buffer = new ArrayList<>();
     private final ReentrantLock lock = new ReentrantLock();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final int maxSize;
     
     private Consumer<List<ProgressEvent>> flushConsumer;
 
@@ -31,6 +32,7 @@ public class ProgressBuffer {
     }
 
     public ProgressBuffer(int maxSize, long flushIntervalMs) {
+        this.maxSize = maxSize;
         startFlushScheduler(flushIntervalMs);
         
         log.info("✅ 进度缓冲区初始化: maxSize={}, flushInterval={}ms", 
@@ -45,7 +47,7 @@ public class ProgressBuffer {
         try {
             buffer.add(event);
             
-            if (buffer.size() >= MAX_SIZE) {
+            if (buffer.size() >= maxSize) {
                 flushInternal();
             }
         } finally {

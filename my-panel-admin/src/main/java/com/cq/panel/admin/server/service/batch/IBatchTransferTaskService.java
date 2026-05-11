@@ -13,7 +13,7 @@ public interface IBatchTransferTaskService {
 
     Long createTask(BatchTransferTaskDTO dto, String userId);
 
-    void updateTask(Long taskId, BatchTransferTaskDTO dto);
+    void updateTask(Long taskId, BatchTransferTaskDTO dto, String userId);
 
     void startTask(Long taskId);
 
@@ -30,4 +30,6 @@ public interface IBatchTransferTaskService {
     List<BatchTransferTask> getTaskList(String status, String sourceAgentId, Integer pageNum, Integer pageSize);
 
     Map<String, Object> getStatistics();
+
+    Map<String, Object> getTaskStatistics(Long taskId);
 }

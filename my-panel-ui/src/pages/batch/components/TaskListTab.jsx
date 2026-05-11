@@ -8,6 +8,7 @@ import {
   DeleteOutlined,
   SearchOutlined,
   ReloadOutlined,
+  PlusCircleOutlined,
   EyeOutlined,
   CloudServerOutlined,
   ClusterOutlined,
@@ -19,7 +20,6 @@ import {
   QuestionCircleOutlined
 } from '@ant-design/icons';
 import TaskStatusBadge from './TaskStatusBadge';
-import { useBatchTasks } from '../hooks/useBatchTasks';
 
 const { Search } = Input;
 
@@ -44,21 +44,38 @@ const routingMap = {
   BROADCAST: { color: 'orange', text: '广播' }
 };
 
-const TaskListTab = () => {
+const cronDescMap = {
+  '0 */1 * * * ?': '每隔 1 分钟',
+  '0 */5 * * * ?': '每隔 5 分钟',
+  '0 */10 * * * ?': '每隔 10 分钟',
+  '0 */30 * * * ?': '每隔 30 分钟',
+  '0 0 */1 * * ?': '每隔 1 小时',
+  '0 0 0 * * ?': '每天 00:00 (午夜)',
+  '0 0 2 * * ?': '每天 02:00 (凌晨)',
+  '0 0 12 * * ?': '每天 12:00 (中午)',
+  '0 0 18 * * ?': '每天 18:00 (傍晚)',
+  '0 0 2 ? * MON': '每周一 02:00',
+  '0 0 2 ? * SUN': '每周日 02:00'
+};
+
+function getCronDescription(expr) {
+  return cronDescMap[expr] || expr;
+}
+
+const TaskListTab = ({ 
+  onCreateClick, 
+  tasks, 
+  loading, 
+  pagination, 
+  fetchTasks,
+  startTask,
+  pauseTask,
+  resumeTask,
+  stopTask,
+  deleteTask
+}) => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState(null);
-
-  const {
-    tasks,
-    loading,
-    pagination,
-    fetchTasks,
-    startTask,
-    pauseTask,
-    resumeTask,
-    stopTask,
-    deleteTask
-  } = useBatchTasks();
 
   const filteredData = (tasks || []).filter(item => {
     const matchSearch = !searchText ||
@@ -87,35 +104,52 @@ const TaskListTab = () => {
     {
       title: '源节点',
       key: 'source',
-      width: 180,
+      width: 220,
       render: (_, record) => (
-        <div>
-          <div style={{ fontWeight: 500, fontSize: 12.5, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <CloudServerOutlined style={{ color: '#52c41a', fontSize: 12 }} />
-            <span>{record.sourceAgentId || '-'}</span>
-          </div>
-          <Tooltip title={record.sourceDir}>
-            <div style={{
+        <Tooltip title={`${record.sourceAgentName || record.sourceAgentId || ''} → ${record.sourceDir || ''}`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <CloudServerOutlined style={{ color: '#52c41a', fontSize: 12, flexShrink: 0 }} />
+            <span style={{
+              fontWeight: 500, fontSize: 12.5, color: '#1f1f1f',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+            }}>{record.sourceAgentName || record.sourceAgentId || '-'}</span>
+            <FilterOutlined style={{ color: '#bfbfbf', fontSize: 10, flexShrink: 0 }} />
+            <span style={{
               fontSize: 11.5, color: '#8c8c8c',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              maxWidth: 170
-            }}>{record.sourceDir || '-'}</div>
-          </Tooltip>
-        </div>
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+            }}>{record.sourceDir || '-'}</span>
+          </div>
+        </Tooltip>
       )
     },
     {
       title: '目标',
       key: 'target',
-      width: 140,
+      width: 220,
       render: (_, record) => {
-        let count = 0;
-        try { count = record.targetAgentIds ? JSON.parse(record.targetAgentIds).length : 0; } catch (e) {}
+        let names = [], dirs = [];
+        try { names = record.targetAgentNames ? JSON.parse(record.targetAgentNames) : []; } catch (e) {}
+        try { dirs = record.targetDirs ? record.targetDirs.split(';') : []; } catch (e) {}
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <ClusterOutlined style={{ color: '#722ed1', fontSize: 13 }} />
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#722ed1' }}>{count}</span>
-            <span style={{ fontSize: 11.5, color: '#8c8c8c' }}>个节点</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {names.length > 0 ? names.map((name, idx) => (
+              <Tooltip key={idx} title={`${name} → ${dirs[idx] || ''}`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <ClusterOutlined style={{ color: '#722ed1', fontSize: 11, flexShrink: 0 }} />
+                  <span style={{
+                    fontWeight: 500, fontSize: 11.5, color: '#722ed1',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
+                  }}>{name}</span>
+                  <FilterOutlined style={{ color: '#d9d9d9', fontSize: 9, flexShrink: 0 }} />
+                  <span style={{
+                    fontSize: 11, color: '#8c8c8c',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
+                  }}>{dirs[idx] || '-'}</span>
+                </div>
+              </Tooltip>
+            )) : (
+              <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
+            )}
           </div>
         );
       }
@@ -172,7 +206,7 @@ const TaskListTab = () => {
       key: 'cron',
       width: 130,
       render: (val) => val ? (
-        <Tooltip title={val}>
+        <Tooltip title={getCronDescription(val)}>
           <span style={{
             fontFamily: 'Monaco, Consolas, monospace', fontSize: 11.5,
             background: '#fafafa', padding: '2px 6px', borderRadius: 4,
@@ -209,6 +243,32 @@ const TaskListTab = () => {
           {time.replace('T', ' ').slice(0, 16)}
         </span>
       ) : '-'
+    },
+    {
+      title: '修改时间',
+      dataIndex: 'updateTime',
+      key: 'updateTime',
+      width: 150,
+      render: (time) => time ? (
+        <span style={{ fontSize: 12, color: '#666' }}>
+          <ClockCircleOutlined style={{ marginRight: 4, fontSize: 11, color: '#bfbfbf' }} />
+          {time.replace('T', ' ').slice(0, 16)}
+        </span>
+      ) : '-'
+    },
+    {
+      title: '创建人',
+      dataIndex: 'createBy',
+      key: 'createBy',
+      width: 100,
+      render: (val) => val || '-'
+    },
+    {
+      title: '更新人',
+      dataIndex: 'updateBy',
+      key: 'updateBy',
+      width: 100,
+      render: (val) => val || '-'
     },
     {
       title: '操作',
@@ -346,12 +406,22 @@ const TaskListTab = () => {
             </Space>
           </Col>
           <Col>
-            <Button icon={<ReloadOutlined />} size="small"
-              onClick={() => fetchTasks()}
-              style={{ borderRadius: 6 }}
-            >
-              刷新
-            </Button>
+            <Space size={6}>
+              {onCreateClick && (
+                <Button type="primary" icon={<PlusCircleOutlined />} size="small"
+                  onClick={onCreateClick}
+                  style={{ borderRadius: 6 }}
+                >
+                  新建任务
+                </Button>
+              )}
+              <Button icon={<ReloadOutlined />} size="small"
+                onClick={() => fetchTasks()}
+                style={{ borderRadius: 6 }}
+              >
+                刷新
+              </Button>
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -378,7 +448,7 @@ const TaskListTab = () => {
           style: { marginTop: 12 }
         }}
         onChange={(pag) => fetchTasks({ page: pag.current, size: pag.pageSize })}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1800 }}
         size="middle"
         rowClassName={(record) => record.status === 'RUNNING' ? 'table-row-running' : ''}
         style={{

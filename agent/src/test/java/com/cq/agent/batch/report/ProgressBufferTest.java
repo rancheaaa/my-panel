@@ -70,16 +70,23 @@ class ProgressBufferTest {
         AtomicBoolean autoFlushed = new AtomicBoolean(false);
         progressBuffer.setFlushConsumer(events -> {
             autoFlushed.set(true);
-            assertTrue(events.size() <= 10, "不应超过最大容量");
+            assertTrue(events.size() <= 10, "不应超过测试用的最大容量");
         });
         
-        for (int i = 0; i < 12; i++) { // 超过MAX_SIZE=10
+        for (int i = 0; i < 12; i++) { // 超过测试用的MAX_SIZE=10
             progressBuffer.addEvent(createProgressEvent((long) i, i * 10, 100));
         }
         
         assertTrue(autoFlushed.get(), "达到最大容量时应自动flush");
         
         System.out.println("✅ 最大容量自动flush: max=10, added=12");
+    }
+
+    @Test
+    @DisplayName("3b. 默认MAX_SIZE符合spec要求(500)")
+    void testDefaultMaxSize() {
+        assertEquals(500, ProgressBuffer.MAX_SIZE, "spec要求buffer.max.size=500");
+        System.out.println("✅ 默认MAX_SIZE=500, 符合spec要求");
     }
 
     // ==================== 4. 并发安全测试 ====================

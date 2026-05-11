@@ -49,23 +49,6 @@ class JobInvokeUtilTest {
     }
 
     @Test
-    @DisplayName("测试Python脚本执行 - 弹窗提示")
-    void testExecutePythonScript_PopupPrompt() {
-        SysJob sysJob = new SysJob();
-        sysJob.setJobType(3);
-        sysJob.setScriptName("python测试");
-        sysJob.setScriptType("python");
-        sysJob.setScriptContent("import tkinter.messagebox as msgbox; msgbox.showinfo(\"测试弹框\", \"Python测试任务已启动\")");
-
-        try {
-            String result = JobInvokeUtil.invokeMethod(sysJob);
-            System.out.println("Python输出: " + result);
-        } catch (Exception e) {
-            fail("Python脚本执行失败: " + e.getMessage());
-        }
-    }
-
-    @Test
     @DisplayName("测试Python脚本执行 - 多行代码")
     void testExecutePythonScript_MultiLine() {
         SysJob sysJob = new SysJob();

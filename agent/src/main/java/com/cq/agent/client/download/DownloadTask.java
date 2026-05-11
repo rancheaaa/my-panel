@@ -1,12 +1,13 @@
 package com.cq.agent.client.download;
 
+import com.cq.agent.client.TransferTask;
 import com.cq.agent.client.upload.Util;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class DownloadTask {
+public class DownloadTask implements TransferTask<DownloadTaskStatus> {
 
     private String transferId;
     private String traceId;

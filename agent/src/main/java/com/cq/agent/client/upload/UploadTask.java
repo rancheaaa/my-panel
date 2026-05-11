@@ -1,5 +1,6 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.client.TransferTask;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Getter
 @Setter
-public class UploadTask {
+public class UploadTask implements TransferTask<UploadTaskStatus> {
     private String localFilePath;
     private String remoteTargetPath;
     private String transferId;

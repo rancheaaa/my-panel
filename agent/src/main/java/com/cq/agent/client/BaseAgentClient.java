@@ -179,17 +179,12 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     @SuppressWarnings("unchecked")
     protected void updateTaskStatus(TASK task, Object status) {
         try {
-            var setStatusMethod = task.getClass().getMethod("setStatus", status.getClass());
-            setStatusMethod.invoke(task, status);
+            if (task instanceof TransferTask) {
+                ((TransferTask<Object>) task).setStatus(status);
+                ((TransferTask<?>) task).updateTimestamp();
+            }
         } catch (Exception e) {
             logger.error("更新任务状态失败: {}", e.getMessage());
-        }
-        
-        try {
-            var updateTimestampMethod = task.getClass().getMethod("updateTimestamp");
-            updateTimestampMethod.invoke(task);
-        } catch (Exception e) {
-            logger.warn("更新时间戳失败: {}", e.getMessage());
         }
         
         inflightTasks.put(getTaskKey(task), task);

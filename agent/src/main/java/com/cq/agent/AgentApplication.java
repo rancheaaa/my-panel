@@ -72,11 +72,11 @@ public class AgentApplication {
             return;
         }
 
-        // Initialize retry manager for batch transfers
-        RetryManager retryManager = new RetryManager();
+        // Initialize retry manager for batch transfers (10 retries, 30min initial, 2h max delay)
+        RetryManager retryManager = new RetryManager(10, 30, 2);
         
         // Initialize transfer concurrency manager
-        int maxConcurrentTransfers = config.getMaxConcurrentUploads() > 0 ? config.getMaxConcurrentUploads() : 5;
+        int maxConcurrentTransfers = 5; // default value from spec.md
         BatchTransferManager transferManager = new BatchTransferManager(maxConcurrentTransfers);
 
         // Connect components to task scheduler manager

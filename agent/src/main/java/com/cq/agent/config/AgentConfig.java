@@ -57,15 +57,6 @@ public class AgentConfig {
     private int maxUploadRateKBPerSecond;
     private int maxDownloadRateKBPerSecond;
 
-    // Upload queue configuration
-    private String uploadQueueDbPath;
-    private String uploadMapDbPath;
-    private String uploadSessionsDbPath;
-
-    // Download queue configuration
-    private String downloadQueueDbPath;
-    private String downloadMapDbPath;
-
     // Upload client configuration
     private int uploadConcurrentUploads;
     private int uploadMaxQueueDepth;
@@ -194,15 +185,6 @@ public class AgentConfig {
         this.chunkSize = getIntProperty("file.chunk.size.bytes", 5 * 1024 * 1024);
         this.uploadSessionTimeoutMinutes = getLongProperty("upload.session.timeout.minutes", 60);
         this.maxUploadRateKBPerSecond = getIntProperty("upload.max.rate.kb.per.second", 0);
-
-        // Upload queue configuration
-        this.uploadQueueDbPath = getStringProperty("upload.queue.db.path", "upload_queue_db");
-        this.uploadMapDbPath = getStringProperty("upload.map.db.path", "upload_map_db");
-        this.uploadSessionsDbPath = getStringProperty("upload.sessions.db.path", "upload_sessions_db");
-
-        // Download queue configuration
-        this.downloadQueueDbPath = getStringProperty("download.queue.db.path", "download_queue_db");
-        this.downloadMapDbPath = getStringProperty("download.map.db.path", "download_map_db");
 
         this.maxDownloadRateKBPerSecond = getIntProperty("download.max.rate.kb.per.second", 0);
 

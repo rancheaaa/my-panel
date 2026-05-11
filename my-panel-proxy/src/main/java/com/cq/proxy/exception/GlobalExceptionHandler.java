@@ -1,8 +1,6 @@
-package com.cq.proxy.web.exception;
+package com.cq.proxy.exception;
 
 import com.cq.proxy.dto.ApiResponse;
-import com.cq.proxy.exception.BusinessException;
-import com.cq.proxy.exception.SystemException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

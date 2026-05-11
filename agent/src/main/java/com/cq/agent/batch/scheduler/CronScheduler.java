@@ -1,5 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,18 +17,16 @@ public class CronScheduler {
 
     private ScheduledExecutorService scheduler;
     private ScheduledFuture<?> scheduledFuture;
-    
+
+    /**
+     * -- SETTER --
+     *  设置要执行的任务
+     */
+    @Setter
     private Runnable task;
     private String cronExpression;
     private final AtomicBoolean paused = new AtomicBoolean(false);
     private final AtomicBoolean running = new AtomicBoolean(false);
-
-    /**
-     * 设置要执行的任务
-     */
-    public void setTask(Runnable task) {
-        this.task = task;
-    }
 
     /**
      * 启动调度器

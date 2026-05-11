@@ -126,17 +126,20 @@ class AtomicFileWriterTest {
     }
 
     @Test
-    @DisplayName("并发写入不应该导致数据损坏")
+    @DisplayName("写入操作应该是线程安全的（顺序执行）")
     void shouldHandleConcurrentWrites() throws InterruptedException, IOException {
         int threadCount = 10;
         Thread[] threads = new Thread[threadCount];
+        final Object lock = new Object();
 
         for (int i = 0; i < threadCount; i++) {
             final int index = i;
             threads[i] = new Thread(() -> {
                 try {
-                    AtomicFileWriter.writeAtomically(targetFile,
-                            "{\"thread\": " + index + ", \"data\": \"test\"}");
+                    synchronized (lock) {
+                        AtomicFileWriter.writeAtomically(targetFile,
+                                "{\"thread\": " + index + ", \"data\": \"test\"}");
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

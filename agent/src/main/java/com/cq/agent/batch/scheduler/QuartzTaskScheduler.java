@@ -16,7 +16,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * 2. 标准Cron表达式解析
  * 3. 热启动、暂停、恢复、更新、删除
  * 4. 启动时立即执行一次
- *
  * 符合spec.md设计要求
  */
 public class QuartzTaskScheduler {

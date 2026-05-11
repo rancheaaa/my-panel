@@ -1,4 +1,4 @@
-package com.cq.proxy.web.controller;
+package com.cq.proxy.controller;
 
 import com.cq.proxy.dto.ApiResponse;
 import com.cq.proxy.dto.ConfigUpdateRequest;

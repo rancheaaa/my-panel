@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
@@ -40,6 +41,7 @@ public class BatchEventHandler {
     /**
      * 处理单个事件
      */
+    @Transactional
     public void handleEvent(BatchSyncEvent event) {
         try {
             // 标记为PROCESSING
@@ -47,26 +49,17 @@ public class BatchEventHandler {
             event.setStartedAt(new Date());
             eventMapper.updateStatusToProcessing(event);
 
-            boolean pushSuccess;
-
-            // 根据事件类型处理
-            switch (event.getEventType()) {
-                case "TASK_CREATED":
-                    pushSuccess = agentPushService.pushConfigToAgent(event.getSourceAgentId(), event.getPayload());
-                    break;
-                case "TASK_UPDATED":
-                    pushSuccess = agentPushService.pushConfigToAgent(event.getSourceAgentId(), event.getPayload());
-                    break;
-                case "TASK_STATUS_CHANGED":
-                    pushSuccess = agentPushService.pushConfigToAgent(event.getSourceAgentId(), event.getPayload());
-                    break;
-                case "TASK_DELETED":
-                    pushSuccess = agentPushService.pushDeleteToAgent(event.getSourceAgentId(), event.getPayload());
-                    break;
-                default:
+            boolean pushSuccess = switch (event.getEventType()) {
+                case "TASK_CREATED" -> agentPushService.pushConfigToAgent(event.getSourceAgentId(), event.getPayload());
+                case "TASK_UPDATED" -> agentPushService.pushConfigToAgent(event.getSourceAgentId(), event.getPayload());
+                case "TASK_STATUS_CHANGED" ->
+                        agentPushService.pushConfigToAgent(event.getSourceAgentId(), event.getPayload());
+                case "TASK_DELETED" -> agentPushService.pushDeleteToAgent(event.getSourceAgentId(), event.getPayload());
+                default -> {
                     log.warn("⚠️  未知事件类型: {}", event.getEventType());
                     throw new IllegalArgumentException("未知事件类型: " + event.getEventType());
-            }
+                }
+            };
 
             if (!pushSuccess) {
                 throw new RuntimeException("Agent未确认持久化");

@@ -12,7 +12,6 @@ import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
@@ -46,14 +45,8 @@ public class AgentApplication {
 
         CommandExecutor commandExecutor = new CommandExecutor(config);
         FileService fileService = new FileService(config);
-        ChunkedTransferService chunkedTransferService;
-        try {
-            chunkedTransferService = new ChunkedTransferService(config);
-        } catch (RocksDBException e) {
-            logger.error("Failed to initialize ChunkedTransferService: {}", e.getMessage(), e);
-            System.exit(1);
-            return;
-        }
+        ChunkedTransferService chunkedTransferService = new ChunkedTransferService(config);
+        logger.info("ChunkedTransferService initialized successfully");
 
         // Initialize batch config management
         String batchConfigDir = Path.of(config.getFileBaseDirectory(), "batch-config").toString();

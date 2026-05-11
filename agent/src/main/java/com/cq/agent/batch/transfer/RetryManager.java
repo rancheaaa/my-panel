@@ -1,5 +1,7 @@
 package com.cq.agent.batch.transfer;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,12 +23,22 @@ public class RetryManager {
 
     private static final Logger log = LoggerFactory.getLogger(RetryManager.class);
 
+    /**
+     * -- GETTER --
+     *  获取最大重试次数
+     */
+    @Getter
     private final int maxRetries;
     private final long initialDelayMs;
     private final long maxDelayMs;
 
     private final Map<Long, AtomicInteger> retryCountMap = new ConcurrentHashMap<>();
 
+    /**
+     * -- SETTER --
+     *  设置重试执行器
+     */
+    @Setter
     private Function<Long, Long> retryExecutor;
 
     /**
@@ -42,13 +54,6 @@ public class RetryManager {
 
         log.info("✅ 重试管理器初始化: maxRetries={}, initialDelay={}min, maxDelay={}h",
             maxRetries, intervalMin, maxDelayHours);
-    }
-
-    /**
-     * 设置重试执行器
-     */
-    public void setRetryExecutor(Function<Long, Long> executor) {
-        this.retryExecutor = executor;
     }
 
     /**
@@ -110,13 +115,6 @@ public class RetryManager {
     public int getRetryCount(Long subtaskId) {
         AtomicInteger count = retryCountMap.get(subtaskId);
         return count != null ? count.get() : 0;
-    }
-
-    /**
-     * 获取最大重试次数
-     */
-    public int getMaxRetries() {
-        return maxRetries;
     }
 
     /**

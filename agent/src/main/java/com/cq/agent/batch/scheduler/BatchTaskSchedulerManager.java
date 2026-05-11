@@ -2,6 +2,8 @@ package com.cq.agent.batch.scheduler;
 
 import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
+import com.cq.agent.batch.report.ProgressEvent;
+import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
@@ -35,6 +37,8 @@ public class BatchTaskSchedulerManager {
     private FileScanner fileScanner;
     @Getter
     private AgentUploader agentUploader;
+    @Getter
+    private ProgressReporter progressReporter;
 
     public BatchTaskSchedulerManager(ConfigFileManager configFileManager) throws SchedulerException {
         this.configFileManager = configFileManager;
@@ -63,6 +67,14 @@ public class BatchTaskSchedulerManager {
     public void setAgentUploader(AgentUploader agentUploader) {
         this.agentUploader = agentUploader;
         log.info("📤 已设置AgentUploader");
+    }
+
+    /**
+     * 设置进度上报器（spec.md 4.8）
+     */
+    public void setProgressReporter(ProgressReporter progressReporter) {
+        this.progressReporter = progressReporter;
+        log.info("📊 已设置ProgressReporter");
     }
 
     /**
@@ -444,9 +456,9 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 批量上传监听器（spec.md 4.6）
-     * 桥接AgentUploader事件到任务管理器
+     * 桥接AgentUploader事件到任务管理器和进度上报
      */
-    private static class BatchUploadListener implements UploadListener {
+    private class BatchUploadListener implements UploadListener {
 
         private final Long taskId;
         private final FileScanner.ScannedFile scannedFile;
@@ -460,24 +472,57 @@ public class BatchTaskSchedulerManager {
         public void onProgress(int totalChunks, int uploadedChunks, double progress) {
             log.debug("📊 上传进度: taskId={}, file={}, {}/{} ({}%)",
                 taskId, scannedFile.getFileName(), uploadedChunks, totalChunks, progress);
-            
-            // TODO: 上报进度到Proxy（spec.md 4.8）
-            // ProgressReporter.reportProgress(taskId, subtaskId, progressData);
+
+            if (progressReporter != null) {
+                ProgressEvent event = new ProgressEvent();
+                event.setSubtaskId(taskId);
+                event.setTaskId(taskId);
+                event.setStatus("SENDING");
+                event.setTransferredChunks(uploadedChunks);
+                event.setTotalChunks(totalChunks);
+                event.setTransferredBytes((long) (scannedFile.getFileSize() * progress));
+                event.setTimestamp(System.currentTimeMillis());
+                event.setSequenceNumber(uploadedChunks);
+
+                progressReporter.reportProgress(event);
+            }
         }
 
         @Override
         public void onComplete(UploadTask task) {
             log.info("✅ 文件上传完成: taskId={}, file={}, transferId={}",
                 taskId, scannedFile.getFileName(), task.getTransferId());
-            
-            // TODO: 更新子任务状态为COMPLETED（spec.md 4.8）
+
+            if (progressReporter != null) {
+                ProgressEvent event = new ProgressEvent();
+                event.setSubtaskId(taskId);
+                event.setTaskId(taskId);
+                event.setTransferId(task.getTransferId());
+                event.setStatus("COMPLETED");
+                event.setTransferredChunks(1);
+                event.setTotalChunks(1);
+                event.setTransferredBytes(scannedFile.getFileSize());
+                event.setTimestamp(System.currentTimeMillis());
+
+                progressReporter.reportProgress(event);
+            }
         }
 
         @Override
         public void onError(String errorMessage) {
             log.error("❌ 文件上传失败: taskId={}, file={}, error={}",
                 taskId, scannedFile.getFileName(), errorMessage);
-            
+
+            if (progressReporter != null) {
+                ProgressEvent event = new ProgressEvent();
+                event.setSubtaskId(taskId);
+                event.setTaskId(taskId);
+                event.setStatus("FAILED");
+                event.setTimestamp(System.currentTimeMillis());
+
+                progressReporter.reportProgress(event);
+            }
+
             // 注意：这里不直接调用failTask，因为单个文件失败不应导致整个任务失败
             // 错误会在processScannedFiles中通过hasFailure标志处理
         }
@@ -486,7 +531,7 @@ public class BatchTaskSchedulerManager {
     /**
      * 延迟重试作业（Quartz Job）
      */
-    public static class DelayedRetryJob implements Job {
+    public class DelayedRetryJob implements Job {
 
         private static final Logger jobLog = LoggerFactory.getLogger(DelayedRetryJob.class);
 
@@ -497,8 +542,31 @@ public class BatchTaskSchedulerManager {
 
             jobLog.info("⏰ 执行延迟重试任务: taskId={}", taskId);
 
-            // TODO: 从configFileManager加载配置并重新执行任务
-            // 这里应该重新触发createTaskRunnable的逻辑
+            try {
+                BatchTransferTaskConfig config = configFileManager.loadTaskConfig(taskId);
+                
+                if (config == null) {
+                    jobLog.warn("⚠️  未找到任务配置: taskId={}, 跳过重试", taskId);
+                    return;
+                }
+                
+                if (!"RUNNING".equals(config.getStatus())) {
+                    jobLog.info("ℹ️  任务状态为{}，跳过重试: taskId={}", config.getStatus(), taskId);
+                    return;
+                }
+
+                jobLog.info("🔄 重新执行任务: taskId={}, sourceDir={}", taskId, config.getSourceDir());
+
+                Runnable task = createTaskRunnable(config);
+                task.run();
+
+                jobLog.info("✅ 延迟重试执行完成: taskId={}", taskId);
+                
+            } catch (Exception e) {
+                jobLog.error("❌ 延迟重试执行失败: taskId={}, error={}", taskId, e.getMessage(), e);
+                
+                failTask(taskId, "延迟重试失败: " + e.getMessage());
+            }
         }
     }
 }

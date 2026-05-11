@@ -1,13 +1,9 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
-
-import java.util.Collections;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -84,7 +80,7 @@ class RetrySchedulerTddTest {
 
     @Test
     @DisplayName("4. [spec.md] 失败时应检查是否需要重试")
-    void testFailTask_shouldCheckRetry() {
+    void testFailTask_shouldCheckRetry2() {
         when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(false);
 
         schedulerManager.failTask(1L, "传输失败");

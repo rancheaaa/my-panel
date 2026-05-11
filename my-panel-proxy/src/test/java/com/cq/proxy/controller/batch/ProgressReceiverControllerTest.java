@@ -1,6 +1,7 @@
 package com.cq.proxy.controller.batch;
 
 import com.cq.proxy.service.batch.ProgressService;
+import com.cq.proxy.controller.ProgressReceiverController;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;

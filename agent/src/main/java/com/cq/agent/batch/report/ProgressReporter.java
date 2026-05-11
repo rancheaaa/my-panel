@@ -1,5 +1,6 @@
 package com.cq.agent.batch.report;
 
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,36 +22,29 @@ public class ProgressReporter {
 
     private final String proxyBaseUrl;
     private final ProgressBuffer buffer = new ProgressBuffer();
-    private final AtomicInteger sequenceNumber = new AtomicInteger(0);
 
+    /**
+     * -- SETTER --
+     *  设置HTTP客户端
+     */
+    @Setter
     private BiFunction<String, String, Boolean> httpClient;
+    /**
+     * -- SETTER --
+     *  设置批量HTTP客户端
+     */
+    @Setter
     private Function<List<ProgressEvent>, Boolean> batchHttpClient;
+    /**
+     * -- SETTER --
+     *  设置本地回退处理器
+     */
+    @Setter
     private Consumer<ProgressEvent> fallbackHandler;
 
     public ProgressReporter(String proxyBaseUrl) {
         this.proxyBaseUrl = proxyBaseUrl;
         log.info("✅ 进度上报器初始化: proxy={}", proxyBaseUrl);
-    }
-
-    /**
-     * 设置HTTP客户端
-     */
-    public void setHttpClient(BiFunction<String, String, Boolean> client) {
-        this.httpClient = client;
-    }
-
-    /**
-     * 设置批量HTTP客户端
-     */
-    public void setBatchHttpClient(Function<List<ProgressEvent>, Boolean> client) {
-        this.batchHttpClient = client;
-    }
-
-    /**
-     * 设置本地回退处理器
-     */
-    public void setFallbackHandler(Consumer<ProgressEvent> handler) {
-        this.fallbackHandler = handler;
     }
 
     /**

@@ -1,4 +1,4 @@
-package com.cq.proxy.web.controller;
+package com.cq.proxy.controller;
 
 import com.cq.proxy.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;

@@ -1,257 +1,151 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@DisplayName("AgentUploader - 重构后（适配新BaseAgentClient）")
 class AgentUploaderTest {
 
     @TempDir
     Path tempDir;
 
+    private AgentConfig config;
+    private Path metaDir;
     private AgentUploader uploader;
-    private PersistentMap<String, UploadTask> taskInflightMap;
 
     @BeforeEach
-    void setUp() throws Exception {
-        AgentConfig agentConfig = new AgentConfig();
-        
-        Path queueDbPath = tempDir.resolve("upload_queue_db");
-        Path mapDbPath = tempDir.resolve("upload_map_db");
-        
-        agentConfig.setUploadQueueDbPath(queueDbPath.toString());
-        agentConfig.setUploadMapDbPath(mapDbPath.toString());
-        
-        uploader = new AgentUploader(agentConfig);
+    void setUp() throws IOException {
+        metaDir = tempDir.resolve("uploads-meta");
+        Files.createDirectories(metaDir);
+
+        config = new AgentConfig();
+        uploader = new TestableAgentUploader(config, metaDir.toString());
         uploader.init();
-        
-        taskInflightMap = getTaskInflightMap(uploader);
     }
 
     @AfterEach
     void tearDown() {
-        if (taskInflightMap != null) {
-            try {
-                taskInflightMap.close();
-            } catch (Exception e) {
-                System.err.println("Error closing taskInflightMap: " + e.getMessage());
-            }
-        }
         if (uploader != null) {
-            try {
-                uploader.shutdown();
-            } catch (Exception e) {
-                System.err.println("Error shutting down uploader: " + e.getMessage());
-            }
+            uploader.shutdown();
         }
     }
 
     @Test
-    void testGetInflightTasksCount_Empty() {
-        int count = uploader.getInflightTasksCount();
-        assertEquals(0, count, "Inflight tasks count should be 0 when no tasks exist");
+    @DisplayName("应该成功初始化并使用内存队列")
+    void shouldInitializeWithMemoryQueue() throws Exception {
+        Field queueField = BaseAgentClient.class.getDeclaredField("taskQueue");
+        queueField.setAccessible(true);
+        Object queue = queueField.get(uploader);
+
+        assertInstanceOf(ConcurrentLinkedQueue.class, queue, "应该是 ConcurrentLinkedQueue");
     }
 
     @Test
-    void testGetAllInflightTasks_Empty() {
+    @DisplayName("应该正确配置 TransferMetaStore")
+    void shouldConfigureTransferMetaStore() throws Exception {
+        Field metaStoreField = BaseAgentClient.class.getDeclaredField("metaStore");
+        metaStoreField.setAccessible(true);
+        Object metaStore = metaStoreField.get(uploader);
+
+        assertNotNull(metaStore, "TransferMetaStore 应该被初始化");
+        assertInstanceOf(TransferMetaStore.class, metaStore);
+    }
+
+    @Test
+    @DisplayName("构造函数不应该接受 RocksDB 路径参数")
+    void shouldNotAcceptRocksDbPaths() {
+        // 验证构造函数签名已变更：不再需要 queueDbPath 和 mapDbPath
+        // 新构造函数只接收 metaDirPath
+        assertDoesNotThrow(() -> {
+            new TestableAgentUploader(config, metaDir.toString());
+        }, "新构造函数应该只接受 metaDirPath 参数");
+    }
+
+    @Test
+    @DisplayName("uploadFile 应该验证本地文件路径")
+    void uploadFileShouldValidateLocalFilePath() {
+        boolean result = uploader.uploadFile(null, "remote/path", null);
+
+        assertFalse(result, "null 路径应该返回 false");
+    }
+
+    @Test
+    @DisplayName("uploadFile 应该验证远程路径")
+    void uploadFileShouldValidateRemotePath() {
+        boolean result = uploader.uploadFile("/local/file.txt", null, null);
+
+        assertFalse(result, "null 远程路径应该返回 false");
+    }
+
+    @Test
+    @DisplayName("uploadFile 应该拒绝非绝对路径")
+    void uploadFileShouldRejectRelativePath() {
+        boolean result = uploader.uploadFile("relative/path.txt", "192.168.1.100:8080@root:/tmp/test", null);
+
+        assertFalse(result, "相对路径应该返回 false");
+    }
+
+    @Test
+    @DisplayName("getInflightTasksCount 应该返回正确的任务数")
+    void shouldReturnCorrectInflightTaskCount() {
+        int count = uploader.getInflightTasksCount();
+
+        assertEquals(0, count, "初始时应该没有进行中的任务");
+    }
+
+    @Test
+    @DisplayName("isInflightTasksEmpty 应该在空队列时返回 true")
+    void shouldReturnTrueWhenEmpty() {
+        assertTrue(uploader.isInflightTasksEmpty(), "空队列应该返回 true");
+    }
+
+    @Test
+    @DisplayName("getInflightTasks 分页查询应该正常工作")
+    void getInflightTasksPaginationShouldWork() {
+        List<UploadTask> tasks = uploader.getInflightTasks(1, 10);
+
+        assertNotNull(tasks, "分页查询不应返回 null");
+        assertTrue(tasks.isEmpty(), "无任务时应返回空列表");
+    }
+
+    @Test
+    @DisplayName("getAllInflightTasks 应该返回空列表当无任务时")
+    void getAllInflightTasksShouldReturnEmptyList() {
         List<UploadTask> tasks = uploader.getAllInflightTasks();
-        assertNotNull(tasks, "Tasks list should not be null");
-        assertTrue(tasks.isEmpty(), "Tasks list should be empty when no tasks exist");
+
+        assertNotNull(tasks);
+        assertTrue(tasks.isEmpty(), "无任务时应返回空列表");
     }
 
     @Test
-    void testGetInflightTasks_InvalidPage() {
-        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-            uploader.getInflightTasks(0, 10);
-        });
-        assertTrue(exception.getMessage().contains("page must be >= 1"), 
-                "Should throw exception for page < 1");
+    @DisplayName("shutdown 应该正常清理资源")
+    void shutdownShouldCleanupResources() {
+        assertDoesNotThrow(() -> uploader.shutdown(), "关闭不应抛异常");
     }
 
-    @Test
-    void testGetInflightTasks_InvalidPageSize_TooSmall() {
-        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-            uploader.getInflightTasks(1, 0);
-        });
-        assertTrue(exception.getMessage().contains("pageSize must be between 1 and 1000"), 
-                "Should throw exception for pageSize < 1");
-    }
+    /**
+     * 可测试的 AgentUploader 子类，用于单元测试
+     */
+    private static class TestableAgentUploader extends AgentUploader {
 
-    @Test
-    void testGetInflightTasks_InvalidPageSize_TooLarge() {
-        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-            uploader.getInflightTasks(1, 1001);
-        });
-        assertTrue(exception.getMessage().contains("pageSize must be between 1 and 1000"), 
-                "Should throw exception for pageSize > 1000");
-    }
-
-    @Test
-    void testGetInflightTasks_SinglePage() throws IOException {
-        int taskCount = 5;
-        createTestTasks(taskCount);
-        
-        List<UploadTask> tasks = uploader.getInflightTasks(1, 10);
-        assertEquals(taskCount, tasks.size(), "Should return all tasks on single page");
-        
-        for (UploadTask task : tasks) {
-            assertNotNull(task.getLocalFilePath());
-            assertNotNull(task.getRemoteTargetPath());
-            assertNotNull(task.getTransferId());
-        }
-    }
-
-    @Test
-    void testGetInflightTasks_MultiplePages() throws IOException {
-        int taskCount = 25;
-        int pageSize = 10;
-        createTestTasks(taskCount);
-        
-        int expectedPage1Count = Math.min(pageSize, taskCount);
-        int expectedPage2Count = Math.min(pageSize, taskCount - pageSize);
-        int expectedPage3Count = Math.max(0, taskCount - 2 * pageSize);
-        
-        List<UploadTask> page1 = uploader.getInflightTasks(1, pageSize);
-        assertEquals(expectedPage1Count, page1.size(), "Page 1 should have correct number of tasks");
-        
-        List<UploadTask> page2 = uploader.getInflightTasks(2, pageSize);
-        assertEquals(expectedPage2Count, page2.size(), "Page 2 should have correct number of tasks");
-        
-        List<UploadTask> page3 = uploader.getInflightTasks(3, pageSize);
-        assertEquals(expectedPage3Count, page3.size(), "Page 3 should have correct number of tasks");
-        
-        List<UploadTask> page4 = uploader.getInflightTasks(4, pageSize);
-        assertTrue(page4.isEmpty(), "Page 4 should be empty");
-    }
-
-    @Test
-    void testGetInflightTasks_PaginationConsistency() throws IOException {
-        int taskCount = 30;
-        int pageSize = 10;
-        createTestTasks(taskCount);
-        
-        int totalPages = (int) Math.ceil((double) taskCount / pageSize);
-        int totalRetrieved = 0;
-        
-        for (int page = 1; page <= totalPages; page++) {
-            List<UploadTask> tasks = uploader.getInflightTasks(page, pageSize);
-            totalRetrieved += tasks.size();
-        }
-        
-        assertEquals(taskCount, totalRetrieved, "Total tasks retrieved across all pages should match total tasks");
-    }
-
-    @Test
-    void testGetAllInflightTasks_MultipleTasks() throws IOException {
-        int taskCount = 15;
-        createTestTasks(taskCount);
-        
-        List<UploadTask> allTasks = uploader.getAllInflightTasks();
-        assertEquals(taskCount, allTasks.size(), "Should return all tasks");
-        
-        for (UploadTask task : allTasks) {
-            assertNotNull(task.getLocalFilePath());
-            assertNotNull(task.getRemoteTargetPath());
-            assertNotNull(task.getTransferId());
-            assertNotNull(task.getTraceId());
-        }
-    }
-
-    @Test
-    void testGetInflightTasksCount_MultipleTasks() throws IOException {
-        int taskCount = 20;
-        createTestTasks(taskCount);
-        
-        int count = uploader.getInflightTasksCount();
-        assertEquals(taskCount, count, "Inflight tasks count should match created tasks");
-    }
-
-    @Test
-    void testGetInflightTasks_GetAllConsistency() throws IOException {
-        int taskCount = 12;
-        createTestTasks(taskCount);
-        
-        List<UploadTask> allTasks = uploader.getAllInflightTasks();
-        List<UploadTask> pagedTasks = uploader.getInflightTasks(1, taskCount);
-        
-        assertEquals(allTasks.size(), pagedTasks.size(), 
-                "getAllInflightTasks and getInflightTasks should return same number of tasks");
-    }
-
-    @Test
-    void testGetInflightTasks_TaskFields() throws IOException {
-        createTestTasks(1);
-        
-        List<UploadTask> tasks = uploader.getInflightTasks(1, 10);
-        assertEquals(1, tasks.size());
-        
-        UploadTask task = tasks.get(0);
-        assertNotNull(task.getCreateTime(), "Task should have createTime");
-        assertNotNull(task.getUpdateTime(), "Task should have updateTime");
-        assertNotNull(task.getEnqueuedTime(), "Task should have enqueuedTime");
-        assertNotNull(task.getListenerClassName(), "Task should have listenerClassName");
-        assertNotNull(task.getStatus(), "Task should have status");
-        assertTrue(task.getTotalSize() > 0, "Task should have positive totalSize");
-    }
-
-    private void createTestTasks(int count) throws IOException {
-        for (int i = 0; i < count; i++) {
-            String localPath = tempDir.resolve("test_file_" + i + ".txt").toString();
-            String remotePath = "/remote/test_file_" + i + ".txt";
-            
-            Files.writeString(Path.of(localPath), "Test content " + i);
-            
-            UploadTask task = new UploadTask(localPath, remotePath, 100,  "http://127.0.0.1:8080/", "admin");
-            task.setTransferId("transfer-" + i);
-            task.setTraceId("trace-" + i);
-            task.setListenerClassName("com.cq.agent.client.upload.TestUploadListener");
-            task.setEnqueuedTime("2026-03-23 10:00:00.000");
-            task.updateTimestamp();
-            
-            taskInflightMap.put(task.getTransferId(), task);
-        }
-    }
-
-    private PersistentMap<String, UploadTask> getTaskInflightMap(AgentUploader uploader) throws Exception {
-        Field field = findFieldInHierarchy(AgentUploader.class, "taskInflightMap");
-        field.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        PersistentMap<String, UploadTask> map = (PersistentMap<String, UploadTask>) field.get(uploader);
-        return map;
-    }
-
-    private Field findFieldInHierarchy(Class<?> clazz, String fieldName) throws NoSuchFieldException {
-        Class<?> current = clazz;
-        while (current != null) {
-            try {
-                return current.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException e) {
-                current = current.getSuperclass();
-            }
-        }
-        throw new NoSuchFieldException("Field " + fieldName + " not found in hierarchy of " + clazz.getName());
-    }
-
-    static class TestUploadListener implements UploadListener {
-        @Override
-        public void onProgress(int total, int uploaded, double progress) {
-        }
-
-        @Override
-        public void onComplete(UploadTask result) {
-        }
-
-        @Override
-        public void onError(String message) {
+        public TestableAgentUploader(AgentConfig agentConfig, String metaDirPath) {
+            super(agentConfig, metaDirPath);
         }
     }
 }

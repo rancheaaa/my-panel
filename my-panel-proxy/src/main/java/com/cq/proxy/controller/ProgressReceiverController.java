@@ -1,4 +1,4 @@
-package com.cq.proxy.controller.batch;
+package com.cq.proxy.controller;
 
 import com.cq.proxy.service.batch.ProgressService;
 import org.slf4j.Logger;

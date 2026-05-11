@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Agent upload client for chunked file transfer.
- * Uses a persistent queue backed by RocksDB for durability.
+ * Uses memory queue and JSON file-based persistence for durability.
  */
 public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
@@ -34,12 +34,13 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
     private final AgentConfig agentConfig;
 
-    public AgentUploader(AgentConfig agentConfig) {
+    public AgentUploader(AgentConfig agentConfig, String metaDirPath) {
         super(agentConfig, agentConfig.getUploadConcurrentUploads(),
                 agentConfig.getUploadMaxQueueDepth(), agentConfig.getUploadWorkerCount(),
                 agentConfig.getUploadMaxRetries(), agentConfig.getUploadRetryDelayMs(),
                 agentConfig.getUploadConnectTimeoutSeconds(), agentConfig.getUploadRequestTimeoutSeconds(),
-                agentConfig.getUploadQueueDbPath(), agentConfig.getUploadMapDbPath(), agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload");
+                metaDirPath,
+                agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload");
         this.agentConfig = agentConfig;
     }
 
@@ -49,10 +50,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         String traceId = task.getTraceId();
 
         try {
-            task.setStatus(UploadTaskStatus.SCANNED);
-            task.updateTimestamp();
+            updateTaskStatus(task, UploadTaskStatus.SCANNED);
             task.incrementRetryCount();
-            this.taskInflightMap.put(task.getTransferId(), task);
 
             String listenerClassName = task.getListenerClassName();
             if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
@@ -69,11 +68,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
             File file = new File(task.getLocalFilePath());
 
-            ApiResponse<ChunkStatusResponse> state;
             task.setStatus(UploadTaskStatus.INIT_UPLOADING);
-            task.updateTimestamp();
-            task.setInitUploadStartTime(Util.currentTime());
-            this.taskInflightMap.put(task.getTransferId(), task);
+            updateTaskStatus(task, UploadTaskStatus.INIT_UPLOADING);
 
             String transferId = task.getTransferId();
             int chunkSize;
@@ -83,8 +79,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             ApiResponse<ChunkStatusResponse> resp = getUploadStatus(task.getRemoteAgentApiUrl(), transferId, traceId);
             if(resp.getData() == null) {
                 ApiResponse<ChunkInitResponse> chunkInitResponse = initUpload(task);
-                logger.debug("[traceId={}] First time to Upload initialized successfully: transferId={}, totalChunks={}, chunkSize={}, initTime={}",
-                        traceId, chunkInitResponse.getData().getTransferId(), chunkInitResponse.getData().getTotalChunks(), chunkInitResponse.getData().getChunkSize(), chunkInitResponse.getData().getInitTime());
+                logger.debug("[traceId={}] Upload initialized: transferId={}, totalChunks={}, chunkSize={}",
+                        traceId, chunkInitResponse.getData().getTransferId(), chunkInitResponse.getData().getTotalChunks(), chunkInitResponse.getData().getChunkSize());
                 chunkSize = chunkInitResponse.getData().getChunkSize();
                 totalChunks = chunkInitResponse.getData().getTotalChunks();
                 missingChunks = chunkInitResponse.getData().getMissingChunks();
@@ -94,75 +90,56 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                 missingChunks = resp.getData().getMissingChunks();
             }
 
-            task.setInitUploadEndTime(Util.currentTime());
-            task.setStatus(UploadTaskStatus.INIT_UPLOAD_COMPLETED);
-            task.updateTimestamp();
-
             task.setChunkSize(chunkSize);
             task.setTotalChunks(totalChunks);
             task.setMissingChunks(missingChunks);
-            this.taskInflightMap.put(task.getTransferId(), task);
+            updateTaskStatus(task, UploadTaskStatus.INIT_UPLOAD_COMPLETED);
 
             try {
-                task.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
-                task.updateTimestamp();
-                task.setUploadChunksStartTime(Util.currentTime());
-                this.taskInflightMap.put(task.getTransferId(), task);
+                updateTaskStatus(task, UploadTaskStatus.UPLOADING_CHUNKS);
                 uploadChunks(task, file, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
 
-                state = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
-                if (state.getData() != null) {
-                    final List<Integer> missingChunks2 = state.getData().getMissingChunks();
-                    task.setMissingChunks(new ArrayList<>(missingChunks2));
-                    if (!missingChunks2.isEmpty()) {
-                        throw new IllegalStateException("Upload failed, missing chunks: " + missingChunks2);
+                ApiResponse<ChunkStatusResponse> finalStatus = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
+                if (finalStatus.getData() != null) {
+                    final List<Integer> finalMissingChunks = finalStatus.getData().getMissingChunks();
+                    task.setMissingChunks(new ArrayList<>(finalMissingChunks));
+                    if (!finalMissingChunks.isEmpty()) {
+                        throw new IllegalStateException("Upload failed, missing chunks: " + finalMissingChunks);
                     }
                 }
-                task.setUploadChunksEndTime(Util.currentTime());
-                task.setStatus(UploadTaskStatus.UPLOAD_CHUNKS_COMPLETED);
-                task.updateTimestamp();
-                this.taskInflightMap.put(task.getTransferId(), task);
+                updateTaskStatus(task, UploadTaskStatus.UPLOAD_CHUNKS_COMPLETED);
             } catch (IOException e) {
-                state = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
-                logger.error("[traceId={}] Chunk upload failed, status: {} {}", traceId, state, e.getMessage());
+                ApiResponse<ChunkStatusResponse> latestStatus = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
+                logger.error("[traceId={}] Chunk upload failed, status: {} {}", traceId, latestStatus, e.getMessage());
                 throw e;
             }
 
             try {
-                task.setStatus(UploadTaskStatus.MERGING_CHUNKS);
-                task.updateTimestamp();
-                task.setMergeChunksStartTime(Util.currentTime());
-                this.taskInflightMap.put(task.getTransferId(), task);
-
+                updateTaskStatus(task, UploadTaskStatus.MERGING_CHUNKS);
                 mergeChunks(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
-
-                task.setMergeChunksEndTime(Util.currentTime());
-                task.setStatus(UploadTaskStatus.MERGE_CHUNKS_COMPLETED);
-                task.updateTimestamp();
-                this.taskInflightMap.put(task.getTransferId(), task);
+                updateTaskStatus(task, UploadTaskStatus.MERGE_CHUNKS_COMPLETED);
             } catch (IOException e) {
-                state = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
-                logger.error("[traceId={}] Merge failed, status:{}  {}", traceId, state, e.getMessage());
+                ApiResponse<ChunkStatusResponse> latestStatus = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
+                logger.error("[traceId={}] Merge failed, status:{}  {}", traceId, latestStatus, e.getMessage());
                 throw e;
             }
+
             if (verifyRemoteFileExists(task.getRemoteAgentApiUrl(), task.getRemoteTargetPath(), traceId)) {
                 task.setUploadSuccessTime(Util.currentTime());
-                task.setStatus(UploadTaskStatus.UPLOAD_SUCCESS);
-                task.updateTimestamp();
-                this.taskInflightMap.put(task.getTransferId(), task);
+                updateTaskStatus(task, UploadTaskStatus.UPLOAD_SUCCESS);
                 handleListenerSuccess(taskKey, task);
+                inflightTasks.remove(task.getTransferId());
             } else {
                 logger.error("[traceId={}] Verify remote file {} failed", traceId, task.getRemoteTargetPath());
-                throw new IOException("Upload failed after all retries, but no result was produced.");
+                throw new IOException("Upload failed: remote file not found");
             }
             logger.info("[traceId={}] Upload task completed: {}", traceId, taskKey);
         } catch (Exception e) {
             logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
-            task.setStatus(UploadTaskStatus.FAILED);
-            task.updateTimestamp();
+            updateTaskStatus(task, UploadTaskStatus.FAILED);
             task.setExceptionDesc(e.getMessage());
-            this.taskInflightMap.put(task.getTransferId(), task);
             handleListenerError(taskKey, e.getMessage());
+            inflightTasks.remove(task.getTransferId());
         } finally {
             listenerCache.remove(taskKey);
         }
@@ -255,8 +232,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             task.setEnqueuedTime(Util.currentTime());
             task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
             task.updateTimestamp();
-            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
-                this.taskInflightMap.put(task.getTransferId(), task);
+            if (!this.inflightTasks.containsKey(task.getTransferId())) {
+                this.inflightTasks.put(task.getTransferId(), task);
             }
             return taskQueue.offer(task);
         } catch (Exception e) {
@@ -293,7 +270,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                             int currentUploaded = uploadedCount.incrementAndGet();
                             task.incrementUploadChunksCount();
                             task.updateTimestamp();
-                            this.taskInflightMap.put(task.getTransferId(), task);
+                            this.inflightTasks.put(task.getTransferId(), task);
                             if (listener != null) {
                                 double progress = (double) currentUploaded / task.getTotalChunks() * 100.0;
                                 handleListenerProgress(taskKey, task.getTotalChunks(), currentUploaded, progress);
@@ -456,22 +433,25 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             throw new IllegalArgumentException("pageSize must be between 1 and 1000");
         }
         int offset = (page - 1) * pageSize;
-        return taskInflightMap.getValues(offset, pageSize);
+        List<UploadTask> allTasks = new ArrayList<>(inflightTasks.values());
+        int fromIndex = Math.min(offset, allTasks.size());
+        int toIndex = Math.min(fromIndex + pageSize, allTasks.size());
+        return allTasks.subList(fromIndex, toIndex);
     }
 
     public List<UploadTask> getAllInflightTasks() {
-        return taskInflightMap.getAllValues();
+        return new ArrayList<>(inflightTasks.values());
     }
 
     public int getInflightTasksCount() {
-        return taskInflightMap.size();
+        return inflightTasks.size();
     }
 
     public boolean isInflightTasksEmpty() {
-        return taskInflightMap.isEmpty();
+        return inflightTasks.isEmpty();
     }
 
     void clearAllInflightTasks() {
-        taskInflightMap.clear();
+        inflightTasks.clear();
     }
 }

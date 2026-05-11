@@ -1,9 +1,12 @@
 package com.cq.agent;
 
+import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
+import com.cq.agent.batch.transfer.BatchTransferManager;
+import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.registry.AgentRegistryService;
@@ -68,6 +71,17 @@ public class AgentApplication {
             System.exit(1);
             return;
         }
+
+        // Initialize retry manager for batch transfers
+        RetryManager retryManager = new RetryManager();
+        
+        // Initialize transfer concurrency manager
+        int maxConcurrentTransfers = config.getMaxConcurrentUploads() > 0 ? config.getMaxConcurrentUploads() : 5;
+        BatchTransferManager transferManager = new BatchTransferManager(maxConcurrentTransfers);
+
+        // Connect components to task scheduler manager
+        taskSchedulerManager.setRetryManager(retryManager);
+        taskSchedulerManager.setTransferManager(transferManager);
 
         // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
         configChangeListener.onCronChange(taskId -> {

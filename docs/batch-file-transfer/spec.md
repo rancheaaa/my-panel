@@ -292,7 +292,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
 | QUEUED   | SENDING   | 调度器取出任务，开始上传      | status='SENDING', started\_at=NOW()                      | 初始化上传会话，获取transfer\_id       |
 | SENDING  | COMPLETED | 所有分块上传成功且验证通过     | status='COMPLETED', completed\_at=NOW(), duration\_ms计算  | 执行post\_transfer\_action（可选） |
 | SENDING  | FAILED    | 上传异常              | status='FAILED', error\_code/message填充                   | 保留进度信息（支持断点续传）               |
-| FAILED   | RETRYING  | 未达最大重试次数，启用自动重试   | status='RETRYING', next\_retry\_after计算, retry\_count+=1 | 设置重试定时器，降低带宽至50%             |
+| FAILED   | RETRYING  | 未达最大重试次数，启用自动重试   | status='RETRYING', next\_retry\_after计算, retry\_count+=1 | 设置重试定时器，等待后重试             |
 | RETRYING | SENDING   | 重试等待期结束           | status='SENDING'                                         | 使用原transfer\_id续传            |
 | RETRYING | FAILED    | 重试次数耗尽 或 超过最大重试天数 | status='FAILED' (终态)                                     | 清理上传资源，上报最终失败                |
 
@@ -1106,7 +1106,7 @@ stateDiagram-v2
 
 1. **指数退避**：首次等待`retry_interval_min`分钟，后续每次翻倍（上限2小时）
 2. **最大重试天数**：超过`retry_max_days`的任务标记为最终失败
-3. **带宽限制**：重试时降低带宽至50%，避免影响其他任务
+3. **最大重试次数**：超过max_retry_count后标记为最终失败
 
 ### 4.8 进度上报策略（Agent → Proxy → DB）
 

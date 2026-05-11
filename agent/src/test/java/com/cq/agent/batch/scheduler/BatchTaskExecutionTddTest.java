@@ -3,7 +3,6 @@ package com.cq.agent.batch.scheduler;
 import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.BatchTransferManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
@@ -34,9 +33,6 @@ class BatchTaskExecutionTddTest {
     private RetryManager retryManager;
 
     @Mock
-    private BatchTransferManager transferManager;
-
-    @Mock
     private FileScanner fileScanner;
 
     private BatchTaskSchedulerManager schedulerManager;
@@ -48,11 +44,7 @@ class BatchTaskExecutionTddTest {
         mocks = MockitoAnnotations.openMocks(this);
         schedulerManager = new BatchTaskSchedulerManager(configFileManager);
         schedulerManager.setRetryManager(retryManager);
-        schedulerManager.setTransferManager(transferManager);
         schedulerManager.setFileScanner(fileScanner);
-
-        // 默认：允许获取传输许可（大多数测试需要）
-        when(transferManager.tryAcquire(anyString())).thenReturn(true);
 
         // 创建临时目录用于测试
         tempDir = Files.createTempDirectory("batch-test");
@@ -86,7 +78,7 @@ class BatchTaskExecutionTddTest {
     void testExecuteTask_shouldScanSourceDirectory() {
         // Given: 创建任务配置
         BatchTransferTaskConfig config = createTestConfig(tempDir.toString());
-        when(fileScanner.scan(anyString(), anyList(), anyList(), any()))
+        when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(Collections.emptyList());
 
         // When: 执行任务
@@ -155,14 +147,11 @@ class BatchTaskExecutionTddTest {
     }
 
     @Test
-    @DisplayName("4. [spec.md 4.6] 扫描到文件后应执行传输逻辑")
-    void testExecuteTask_shouldProcessScannedFiles() {
-        // Given: 模拟扫描到文件
-        FileScanner.ScannedFile file1 = createScannedFile("app.log", 1024L);
-        FileScanner.ScannedFile file2 = createScannedFile("error.log", 2048L);
-
-        when(fileScanner.scan(anyString(), anyList(), anyList(), any()))
-            .thenReturn(List.of(file1, file2));
+    @DisplayName("4. [spec.md 4.5] 扫描不到文件时也应标记完成")
+    void testExecuteTask_noFilesFoundShouldComplete() {
+        // Given: 模拟扫描无文件
+        when(fileScanner.scan(anyString(), any(), any(), any()))
+            .thenReturn(Collections.emptyList());
 
         BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
 
@@ -170,36 +159,16 @@ class BatchTaskExecutionTddTest {
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
         taskRunnable.run();
 
-        // Then: 应处理扫描到的文件（completeTask被调用表示成功完成）
+        // Then: 无文件时也应正常完成
         verify(retryManager).recordSuccess(eq(1001L));
 
-        System.out.println("✅ 文件处理验证: 扫描到" + 2 + "个文件并处理完成");
+        System.out.println("✅ 空目录验证: 无文件时也正常完成");
     }
 
     @Test
-    @DisplayName("5. [spec.md 4.6] 传输成功后应记录完成状态")
-    void testExecuteTask_successShouldRecordComplete() {
-        // Given: 模拟扫描到文件并成功处理
-        when(fileScanner.scan(anyString(), anyList(), anyList(), any()))
-            .thenReturn(List.of(createScannedFile("test.log", 1024L)));
-
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
-
-        // When: 执行任务
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
-
-        // Then: 应调用completeTask记录成功
-        verify(retryManager).recordSuccess(eq(1001L));
-        verify(transferManager).release(eq("1001"));
-
-        System.out.println("✅ 成功记录验证: completeTask被正确调用");
-    }
-
-    @Test
-    @DisplayName("6. [spec.md 4.7] 扫描失败时应触发重试机制")
+    @DisplayName("5. [spec.md 4.7] 扫描失败时应触发重试机制")
     void testExecuteTask_scanFailureShouldTriggerRetry() {
-        // Given: 模拟扫描失败（使用正确的参数匹配器）
+        // Given: 模拟扫描失败
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenThrow(new RuntimeException("目录不存在"));
         
@@ -218,67 +187,10 @@ class BatchTaskExecutionTddTest {
     }
 
     @Test
-    @DisplayName("7. [spec.md 4.5] 扫描不到文件时也应标记完成")
-    void testExecuteTask_noFilesFoundShouldComplete() {
-        // Given: 模拟扫描无文件
-        when(fileScanner.scan(anyString(), anyList(), anyList(), any()))
-            .thenReturn(Collections.emptyList());
-
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
-
-        // When: 执行任务
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
-
-        // Then: 无文件时也应正常完成
-        verify(retryManager).recordSuccess(eq(1001L));
-
-        System.out.println("✅ 空目录验证: 无文件时也正常完成");
-    }
-
-    @Test
-    @DisplayName("8. [spec.md] 执行前应获取传输许可")
-    void testExecuteTask_shouldAcquirePermitBeforeExecution() {
-        // Given: 配置传输许可控制
-        when(fileScanner.scan(anyString(), anyList(), anyList(), any()))
-            .thenReturn(Collections.emptyList());
-
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
-
-        // When: 执行任务
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
-
-        // Then: 应先尝试获取许可
-        verify(transferManager).tryAcquire(eq("1001"));
-
-        System.out.println("✅ 许可控制验证: 执行前获取传输许可");
-    }
-
-    @Test
-    @DisplayName("9. [spec.md] 无法获取许可时应跳过执行")
-    void testExecuteTask_skipWhenCannotAcquirePermit() {
-        // Given: 无法获取许可（覆盖默认行为）
-        when(transferManager.tryAcquire(anyString())).thenReturn(false);
-
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
-
-        // When: 执行任务
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
-
-        // Then: 不应执行扫描
-        verify(fileScanner, never()).scan(anyString(), anyList(), anyList(), anyInt());
-        verify(retryManager).shouldRetry(eq(1001L), contains("获取传输许可超时"));
-
-        System.out.println("✅ 许可拒绝验证: 无许可时跳过执行");
-    }
-
-    @Test
-    @DisplayName("10. [spec.md 4.7] 超过最大重试次数应标记最终失败")
+    @DisplayName("6. [spec.md 4.7] 超过最大重试次数应标记最终失败")
     void testExecuteTask_maxRetriesExceededShouldFail() {
         // Given: 模拟失败且超过最大重试次数
-        when(fileScanner.scan(anyString(), anyList(), anyList(), any()))
+        when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenThrow(new RuntimeException("永久性错误"));
         
         when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(false);
@@ -293,6 +205,25 @@ class BatchTaskExecutionTddTest {
         verify(retryManager, never()).calculateNextRetryDelay(anyLong(), anyInt());
 
         System.out.println("✅ 最终失败验证: 超过最大重试次数不再调度");
+    }
+
+    @Test
+    @DisplayName("7. [spec.md] 无目标Agent时应跳过传输")
+    void testExecuteTask_noTargetAgentsShouldSkip() {
+        // Given: 无目标Agent配置
+        when(fileScanner.scan(anyString(), any(), any(), any()))
+            .thenReturn(List.of(createScannedFile("test.log", 1024L)));
+
+        BatchTransferTaskConfig config = createTestConfig(tempDir.toString());  // 不设置targetAgentIds
+
+        // When: 执行任务
+        Runnable taskRunnable = invokeCreateTaskRunnable(config);
+        taskRunnable.run();
+
+        // Then: 任务仍应完成（无目标时视为空操作）
+        verify(retryManager).recordSuccess(eq(1001L));
+
+        System.out.println("✅ 空目标验证: 无目标Agent时跳过传输");
     }
 
     // ==================== 辅助方法 ====================

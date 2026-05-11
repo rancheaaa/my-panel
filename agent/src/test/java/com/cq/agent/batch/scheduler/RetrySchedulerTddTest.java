@@ -2,7 +2,6 @@ package com.cq.agent.batch.scheduler;
 
 import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.batch.transfer.BatchTransferManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
@@ -29,9 +28,6 @@ class RetrySchedulerTddTest {
     @Mock
     private RetryManager retryManager;
 
-    @Mock
-    private BatchTransferManager transferManager;
-
     private BatchTaskSchedulerManager schedulerManager;
     private AutoCloseable mocks;
 
@@ -40,7 +36,6 @@ class RetrySchedulerTddTest {
         mocks = MockitoAnnotations.openMocks(this);
         schedulerManager = new BatchTaskSchedulerManager(configFileManager);
         schedulerManager.setRetryManager(retryManager);
-        schedulerManager.setTransferManager(transferManager);
     }
 
     @AfterEach
@@ -88,14 +83,14 @@ class RetrySchedulerTddTest {
     }
 
     @Test
-    @DisplayName("4. [spec.md] 失败时应释放传输许可")
-    void testFailTask_shouldReleasePermit() {
+    @DisplayName("4. [spec.md] 失败时应检查是否需要重试")
+    void testFailTask_shouldCheckRetry() {
         when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(false);
 
         schedulerManager.failTask(1L, "传输失败");
 
-        verify(transferManager).release(eq("1"));
-        System.out.println("✅ 许可释放验证: 调用release");
+        verify(retryManager).shouldRetry(eq(1L), eq("传输失败"));
+        System.out.println("✅ 失败重试验证: 调用shouldRetry");
     }
 
     @Test
@@ -104,8 +99,7 @@ class RetrySchedulerTddTest {
         schedulerManager.completeTask(1L);
 
         verify(retryManager).recordSuccess(eq(1L));
-        verify(transferManager).release(eq("1"));
-        System.out.println("✅ 成功记录验证: 调用recordSuccess和release");
+        System.out.println("✅ 成功记录验证: 调用recordSuccess");
     }
 
     @Test

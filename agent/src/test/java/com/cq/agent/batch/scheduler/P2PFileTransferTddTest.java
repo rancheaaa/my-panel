@@ -3,7 +3,6 @@ package com.cq.agent.batch.scheduler;
 import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.BatchTransferManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadListener;
@@ -38,9 +37,6 @@ class P2PFileTransferTddTest {
     private RetryManager retryManager;
 
     @Mock
-    private BatchTransferManager transferManager;
-
-    @Mock
     private FileScanner fileScanner;
 
     @Mock
@@ -55,14 +51,10 @@ class P2PFileTransferTddTest {
         mocks = MockitoAnnotations.openMocks(this);
         schedulerManager = new BatchTaskSchedulerManager(configFileManager);
         schedulerManager.setRetryManager(retryManager);
-        schedulerManager.setTransferManager(transferManager);
         schedulerManager.setFileScanner(fileScanner);
 
         // 注入AgentUploader
         schedulerManager.setAgentUploader(agentUploader);
-
-        // 默认：允许获取传输许可
-        when(transferManager.tryAcquire(anyString())).thenReturn(true);
 
         // 创建临时目录用于测试
         tempDir = Files.createTempDirectory("p2p-test");
@@ -244,9 +236,8 @@ class P2PFileTransferTddTest {
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
         taskRunnable.run();
 
-        // Then: 任务应成功完成
+        // Then: 应调用completeTask记录成功
         verify(retryManager).recordSuccess(eq(1001L));
-        verify(transferManager).release(eq("1001"));
 
         System.out.println("✅ 成功完成验证: uploadFile返回true后任务完成");
     }

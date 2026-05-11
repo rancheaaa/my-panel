@@ -3,11 +3,11 @@ package com.cq.agent.batch.scheduler;
 import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.BatchTransferManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
+import lombok.Getter;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
@@ -15,13 +15,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 批量任务调度管理器
  * 负责管理所有批量传输任务的Quartz调度
  * 集成RetryManager处理重试逻辑
- * 集成BatchTransferManager控制并发传输
  * 集成FileScanner进行文件扫描（spec.md 4.5）
  * 集成AgentUploader进行P2P文件传输（spec.md 4.6）
  */
@@ -32,9 +30,10 @@ public class BatchTaskSchedulerManager {
     private final ConfigFileManager configFileManager;
     private final QuartzTaskScheduler quartzTaskScheduler;
 
+    @Getter
     private RetryManager retryManager;
-    private BatchTransferManager transferManager;
     private FileScanner fileScanner;
+    @Getter
     private AgentUploader agentUploader;
 
     public BatchTaskSchedulerManager(ConfigFileManager configFileManager) throws SchedulerException {
@@ -50,19 +49,6 @@ public class BatchTaskSchedulerManager {
         log.info("🔄 已设置RetryManager");
     }
 
-    public RetryManager getRetryManager() {
-        return retryManager;
-    }
-
-    public void setTransferManager(BatchTransferManager transferManager) {
-        this.transferManager = transferManager;
-        log.info("🔐 已设置BatchTransferManager");
-    }
-
-    public BatchTransferManager getTransferManager() {
-        return transferManager;
-    }
-
     /**
      * 设置文件扫描器（spec.md 4.5）
      */
@@ -71,20 +57,12 @@ public class BatchTaskSchedulerManager {
         log.info("📁 已设置FileScanner");
     }
 
-    public FileScanner getFileScanner() {
-        return fileScanner;
-    }
-
     /**
      * 设置P2P上传器（spec.md 4.6）
      */
     public void setAgentUploader(AgentUploader agentUploader) {
         this.agentUploader = agentUploader;
         log.info("📤 已设置AgentUploader");
-    }
-
-    public AgentUploader getAgentUploader() {
-        return agentUploader;
     }
 
     /**
@@ -212,15 +190,9 @@ public class BatchTaskSchedulerManager {
      * 标记任务完成并释放资源
      */
     public void completeTask(Long taskId) {
-        String taskIdStr = String.valueOf(taskId);
-        
-        if (transferManager != null) {
-            transferManager.release(taskIdStr);
-            log.info("✅ 任务已完成，释放许可: taskId={}", taskId);
-        }
-        
         if (retryManager != null) {
             retryManager.recordSuccess(taskId);
+            log.info("✅ 任务已完成: taskId={}", taskId);
         }
     }
 
@@ -230,11 +202,6 @@ public class BatchTaskSchedulerManager {
      */
     public boolean failTask(Long taskId, String error) {
         log.warn("⚠️  任务执行失败: taskId={}, error={}", taskId, error);
-
-        // 释放传输许可
-        if (transferManager != null) {
-            transferManager.release(String.valueOf(taskId));
-        }
 
         // 检查是否应重试
         if (retryManager == null) {
@@ -265,44 +232,30 @@ public class BatchTaskSchedulerManager {
     /**
      * 创建任务执行Runnable
      * 执行流程：
-     * 1. 获取传输许可（并发控制）
-     * 2. 扫描源目录（FileScanner - spec.md 4.5）
-     * 3. P2P文件传输（AgentUploader - spec.md 4.6）
-     * 4. 记录结果并处理重试（spec.md 4.7）
+     * 1. 扫描源目录（FileScanner - spec.md 4.5）
+     * 2. P2P文件传输（AgentUploader - spec.md 4.6）
+     * 3. 记录结果并处理重试（spec.md 4.7）
      */
     private Runnable createTaskRunnable(BatchTransferTaskConfig config) {
         return () -> {
             Long taskId = config.getTaskId();
-            String taskIdStr = String.valueOf(taskId);
             
             log.info("🚀 开始执行任务: taskId={}, sourceDir={}", taskId, config.getSourceDir());
 
             try {
-                // Step 1: 获取传输许可（并发控制）
-                if (transferManager != null && !transferManager.tryAcquire(taskIdStr)) {
-                    log.warn("⚠️  无法获取传输许可，跳过本次执行: taskId={}", taskId);
-                    failTask(taskId, "获取传输许可超时");
-                    return;
-                }
-
-                try {
-                    // Step 2: 扫描源目录（spec.md 4.5）
-                    List<FileScanner.ScannedFile> scannedFiles = scanSourceDirectory(config);
-                    
-                    // Step 3: P2P文件传输（spec.md 4.6）
-                    processScannedFiles(taskId, config, scannedFiles);
-                    
-                    // Step 4: 标记任务完成
-                    completeTask(taskId);
-                    log.info("✅ 任务执行成功: taskId={}, processedFiles={}", taskId, scannedFiles.size());
-                    
-                } catch (Exception e) {
-                    log.error("❌ 任务执行异常: taskId={}, error={}", taskId, e.getMessage(), e);
-                    failTask(taskId, e.getMessage());
-                }
+                // Step 1: 扫描源目录（spec.md 4.5）
+                List<FileScanner.ScannedFile> scannedFiles = scanSourceDirectory(config);
+                
+                // Step 2: P2P文件传输（spec.md 4.6）
+                processScannedFiles(taskId, config, scannedFiles);
+                
+                // Step 3: 标记任务完成
+                completeTask(taskId);
+                log.info("✅ 任务执行成功: taskId={}, processedFiles={}", taskId, scannedFiles.size());
                 
             } catch (Exception e) {
-                log.error("❌ 任务执行严重异常: taskId={}, error={}", taskId, e.getMessage(), e);
+                log.error("❌ 任务执行异常: taskId={}, error={}", taskId, e.getMessage(), e);
+                failTask(taskId, e.getMessage());
             }
         };
     }
@@ -429,7 +382,7 @@ public class BatchTaskSchedulerManager {
         try {
             // 从targetAgentNames解析目标信息
             // 格式：username@ip:port
-            String targetAgentName = config.getTargetAgentNames().get(0);  // 取第一个目标
+            String targetAgentName = config.getTargetAgentNames().getFirst();  // 取第一个目标
             
             String[] parts = targetAgentName.split("@");
             if (parts.length != 2) {
@@ -440,7 +393,7 @@ public class BatchTaskSchedulerManager {
             String ipPort = parts[1];  // ip:port
 
             // 构建目标路径
-            String targetDir = config.getTargetDirs().get(0);  // 取第一个目标目录
+            String targetDir = config.getTargetDirs().getFirst();  // 取第一个目标目录
             String destPath = targetDir + "/" + scannedFile.getFileName();
 
             // 组装remoteTargetInfo
@@ -493,7 +446,7 @@ public class BatchTaskSchedulerManager {
      * 批量上传监听器（spec.md 4.6）
      * 桥接AgentUploader事件到任务管理器
      */
-    private class BatchUploadListener implements UploadListener {
+    private static class BatchUploadListener implements UploadListener {
 
         private final Long taskId;
         private final FileScanner.ScannedFile scannedFile;
@@ -505,7 +458,7 @@ public class BatchTaskSchedulerManager {
 
         @Override
         public void onProgress(int totalChunks, int uploadedChunks, double progress) {
-            log.debug("📊 上传进度: taskId={}, file={}, {}/{} ({:.1f}%)",
+            log.debug("📊 上传进度: taskId={}, file={}, {}/{} ({}%)",
                 taskId, scannedFile.getFileName(), uploadedChunks, totalChunks, progress);
             
             // TODO: 上报进度到Proxy（spec.md 4.8）

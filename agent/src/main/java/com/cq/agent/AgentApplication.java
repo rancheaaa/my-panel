@@ -5,7 +5,6 @@ import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
-import com.cq.agent.batch.transfer.BatchTransferManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
@@ -74,14 +73,9 @@ public class AgentApplication {
 
         // Initialize retry manager for batch transfers (10 retries, 30min initial, 2h max delay)
         RetryManager retryManager = new RetryManager(10, 30, 2);
-        
-        // Initialize transfer concurrency manager
-        int maxConcurrentTransfers = 5; // default value from spec.md
-        BatchTransferManager transferManager = new BatchTransferManager(maxConcurrentTransfers);
 
         // Connect components to task scheduler manager
         taskSchedulerManager.setRetryManager(retryManager);
-        taskSchedulerManager.setTransferManager(transferManager);
 
         // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
         configChangeListener.onCronChange(taskId -> {

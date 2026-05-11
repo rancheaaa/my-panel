@@ -365,6 +365,7 @@
         <module>my-panel-common</module>
         <module>cli-tools</module>
         <module>distribution</module>
+        <module>integration-test</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -39,7 +39,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                 agentConfig.getUploadMaxQueueDepth(), agentConfig.getUploadWorkerCount(),
                 agentConfig.getUploadMaxRetries(), agentConfig.getUploadRetryDelayMs(),
                 agentConfig.getUploadConnectTimeoutSeconds(), agentConfig.getUploadRequestTimeoutSeconds(),
-                agentConfig.getTransfersMetaDir(),
+                agentConfig.getUploadMetaDir(),
                 agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload");
         this.agentConfig = agentConfig;
     }

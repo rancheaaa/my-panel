@@ -36,7 +36,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 agentConfig.getDownloadMaxQueueDepth(), agentConfig.getDownloadWorkerCount(),
                 agentConfig.getDownloadMaxRetries(), agentConfig.getDownloadRetryDelayMs(),
                 agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
-                agentConfig.getTransfersMetaDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
+                agentConfig.getDownloadMetaDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
     }
 
     @Override

@@ -1,9 +1,7 @@
 package com.cq.proxy.repository.mapper;
 
 import com.cq.proxy.repository.entity.BatchTransferSubtask;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
 
 import java.util.Date;
 import java.util.List;
@@ -14,6 +12,40 @@ import java.util.Map;
  */
 @Mapper
 public interface BatchTransferSubtaskMapper {
+
+    /**
+     * 插入子任务
+     */
+    @Insert("""
+        INSERT INTO batch_transfer_subtask (
+            task_id, source_agent_id, source_agent_name,
+            target_agent_id, target_agent_name,
+            source_path, target_path, file_name, file_size_bytes,
+            status, transfer_id,
+            transferred_chunks, total_chunks, transferred_bytes, speed_bytes_per_sec,
+            started_at, completed_at, duration_ms,
+            error_code, error_message, error_stack_trace,
+            retry_count, last_retry_at, next_retry_after,
+            create_by, create_time, update_by, update_time, remark
+        ) VALUES (
+            #{taskId}, #{sourceAgentId}, #{sourceAgentName},
+            #{targetAgentId}, #{targetAgentName},
+            #{sourcePath}, #{targetPath}, #{fileName}, #{fileSizeBytes},
+            #{status}, #{transferId},
+            #{transferredChunks}, #{totalChunks}, #{transferredBytes}, #{speedBytesPerSec},
+            #{startedAt}, #{completedAt}, #{durationMs},
+            #{errorCode}, #{errorMessage}, #{errorStackTrace},
+            #{retryCount}, #{lastRetryAt}, #{nextRetryAfter},
+            #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
+        )
+        """)
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insert(BatchTransferSubtask subtask);
+
+    /**
+     * 根据实体更新子任务（只更新非空字段）
+     */
+    int updateByEntity(BatchTransferSubtask subtask);
 
     /**
      * 更新进度字段

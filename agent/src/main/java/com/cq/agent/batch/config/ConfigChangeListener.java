@@ -226,8 +226,14 @@ public class ConfigChangeListener {
 
     private boolean hasBasicFieldsChanged(AgentTaskConfig oldConfig, AgentTaskConfig newConfig) {
         boolean sourceDirChanged = hasFieldChanged(oldConfig.getSourceDir(), newConfig.getSourceDir());
-        boolean backupDirChanged = hasFieldChanged(oldConfig.getBackupDir(), newConfig.getBackupDir());
-        boolean backupModeChanged = hasFieldChanged(oldConfig.getBackupMode(), newConfig.getBackupMode());
+        TransferConfig oldTransfer = oldConfig.getTransferConfig();
+        TransferConfig newTransfer = newConfig.getTransferConfig();
+        boolean backupDirChanged = hasFieldChanged(
+                oldTransfer != null ? oldTransfer.getBackupDir() : null,
+                newTransfer != null ? newTransfer.getBackupDir() : null);
+        boolean backupModeChanged = hasFieldChanged(
+                oldTransfer != null ? oldTransfer.getBackupMode() : null,
+                newTransfer != null ? newTransfer.getBackupMode() : null);
         boolean statusChanged = hasFieldChanged(oldConfig.getStatus(), newConfig.getStatus());
 
         return sourceDirChanged || backupDirChanged || backupModeChanged || statusChanged;

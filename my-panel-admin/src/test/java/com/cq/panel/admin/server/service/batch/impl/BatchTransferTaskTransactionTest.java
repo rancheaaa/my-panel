@@ -262,7 +262,7 @@ class BatchTransferTaskTransactionTest {
         task.setStatus("RUNNING");
         when(taskMapper.selectById(1L)).thenReturn(task);
         when(taskMapper.deleteById(1L)).thenReturn(1);
-        when(configSerializer.serialize(any())).thenReturn("{\"taskId\":1}");
+        when(configSerializer.serializeForAgent(any())).thenReturn("{\"taskId\":1}");
         when(eventMapper.insertEvent(any())).thenReturn(1);
 
         service.stopTask(1L);

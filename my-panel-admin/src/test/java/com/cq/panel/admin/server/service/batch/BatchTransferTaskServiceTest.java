@@ -39,6 +39,8 @@ class BatchTransferTaskServiceTest {
 
     private WildcardConflictDetector conflictDetector;
     private CronExpressionValidator cronValidator;
+
+    @Mock
     private BatchConfigSerializer configSerializer;
     
     private IBatchTransferTaskService taskService;
@@ -46,10 +48,9 @@ class BatchTransferTaskServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        
+
         conflictDetector = new WildcardConflictDetector();
         cronValidator = new CronExpressionValidator();
-        configSerializer = new BatchConfigSerializer();
 
         taskService = new BatchTransferTaskServiceImpl(
             taskMapper,
@@ -91,6 +92,9 @@ class BatchTransferTaskServiceTest {
         BatchTransferTask existing = createExistingTask();
         existing.setSourceAgentId("agent-003");
         when(taskMapper.selectList(any())).thenReturn(Arrays.asList(existing));
+        when(configSerializer.deserialize(anyString(), eq(List.class)))
+            .thenReturn(Arrays.asList("*.log"))
+            .thenReturn(Arrays.asList("debug*"));
 
         BatchTransferTaskDTO dto = createValidDTO("冲突任务");
         dto.setSourceDir("/var/log/app");
@@ -102,7 +106,7 @@ class BatchTransferTaskServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("通配符冲突"));
-        
+ 
         verify(taskMapper, never()).insert(any());
         System.out.println("✅ 冲突检测正常: " + exception.getMessage());
     }
@@ -160,10 +164,11 @@ class BatchTransferTaskServiceTest {
     }
 
     @Test
-    @DisplayName("6. 事件Payload包含完整配置")
+    @DisplayName("6. Payload包含完整配置信息")
     void testCreateTask_eventPayloadContainsFullConfig() {
         when(taskMapper.insert(any())).thenReturn(1);
         when(eventMapper.insertEvent(any())).thenReturn(1);
+        when(configSerializer.serializeForAgent(any())).thenReturn("{\"taskId\":1,\"taskName\":\"Payload测试任务\",\"targetAgents\":[{\"agentId\":\"agent-003\",\"agentName\":\"root@node3:7777\"}]}");
 
         BatchTransferTaskDTO dto = createValidDTO("Payload测试任务");
         dto.setIncludePatterns(Arrays.asList("*.txt", "*.log"));
@@ -201,9 +206,11 @@ class BatchTransferTaskServiceTest {
     }
 
     @Test
-    @DisplayName("8. Agent名称持久化")
+    @DisplayName("5. Agent名称持久化")
     void testCreateTask_agentNamesPersisted() {
         when(taskMapper.insert(any())).thenReturn(1);
+        when(configSerializer.serializeForAgent(any())).thenReturn("{}");
+        when(configSerializer.serialize(any(List.class))).thenReturn("[\"root@node1:7777\",\"root@node2:7777\"]");
 
         BatchTransferTaskDTO dto = createValidDTO("Agent名称测试");
         dto.setSourceAgentName("root@192.168.1.100:8888");
@@ -216,6 +223,7 @@ class BatchTransferTaskServiceTest {
 
         BatchTransferTask saved = taskCaptor.getValue();
         assertEquals("root@192.168.1.100:8888", saved.getSourceAgentName());
+        assertNotNull(saved.getTargetAgentNames());
         assertTrue(saved.getTargetAgentNames().contains("root@node1:7777"));
         assertTrue(saved.getTargetAgentNames().contains("root@node2:7777"));
 
@@ -250,6 +258,9 @@ class BatchTransferTaskServiceTest {
         BatchTransferTask conflict2 = createExistingTaskWithId(3L);
         conflict2.setSourceAgentId("agent-003");
         when(taskMapper.selectList(any())).thenReturn(Arrays.asList(conflict1, conflict2));
+        when(configSerializer.deserialize(anyString(), eq(List.class)))
+            .thenReturn(Arrays.asList("*.log"))
+            .thenReturn(Arrays.asList("debug*"));
 
         BatchTransferTaskDTO dto = createValidDTO("冲突更新任务");
         dto.setSourceDir("/var/log/app");
@@ -340,6 +351,7 @@ class BatchTransferTaskServiceTest {
             task.setStatus(status);
             when(taskMapper.selectById(anyLong())).thenReturn(task);
             when(taskMapper.deleteById(anyLong())).thenReturn(1);
+            when(configSerializer.serializeForAgent(any())).thenReturn("{\"taskId\":1}");
 
             taskService.stopTask(1L);
 
@@ -379,6 +391,7 @@ class BatchTransferTaskServiceTest {
         when(taskMapper.selectById(anyLong())).thenReturn(createExistingTask());
         when(taskMapper.deleteById(anyLong())).thenReturn(1);
         when(eventMapper.insertEvent(any())).thenReturn(1);
+        when(configSerializer.serializeForAgent(any())).thenReturn("{\"taskId\":1}");
 
         taskService.deleteTasks(Arrays.asList(1L));
 

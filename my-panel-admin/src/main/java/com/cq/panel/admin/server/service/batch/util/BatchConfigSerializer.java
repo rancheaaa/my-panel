@@ -57,6 +57,7 @@ public class BatchConfigSerializer {
       AgentTaskConfig config = new AgentTaskConfig();
       config.setTaskId(task.getId());
       config.setTaskName(task.getTaskName());
+      config.setTaskDescription(task.getTaskDescription());
       config.setStatus(task.getStatus());
       config.setVersion(new SimpleDateFormat("yyyyMMddHHmmss").format(task.getUpdateTime()));
       config.setSourceAgentId(task.getSourceAgentId());
@@ -71,8 +72,6 @@ public class BatchConfigSerializer {
       if (task.getStartedAt() != null) {
         config.setStartedAt(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(task.getStartedAt()));
       }
-      config.setBackupDir(task.getBackupDir());
-      config.setBackupMode(task.getBackupMode());
       return objectMapper.writeValueAsString(config);
     } catch (JsonProcessingException e) {
       throw new SerializationException("Agent格式序列化失败: " + e.getMessage(), e);
@@ -104,10 +103,24 @@ public class BatchConfigSerializer {
 
   private TransferConfig buildTransferConfig(BatchTransferTask task) {
     TransferConfig transferConfig = new TransferConfig();
-    transferConfig.setRoutingStrategy(task.getRoutingStrategy());
+
+    // 1. 基础设置
+    transferConfig.setTransferMode(task.getTransferMode());
     transferConfig
         .setPreserveDirStructure(task.getPreserveDirStructure() != null && task.getPreserveDirStructure() == 1);
+
+    // 2. 路由控制
+    transferConfig.setRoutingStrategy(task.getRoutingStrategy());
+    transferConfig.setRoutingConfig(task.getRoutingConfig());
+
+    // 3. 性能控制（暂无字段，保留扩展）
+    // transferConfig.setMaxBandwidthKbS(...);
+
+    // 4. 传输后操作
     transferConfig.setPostTransferAction(task.getPostTransferAction());
+    transferConfig.setBackupDir(task.getBackupDir());
+    transferConfig.setBackupMode(task.getBackupMode());
+
     return transferConfig;
   }
 

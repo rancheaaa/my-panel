@@ -1,5 +1,6 @@
 package com.cq.proxy.service.batch;
 
+import com.cq.proxy.repository.entity.BatchTransferSubtask;
 import java.util.List;
 
 /**
@@ -9,46 +10,48 @@ import java.util.List;
 public interface ProgressService {
 
     /**
+     * 创建子任务（INSERT）
+     */
+    Long createSubTask(BatchTransferSubtask subtask);
+
+    /**
      * 更新单个子任务进度
-     * @param subtaskId 子任务ID
-     * @param transferredBytes 已传输字节数
-     * @param totalBytes 总字节数
      */
     void updateProgress(Long subtaskId, int transferredBytes, int totalBytes);
 
     /**
+     * 扩展版进度更新（包含chunks和speed信息）
+     */
+    void updateProgressExt(Long subtaskId, Integer transferredChunks, Integer totalChunks,
+                           Long transferredBytes, Long speedBytesPerSec);
+
+    /**
      * 检查数据是否过期（基于时间戳）
-     * @param subtaskId 子任务ID
-     * @param timestamp 时间戳
-     * @return true表示数据已过期
      */
     boolean isStaleData(Long subtaskId, Long timestamp);
 
     /**
      * 批量更新进度
-     * @param progressList 进度列表
      */
     void batchUpdateProgress(List<?> progressList);
 
     /**
+     * 更新完整子任务状态
+     */
+    void updateSubTaskStatus(BatchTransferSubtask subtask);
+
+    /**
      * 标记子任务完成
-     * @param subtaskId 子任务ID
-     * @param targetPath 目标路径
      */
     void markCompleted(Long subtaskId, String targetPath);
 
     /**
      * 标记子任务失败
-     * @param subtaskId 子任务ID
-     * @param errorCode 错误码
-     * @param errorMessage 错误消息
      */
-    void markFailed(Long subtaskId, String errorCode, String errorMessage);
+    void markFailed(Long subtaskId, String errorCode, String errorMessage, String errorStackTrace);
 
     /**
      * 调度下次重试
-     * @param subtaskId 子任务ID
-     * @return 下次重试时间戳
      */
     long scheduleNextRetry(Long subtaskId);
 }

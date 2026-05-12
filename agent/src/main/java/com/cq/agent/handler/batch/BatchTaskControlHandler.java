@@ -47,6 +47,16 @@ public class BatchTaskControlHandler implements IRequestHandler {
             String body = request.content().toString(StandardCharsets.UTF_8);
             JsonObject json = JsonParser.parseString(body).getAsJsonObject();
 
+            if (!json.has("taskId") || json.get("taskId") == null) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, ApiResponse.failure(400, "缺少必填字段: taskId"));
+                return;
+            }
+
+            if (!json.has("action") || json.get("action") == null) {
+                sendResponse(ctx, HttpResponseStatus.BAD_REQUEST, ApiResponse.failure(400, "缺少必填字段: action"));
+                return;
+            }
+
             Long taskId = json.get("taskId").getAsLong();
             String action = json.get("action").getAsString();
 

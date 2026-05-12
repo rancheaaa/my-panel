@@ -1,12 +1,12 @@
 package com.cq.proxy.service.batch;
 
-import com.cq.panel.common.loadbalancer.HttpResponse;
-import com.cq.panel.common.loadbalancer.SimpleHttpClient;
 import com.cq.proxy.repository.entity.AgentRegistry;
 import com.cq.proxy.repository.mapper.AgentRegistryMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
@@ -29,7 +29,7 @@ class AgentPushServiceTransactionTest {
     private AgentRegistryMapper agentRegistryMapper;
 
     @Mock
-    private SimpleHttpClient httpClient;
+    private RestTemplate restTemplate;
 
     private ObjectMapper objectMapper;
     private AgentPushService agentPushService;
@@ -40,7 +40,7 @@ class AgentPushServiceTransactionTest {
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         objectMapper = new ObjectMapper();
-        agentPushService = new AgentPushService(agentRegistryMapper, httpClient, objectMapper);
+        agentPushService = new AgentPushService(agentRegistryMapper, restTemplate, objectMapper);
 
         // 默认Agent在线
         AgentRegistry registry = new AgentRegistry();
@@ -62,8 +62,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("1. Agent返回success=true且configPersisted=true - 返回true")
     void testPushConfig_agentConfirmPersisted_returnsTrue() {
         String responseJson = "{\"success\":true,\"data\":{\"configPersisted\":true,\"receivedAt\":1778430000000,\"version\":20260509103000}}";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
 
@@ -74,8 +75,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("2. Agent返回success=true但configPersisted=false - 返回false")
     void testPushConfig_agentNotPersisted_returnsFalse() {
         String responseJson = "{\"success\":true,\"data\":{\"configPersisted\":false,\"receivedAt\":1778430000000,\"version\":20260509103000}}";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
 
@@ -86,8 +88,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("3. Agent返回success=false - 返回false")
     void testPushConfig_agentReturnsError_returnsFalse() {
         String responseJson = "{\"success\":false,\"code\":500,\"msg\":\"磁盘已满\"}";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
 
@@ -97,8 +100,9 @@ class AgentPushServiceTransactionTest {
     @Test
     @DisplayName("4. HTTP状态码非2xx - 返回false")
     void testPushConfig_httpError_returnsFalse() {
-        HttpResponse<String> response = new HttpResponse<>("Internal Server Error", 500);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
 
@@ -108,8 +112,8 @@ class AgentPushServiceTransactionTest {
     @Test
     @DisplayName("5. 网络异常 - 抛出RuntimeException")
     void testPushConfig_networkException_throwsException() {
-        doThrow(new RuntimeException("Connection timeout"))
-            .when(httpClient).post(anyString(), any(), anyMap(), any());
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenThrow(new RuntimeException("Connection timeout"));
 
         assertThrows(RuntimeException.class, () -> {
             agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
@@ -122,8 +126,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("6. 删除指令推送成功 - 返回true")
     void testPushDelete_success_returnsTrue() {
         String responseJson = "{\"success\":true,\"data\":{\"deleted\":true}}";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushDeleteToAgent("agent-001", "{\"taskId\":1}");
 
@@ -134,8 +139,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("7. 删除指令推送失败 - 返回false")
     void testPushDelete_failure_returnsFalse() {
         String responseJson = "{\"success\":false,\"msg\":\"任务不存在\"}";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushDeleteToAgent("agent-001", "{\"taskId\":1}");
 
@@ -148,8 +154,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("8. 正确解析嵌套JSON中的configPersisted字段")
     void testPushConfig_parseNestedJson_correctly() {
         String responseJson = "{\"success\":true,\"code\":200,\"msg\":\"Success\",\"data\":{\"configPersisted\":true,\"receivedAt\":1778430000000,\"version\":20260509103000,\"taskId\":1,\"changed\":true}}";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
 
@@ -160,8 +167,9 @@ class AgentPushServiceTransactionTest {
     @DisplayName("9. 响应JSON格式异常 - 返回false")
     void testPushConfig_invalidJson_returnsFalse() {
         String responseJson = "not valid json";
-        HttpResponse<String> response = new HttpResponse<>(responseJson, 200);
-        doReturn(response).when(httpClient).post(anyString(), any(), anyMap(), any());
+        ResponseEntity<String> response = new ResponseEntity<>(responseJson, HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class)))
+            .thenReturn(response);
 
         boolean result = agentPushService.pushConfigToAgent("agent-001", "{\"taskId\":1}");
 

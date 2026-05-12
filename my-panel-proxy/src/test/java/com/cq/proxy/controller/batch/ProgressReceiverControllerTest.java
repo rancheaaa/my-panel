@@ -1,10 +1,9 @@
 package com.cq.proxy.controller.batch;
 
+import com.cq.proxy.controller.dto.SubTaskDTO;
 import com.cq.proxy.service.batch.ProgressService;
 import com.cq.proxy.controller.ProgressReceiverController;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
@@ -31,8 +30,6 @@ class ProgressReceiverControllerTest {
     private ProgressService progressService;
 
     private ProgressReceiverController controller;
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -110,28 +107,29 @@ class ProgressReceiverControllerTest {
     @Test
     @DisplayName("4. POST /api/batch/subtask/progress/batch - 批量更新成功")
     void testReceiveBatchProgress_success() throws Exception {
-        List<Map<String, Object>> batchData = Arrays.asList(
-                createProgressMap(101L, 30, 100),
-                createProgressMap(102L, 60, 100),
-                createProgressMap(103L, 90, 100));
+        SubTaskDTO[] batchData = new SubTaskDTO[] {
+                createSubTaskDTO(101L, 30, 100),
+                createSubTaskDTO(102L, 60, 100),
+                createSubTaskDTO(103L, 90, 100)
+        };
 
-        doNothing().when(progressService).batchUpdateProgress(anyList());
+        doNothing().when(progressService).batchUpdateProgress(any(SubTaskDTO[].class));
 
         mockMvc.perform(post("/api/batch/subtask/progress/batch")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(batchData)))
+                .content(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(batchData)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.updatedCount").value(3));
 
-        verify(progressService).batchUpdateProgress(argThat(list -> ((List<?>) list).size() == 3));
+        verify(progressService).batchUpdateProgress(argThat(array -> array.length == 3));
         System.out.println("✅ 批量进度更新API成功");
     }
 
     @Test
     @DisplayName("5. POST /api/batch/subtask/progress/batch - 空列表返回0")
     void testReceiveBatchProgress_emptyList() throws Exception {
-        doNothing().when(progressService).batchUpdateProgress(anyList());
+        doNothing().when(progressService).batchUpdateProgress(any(SubTaskDTO[].class));
 
         mockMvc.perform(post("/api/batch/subtask/progress/batch")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -262,12 +260,12 @@ class ProgressReceiverControllerTest {
                 """, subtaskId, transferredBytes, totalBytes, timestamp);
     }
 
-    private Map<String, Object> createProgressMap(Long subtaskId, int transferredBytes, int totalBytes) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("subtaskId", subtaskId);
-        map.put("transferredBytes", transferredBytes);
-        map.put("totalBytes", totalBytes);
-        map.put("timestamp", System.currentTimeMillis());
-        return map;
+    private SubTaskDTO createSubTaskDTO(Long subtaskId, int transferredBytes, int totalBytes) {
+        SubTaskDTO dto = new SubTaskDTO();
+        dto.setSubtaskId(subtaskId);
+        dto.setTransferredBytes((long) transferredBytes);
+        dto.setTotalBytes(totalBytes);
+        dto.setTimestamp(System.currentTimeMillis());
+        return dto;
     }
 }

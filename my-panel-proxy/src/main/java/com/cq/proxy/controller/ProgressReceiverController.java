@@ -1,5 +1,6 @@
 package com.cq.proxy.controller;
 
+import com.cq.proxy.controller.dto.*;
 import com.cq.proxy.repository.entity.BatchTransferSubtask;
 import com.cq.proxy.service.batch.ProgressService;
 import org.slf4j.Logger;
@@ -7,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.Date;
 
 /**
  * 进度接收控制器
@@ -30,225 +31,245 @@ public class ProgressReceiverController {
      * 创建子任务（Agent开始传输前调用）
      */
     @PostMapping("/create")
-    public ResponseEntity<Map<String, Object>> createSubTask(@RequestBody Map<String, Object> subtaskData) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<SubTaskCreateResponse>> createSubTask(@RequestBody SubTaskDTO dto) {
         try {
-            BatchTransferSubtask subtask = convertToSubtask(subtaskData);
+            BatchTransferSubtask subtask = convertToSubtask(dto);
             Long subtaskId = progressService.createSubTask(subtask);
 
-            result.put("code", 200);
-            result.put("msg", "success");
-            result.put("data", Map.of("subtaskId", subtaskId));
-            log.info("✅ 子任务创建: taskId={}, file={}", subtask.getTaskId(), subtask.getFileName());
+            log.info("✅ 子任务创建: taskId={}, file={}", dto.getTaskId(), dto.getFileName());
+            return ResponseEntity.ok(ApiResponse.success(new SubTaskCreateResponse(subtaskId)));
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 子任务创建失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
     /**
      * 接收单个子任务进度更新
      */
     @PostMapping("/progress")
-    public ResponseEntity<Map<String, Object>> receiveProgress(@RequestBody Map<String, Object> progressData) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<Void>> receiveProgress(@RequestBody SubTaskDTO dto) {
         try {
-            Long subtaskId = ((Number) progressData.get("subtaskId")).longValue();
-            int transferredBytes = ((Number) progressData.get("transferredBytes")).intValue();
-            int totalBytes = ((Number) progressData.get("totalBytes")).intValue();
-
-            Long timestamp = progressData.containsKey("timestamp") ?
-                ((Number) progressData.get("timestamp")).longValue() : System.currentTimeMillis();
-
-            if (progressService.isStaleData(subtaskId, timestamp)) {
-                result.put("code", 200);
-                result.put("msg", "stale data ignored");
-                return ResponseEntity.ok(result);
+            if (dto.getSubtaskId() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: subtaskId"));
             }
 
-            Integer transferredChunks = progressData.containsKey("transferredChunks") ?
-                ((Number) progressData.get("transferredChunks")).intValue() : null;
-            Integer totalChunks = progressData.containsKey("totalChunks") ?
-                ((Number) progressData.get("totalChunks")).intValue() : null;
-            Long speedBytesPerSec = progressData.containsKey("speedBytesPerSec") ?
-                ((Number) progressData.get("speedBytesPerSec")).longValue() : null;
+            if (dto.getTransferredBytes() == null || dto.getTotalBytes() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: transferredBytes, totalBytes"));
+            }
 
-            progressService.updateProgressExt(subtaskId, transferredChunks, totalChunks,
-                (long) transferredBytes, speedBytesPerSec);
+            Long timestamp = dto.getTimestamp() != null ? dto.getTimestamp() : System.currentTimeMillis();
 
-            result.put("code", 200);
-            result.put("msg", "success");
+            if (progressService.isStaleData(dto.getSubtaskId(), timestamp)) {
+                return ResponseEntity.ok(ApiResponse.success("stale data ignored", null));
+            }
+
+            progressService.updateProgressExt(
+                    dto.getSubtaskId(),
+                    dto.getTransferredChunks(),
+                    dto.getTotalChunks(),
+                    dto.getTransferredBytes(),
+                    dto.getSpeedBytesPerSec());
+
             log.debug("✅ 子任务进度更新: subtaskId={}, {}/{} bytes",
-                subtaskId, transferredBytes, totalBytes);
+                    dto.getSubtaskId(), dto.getTransferredBytes(), dto.getTotalBytes());
+            return ResponseEntity.ok(ApiResponse.success());
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 进度更新失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
     /**
      * 接收完整子任务状态更新（包含所有字段）
      */
     @PostMapping("/status")
-    public ResponseEntity<Map<String, Object>> receiveStatus(@RequestBody Map<String, Object> statusData) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<Void>> receiveStatus(@RequestBody SubTaskDTO dto) {
         try {
-            BatchTransferSubtask subtask = convertToSubtask(statusData);
+            if (dto.getSubtaskId() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: subtaskId"));
+            }
+
+            if (dto.getStatus() == null || dto.getStatus().isBlank()) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: status"));
+            }
+
+            BatchTransferSubtask subtask = convertToSubtask(dto);
             progressService.updateSubTaskStatus(subtask);
 
-            result.put("code", 200);
-            result.put("msg", "success");
-            log.info("✅ 子任务状态更新: subtaskId={}, status={}", subtask.getId(), subtask.getStatus());
+            log.info("✅ 子任务状态更新: subtaskId={}, status={}", dto.getSubtaskId(), dto.getStatus());
+            return ResponseEntity.ok(ApiResponse.success());
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 状态更新失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
     /**
      * 批量接收多个子任务进度
      */
     @PostMapping("/progress/batch")
-    public ResponseEntity<Map<String, Object>> receiveBatchProgress(
-            @RequestBody List<Map<String, Object>> batchData) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<BatchUpdateResponse>> receiveBatchProgress(@RequestBody SubTaskDTO[] batchData) {
         try {
+            if (batchData == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("请求体不能为null"));
+            }
+
             progressService.batchUpdateProgress(batchData);
 
-            result.put("code", 200);
-            result.put("data", Map.of("updatedCount", batchData.size()));
-            log.info("✅ 批量进度更新: count={}", batchData.size());
+            log.info("✅ 批量进度更新: count={}", batchData.length);
+            return ResponseEntity.ok(ApiResponse.success(new BatchUpdateResponse(batchData.length)));
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 批量进度更新失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
     /**
      * 接收子任务完成通知
      */
     @PostMapping("/complete")
-    public ResponseEntity<Map<String, Object>> receiveComplete(@RequestBody Map<String, Object> data) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<SubTaskStatusResponse>> receiveComplete(@RequestBody SubTaskDTO dto) {
         try {
-            Long subtaskId = ((Number) data.get("subtaskId")).longValue();
-            String targetPath = (String) data.get("targetPath");
+            if (dto.getSubtaskId() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: subtaskId"));
+            }
 
-            progressService.markCompleted(subtaskId, targetPath);
+            progressService.markCompleted(dto.getSubtaskId(), dto.getTargetPath());
 
-            result.put("code", 200);
-            result.put("data", Map.of("status", "COMPLETED"));
-            log.info("✅ 子任务完成: subtaskId={}, path={}", subtaskId, targetPath);
+            log.info("✅ 子任务完成: subtaskId={}, path={}", dto.getSubtaskId(), dto.getTargetPath());
+            return ResponseEntity.ok(ApiResponse.success(new SubTaskStatusResponse("COMPLETED")));
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 完成通知处理失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
     /**
      * 接收子任务失败通知
      */
     @PostMapping("/failed")
-    public ResponseEntity<Map<String, Object>> receiveFailed(@RequestBody Map<String, Object> errorData) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<SubTaskStatusResponse>> receiveFailed(@RequestBody SubTaskDTO dto) {
         try {
-            Long subtaskId = ((Number) errorData.get("subtaskId")).longValue();
-            String errorCode = (String) errorData.get("errorCode");
-            String errorMessage = (String) errorData.get("errorMessage");
-            String errorStackTrace = (String) errorData.get("errorStackTrace");
+            if (dto.getSubtaskId() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: subtaskId"));
+            }
 
-            progressService.markFailed(subtaskId, errorCode, errorMessage, errorStackTrace);
+            progressService.markFailed(
+                    dto.getSubtaskId(),
+                    dto.getErrorCode(),
+                    dto.getErrorMessage(),
+                    dto.getErrorStackTrace());
 
-            result.put("code", 200);
-            result.put("data", Map.of("status", "FAILED"));
             log.warn("⚠️  子任务失败: subtaskId={}, error=[{}]: {}",
-                subtaskId, errorCode, errorMessage);
+                    dto.getSubtaskId(), dto.getErrorCode(), dto.getErrorMessage());
+            return ResponseEntity.ok(ApiResponse.success(new SubTaskStatusResponse("FAILED")));
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 失败通知处理失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
     /**
      * 接收重试中状态通知
      */
     @PostMapping("/retrying")
-    public ResponseEntity<Map<String, Object>> receiveRetrying(@RequestBody Map<String, Object> retryData) {
-        Map<String, Object> result = new HashMap<>();
-
+    public ResponseEntity<ApiResponse<RetryResponse>> receiveRetrying(@RequestBody SubTaskDTO dto) {
         try {
-            Long subtaskId = ((Number) retryData.get("subtaskId")).longValue();
+            if (dto.getSubtaskId() == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.badRequest("缺少必填字段: subtaskId"));
+            }
 
-            long nextRetryAt = progressService.scheduleNextRetry(subtaskId);
+            long nextRetryAt = progressService.scheduleNextRetry(dto.getSubtaskId());
 
-            result.put("code", 200);
-            result.put("data", Map.of(
-                "status", "RETRYING",
-                "nextRetryAt", nextRetryAt
-            ));
-            log.info("🔄 子任务重试中: subtaskId={}, nextRetryAt={}", subtaskId, nextRetryAt);
+            log.info("🔄 子任务重试中: subtaskId={}, nextRetryAt={}", dto.getSubtaskId(), nextRetryAt);
+            return ResponseEntity.ok(ApiResponse.success(new RetryResponse("RETRYING", nextRetryAt)));
 
         } catch (Exception e) {
-            result.put("code", 500);
-            result.put("msg", e.getMessage());
             log.error("❌ 重试通知处理失败: {}", e.getMessage());
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }
-
-        return ResponseEntity.ok(result);
     }
 
-    private BatchTransferSubtask convertToSubtask(Map<String, Object> data) {
+    /**
+     * 将DTO转换为实体类
+     */
+    private BatchTransferSubtask convertToSubtask(SubTaskDTO dto) {
         BatchTransferSubtask subtask = new BatchTransferSubtask();
 
-        if (data.containsKey("id")) subtask.setId(((Number) data.get("id")).longValue());
-        if (data.containsKey("taskId")) subtask.setTaskId(((Number) data.get("taskId")).longValue());
-        if (data.containsKey("sourceAgentId")) subtask.setSourceAgentId((String) data.get("sourceAgentId"));
-        if (data.containsKey("sourceAgentName")) subtask.setSourceAgentName((String) data.get("sourceAgentName"));
-        if (data.containsKey("targetAgentId")) subtask.setTargetAgentId((String) data.get("targetAgentId"));
-        if (data.containsKey("targetAgentName")) subtask.setTargetAgentName((String) data.get("targetAgentName"));
-        if (data.containsKey("sourcePath")) subtask.setSourcePath((String) data.get("sourcePath"));
-        if (data.containsKey("targetPath")) subtask.setTargetPath((String) data.get("targetPath"));
-        if (data.containsKey("fileName")) subtask.setFileName((String) data.get("fileName"));
-        if (data.containsKey("fileSizeBytes")) subtask.setFileSizeBytes(((Number) data.get("fileSizeBytes")).longValue());
-        if (data.containsKey("status")) subtask.setStatus((String) data.get("status"));
-        if (data.containsKey("transferId")) subtask.setTransferId((String) data.get("transferId"));
-        if (data.containsKey("transferredChunks")) subtask.setTransferredChunks(((Number) data.get("transferredChunks")).intValue());
-        if (data.containsKey("totalChunks")) subtask.setTotalChunks(((Number) data.get("totalChunks")).intValue());
-        if (data.containsKey("transferredBytes")) subtask.setTransferredBytes(((Number) data.get("transferredBytes")).longValue());
-        if (data.containsKey("speedBytesPerSec")) subtask.setSpeedBytesPerSec(((Number) data.get("speedBytesPerSec")).longValue());
-        if (data.containsKey("errorCode")) subtask.setErrorCode((String) data.get("errorCode"));
-        if (data.containsKey("errorMessage")) subtask.setErrorMessage((String) data.get("errorMessage"));
-        if (data.containsKey("errorStackTrace")) subtask.setErrorStackTrace((String) data.get("errorStackTrace"));
+        // 基础ID字段
+        if (dto.getId() != null)
+            subtask.setId(dto.getId());
+        if (dto.getTaskId() != null)
+            subtask.setTaskId(dto.getTaskId());
+
+        // Agent信息
+        if (dto.getSourceAgentId() != null)
+            subtask.setSourceAgentId(dto.getSourceAgentId());
+        if (dto.getSourceAgentName() != null)
+            subtask.setSourceAgentName(dto.getSourceAgentName());
+        if (dto.getTargetAgentId() != null)
+            subtask.setTargetAgentId(dto.getTargetAgentId());
+        if (dto.getTargetAgentName() != null)
+            subtask.setTargetAgentName(dto.getTargetAgentName());
+
+        // 文件信息
+        if (dto.getSourcePath() != null)
+            subtask.setSourcePath(dto.getSourcePath());
+        if (dto.getTargetPath() != null)
+            subtask.setTargetPath(dto.getTargetPath());
+        if (dto.getFileName() != null)
+            subtask.setFileName(dto.getFileName());
+        if (dto.getFileSizeBytes() != null)
+            subtask.setFileSizeBytes(dto.getFileSizeBytes());
+        if (dto.getFileLastModified() != null)
+            subtask.setFileLastModified(new Date(dto.getFileLastModified()));
+
+        // 状态信息
+        if (dto.getStatus() != null && !dto.getStatus().isBlank())
+            subtask.setStatus(dto.getStatus());
+        if (dto.getTransferId() != null)
+            subtask.setTransferId(dto.getTransferId());
+
+        // 进度信息
+        if (dto.getTransferredChunks() != null)
+            subtask.setTransferredChunks(dto.getTransferredChunks());
+        if (dto.getTotalChunks() != null)
+            subtask.setTotalChunks(dto.getTotalChunks());
+        if (dto.getTransferredBytes() != null)
+            subtask.setTransferredBytes(dto.getTransferredBytes());
+        if (dto.getSpeedBytesPerSec() != null)
+            subtask.setSpeedBytesPerSec(dto.getSpeedBytesPerSec());
+
+        // 时间信息（时间戳转Date）
+        if (dto.getStartedAt() != null)
+            subtask.setStartedAt(new Date(dto.getStartedAt()));
+        if (dto.getCompletedAt() != null)
+            subtask.setCompletedAt(new Date(dto.getCompletedAt()));
+        if (dto.getDurationMs() != null)
+            subtask.setDurationMs(dto.getDurationMs());
+
+        // 错误信息
+        if (dto.getErrorCode() != null)
+            subtask.setErrorCode(dto.getErrorCode());
+        if (dto.getErrorMessage() != null)
+            subtask.setErrorMessage(dto.getErrorMessage());
+        if (dto.getErrorStackTrace() != null)
+            subtask.setErrorStackTrace(dto.getErrorStackTrace());
+
+        // 重试信息
+        if (dto.getRetryCount() != null)
+            subtask.setRetryCount(dto.getRetryCount());
+        if (dto.getLastRetryAt() != null)
+            subtask.setLastRetryAt(new Date(dto.getLastRetryAt()));
+        if (dto.getNextRetryAfter() != null)
+            subtask.setNextRetryAfter(new Date(dto.getNextRetryAfter()));
 
         return subtask;
     }

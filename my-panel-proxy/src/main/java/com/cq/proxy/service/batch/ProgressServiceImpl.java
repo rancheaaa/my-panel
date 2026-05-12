@@ -1,5 +1,6 @@
 package com.cq.proxy.service.batch;
 
+import com.cq.proxy.controller.dto.SubTaskDTO;
 import com.cq.proxy.repository.entity.BatchTransferSubtask;
 import com.cq.proxy.repository.mapper.BatchTransferSubtaskMapper;
 import org.slf4j.Logger;
@@ -95,36 +96,24 @@ public class ProgressServiceImpl implements ProgressService {
     }
 
     @Override
-    public void batchUpdateProgress(List<?> progressList) {
-        if (progressList == null || progressList.isEmpty())
+    public void batchUpdateProgress(SubTaskDTO[] dtoArray) {
+        if (dtoArray == null || dtoArray.length == 0)
             return;
 
-        log.info("📦 批量进度更新: {} 条记录", progressList.size());
+        log.info("📦 批量进度更新: {} 条记录", dtoArray.length);
 
         try {
-            for (Object item : progressList) {
-                if (item instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> progress = (Map<String, Object>) item;
-
-                    Long subtaskId = ((Number) progress.get("subtaskId")).longValue();
-                    Integer transferredChunks = progress.containsKey("transferredChunks")
-                            ? ((Number) progress.get("transferredChunks")).intValue()
-                            : null;
-                    Long transferredBytes = progress.containsKey("transferredBytes")
-                            ? ((Number) progress.get("transferredBytes")).longValue()
-                            : null;
-                    Long speedBytesPerSec = progress.containsKey("speedBytesPerSec")
-                            ? ((Number) progress.get("speedBytesPerSec")).longValue()
-                            : null;
-
-                    if (transferredBytes != null) {
-                        updateProgressExt(subtaskId, transferredChunks, null,
-                                transferredBytes, speedBytesPerSec);
-                    }
+            for (SubTaskDTO dto : dtoArray) {
+                if (dto.getSubtaskId() != null && dto.getTransferredBytes() != null) {
+                    updateProgressExt(
+                            dto.getSubtaskId(),
+                            dto.getTransferredChunks(),
+                            dto.getTotalChunks(),
+                            dto.getTransferredBytes(),
+                            dto.getSpeedBytesPerSec());
                 }
             }
-            log.info("✅ 批量进度已更新到DB: count={}", progressList.size());
+            log.info("✅ 批量进度已更新到DB: count={}", dtoArray.length);
         } catch (Exception e) {
             log.error("❌ 批量进度更新DB失败: error={}", e.getMessage());
             throw new RuntimeException("批量进度更新失败", e);

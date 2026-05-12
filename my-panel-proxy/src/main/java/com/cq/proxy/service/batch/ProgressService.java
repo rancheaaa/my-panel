@@ -1,5 +1,6 @@
 package com.cq.proxy.service.batch;
 
+import com.cq.proxy.controller.dto.SubTaskDTO;
 import com.cq.proxy.repository.entity.BatchTransferSubtask;
 import java.util.List;
 
@@ -23,7 +24,7 @@ public interface ProgressService {
      * 扩展版进度更新（包含chunks和speed信息）
      */
     void updateProgressExt(Long subtaskId, Integer transferredChunks, Integer totalChunks,
-                           Long transferredBytes, Long speedBytesPerSec);
+            Long transferredBytes, Long speedBytesPerSec);
 
     /**
      * 检查数据是否过期（基于时间戳）
@@ -31,9 +32,9 @@ public interface ProgressService {
     boolean isStaleData(Long subtaskId, Long timestamp);
 
     /**
-     * 批量更新进度
+     * 批量更新进度（使用DTO数组）
      */
-    void batchUpdateProgress(List<?> progressList);
+    void batchUpdateProgress(SubTaskDTO[] dtoArray);
 
     /**
      * 更新完整子任务状态

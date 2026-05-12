@@ -1,5 +1,6 @@
 package com.cq.proxy.service.batch;
 
+import com.cq.proxy.controller.dto.SubTaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +21,7 @@ public class ProgressBatchWriter {
     public static final long FLUSH_INTERVAL_MS = 1000;
 
     private final ProgressService progressService;
-    private final List<Map<String, Object>> buffer = new ArrayList<>();
+    private final List<SubTaskDTO> buffer = new ArrayList<>();
     private final ReentrantLock lock = new ReentrantLock();
     private final AtomicInteger pendingCount = new AtomicInteger(0);
 
@@ -35,10 +36,10 @@ public class ProgressBatchWriter {
      * 添加进度数据到缓冲区
      * 达到阈值自动触发flush
      */
-    public void add(Map<String, Object> progressData) {
+    public void add(SubTaskDTO dto) {
         lock.lock();
         try {
-            buffer.add(progressData);
+            buffer.add(dto);
             int count = pendingCount.incrementAndGet();
             
             if (count >= BATCH_SIZE) {
@@ -94,14 +95,14 @@ public class ProgressBatchWriter {
             return 0;
         }
 
-        List<Map<String, Object>> toFlush = new ArrayList<>(buffer);
+        SubTaskDTO[] toFlush = buffer.toArray(new SubTaskDTO[0]);
         buffer.clear();
         pendingCount.set(0);
 
         try {
             progressService.batchUpdateProgress(toFlush);
-            log.debug("✅ 批量flush: {} 条", toFlush.size());
-            return toFlush.size();
+            log.debug("✅ 批量flush: {} 条", toFlush.length);
+            return toFlush.length;
         } catch (Exception e) {
             log.error("❌ 批量flush失败: {}", e.getMessage());
             throw new RuntimeException("Batch flush failed", e);

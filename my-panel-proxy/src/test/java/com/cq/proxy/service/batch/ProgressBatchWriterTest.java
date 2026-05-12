@@ -1,5 +1,6 @@
 package com.cq.proxy.service.batch;
 
+import com.cq.proxy.controller.dto.SubTaskDTO;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
 
@@ -41,8 +42,8 @@ class ProgressBatchWriterTest {
     @Test
     @DisplayName("1. add() + flush() - 批量写入成功")
     void testAddAndFlush_success() {
-        Map<String, Object> item1 = createProgressItem(1L, 50, 100);
-        Map<String, Object> item2 = createProgressItem(2L, 80, 100);
+        SubTaskDTO item1 = createSubTaskDTO(1L, 50, 100);
+        SubTaskDTO item2 = createSubTaskDTO(2L, 80, 100);
 
         batchWriter.add(item1);
         batchWriter.add(item2);
@@ -51,8 +52,8 @@ class ProgressBatchWriterTest {
 
         int flushed = batchWriter.flush();
 
-        verify(progressService).batchUpdateProgress(argThat(list -> 
-            ((List<?>) list).size() == 2));
+        verify(progressService).batchUpdateProgress(argThat(array -> 
+            array.length == 2));
         assertEquals(0, batchWriter.getPendingCount());
         System.out.println("✅ 批量写入成功: flushed=" + flushed);
     }
@@ -63,10 +64,10 @@ class ProgressBatchWriterTest {
     @DisplayName("2. 达到阈值自动flush")
     void testAutoFlush_onThresholdReached() {
         for (int i = 0; i < ProgressBatchWriter.BATCH_SIZE; i++) {
-            batchWriter.add(createProgressItem((long) i, i * 10, 100));
+            batchWriter.add(createSubTaskDTO((long) i, i * 10, 100));
         }
 
-        verify(progressService, times(1)).batchUpdateProgress(anyList());
+        verify(progressService, times(1)).batchUpdateProgress(any(SubTaskDTO[].class));
         assertEquals(0, batchWriter.getPendingCount());
         System.out.println("✅ 阈值=" + ProgressBatchWriter.BATCH_SIZE + " 时自动flush");
     }
@@ -76,11 +77,11 @@ class ProgressBatchWriterTest {
     @Test
     @DisplayName("3. 定时器到期自动flush")
     void testScheduledFlush_afterInterval() throws InterruptedException {
-        batchWriter.add(createProgressItem(1L, 30, 100));
+        batchWriter.add(createSubTaskDTO(1L, 30, 100));
 
         Thread.sleep(1500); // 等待定时器触发 (>FLUSH_INTERVAL_MS=1000)
 
-        verify(progressService, atLeastOnce()).batchUpdateProgress(anyList());
+        verify(progressService, atLeastOnce()).batchUpdateProgress(any(SubTaskDTO[].class));
         System.out.println("✅ 定时器flush成功");
     }
 
@@ -95,7 +96,7 @@ class ProgressBatchWriterTest {
             final int index = i;
             executorService.submit(() -> {
                 try {
-                    batchWriter.add(createProgressItem((long) index, index * 5, 100));
+                    batchWriter.add(createSubTaskDTO((long) index, index * 5, 100));
                 } finally {
                     latch.countDown();
                 }
@@ -114,13 +115,13 @@ class ProgressBatchWriterTest {
     @Test
     @DisplayName("5. shutdown()时flush剩余数据")
     void testShutdown_flushesRemaining() {
-        batchWriter.add(createProgressItem(99L, 99, 100));
-        batchWriter.add(createProgressItem(100L, 100, 100));
+        batchWriter.add(createSubTaskDTO(99L, 99, 100));
+        batchWriter.add(createSubTaskDTO(100L, 100, 100));
 
         batchWriter.shutdown();
 
-        verify(progressService).batchUpdateProgress(argThat(list -> 
-            ((List<?>) list).size() == 2));
+        verify(progressService).batchUpdateProgress(argThat(array -> 
+            array.length == 2));
         System.out.println("✅ shutdown时flush剩余数据");
     }
 
@@ -137,21 +138,21 @@ class ProgressBatchWriterTest {
     @Test
     @DisplayName("7. 单个item未达到阈值不flush")
     void testSingleItem_noAutoFlush() {
-        batchWriter.add(createProgressItem(1L, 10, 100));
+        batchWriter.add(createSubTaskDTO(1L, 10, 100));
         
-        verify(progressService, never()).batchUpdateProgress(anyList());
+        verify(progressService, never()).batchUpdateProgress(any(SubTaskDTO[].class));
         assertEquals(1, batchWriter.getPendingCount());
         System.out.println("✅ 单个item不触发auto-flush");
     }
 
     // ==================== 辅助方法 ====================
 
-    private Map<String, Object> createProgressItem(Long subtaskId, int transferredBytes, int totalBytes) {
-        Map<String, Object> item = new HashMap<>();
-        item.put("subtaskId", subtaskId);
-        item.put("transferredBytes", transferredBytes);
-        item.put("totalBytes", totalBytes);
-        item.put("timestamp", System.currentTimeMillis());
-        return item;
+    private SubTaskDTO createSubTaskDTO(Long subtaskId, int transferredBytes, int totalBytes) {
+        SubTaskDTO dto = new SubTaskDTO();
+        dto.setSubtaskId(subtaskId);
+        dto.setTransferredBytes((long) transferredBytes);
+        dto.setTotalBytes(totalBytes);
+        dto.setTimestamp(System.currentTimeMillis());
+        return dto;
     }
 }

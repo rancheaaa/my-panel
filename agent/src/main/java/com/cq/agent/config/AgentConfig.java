@@ -75,6 +75,9 @@ public class AgentConfig {
     private int downloadConnectTimeoutSeconds;
     private int downloadRequestTimeoutSeconds;
 
+    // Transfer metadata directory (for resumable uploads/downloads)
+    private String transfersMetaDir;
+
     // Registry configuration
     private List<String> registryServerUrls;
     private String nodeName;
@@ -205,6 +208,9 @@ public class AgentConfig {
         this.downloadRetryDelayMs = getLongProperty("download.retry.delay.ms", 2000);
         this.downloadConnectTimeoutSeconds = getIntProperty("download.connect.timeout.seconds", 10);
         this.downloadRequestTimeoutSeconds = getIntProperty("download.request.timeout.seconds", 60);
+
+        // Transfer metadata directory
+        this.transfersMetaDir = getStringProperty("transfer.meta.dir", "./data/transfers");
 
         // Validate configuration
         validateConfiguration();

@@ -35,7 +35,7 @@ class AgentUploaderTest {
         Files.createDirectories(metaDir);
 
         config = new AgentConfig();
-        uploader = new TestableAgentUploader(config, metaDir.toString());
+        uploader = new TestableAgentUploader(config);
         uploader.init();
     }
 
@@ -68,13 +68,12 @@ class AgentUploaderTest {
     }
 
     @Test
-    @DisplayName("构造函数不应该接受 RocksDB 路径参数")
-    void shouldNotAcceptRocksDbPaths() {
-        // 验证构造函数签名已变更：不再需要 queueDbPath 和 mapDbPath
-        // 新构造函数只接收 metaDirPath
+    @DisplayName("构造函数应该只接受 AgentConfig 参数")
+    void shouldOnlyAcceptAgentConfig() {
+        // 验证构造函数签名已变更：只接受 AgentConfig 参数，metaDirPath 从配置中获取
         assertDoesNotThrow(() -> {
-            new TestableAgentUploader(config, metaDir.toString());
-        }, "新构造函数应该只接受 metaDirPath 参数");
+            new TestableAgentUploader(config);
+        }, "新构造函数应该只接受 AgentConfig 参数");
     }
 
     @Test
@@ -144,8 +143,8 @@ class AgentUploaderTest {
      */
     private static class TestableAgentUploader extends AgentUploader {
 
-        public TestableAgentUploader(AgentConfig agentConfig, String metaDirPath) {
-            super(agentConfig, metaDirPath);
+        public TestableAgentUploader(AgentConfig agentConfig) {
+            super(agentConfig);
         }
     }
 }

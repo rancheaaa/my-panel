@@ -34,12 +34,12 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
     private final AgentConfig agentConfig;
 
-    public AgentUploader(AgentConfig agentConfig, String metaDirPath) {
+    public AgentUploader(AgentConfig agentConfig) {
         super(agentConfig, agentConfig.getUploadConcurrentUploads(),
                 agentConfig.getUploadMaxQueueDepth(), agentConfig.getUploadWorkerCount(),
                 agentConfig.getUploadMaxRetries(), agentConfig.getUploadRetryDelayMs(),
                 agentConfig.getUploadConnectTimeoutSeconds(), agentConfig.getUploadRequestTimeoutSeconds(),
-                metaDirPath,
+                agentConfig.getTransfersMetaDir(),
                 agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload");
         this.agentConfig = agentConfig;
     }
@@ -142,6 +142,25 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             inflightTasks.remove(task.getTransferId());
         } finally {
             listenerCache.remove(taskKey);
+        }
+    }
+
+    public void updateTaskStatus(UploadTask task, UploadTaskStatus status) {
+        try {
+            task.setStatus(status);
+            task.updateTimestamp();
+        } catch (Exception e) {
+            logger.error("更新任务状态失败: {}", e.getMessage());
+        }
+
+        inflightTasks.put(getTaskKey(task), task);
+
+        if (metaStore != null) {
+            try {
+                metaStore.saveTask(task);
+            } catch (IOException e) {
+                logger.warn("保存任务元数据失败: {}", e.getMessage());
+            }
         }
     }
 

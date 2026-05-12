@@ -2,6 +2,8 @@ package com.cq.agent.client.download;
 
 import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.client.RemoteAgentInfo;
+import com.cq.agent.client.upload.UploadTask;
+import com.cq.agent.client.upload.UploadTaskStatus;
 import com.cq.agent.client.upload.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
@@ -29,12 +31,12 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
     private static final Logger logger = LoggerFactory.getLogger(AgentDownloader.class);
 
-    public AgentDownloader(AgentConfig agentConfig, String metaDirPath) {
+    public AgentDownloader(AgentConfig agentConfig) {
         super(agentConfig, agentConfig.getDownloadConcurrentDownloads(),
                 agentConfig.getDownloadMaxQueueDepth(), agentConfig.getDownloadWorkerCount(),
                 agentConfig.getDownloadMaxRetries(), agentConfig.getDownloadRetryDelayMs(),
                 agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
-                metaDirPath, agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
+                agentConfig.getTransfersMetaDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
     }
 
     @Override
@@ -121,6 +123,25 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             inflightTasks.remove(task.getTransferId());
         } finally {
             listenerCache.remove(taskKey);
+        }
+    }
+
+    public void updateTaskStatus(DownloadTask task, DownloadTaskStatus status) {
+        try {
+            task.setStatus(status);
+            task.updateTimestamp();
+        } catch (Exception e) {
+            logger.error("更新任务状态失败: {}", e.getMessage());
+        }
+
+        inflightTasks.put(getTaskKey(task), task);
+
+        if (metaStore != null) {
+            try {
+                metaStore.saveTask(task);
+            } catch (IOException e) {
+                logger.warn("保存任务元数据失败: {}", e.getMessage());
+            }
         }
     }
 

@@ -2,6 +2,7 @@ package com.cq.agent.client.upload;
 
 import com.cq.agent.client.BaseIntegrationTest;
 import com.cq.agent.client.RemoteAgentInfo;
+import com.cq.agent.client.Util;
 import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.*;
 import com.google.gson.JsonObject;
@@ -56,7 +57,7 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
 
             @Override
             public void onError(String errorMessage) {
-                logger.error("Upload failed: {}", errorMessage);
+                logger.error("Listener found Upload failed: {}", errorMessage);
                 latch.countDown();
             }
         };

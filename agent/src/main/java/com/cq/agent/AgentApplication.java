@@ -5,13 +5,20 @@ import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
+import com.cq.agent.batch.scheduler.FailedQueueScannerJob;
 import com.cq.agent.batch.transfer.RetryManager;
+import com.cq.agent.client.upload.AgentUploader;
+import com.cq.agent.client.download.AgentDownloader;
+import com.cq.agent.client.TransferMetaStore;
+import com.cq.agent.client.upload.UploadTask;
+import com.cq.agent.client.download.DownloadTask;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
+import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
@@ -67,14 +74,47 @@ public class AgentApplication {
         // Initialize retry manager for batch transfers (10 retries, 30min initial, 2h max delay)
         RetryManager retryManager = new RetryManager(10, 30, 2);
 
+        // Initialize upload/download agents for failed task retry mechanism
+        AgentUploader agentUploader = new AgentUploader(config);
+        agentUploader.init();
+        
+        AgentDownloader agentDownloader = new AgentDownloader(config);
+        agentDownloader.init();
+
+        // Initialize RetryManager with full dependencies (for failed queue scanning)
+        try {
+            TransferMetaStore<UploadTask> uploadMetaStore = new TransferMetaStore<>(
+                Path.of(config.getUploadSendingQueueDir()), UploadTask.class);
+            TransferMetaStore<DownloadTask> downloadMetaStore = new TransferMetaStore<>(
+                Path.of(config.getDownloadSendingQueueDir()), DownloadTask.class);
+            
+            Path uploadFailQueueDir = Path.of(config.getUploadFailRetryQueueDir());
+            Path downloadFailQueueDir = Path.of(config.getDownloadFailRetryQueueDir());
+            
+            retryManager.init(
+                uploadMetaStore,
+                downloadMetaStore,
+                uploadFailQueueDir,
+                downloadFailQueueDir,
+                agentUploader,
+                agentDownloader
+            );
+            
+            logger.info("✅ RetryManager 初始化完成，失败队列扫描间隔: {}ms", config.getFailedQueueScanIntervalMs());
+        } catch (Exception e) {
+            logger.warn("⚠️ RetryManager 初始化失败，将使用无持久化模式: {}", e.getMessage());
+        }
+
         // Connect components to task scheduler manager
         taskSchedulerManager.setRetryManager(retryManager);
+        taskSchedulerManager.setAgentUploader(agentUploader);
 
         // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
         configChangeListener.onCronChange(taskId -> {
             BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
             if (taskConfig != null) {
                 taskSchedulerManager.updateTask(taskConfig);
+                retryManager.registerTaskConfig(taskId, taskConfig);  // Register for retry mechanism
             }
         });
         configChangeListener.onAnyChange(ctx -> {
@@ -82,17 +122,44 @@ public class AgentApplication {
                 BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                 if (taskConfig != null && "RUNNING".equals(taskConfig.getStatus())) {
                     taskSchedulerManager.startTask(taskConfig);
+                    retryManager.registerTaskConfig(ctx.taskId, taskConfig);  // Register for retry mechanism
                 }
             } else if ("CONFIG_UPDATED".equals(ctx.field)) {
                 BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                 if (taskConfig != null) {
                     taskSchedulerManager.updateTask(taskConfig);
+                    retryManager.registerTaskConfig(ctx.taskId, taskConfig);  // Update retry config
                 }
             }
         });
 
         // Start all RUNNING tasks from local config
         taskSchedulerManager.startAllRunningTasks();
+
+        // Register FailedQueueScannerJob for automatic retry of failed tasks
+        try {
+            JobDetail failedQueueScannerJob = JobBuilder.newJob(FailedQueueScannerJob.class)
+                    .withIdentity("failedQueueScanner", "retry-group")
+                    .build();
+
+            // 将 RetryManager 放入 JobDataMap
+            failedQueueScannerJob.getJobDataMap().put("retryManager", retryManager);
+
+            Trigger failedQueueScannerTrigger = TriggerBuilder.newTrigger()
+                    .withIdentity("failedQueueScannerTrigger", "retry-group")
+                    .withSchedule(SimpleScheduleBuilder.simpleSchedule()
+                            .withIntervalInMilliseconds(config.getFailedQueueScanIntervalMs())
+                            .repeatForever())
+                    .build();
+
+            taskSchedulerManager.scheduleFailedQueueScannerJob(failedQueueScannerJob, failedQueueScannerTrigger);
+
+            logger.info("✅ FailedQueueScannerJob 已注册，扫描间隔: {}ms ({}分钟)",
+                config.getFailedQueueScanIntervalMs(),
+                config.getFailedQueueScanIntervalMs() / 60000);
+        } catch (Exception e) {
+            logger.warn("⚠️ 注册 FailedQueueScannerJob 失败: {}", e.getMessage());
+        }
 
         HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService, configFileManager, configChangeListener, taskSchedulerManager);
         

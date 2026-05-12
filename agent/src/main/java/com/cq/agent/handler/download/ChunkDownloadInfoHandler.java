@@ -1,6 +1,6 @@
 package com.cq.agent.handler.download;
 
-import com.cq.agent.client.upload.Util;
+import com.cq.agent.client.Util;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ChunkDownloadInfoRequest;
 import com.cq.agent.dto.ChunkDownloadInfoResponse;

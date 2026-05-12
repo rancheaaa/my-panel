@@ -196,6 +196,14 @@ public class BatchTaskSchedulerManager {
         return quartzTaskScheduler.isTaskRunning(taskId);
     }
 
+    /**
+     * 调度失败队列扫描 Job（供 AgentApplication 启动时调用）
+     */
+    public void scheduleFailedQueueScannerJob(JobDetail jobDetail, Trigger trigger) throws Exception {
+        Scheduler scheduler = quartzTaskScheduler.getScheduler();
+        scheduler.scheduleJob(jobDetail, trigger);
+    }
+
     // ==================== 任务结果管理 ====================
 
     /**
@@ -366,14 +374,18 @@ public class BatchTaskSchedulerManager {
             }
         }
 
-        // 如果有任何文件失败，抛出异常以触发重试机制
+        // 如果有任何文件失败，记录日志但不抛出异常
+        // 失败的文件已经通过 moveToFailedQueue() 自动移入失败队列
+        // RetryManager 会定期扫描并重试这些文件
         if (!failedFiles.isEmpty()) {
-            throw new RuntimeException(String.format(
-                "部分文件传输失败 (%d/%d): %s", 
-                failedFiles.size(), 
-                scannedFiles.size(),
-                String.join(", ", failedFiles)
-            ));
+            log.warn("⚠️ 部分文件传输失败 ({}/{}): {}",
+                failedFiles.size(), scannedFiles.size(),
+                String.join(", ", failedFiles));
+            log.info("ℹ️ 失败的文件将进入失败队列，等待 RetryManager 定时扫描和重试");
+
+            if (agentUploader != null) {
+                log.info("ℹ️ 上传失败队列路径: {}", agentUploader.getFailedQueueDir());
+            }
         }
     }
 

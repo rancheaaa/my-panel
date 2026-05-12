@@ -2,7 +2,6 @@ package com.cq.agent.batch.scheduler;
 
 import com.cq.agent.batch.config.BatchTransferTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.batch.transfer.BatchTransferManager;
 import com.cq.agent.batch.transfer.RetryManager;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
@@ -29,9 +28,6 @@ class BatchTaskSchedulerManagerIntegrationTest {
     @Mock
     private RetryManager retryManager;
 
-    @Mock
-    private BatchTransferManager transferManager;
-
     private BatchTaskSchedulerManager schedulerManager;
     private AutoCloseable mocks;
 
@@ -41,7 +37,6 @@ class BatchTaskSchedulerManagerIntegrationTest {
         // 使用反射注入mock对象
         schedulerManager = new BatchTaskSchedulerManager(configFileManager);
         schedulerManager.setRetryManager(retryManager);
-        schedulerManager.setTransferManager(transferManager);
     }
 
     @AfterEach
@@ -60,42 +55,6 @@ class BatchTaskSchedulerManagerIntegrationTest {
         assertNotNull(schedulerManager.getRetryManager(), "应设置RetryManager");
         assertSame(retryManager, schedulerManager.getRetryManager(), "应为同一个实例");
         System.out.println("✅ RetryManager已集成");
-    }
-
-    @Test
-    @DisplayName("2. [集成] BatchTaskSchedulerManager应有BatchTransferManager实例")
-    void testHasTransferManager() {
-        assertNotNull(schedulerManager.getTransferManager(), "应设置BatchTransferManager");
-        assertSame(transferManager, schedulerManager.getTransferManager(), "应为同一个实例");
-        System.out.println("✅ BatchTransferManager已集成");
-    }
-
-    @Test
-    @DisplayName("3. [集成] 启动任务时应在传输前获取许可")
-    void testStartTask_shouldAcquirePermit() throws InterruptedException {
-        when(configFileManager.loadAllTaskConfigs()).thenReturn(Collections.emptyList());
-        when(transferManager.tryAcquire(anyString())).thenReturn(true);
-
-        BatchTransferTaskConfig config = createRunningConfig(1L, "0 */5 * * * ?");
-        schedulerManager.startTask(config);
-        
-        // 等待Quartz异步执行
-        Thread.sleep(200);
-
-        verify(transferManager).tryAcquire(eq("1"));
-        System.out.println("✅ 启动任务时获取传输许可");
-    }
-
-    @Test
-    @DisplayName("4. [集成] 传输完成后应释放许可")
-    void testCompleteTask_shouldReleasePermit() {
-        when(transferManager.tryAcquire(anyString())).thenReturn(true);
-
-        // 直接调用completeTask（不通过startTask避免立即执行）
-        schedulerManager.completeTask(1L);
-
-        verify(transferManager).release(eq("1"));
-        System.out.println("✅ 任务完成时释放传输许可");
     }
 
     @Test

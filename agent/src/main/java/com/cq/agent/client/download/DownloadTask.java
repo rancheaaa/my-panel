@@ -1,13 +1,13 @@
 package com.cq.agent.client.download;
 
-import com.cq.agent.client.TransferTask;
-import com.cq.agent.client.upload.Util;
+import com.cq.agent.client.TaskInfo;
+import com.cq.agent.client.Util;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class DownloadTask implements TransferTask<DownloadTaskStatus> {
+public class DownloadTask implements TaskInfo {
 
     private String transferId;
     private String traceId;
@@ -21,6 +21,8 @@ public class DownloadTask implements TransferTask<DownloadTaskStatus> {
     private String createTime;
     private String updateTime;
     private String enqueuedTime;
+    private String scannedStartTime;
+    private String scannedEndTime;
     private String initDownloadStartTime;
     private String initDownloadEndTime;
     private String downloadChunksStartTime;
@@ -73,6 +75,8 @@ public class DownloadTask implements TransferTask<DownloadTaskStatus> {
                 ", createTime='" + createTime + '\'' +
                 ", updateTime='" + updateTime + '\'' +
                 ", enqueuedTime='" + enqueuedTime + '\'' +
+                ", scannedStartTime='" + scannedStartTime + '\'' +
+                ", scannedEndTime='" + scannedEndTime + '\'' +
                 ", initDownloadStartTime='" + initDownloadStartTime + '\'' +
                 ", initDownloadEndTime='" + initDownloadEndTime + '\'' +
                 ", downloadChunksStartTime='" + downloadChunksStartTime + '\'' +

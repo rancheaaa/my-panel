@@ -243,29 +243,36 @@ class P2PFileTransferTddTest {
     }
 
     @Test
-    @DisplayName("6. [spec.md 4.7] 上传失败时应触发重试机制")
+    @DisplayName("6. [spec.md 4.7] 上传失败时应进入失败队列而非整体重试")
     void testProcessScannedFiles_uploadFailureShouldTriggerRetry() {
         // Given: 模拟上传失败
         FileScanner.ScannedFile scannedFile = createScannedFile("fail.log", 512L);
-        
+
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
-        
+
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(false);  // 上传失败
-        
-        when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(false);
+
+        // 新行为：不再调用 shouldRetry()，而是让失败的文件进入失败队列
+        // RetryManager 会定时扫描并重试
 
         BatchTransferTaskConfig config = createTestConfigWithTargets();
 
-        // When: 执行任务
+        // When: 执行任务（不应该抛出异常）
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
+        
+        // Then: 任务应该正常完成（不抛出异常），失败的文件已进入失败队列
+        assertDoesNotThrow(() -> taskRunnable.run(),
+            "部分文件失败不应导致整个任务失败");
 
-        // Then: 应检查是否需要重试（错误信息包含文件名）
-        verify(retryManager).shouldRetry(eq(1001L), contains("fail.log"));
+        // 验证：不再调用旧的 shouldRetry 方法（因为改为异步重试机制）
+        verify(retryManager, never()).shouldRetry(anyLong(), anyString());
 
-        System.out.println("✅ 失败重试验证: uploadFile返回false后触发重试检查");
+        // 验证：任务完成时仍会记录成功（对于成功的文件）
+        verify(retryManager).recordSuccess(1001L);
+
+        System.out.println("✅ 失败重试验证: uploadFile返回false后不抛异常，失败文件进入队列等待定时重试");
     }
 
     @Test

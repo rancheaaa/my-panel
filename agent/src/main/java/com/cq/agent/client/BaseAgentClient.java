@@ -1,25 +1,23 @@
 package com.cq.agent.client;
 
-import com.cq.agent.client.upload.TransferMetaStore;
-import com.cq.agent.client.upload.UploadTaskStatus;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.ApiResponse;
 import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.*;
 
-public abstract class BaseAgentClient<TASK, LISTENER> {
+public abstract class BaseAgentClient<TASK extends TaskInfo, LISTENER> {
 
     protected static final Logger logger = LoggerFactory.getLogger(BaseAgentClient.class);
 
@@ -48,11 +46,13 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     protected final int maxQueueDepth;
 
     protected TransferMetaStore<TASK> metaStore;
+    protected Path failedQueueDir;
 
     protected BaseAgentClient(AgentConfig agentConfig, int concurrentThreads,
                             int maxQueueDepth, int workerCount, int maxRetries, long retryDelayMs,
-                            int connectTimeoutSeconds, int requestTimeoutSeconds, String metaDirPath,
-                            int maxRateKBPerSecond, Class<TASK> taskClass, String operationType) {
+                            int connectTimeoutSeconds, int requestTimeoutSeconds, String sendingQueueDirPath,
+                            int maxRateKBPerSecond, Class<TASK> taskClass, String operationType,
+                            String failedQueueDirPath) {
         if (concurrentThreads < 1 || concurrentThreads > 64) {
             throw new IllegalArgumentException("concurrentThreads must be between 1 and 64");
         }
@@ -70,7 +70,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             this.taskQueue = new ConcurrentLinkedQueue<>();
 
             try {
-                Path metaDir = Path.of(metaDirPath);
+                Path metaDir = Path.of(sendingQueueDirPath);
                 if (!java.nio.file.Files.exists(metaDir)) {
                     java.nio.file.Files.createDirectories(metaDir);
                 }
@@ -84,6 +84,17 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             } catch (Exception e) {
                 logger.warn("初始化 TransferMetaStore 失败，将使用无持久化模式: {}", e.getMessage());
                 this.metaStore = null;
+            }
+
+            try {
+                this.failedQueueDir = Path.of(failedQueueDirPath);
+                if (!Files.exists(this.failedQueueDir)) {
+                    Files.createDirectories(this.failedQueueDir);
+                }
+                logger.info("{} 失败重试队列目录: {}", operationType, this.failedQueueDir.toAbsolutePath());
+            } catch (Exception e) {
+                logger.warn("初始化失败队列目录失败: {}", e.getMessage());
+                this.failedQueueDir = null;
             }
 
             this.maxRetries = Math.max(1, maxRetries);
@@ -175,28 +186,6 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
 
     protected abstract void processTask(TASK task);
     protected abstract String getTaskKey(TASK task);
-
-    @SuppressWarnings("unchecked")
-    protected void updateTaskStatus(TASK task, Object status) {
-        try {
-            if (task instanceof TransferTask) {
-                ((TransferTask<Object>) task).setStatus(status);
-                ((TransferTask<?>) task).updateTimestamp();
-            }
-        } catch (Exception e) {
-            logger.error("更新任务状态失败: {}", e.getMessage());
-        }
-        
-        inflightTasks.put(getTaskKey(task), task);
-        
-        if (metaStore != null) {
-            try {
-                metaStore.saveTask(task);
-            } catch (IOException e) {
-                logger.warn("保存任务元数据失败: {}", e.getMessage());
-            }
-        }
-    }
 
     protected void applyRateLimit(int dataSize, String traceId) throws InterruptedException {
         if (rateLimiter == null || dataSize <= 0) {

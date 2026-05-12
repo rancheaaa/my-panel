@@ -40,12 +40,6 @@
             <artifactId>guava</artifactId>
         </dependency>
 
-        <!-- RocksDB -->
-        <dependency>
-            <groupId>org.rocksdb</groupId>
-            <artifactId>rocksdbjni</artifactId>
-        </dependency>
-
         <!-- Quartz Scheduler -->
         <dependency>
             <groupId>org.quartz-scheduler</groupId>

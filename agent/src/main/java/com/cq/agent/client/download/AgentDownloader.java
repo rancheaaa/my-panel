@@ -2,9 +2,7 @@ package com.cq.agent.client.download;
 
 import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.client.RemoteAgentInfo;
-import com.cq.agent.client.upload.UploadTask;
-import com.cq.agent.client.upload.UploadTaskStatus;
-import com.cq.agent.client.upload.Util;
+import com.cq.agent.client.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
 import org.slf4j.Logger;
@@ -23,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,7 +33,8 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 agentConfig.getDownloadMaxQueueDepth(), agentConfig.getDownloadWorkerCount(),
                 agentConfig.getDownloadMaxRetries(), agentConfig.getDownloadRetryDelayMs(),
                 agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
-                agentConfig.getDownloadMetaDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
+                agentConfig.getDownloadSendingQueueDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download",
+                agentConfig.getDownloadFailRetryQueueDir());
     }
 
     @Override
@@ -45,6 +43,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         String traceId = task.getTraceId();
 
         try {
+            task.setScannedStartTime(Util.currentTime());
             updateTaskStatus(task, DownloadTaskStatus.SCANNED);
             task.incrementRetryCount();
 
@@ -68,11 +67,14 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                     throw new IOException("Failed to create parent directory: " + parentDir.getAbsolutePath());
                 }
             }
+            task.setScannedEndTime(Util.currentTime());
+
             final String tmpPath = parentDir.toPath().resolve("." + UUID.randomUUID().toString().replace("-", ""))
                     .normalize().toAbsolutePath().toString();
             task.setTmpLocalFilePath(tmpPath);
 
-            updateTaskStatus(task, DownloadTaskStatus.INIT_DOWNLOAD_COMPLETED);
+            task.setInitDownloadStartTime(Util.currentTime());
+            updateTaskStatus(task, DownloadTaskStatus.INIT_DOWNLOADING);
 
             ApiResponse<ChunkDownloadInfoResponse> chunkInitResponse = getDownloadInfo(task);
             logger.debug("[traceId={}] Download initialized: transferId={}, totalChunks={}, chunkSize={}",
@@ -82,11 +84,14 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
             task.setChunkSize(chunkInitResponse.getData().getChunkSize());
             task.setTotalChunks(chunkInitResponse.getData().getTotalChunks());
+            task.setInitDownloadEndTime(Util.currentTime());
             updateTaskStatus(task, DownloadTaskStatus.INIT_DOWNLOAD_COMPLETED);
 
             try {
+                task.setDownloadChunksStartTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOADING_CHUNKS);
                 downloadChunks(task, localFile, taskKey, traceId);
+                task.setDownloadChunksEndTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_CHUNKS_COMPLETED);
             } catch (IOException e) {
                 logger.error("[traceId={}] Chunk download failed", traceId, e);
@@ -94,16 +99,22 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             }
 
             try {
-                updateTaskStatus(task, DownloadTaskStatus.MERGING);
+                task.setMergeChunksStartTime(Util.currentTime());
+                updateTaskStatus(task, DownloadTaskStatus.MERGING_CHUNKS);
                 mergeChunks(task);
+                task.setMergeChunksEndTime(Util.currentTime());
+                updateTaskStatus(task, DownloadTaskStatus.MERGE_CHUNKS_COMPLETED);
             } catch (IOException e) {
                 logger.error("[traceId={}] Chunk merge failed", traceId, e);
                 throw e;
             }
 
             try {
-                updateTaskStatus(task, DownloadTaskStatus.VERIFYING);
+                task.setVerifyStartTime(Util.currentTime());
+                updateTaskStatus(task, DownloadTaskStatus.VERIFYING_CHUNKS);
                 verifyDownload(task, traceId);
+                task.setVerifyEndTime(Util.currentTime());
+                updateTaskStatus(task, DownloadTaskStatus.VERIFY_CHUNKS_COMPLETED);
 
                 task.setDownloadSuccessTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_SUCCESS);
@@ -117,8 +128,17 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             logger.info("[traceId={}] Download task completed: {}", traceId, taskKey);
         } catch (Exception e) {
             logger.error("[traceId={}] Download task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
-            updateTaskStatus(task, DownloadTaskStatus.FAILED);
             task.setExceptionDesc(e.getMessage());
+            updateTaskStatus(task, DownloadTaskStatus.FAILED);
+
+            if (metaStore != null && failedQueueDir != null) {
+                try {
+                    metaStore.moveToFailedQueue(task.getTransferId(), failedQueueDir);
+                } catch (IOException ex) {
+                    logger.warn("[traceId={}] 移动失败任务到重试队列失败: {}", traceId, ex.getMessage());
+                }
+            }
+
             handleListenerError(taskKey, e.getMessage());
             inflightTasks.remove(task.getTransferId());
         } finally {
@@ -235,6 +255,10 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 listenerCache.put(taskKey, listener);
             }
 
+            if (metaStore != null) {
+                metaStore.saveTask(task);
+            }
+
             if (!this.inflightTasks.containsKey(task.getTransferId())) {
                 this.inflightTasks.put(task.getTransferId(), task);
             }
@@ -291,7 +315,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         logger.debug("[traceId={}] Downloading chunk {} for transferId: {} using zero-copy", traceId, chunkIndex, task.getTransferId());
 
         File destFile = Paths.get(task.getRemoteFilePath()).toFile();
-        String destFileDir = com.cq.agent.client.upload.Util.transferToLinuxPath(destFile.getParent());
+        String destFileDir = Util.transferToLinuxPath(destFile.getParent());
         String destFileName = destFile.getName();
 
         ChunkDownloadRequest req = new ChunkDownloadRequest();
@@ -523,12 +547,12 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
         
         List<Integer> missingChunks = scanDownloadedChunks(tmpDir, file.getName(), task.getChunkSize(), task.getTotalSize(), task.getTotalChunks(), traceId);
-        AtomicInteger downloadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
+        int initialDownloadedCount = task.getTotalChunks() - missingChunks.size();
         DownloadListener listener = listenerCache.get(taskKey);
-        task.setDownloadedChunksCount(downloadedCount.get());
-        
-        logger.debug("[traceId={}] Scanned tmp directory: downloaded={}, missing={}", 
-                traceId, downloadedCount.get(), missingChunks.size());
+        task.setDownloadedChunksCount(initialDownloadedCount);
+
+        logger.debug("[traceId={}] Scanned tmp directory: downloaded={}, missing={}",
+                traceId, initialDownloadedCount, missingChunks.size());
         try  {
             CompletableFuture<?>[] downloadFutures = missingChunks.stream()
                     .map(chunkIndex -> CompletableFuture.runAsync(() -> {
@@ -537,23 +561,23 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                                 handleListenerBeforeSend(taskKey, task);
                             }
                             File chunkFile = downloadChunk(task, chunkIndex, traceId);
-                            
+
                             long chunkSize = chunkFile.length();
                             if (chunkSize == 0) {
                                 throw new IOException("Empty chunk file downloaded for chunk " + chunkIndex);
                             }
-                            
+
                             int expectedChunkSize = calculateExpectedChunkSize(chunkIndex, task.getChunkSize(), task.getTotalSize());
                             if (chunkSize != expectedChunkSize) {
                                 throw new IOException(String.format(
                                         "Chunk size mismatch for chunk %d: expected=%d, actual=%d",
                                         chunkIndex, expectedChunkSize, chunkSize));
                             }
-                            
+
                             applyRateLimit((int) chunkSize, traceId);
 
-                            int currentDownloaded = downloadedCount.incrementAndGet();
                             task.incrementDownloadChunksCount();
+                            int currentDownloaded = task.getDownloadedChunksCount();
                             task.updateTimestamp();
                             this.inflightTasks.put(task.getTransferId(), task);
 
@@ -634,5 +658,41 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
         
         return missingChunks;
+    }
+
+    /**
+     * 重新提交失败的下载任务（内部方法，供 RetryManager 调用）
+     * 与 downloadFile() 的区别：
+     * - 不重新扫描文件
+     * - 直接使用已有的任务对象
+     * - 跳过文件存在性检查
+     *
+     * @param task 已有的 DownloadTask 对象（包含 remoteSourcePath, localTargetPath 等）
+     */
+    public void resubmitTask(DownloadTask task) {
+        String taskKey = getTaskKey(task);
+        String traceId = task.getTraceId();
+
+        logger.info("[traceId={}] 🔄 重新提交失败下载任务: transferId={}, file={}, retryCount={}",
+            traceId,
+            task.getTransferId(),
+            task.getLocalFilePath(),
+            task.getRetryCount());
+
+        // 直接将任务对象放入工作队列（worker线程会自动poll并处理）
+        boolean offered = taskQueue.offer(task);
+
+        if (offered) {
+            logger.debug("✅ 任务已加入工作队列: taskKey={}", taskKey);
+        } else {
+            logger.error("❌ 任务加入工作队列失败: taskKey={}", taskKey);
+        }
+    }
+
+    /**
+     * 获取失败队列目录
+     */
+    public Path getFailedQueueDir() {
+        return failedQueueDir;
     }
 }

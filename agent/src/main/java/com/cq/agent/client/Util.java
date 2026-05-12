@@ -1,6 +1,4 @@
-package com.cq.agent.client.upload;
-
-import com.cq.agent.client.RemoteAgentInfo;
+package com.cq.agent.client;
 
 import java.io.IOException;
 import java.net.URL;

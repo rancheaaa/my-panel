@@ -76,8 +76,15 @@ public class AgentConfig {
     private int downloadRequestTimeoutSeconds;
 
     // Transfer metadata directories (for resumable uploads/downloads)
-    private String uploadMetaDir;
-    private String downloadMetaDir;
+    private String uploadSendingQueueDir;
+    private String downloadSendingQueueDir;
+
+    // Failed task retry queue directories
+    private String uploadFailRetryQueueDir;
+    private String downloadFailRetryQueueDir;
+
+    // Failed queue scan interval (milliseconds)
+    private long failedQueueScanIntervalMs;
 
     // Registry configuration
     private List<String> registryServerUrls;
@@ -211,8 +218,15 @@ public class AgentConfig {
         this.downloadRequestTimeoutSeconds = getIntProperty("download.request.timeout.seconds", 60);
 
         // Transfer metadata directories
-        this.uploadMetaDir = getStringProperty("upload.meta.dir", "./data/transfers/uploads");
-        this.downloadMetaDir = getStringProperty("download.meta.dir", "./data/transfers/downloads");
+        this.uploadSendingQueueDir = getStringProperty("upload.sending.queue.dir", "/tmp/my-panel/admin/data/transfers/uploadSendingQueue");
+        this.downloadSendingQueueDir = getStringProperty("download.sending.queue.dir", "/tmp/my-panel/admin/data/transfers/downloadSendingQueue");
+
+        // Failed task retry queue directories
+        this.uploadFailRetryQueueDir = getStringProperty("upload.fail.retry.queue.dir", "/tmp/my-panel/admin/data/transfers/uploadFailRetryQueue");
+        this.downloadFailRetryQueueDir = getStringProperty("download.fail.retry.queue.dir", "/tmp/my-panel/admin/data/transfers/downloadFailRetryQueue");
+
+        // Failed queue scan interval (default: 5 minutes)
+        this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 5 * 60 * 1000L);
 
         // Validate configuration
         validateConfiguration();
@@ -390,5 +404,9 @@ public class AgentConfig {
         }
         logger.info("Could not find a suitable non-loopback IP, defaulting to 0.0.0.0");
         return "0.0.0.0";
+    }
+
+    public long getFailedQueueScanIntervalMs() {
+        return failedQueueScanIntervalMs;
     }
 }

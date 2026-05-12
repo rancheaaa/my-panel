@@ -1,5 +1,6 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.client.download.DownloadTask;
 import com.cq.agent.client.download.DownloadTaskStatus;
 import org.junit.jupiter.api.AfterEach;
@@ -70,13 +71,13 @@ class TransferMetaStoreTest {
     }
 
     @Test
-    @DisplayName("保存后文件应该存在")
+    @DisplayName("保存后文件应该存在且包含状态前缀")
     void shouldCreateFileAfterSave() throws IOException {
         UploadTask task = createUploadTask("transfer-789");
 
         uploadMetaStore.saveTask(task);
 
-        Path expectedFile = tempDir.resolve("uploads").resolve("upload-transfer-789.json");
+        Path expectedFile = tempDir.resolve("uploads").resolve("PREPARED-upload-transfer-789.json");
         assertTrue(Files.exists(expectedFile), "元数据文件应该存在");
     }
 
@@ -169,7 +170,7 @@ class TransferMetaStoreTest {
     @Test
     @DisplayName("处理损坏的JSON文件时不应该抛异常")
     void shouldHandleCorruptedJsonFiles() throws IOException {
-        Path corruptedFile = tempDir.resolve("uploads").resolve("upload-corrupted.json");
+        Path corruptedFile = tempDir.resolve("uploads").resolve("CORRUPTED-upload-corrupted.json");
         Files.writeString(corruptedFile, "{invalid json content}");
 
         List<UploadTask> pendingTasks = uploadMetaStore.recoverPendingTasks();
@@ -178,19 +179,169 @@ class TransferMetaStoreTest {
     }
 
     @Test
-    @DisplayName("覆盖保存应该更新任务内容")
+    @DisplayName("覆盖保存应该更新任务内容并清理旧状态文件")
     void shouldOverwriteExistingTask() throws IOException {
         UploadTask originalTask = createUploadTask("overwrite-test");
         originalTask.setStatus(UploadTaskStatus.SCANNED);
         uploadMetaStore.saveTask(originalTask);
 
+        Path oldFile = tempDir.resolve("uploads").resolve("SCANNED-upload-overwrite-test.json");
+        assertTrue(Files.exists(oldFile), "旧状态文件应该存在");
+
         UploadTask updatedTask = createUploadTask("overwrite-test");
         updatedTask.setStatus(UploadTaskStatus.INIT_UPLOADING);
         uploadMetaStore.saveTask(updatedTask);
 
+        Path newFile = tempDir.resolve("uploads").resolve("INIT_UPLOADING-upload-overwrite-test.json");
+        assertTrue(Files.exists(newFile), "新状态文件应该存在");
+        assertFalse(Files.exists(oldFile), "旧状态文件应该被删除");
+
         Optional<UploadTask> loaded = uploadMetaStore.loadTask("overwrite-test");
         assertTrue(loaded.isPresent());
         assertEquals(UploadTaskStatus.INIT_UPLOADING, loaded.get().getStatus(), "应该是更新后的状态");
+    }
+
+    @Test
+    @DisplayName("状态切换时应该只保留当前状态的文件")
+    void shouldOnlyKeepCurrentStatusFile() throws IOException {
+        UploadTask task = createUploadTask("status-transition");
+
+        task.setStatus(UploadTaskStatus.PREPARED);
+        uploadMetaStore.saveTask(task);
+        assertEquals(countFilesForTransferId("status-transition"), 1, "PREPARED状态下应该只有1个文件");
+
+        task.setStatus(UploadTaskStatus.SCANNED);
+        uploadMetaStore.saveTask(task);
+        assertEquals(countFilesForTransferId("status-transition"), 1, "SCANNED状态下应该只有1个文件");
+
+        task.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
+        uploadMetaStore.saveTask(task);
+        assertEquals(countFilesForTransferId("status-transition"), 1, "UPLOADING_CHUNKS状态下应该只有1个文件");
+
+        task.setStatus(UploadTaskStatus.UPLOAD_SUCCESS);
+        uploadMetaStore.saveTask(task);
+        assertEquals(countFilesForTransferId("status-transition"), 1, "UPLOAD_SUCCESS状态下应该只有1个文件");
+
+        Path finalFile = tempDir.resolve("uploads").resolve("UPLOAD_SUCCESS-upload-status-transition.json");
+        assertTrue(Files.exists(finalFile), "最终应该是UPLOAD_SUCCESS状态文件");
+    }
+
+    @Test
+    @DisplayName("删除任务应该清理所有状态文件")
+    void shouldDeleteAllStatusFiles() throws IOException {
+        UploadTask task = createUploadTask("delete-all-status");
+        task.setStatus(UploadTaskStatus.SCANNED);
+        uploadMetaStore.saveTask(task);
+
+        assertTrue(countFilesForTransferId("delete-all-status") > 0, "保存后应该有文件");
+
+        uploadMetaStore.deleteTask("delete-all-status");
+
+        assertEquals(countFilesForTransferId("delete-all-status"), 0, "删除后不应该有任何状态文件");
+    }
+
+    @Test
+    @DisplayName("下载任务也应该支持状态前缀命名")
+    void downloadTaskShouldSupportStatusPrefixNaming() throws IOException {
+        DownloadTask task = createDownloadTask("download-with-status");
+        task.setStatus(DownloadTaskStatus.SCANNED);
+        downloadMetaStore.saveTask(task);
+
+        Path expectedFile = tempDir.resolve("downloads").resolve("SCANNED-download-download-with-status.json");
+        assertTrue(Files.exists(expectedFile), "下载任务元数据文件应该包含状态前缀");
+
+        Optional<DownloadTask> loaded = downloadMetaStore.loadTask("download-with-status");
+        assertTrue(loaded.isPresent());
+        assertEquals(DownloadTaskStatus.SCANNED, loaded.get().getStatus());
+    }
+
+    @Test
+    @DisplayName("JSON文件应该包含所有字段包括null值字段")
+    void shouldIncludeAllFieldsIncludingNullOnes() throws IOException {
+        UploadTask task = createUploadTask("full-fields-test");
+
+        uploadMetaStore.saveTask(task);
+
+        Path jsonFile = tempDir.resolve("uploads").resolve("PREPARED-upload-full-fields-test.json");
+        assertTrue(Files.exists(jsonFile), "JSON文件应该存在");
+
+        String jsonContent = Files.readString(jsonFile);
+
+        assertNotNull(jsonContent, "JSON内容不应该为null");
+
+        assertTrue(jsonContent.contains("\"localFilePath\""), "应该包含localFilePath字段");
+        assertTrue(jsonContent.contains("\"remoteTargetPath\""), "应该包含remoteTargetPath字段");
+        assertTrue(jsonContent.contains("\"transferId\""), "应该包含transferId字段");
+        assertTrue(jsonContent.contains("\"traceId\""), "应该包含traceId字段");
+        assertTrue(jsonContent.contains("\"status\""), "应该包含status字段");
+        assertTrue(jsonContent.contains("\"listenerClassName\""), "应该包含listenerClassName字段");
+        assertTrue(jsonContent.contains("\"remoteAgentApiUrl\""), "应该包含remoteAgentApiUrl字段");
+        assertTrue(jsonContent.contains("\"remoteAgentUsername\""), "应该包含remoteAgentUsername字段");
+        assertTrue(jsonContent.contains("\"createTime\""), "应该包含createTime字段");
+        assertTrue(jsonContent.contains("\"updateTime\""), "应该包含updateTime字段");
+        assertTrue(jsonContent.contains("\"enqueuedTime\""), "应该包含enqueuedTime字段");
+        assertTrue(jsonContent.contains("\"scannedStartTime\""), "应该包含scannedStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"scannedEndTime\""), "应该包含scannedEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"initUploadStartTime\""), "应该包含initUploadStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"initUploadEndTime\""), "应该包含initUploadEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"uploadChunksStartTime\""), "应该包含uploadChunksStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"uploadChunksEndTime\""), "应该包含uploadChunksEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"mergeChunksStartTime\""), "应该包含mergeChunksStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"mergeChunksEndTime\""), "应该包含mergeChunksEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"uploadSuccessTime\""), "应该包含uploadSuccessTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"verifyStartTime\""), "应该包含verifyStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"verifyEndTime\""), "应该包含verifyEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"chunkSize\""), "应该包含chunkSize字段");
+        assertTrue(jsonContent.contains("\"totalChunks\""), "应该包含totalChunks字段");
+        assertTrue(jsonContent.contains("\"totalSize\""), "应该包含totalSize字段");
+        assertTrue(jsonContent.contains("\"exceptionDesc\""), "应该包含exceptionDesc字段（即使为null）");
+        assertTrue(jsonContent.contains("\"missingChunks\""), "应该包含missingChunks字段");
+        assertTrue(jsonContent.contains("\"uploadChunksCount\""), "应该包含uploadChunksCount字段");
+        assertTrue(jsonContent.contains("\"retryCount\""), "应该包含retryCount字段");
+    }
+
+    @Test
+    @DisplayName("下载任务JSON也应该包含所有字段包括null值字段")
+    void shouldIncludeAllDownloadTaskFieldsIncludingNullOnes() throws IOException {
+        DownloadTask task = createDownloadTask("download-full-fields");
+
+        downloadMetaStore.saveTask(task);
+
+        Path jsonFile = tempDir.resolve("downloads").resolve("PREPARED-download-download-full-fields.json");
+        assertTrue(Files.exists(jsonFile), "下载任务JSON文件应该存在");
+
+        String jsonContent = Files.readString(jsonFile);
+        assertNotNull(jsonContent, "JSON内容不应该为null");
+
+        assertTrue(jsonContent.contains("\"transferId\""), "应该包含transferId字段");
+        assertTrue(jsonContent.contains("\"traceId\""), "应该包含traceId字段");
+        assertTrue(jsonContent.contains("\"remoteFilePath\""), "应该包含remoteFilePath字段");
+        assertTrue(jsonContent.contains("\"localFilePath\""), "应该包含localFilePath字段");
+        assertTrue(jsonContent.contains("\"tmpLocalFilePath\""), "应该包含tmpLocalFilePath字段（即使为null）");
+        assertTrue(jsonContent.contains("\"remoteAgentApiUrl\""), "应该包含remoteAgentApiUrl字段");
+        assertTrue(jsonContent.contains("\"remoteAgentUsername\""), "应该包含remoteAgentUsername字段");
+        assertTrue(jsonContent.contains("\"totalSize\""), "应该包含totalSize字段");
+        assertTrue(jsonContent.contains("\"status\""), "应该包含status字段");
+        assertTrue(jsonContent.contains("\"createTime\""), "应该包含createTime字段");
+        assertTrue(jsonContent.contains("\"updateTime\""), "应该包含updateTime字段");
+        assertTrue(jsonContent.contains("\"enqueuedTime\""), "应该包含enqueuedTime字段");
+        assertTrue(jsonContent.contains("\"scannedStartTime\""), "应该包含scannedStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"scannedEndTime\""), "应该包含scannedEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"initDownloadStartTime\""), "应该包含initDownloadStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"initDownloadEndTime\""), "应该包含initDownloadEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"downloadChunksStartTime\""), "应该包含downloadChunksStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"downloadChunksEndTime\""), "应该包含downloadChunksEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"mergeChunksStartTime\""), "应该包含mergeChunksStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"mergeChunksEndTime\""), "应该包含mergeChunksEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"verifyStartTime\""), "应该包含verifyStartTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"verifyEndTime\""), "应该包含verifyEndTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"downloadSuccessTime\""), "应该包含downloadSuccessTime字段（即使为null）");
+        assertTrue(jsonContent.contains("\"chunkSize\""), "应该包含chunkSize字段");
+        assertTrue(jsonContent.contains("\"totalChunks\""), "应该包含totalChunks字段");
+        assertTrue(jsonContent.contains("\"downloadedChunksCount\""), "应该包含downloadedChunksCount字段");
+        assertTrue(jsonContent.contains("\"retryCount\""), "应该包含retryCount字段");
+        assertTrue(jsonContent.contains("\"listenerClassName\""), "应该包含listenerClassName字段（即使为null）");
+        assertTrue(jsonContent.contains("\"exceptionDesc\""), "应该包含exceptionDesc字段（即使为null）");
     }
 
     private UploadTask createUploadTask(String transferId) {
@@ -219,5 +370,19 @@ class TransferMetaStoreTest {
 
     private String getOldTimestamp() {
         return "2020-01-01 00:00:00.000";
+    }
+
+    private int countFilesForTransferId(String transferId) throws IOException {
+        Path uploadDir = tempDir.resolve("uploads");
+        if (!Files.exists(uploadDir)) {
+            return 0;
+        }
+
+        try (var paths = Files.list(uploadDir)) {
+            return (int) paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().contains("upload-" + transferId + ".json"))
+                    .count();
+        }
     }
 }

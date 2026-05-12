@@ -1,6 +1,7 @@
 package com.cq.agent.client.upload;
 
 import com.cq.agent.client.BaseAgentClient;
+import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,9 +14,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 

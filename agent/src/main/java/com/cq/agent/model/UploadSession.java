@@ -2,6 +2,7 @@ package com.cq.agent.model;
 
 import com.cq.agent.dto.ChunkInitResponse;
 import com.cq.agent.dto.ChunkStatusResponse;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Files;
@@ -20,15 +21,23 @@ public class UploadSession {
 
     private static final Logger log = LoggerFactory.getLogger(UploadSession.class);
 
+    @Getter
     private final String transferId;
+    @Getter
     private final String traceId;
+    @Getter
     private final String destFileDir;
+    @Getter
     private final String destFileName;
+    @Getter
     private final long totalSize;
+    @Getter
     private final int totalChunks;
+    @Getter
     private final int chunkSize;
     private final long createTime;
     private final Set<Integer> receivedChunks;
+    @Getter
     private final String tempDirectory;
     private volatile long lastAccessTime;
     private volatile boolean completed;
@@ -63,34 +72,6 @@ public class UploadSession {
         this.merged = merged;
     }
 
-    public String getTransferId() {
-        return transferId;
-    }
-
-    public String getTraceId() {
-        return traceId;
-    }
-
-    public String getDestFileDir() {
-        return destFileDir;
-    }
-
-    public String getDestFileName() {
-        return destFileName;
-    }
-
-    public long getTotalSize() {
-        return totalSize;
-    }
-
-    public int getTotalChunks() {
-        return totalChunks;
-    }
-
-    public int getChunkSize() {
-        return chunkSize;
-    }
-
     public long getCreateTime() {
         return createTime;
     }
@@ -101,10 +82,6 @@ public class UploadSession {
 
     public void updateLastAccessTime() {
         this.lastAccessTime = System.currentTimeMillis();
-    }
-
-    public String getTempDirectory() {
-        return tempDirectory;
     }
 
     public void refresh() {

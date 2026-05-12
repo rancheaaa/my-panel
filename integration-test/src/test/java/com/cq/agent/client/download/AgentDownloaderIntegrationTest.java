@@ -5,7 +5,7 @@ import com.cq.agent.client.RemoteAgentInfo;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
-import com.cq.agent.client.upload.Util;
+import com.cq.agent.client.Util;
 import com.cq.agent.config.AgentConfig;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.*;

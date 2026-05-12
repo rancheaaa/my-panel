@@ -5,48 +5,53 @@
 **状态**: ✅ 已批准
 **作者**: AI Assistant
 
----
+***
 
 ## 1. 项目背景与目标
 
 ### 1.1 当前问题诊断
 
 #### 问题 1: RocksDB 复杂度过高
+
 - **PersistentQueue**: 226 行代码，基于 RocksDB 实现
 - **PersistentMap**: 268 行代码，基于 RocksDB 实现（客户端和服务端各一个）
-- **总代码量**: ~762 行仅用于持久化层
+- **总代码量**: \~762 行仅用于持久化层
 - **依赖体积**: rocksdbjni-6.10.2.jar 约 15MB
 - **运维成本**: 需要管理数据库文件、手动清理、专用工具调试
 
 #### 问题 2: 大量重复代码
+
 AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式：
+
 - `processTask()` 方法结构完全一致（122行 vs 122行）
 - 状态管理模式重复：`setStatus() → updateTimestamp() → taskInflightMap.put()` 出现 **20+ 次**
 - 分块上传/下载逻辑高度相似（CompletableFuture + ThreadPoolExecutor + 超时计算）
 - 错误处理模式完全相同（嵌套 try-catch 块）
 
 #### 问题 3: 流程控制复杂
+
 - 单个方法包含 4 个阶段（初始化→分块传输→合并→验证）
 - 多层嵌套的 try-catch 块导致可读性差
 - 缺乏清晰的阶段划分和状态机概念
 
 ### 1.2 优化目标
 
-| 目标 | 具体指标 |
-|------|---------|
+| 目标         | 具体指标                           |
+| ---------- | ------------------------------ |
 | **简化持久化层** | 移除所有 RocksDB 依赖，仅发起方使用 JSON 文件 |
-| **消除代码重复** | 提取公共逻辑到基类和工具类，减少 ~35% 代码量 |
-| **优化流程控制** | 使用模板方法模式拆分为清晰阶段，提高可读性 |
-| **统一异常处理** | 集中错误处理逻辑，减少嵌套层级 |
-| **保障核心功能** | 断点续传、分块传输、多线程传输等功能完全保留 |
+| **消除代码重复** | 提取公共逻辑到基类和工具类，减少 \~35% 代码量     |
+| **优化流程控制** | 使用模板方法模式拆分为清晰阶段，提高可读性          |
+| **统一异常处理** | 集中错误处理逻辑，减少嵌套层级                |
+| **保障核心功能** | 断点续传、分块传输、多线程传输等功能完全保留         |
 
----
+***
 
 ## 2. 解决方案概述
 
 ### 2.1 方案选择：发起方文件系统追踪（简化版）
 
 **核心理念**：
+
 - ✅ **仅发起方（客户端）存储 JSON 元数据**：上传任务由 AgentUploader 存储，下载任务由 AgentDownloader 存储
 - ❌ **目标方（服务端）不存储任何持久化数据**：仅使用内存 ConcurrentHashMap 管理活跃 session
 - 利用已有的分块文件目录作为天然的进度标记
@@ -59,7 +64,7 @@ AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式�
 ✅ **天然可靠**: 分块文件存在 = 已完成的进度
 ✅ **易于调试**: 无需专用工具
 ✅ **启动快速**: 扫描文件比初始化 RocksDB 快 10 倍
-✅ **更简单**: 目标方无需持久化，减少 ~180 行代码
+✅ **更简单**: 目标方无需持久化，减少 \~180 行代码
 
 ### 2.2 架构对比图
 
@@ -83,8 +88,8 @@ AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式�
     └──────┬──────┘                            └───────┬───────┘
            │                                            │
     ┌──────┴──────┐                            ┌───────┴───────┐
-    │   RocksDB DB  │                           │ .transfers/    │
-    │  (数据库文件)  │                           │ (元数据目录)    │
+    │   RocksDB DB  │                           │ uploadsMeta/   │
+│  (数据库文件)  │                           │ downloadsMeta/ │
     └───────────────┘                           └───────────────┘
 
 ┌─────────────────────┐                      ┌─────────────────────┐
@@ -105,44 +110,52 @@ AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式�
 
 ### 2.3 持久化职责划分
 
-| 角色 | 场景 | 是否持久化 | 存储方式 | 数据内容 |
-|------|------|-----------|---------|---------|
-| **AgentUploader** (发起方) | 上传文件 | ✅ **是** | JSON 文件 | 任务元数据（路径、大小、transferId 等） |
-| **AgentDownloader** (发起方) | 下载文件 | ✅ **是** | JSON 文件 | 任务元数据 + 本地分块文件目录 |
-| **ChunkedTransferService** (目标方) | 接收上传 | ❌ **否** | 内存 Map | 仅运行时 session 管理 |
-| **远程 Agent** (目标方) | 提供下载 | ❌ **否** | 无 | 无状态 API |
+| 角色                               | 场景   | 是否持久化   | 存储方式    | 数据内容                      |
+| -------------------------------- | ---- | ------- | ------- | ------------------------- |
+| **AgentUploader** (发起方)          | 上传文件 | ✅ **是** | JSON 文件 | 任务元数据（路径、大小、transferId 等） |
+| **AgentDownloader** (发起方)        | 下载文件 | ✅ **是** | JSON 文件 | 任务元数据 + 本地分块文件目录          |
+| **ChunkedTransferService** (目标方) | 接收上传 | ❌ **否** | 内存 Map  | 仅运行时 session 管理           |
+| **远程 Agent** (目标方)               | 提供下载 | ❌ **否** | 无       | 无状态 API                   |
 
 **关键原则**：
+
 > **断点续传的状态信息只存在于发起方**，目标方是无状态的或者仅保持运行时内存状态。
 > 发起方重启后通过本地 JSON 元数据恢复任务，然后查询目标方获取最新进度。
 
----
+***
 
 ## 3. 详细设计
 
-### 3.1 目录结构设计（仅发起方）
+### 3.1 目录结构设计
 
 #### 客户端（源节点）- 上传/下载任务的发起方
+
+**上传任务元数据目录** (配置项: `upload.meta.dir`, 默认: `/tmp/my-panel/admin/data/transfers/uploadsMeta`)
+
 ```
-{agentBaseDir}/
-├── transfers/                              # 任务元数据目录 ⭐ 新增
-│   ├── upload-{transferId}.json           # 上传任务元数据
-│   └── download-{transferId}.json         # 下载任务元数据
-└── chunks/                                # 下载任务的分块文件目录（已有）
-    ├── {fileName}_chunk_0                 # 已下载的分块0
-    ├── {fileName}_chunk_1                 # 已下载的分块1
-    └── ...
+{uploadMetaDir}/                              # 上传任务元数据目录
+└── upload-{transferId}.json                 # 上传任务元数据
+```
+
+**下载任务元数据目录** (配置项: `download.meta.dir`, 默认: `/tmp/my-panel/admin/data/transfers/downloadsMeta`)
+
+```
+{downloadMetaDir}/                            # 下载任务元数据目录
+├── download-{transferId}.json               # 下载任务元数据
 ```
 
 **说明**：
+
 - ✅ **仅发起方维护此目录结构**
+- ✅ **上传和下载使用独立的元数据目录**：通过 `upload.meta.dir` 和 `download.meta.dir` 配置项分别指定
 - ✅ 上传任务：JSON 记录元数据，进度通过查询远程 API 获取
 - ✅ 下载任务：JSON 记录元数据 + chunks/ 目录记录已下载的分块文件
 - ❌ **目标方（服务端）无此目录**
 
 ### 3.2 元数据文件格式（仅发起方）
 
-#### 上传任务元数据 (.transfers/upload-{id}.json)
+#### 上传任务元数据 (uploadsMeta/upload-{id}.json)
+
 ```json
 {
   "transferId": "abc123def456",
@@ -163,7 +176,8 @@ AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式�
 }
 ```
 
-#### 下载任务元数据 (.transfers/download-{id}.json)
+#### 下载任务元数据 (downloadsMeta/download-{id}.json)
+
 ```json
 {
   "transferId": "abc123def456",
@@ -192,6 +206,7 @@ AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式�
 #### 核心工具类：AtomicFileWriter
 
 **写入流程**：
+
 ```
 1. 准备 JSON 数据内容
         ↓
@@ -209,6 +224,7 @@ AgentUploader (477行) 和 AgentDownloader (655行) 存在高度相似的模式�
 ```
 
 **实现要点**：
+
 ```java
 public final class AtomicFileWriter {
     public static void writeAtomically(Path targetPath, String content) throws IOException {
@@ -239,32 +255,36 @@ public final class AtomicFileWriter {
 ```
 
 **使用场景**：
+
 - TransferMetaStore.saveTask() - 保存任务元数据（仅发起方）
 - 所有需要持久化状态的场景（仅限发起方）
 
----
+***
 
 ## 4. 组件重构详细设计
 
 ### 4.1 新增组件清单（精简版）
 
-| 组件名 | 职责 | 估计行数 | 使用者 | 位置 |
-|--------|------|---------|--------|------|
-| **AtomicFileWriter** | 原子性文件写入工具 | ~80行 | TransferMetaStore | `util/` |
-| **TransferMetaStore** | 发起方任务元数据管理 | ~180行 | BaseAgentClient | `client/upload/` |
+| 组件名                   | 职责         | 估计行数   | 使用者               | 位置               |
+| --------------------- | ---------- | ------ | ----------------- | ---------------- |
+| **AtomicFileWriter**  | 原子性文件写入工具  | \~80行  | TransferMetaStore | `util/`          |
+| **TransferMetaStore** | 发起方任务元数据管理 | \~180行 | BaseAgentClient   | `client/upload/` |
 
 **对比原方案的变化**：
+
 - ❌ ~~SessionMetaStore~~ （已移除，目标方不持久化）
-- **净减**: 少实现 ~180 行代码
+- **净减**: 少实现 \~180 行代码
 
 ### 4.2 BaseAgentClient 重构
 
 #### 当前问题
+
 - 与 RocksDB 强耦合（通过构造函数参数传入 db path）
 - 缺乏统一的状态管理抽象
 - 大量样板代码分散在子类中
 
 #### 优化后的基类结构
+
 ```java
 public abstract class BaseAgentClient<TASK, LISTENER> {
     // 运行时状态（内存）
@@ -325,6 +345,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
 ```
 
 #### 构造函数变更
+
 ```java
 // ❌ 当前实现（RocksDB 版本）
 protected BaseAgentClient(AgentConfig config,
@@ -353,6 +374,7 @@ protected BaseAgentClient(AgentConfig config,
 #### processTask 方法重构（模板方法模式）
 
 **当前实现**（122行单方法）：
+
 ```java
 @Override
 protected void processTask(UploadTask task) {
@@ -388,6 +410,7 @@ protected void processTask(UploadTask task) {
 ```
 
 **优化后**（清晰阶段划分）：
+
 ```java
 @Override
 protected void processTask(UploadTask task) {
@@ -460,6 +483,7 @@ private void uploadChunks(UploadTask task) throws IOException {
 ### 4.4 AgentDownloader 重构（发起方）
 
 与 AgentUploader 采用相同的模板方法模式，主要差异：
+
 - 分块下载从远程读取到本地文件
 - 进度追踪通过扫描本地 `chunks/` 目录（天然可靠）
 - 合并操作在本地完成
@@ -470,6 +494,7 @@ private void uploadChunks(UploadTask task) throws IOException {
 #### 关键变更：移除所有持久化！
 
 **当前实现**（复杂）：
+
 ```java
 // ❌ 当前：使用 RocksDB 持久化 sessions
 private final PersistentMap<String, UploadSession> uploadSessions;  // RocksDB
@@ -482,6 +507,7 @@ private final PersistentMap<String, UploadSession> uploadSessions;  // RocksDB
 ```
 
 **优化后**（极简）：
+
 ```java
 // ✅ 优化后：纯内存管理，零持久化
 private final ConcurrentHashMap<String, UploadSession> uploadSessions;  // 纯内存
@@ -493,6 +519,7 @@ private final ConcurrentHashMap<String, UploadSession> uploadSessions;  // 纯�
 #### 构造函数对比
 
 **❌ 当前实现**：
+
 ```java
 public ChunkedTransferService(AgentConfig config) throws RocksDBException {
     Path uploadSessionDbPath = baseDirectory.resolve(config.getUploadSessionsDbPath());
@@ -521,6 +548,7 @@ public ChunkedTransferService(AgentConfig config) throws RocksDBException {
 ```
 
 **✅ 优化后**：
+
 ```java
 public ChunkedTransferService(AgentConfig config) {
     // 1. 创建分块文件根目录（用于临时存储接收到的分块）
@@ -539,11 +567,12 @@ public ChunkedTransferService(AgentConfig config) {
 }
 ```
 
-**代码行数变化**：~84行 → ~20行 (**减少76%**)
+**代码行数变化**：\~84行 → \~20行 (**减少76%**)
 
 #### Session 持久化时机（全部移除！）
 
 **❌ 当前实现**（需要在多个节点持久化）:
+
 ```java
 // 在这些地方调用 sessionMetaStore.saveSession(session):
 // 1. initUpload() - 创建新 session 后
@@ -553,6 +582,7 @@ public ChunkedTransferService(AgentConfig config) {
 ```
 
 **✅ 优化后**（无需任何持久化）:
+
 ```java
 // 仅操作内存 Map：
 // 1. initUpload() - uploadSessions.put(transferId, session)
@@ -564,6 +594,7 @@ public ChunkedTransferService(AgentConfig config) {
 #### 过期清理机制（大幅简化）
 
 **❌ 当前实现**：
+
 ```java
 private void cleanupExpiredSessions() {
     // 1. 遍历 RocksDB（IO 密集型操作）
@@ -589,6 +620,7 @@ private void cleanupExpiredSessions() {
 ```
 
 **✅ 优化后**：
+
 ```java
 private void cleanupExpiredSessions() {
     // 1. 遍历内存 Map（极快，无 IO）
@@ -614,14 +646,16 @@ private void cleanupExpiredSessions() {
 
 **性能提升**：清理操作从 **秒级（RocksDB 遍历+文件删除）** 降低到 **毫秒级（内存遍历+少量文件删除）**
 
----
+***
 
 ## 5. 断点续传机制详解（仅发起方负责）
 
 ### 5.1 核心原理
 
 **重要理念转变**：
+
 > **断点续传的状态信息完全由发起方维护**
+>
 > - 发起方：本地 JSON 元数据 + 分块文件（下载场景）
 > - 目标方：无状态或仅运行时内存状态
 > - 发起方重启后自动恢复，重新连接目标方获取最新进度
@@ -631,7 +665,7 @@ private void cleanupExpiredSessions() {
 ```
 AgentUploader（发起方）重启
     ↓
-扫描 .transfers/ 目录
+扫描 uploadsMeta/ 目录
     ↓
 找到 upload-{transferId}.json 文件？
     ├─ Yes → 读取元数据，重建 UploadTask 对象
@@ -647,12 +681,13 @@ AgentUploader（发起方）重启
     │        ↓
     │   合并 + 验证 → 成功
     │        ↓
-    │   删除 .transfers/upload-{id}.json
+    │   删除 uploadsMeta/upload-{id}.json
     │
     └─ No  → ✅ 无待恢复的上传任务
 ```
 
 **关键特点**：
+
 - ✅ **上传进度由发起方主动追踪**
 - ✅ **目标方仅提供运行时状态查询 API**
 - ✅ **目标方重启不影响断点续传**（发起方会重新 init 并获取新 session）
@@ -663,7 +698,7 @@ AgentUploader（发起方）重启
 ```
 AgentDownloader（发起方）重启
     ↓
-扫描 .transfers/ 目录
+扫描 downloadsMeta/ 目录
     ↓
 找到 download-{transferId}.json 文件？
     ├─ Yes → 读取元数据，重建 DownloadTask 对象
@@ -680,12 +715,13 @@ AgentDownloader（发起方）重启
     │        ↓
     │   本地合并 + 验证 → 成功
     │        ↓
-    │   删除 .transfers/download-{id}.json + 清理 chunks/
+    │   删除 downloadsMeta/download-{id}.json + 清理 chunks/
     │
     └─ No  → ✅ 无待恢复的下载任务
 ```
 
 **关键特点**：
+
 - ✅ **下载进度完全在发起方本地**（分块文件存在性判断）
 - ✅ **天然可靠**：文件存在且大小正确 = 已成功下载
 - ✅ **不依赖远程状态**：即使远程节点重启也不影响
@@ -733,6 +769,7 @@ AgentDownloader（发起方）重启
 ```
 
 **目标方重启后的行为**：
+
 ```
 目标方 Agent 重启
     ↓
@@ -753,12 +790,13 @@ ChunkedTransferService 重新初始化
 ```
 
 **优势**：
+
 - ✅ **目标方启动极快**：无需加载数据库或恢复 session
 - ✅ **无数据损坏风险**：重启后内存清空，不会读取到损坏的数据
 - ✅ **简化运维**：无需备份目标方的状态数据
 - ✅ **天然容错**：目标方可随时重启而不影响正在进行传输的任务（发起方会自动处理）
 
----
+***
 
 ## 6. 配置清理方案
 
@@ -766,17 +804,18 @@ ChunkedTransferService 重新初始化
 
 #### AgentConfig.java 中的字段（第198-205行）
 
-| 字段名 | 类型 | 用途 | 操作 |
-|--------|------|------|------|
-| `uploadQueueDbPath` | String | 上传队列 RocksDB 路径 | ❌ 删除 |
-| `uploadMapDbPath` | String | 上传任务映射 RocksDB 路径 | ❌ 删除 |
+| 字段名                    | 类型     | 用途                         | 操作           |
+| ---------------------- | ------ | -------------------------- | ------------ |
+| `uploadQueueDbPath`    | String | 上传队列 RocksDB 路径            | ❌ 删除         |
+| `uploadMapDbPath`      | String | 上传任务映射 RocksDB 路径          | ❌ 删除         |
 | `uploadSessionsDbPath` | String | **服务端** session RocksDB 路径 | ❌ 删除（目标方不需要） |
-| `downloadQueueDbPath` | String | 下载队列 RocksDB 路径 | ❌ 删除 |
-| `downloadMapDbPath` | String | 下载任务映射 RocksDB 路径 | ❌ 删除 |
+| `downloadQueueDbPath`  | String | 下载队列 RocksDB 路径            | ❌ 删除         |
+| `downloadMapDbPath`    | String | 下载任务映射 RocksDB 路径          | ❌ 删除         |
 
 对应的 getter/setter 方法也需要删除。
 
 #### pom.xml 中的依赖（第43-47行）
+
 ```xml
 <!-- ❌ 删除此依赖块 -->
 <dependency>
@@ -786,6 +825,7 @@ ChunkedTransferService 重新初始化
 ```
 
 #### agent.properties 或配置文件中的相关配置项
+
 ```properties
 # ❌ 删除以下配置项
 upload.queue.db.path=upload_queue_db
@@ -797,34 +837,43 @@ download.map.db.path=download_map_db
 
 ### 6.2 新增配置项（仅发起方需要）
 
-| 字段名 | 类型 | 默认值 | 用途 | 使用者 |
-|--------|------|--------|------|--------|
-| `transfersMetaDir` | String | `"./data/transfers"` | 任务元数据目录 | AgentUploader / AgentDownloader |
+| 字段名                 | 类型     | 默认值                            | 用途        | 使用者             |
+| ------------------- | ------ | ------------------------------ | --------- | --------------- |
+| `upload.meta.dir`   | String | `"./data/transfers/uploads"`   | 上传任务元数据目录 | AgentUploader   |
+| `download.meta.dir` | String | `"./data/transfers/downloads"` | 下载任务元数据目录 | AgentDownloader |
 
-**注意**：目标方（ChunkedTransferService）不需要任何新的配置项。
+**注意**：
 
----
+- ✅ **上传和下载使用独立的元数据目录**，便于独立管理和清理
+- ✅ 目录会在首次使用时自动创建（如果不存在）
+- ❌ 目标方（ChunkedTransferService）不需要任何新的配置项
+
+***
 
 ## 7. 代码变更范围与影响分析（精简版）
 
 ### 7.1 文件变更清单
 
 #### 需要删除的文件（3个）
+
 ```
 agent/src/main/java/com/cq/agent/client/upload/PersistentQueue.java    # 226行
 agent/src/main/java/com/cq/agent/client/upload/PersistentMap.java      # 268行
 ```
 
 #### 需要新增的文件（2个，比原方案少1个）
+
 ```
 agent/src/main/java/com/cq/agent/util/AtomicFileWriter.java             # ~80行
 agent/src/main/java/com/cq/agent/client/upload/TransferMetaStore.java  # ~180行
 ```
 
 **❌ 已移除**：
-- ~~SessionMetaStore.java~~ （目标方不需要持久化，节省 ~180 行）
+
+- ~~SessionMetaStore.java~~ （目标方不需要持久化，节省 \~180 行）
 
 #### 需要重构的文件（6个）
+
 ```
 agent/src/main/java/com/cq/agent/client/BaseAgentClient.java            # 🔧 移除 RocksDB 参数
 agent/src/main/java/com/cq/agent/client/upload/AgentUploader.java      # 🔧 使用 TransferMetaStore
@@ -835,6 +884,7 @@ agent/pom.xml                                                          # 🔧 �
 ```
 
 #### 可能受影响的测试文件
+
 ```
 agent/src/test/java/com/cq/agent/integration/client/upload/PersistentMapTest.java  # 需删除或重写
 agent/src/test/java/com/cq/agent/client/upload/AgentUploaderTest.java              # 需适配新接口
@@ -844,34 +894,34 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 
 ### 7.2 代码量变化预估（更新版）
 
-| 组件 | 当前行数 | 优化后行数 | 变化率 | 说明 |
-|------|---------|-----------|--------|------|
-| **PersistentQueue** | 226 | 0 (删除) | -100% | 客户端队列 |
-| **PersistentMap** (客户端) | 268 | 0 (删除) | -100% | 客户端任务 Map |
-| **PersistentMap** (服务端) | 268 | 0 (删除) | -100% | **服务端 Session Map** |
-| **AtomicFileWriter** | 0 | ~80 | 新增 | 通用工具 |
-| **TransferMetaStore** | 0 | ~180 | 新增 | **仅发起方使用** |
-| ~~SessionMetaStore~~ | - | - | - | **❌ 已取消** |
-| **BaseAgentClient** | 323 | ~260 | -19% | 移除 RocksDB 参数 |
-| **AgentUploader** | 477 | ~320 | -33% | 使用模板方法 |
-| **AgentDownloader** | 655 | ~420 | -36% | 使用模板方法 |
-| **ChunkedTransferService** | ~900 | ~650 | -28% | **大幅简化** |
-| **总计** | **~3117** | **~1910** | **-39%** | **比原方案多减少7%** |
+| 组件                         | 当前行数       | 优化后行数      | 变化率      | 说明                  |
+| -------------------------- | ---------- | ---------- | -------- | ------------------- |
+| **PersistentQueue**        | 226        | 0 (删除)     | -100%    | 客户端队列               |
+| **PersistentMap** (客户端)    | 268        | 0 (删除)     | -100%    | 客户端任务 Map           |
+| **PersistentMap** (服务端)    | 268        | 0 (删除)     | -100%    | **服务端 Session Map** |
+| **AtomicFileWriter**       | 0          | \~80       | 新增       | 通用工具                |
+| **TransferMetaStore**      | 0          | \~180      | 新增       | **仅发起方使用**          |
+| ~~SessionMetaStore~~       | -          | -          | -        | **❌ 已取消**           |
+| **BaseAgentClient**        | 323        | \~260      | -19%     | 移除 RocksDB 参数       |
+| **AgentUploader**          | 477        | \~320      | -33%     | 使用模板方法              |
+| **AgentDownloader**        | 655        | \~420      | -36%     | 使用模板方法              |
+| **ChunkedTransferService** | \~900      | \~650      | -28%     | **大幅简化**            |
+| **总计**                     | **\~3117** | **\~1910** | **-39%** | **比原方案多减少7%**       |
 
 ### 7.3 接口兼容性分析
 
 #### 公共 API 变更
 
-| 类名 | 方法签名 | 变更类型 | 影响程度 |
-|------|---------|---------|---------|
-| AgentUploader | `uploadFile(String, String, UploadListener)` | ✅ 不变 | 无影响 |
-| AgentDownloader | `downloadFile(String, String, DownloadListener)` | ✅ 不变 | 无影响 |
-| BaseAgentClient | 构造函数参数 | ⚠️ 变更 | 低（仅内部调用） |
-| ChunkedTransferService | 公共方法 | ✅ 不变 | 无影响 |
+| 类名                     | 方法签名                                             | 变更类型  | 影响程度     |
+| ---------------------- | ------------------------------------------------ | ----- | -------- |
+| AgentUploader          | `uploadFile(String, String, UploadListener)`     | ✅ 不变  | 无影响      |
+| AgentDownloader        | `downloadFile(String, String, DownloadListener)` | ✅ 不变  | 无影响      |
+| BaseAgentClient        | 构造函数参数                                           | ⚠️ 变更 | 低（仅内部调用） |
+| ChunkedTransferService | 公共方法                                             | ✅ 不变  | 无影响      |
 
 **结论**：对外公开的 API 接口保持不变，BatchTaskSchedulerManager 等调用方无需修改。
 
----
+***
 
 ## 8. 分阶段实施计划（更新版）
 
@@ -904,6 +954,7 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 #### 第一阶段：基础设施（2天）
 
 **Task 1.1: AtomicFileWriter 工具类**
+
 - [ ] 创建 `util/AtomicFileWriter.java`
 - [ ] 实现 `writeAtomically(Path, String)` 方法
 - [ ] 实现 `deleteIfExists(Path)` 方法
@@ -915,6 +966,7 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
   - 文件权限处理
 
 **Task 1.2: TransferMetaStore（仅发起方使用）**
+
 - [ ] 创建 `client/upload/TransferMetaStore.java`
 - [ ] 实现 CRUD 操作（save/load/delete/list）
 - [ ] 实现任务恢复逻辑（recoverPendingTasks）
@@ -928,6 +980,7 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 #### 第二阶段：客户端重构（6天）
 
 **Task 2.1: BaseAgentClient 重构**
+
 - [ ] 修改构造函数签名（移除 queueDbPath/mapDbPath）
 - [ ] 添加 `TransferMetaStore` 依赖注入
 - [ ] 实现 `updateTaskStatus()` 统一方法
@@ -936,6 +989,7 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 - [ ] 更新 `init()` 和 `shutdown()` 方法
 
 **Task 2.2: AgentUploader 重构**
+
 - [ ] 使用 `executePhase()` 拆分 `processTask()` 方法
 - [ ] 使用 `executeInParallel()` 重构 `uploadChunks()` 方法
 - [ ] 移除重复的状态更新代码
@@ -943,11 +997,13 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 - [ ] 保持公共 API `uploadFile()` 不变
 
 **Task 2.3: AgentDownloader 重构**
+
 - [ ] 同 Task 2.2 的步骤
 - [ ] 特别注意：复用现有的 `scanDownloadedChunks()` 逻辑
 - [ ] 验证下载断点续传功能正常
 
 **Task 2.4: 客户端集成测试**
+
 - [ ] 测试上传功能（小文件、大文件）
 - [ ] 测试下载功能
 - [ ] 测试断点续传（中途重启发起方）
@@ -957,6 +1013,7 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 #### 第三阶段：服务端重构（3天）⚡ 简化版
 
 **Task 3.1: ChunkedTransferService 大幅简化**
+
 - [ ] 替换 `PersistentMap` 为纯 `ConcurrentHashMap`
 - [ ] 修改构造函数，**移除所有 RocksDB 相关参数和逻辑**
 - [ ] **删除**所有 `sessionMetaStore.saveSession()` 调用
@@ -964,6 +1021,7 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 - [ ] **移除**启动时的 session 恢复逻辑（不再需要）
 
 **Task 3.2: 服务端测试验证**
+
 - [ ] 编写单元测试验证内存 session 管理
 - [ ] 手动测试：
   - 启动目标方 Agent
@@ -975,18 +1033,21 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 #### 第四阶段：清理与收尾（2天）
 
 **Task 4.1: 删除旧代码**
+
 - [ ] 删除 `PersistentQueue.java`
 - [ ] 删除 `PersistentMap.java`
 - [ ] 删除相关的 import 语句
 - [ ] 清理 pom.xml 中的 rocksdbjni 依赖
 
 **Task 4.2: 配置清理**
+
 - [ ] 从 `AgentConfig.java` 删除 5 个 RocksDB 路径字段
 - [ ] 删除对应的 getter/setter 方法
 - [ ] 从配置文件中删除相关配置项
-- [ ] 添加新的 `transfersMetaDir` 配置项（仅1个）
+- [ ] 添加新的 `upload.meta.dir` 和 `download.meta.dir` 配置项（仅2项）
 
 **Task 4.3: 最终验证**
+
 - [ ] 端到端测试：完整的上传→下载流程
 - [ ] 断点续传测试：多次重启**发起方**
 - [ ] **目标方重启测试**：验证无状态设计的健壮性
@@ -994,79 +1055,80 @@ agent/src/test/java/com/cq/agent/integration/client/AgentDownloaderIntegrationTe
 - [ ] 内存泄漏检测：长时间运行稳定性测试
 - [ ] 更新 README.md 和相关文档
 
----
+***
 
 ## 9. 风险分析与应对策略（更新版）
 
 ### 9.1 技术风险
 
-| 风险项 | 概率 | 影响 | 应对措施 |
-|--------|------|------|---------|
-| **并发写入冲突**（仅发起方） | 中 | 中 | 1. 使用 synchronized 保护写操作<br/>2. 降低写入频率（仅在状态变更时）<br/>3. 文件锁作为备选方案 |
-| **文件系统性能瓶颈**（仅发起方） | 低 | 低 | 1. JSON 文件很小（<1KB），IO 开销可忽略<br/>2. 内存 Map 作为主存储，JSON 仅作备份<br/>3. 可配置是否启用持久化 |
-| **异常中断导致残留文件**（仅发起方） | 低 | 低 | 1. 启动时自动扫描和清理损坏文件<br/>2. 临时文件命名包含时间戳，易于识别<br/>3. 定期清理任务 |
-| **目标方重启导致 session 丢失** | 高 | **低** | ✅ **这是设计特性而非缺陷**：<br/>1. 发起方会检测到远程错误并重新 init<br/>2. 目标方重启后会创建全新 session<br/>3. 发起方根据本地元数据继续传输<br/>4. **无需特殊处理，天然容错** |
-| **大规模并发场景性能下降** | 中 | 中 | 1. 内存 ConcurrentHashMap 作为主存储（目标方和发起方）<br/>2. 异步批量写入替代实时同步（发起方）<br/>3. 监控写入延迟，设置告警阈值 |
+| 风险项                    | 概率 | 影响    | 应对措施                                                                                             |
+| ---------------------- | -- | ----- | ------------------------------------------------------------------------------------------------ |
+| **并发写入冲突**（仅发起方）       | 中  | 中     | 1. 使用 synchronized 保护写操作2. 降低写入频率（仅在状态变更时）3. 文件锁作为备选方案                                           |
+| **文件系统性能瓶颈**（仅发起方）     | 低  | 低     | 1. JSON 文件很小（<1KB），IO 开销可忽略2. 内存 Map 作为主存储，JSON 仅作备份3. 可配置是否启用持久化                                |
+| **异常中断导致残留文件**（仅发起方）   | 低  | 低     | 1. 启动时自动扫描和清理损坏文件2. 临时文件命名包含时间戳，易于识别3. 定期清理任务                                                    |
+| **目标方重启导致 session 丢失** | 高  | **低** | ✅ **这是设计特性而非缺陷**：1. 发起方会检测到远程错误并重新 init2. 目标方重启后会创建全新 session3. 发起方根据本地元数据继续传输4. **无需特殊处理，天然容错** |
+| **大规模并发场景性能下降**        | 中  | 中     | 1. 内存 ConcurrentHashMap 作为主存储（目标方和发起方）2. 异步批量写入替代实时同步（发起方）3. 监控写入延迟，设置告警阈值                       |
 
 ### 9.2 业务风险
 
-| 风险项 | 概率 | 影响 | 应对措施 |
-|--------|------|------|---------|
-| **断点续传数据丢失**（仅发起方） | 低 | 高 | 1. 原子性写入保证一致性<br/>2. 定期备份关键元数据（可选）<br/>3. 监控任务失败率 |
-| **迁移期间服务不可用** | 低 | 高 | 1. 灰度发布，先在测试环境验证<br/>2. 选择低峰期进行切换<br/>3. 目标方无状态，迁移风险更低 |
-| **第三方组件不兼容** | 极低 | 中 | 1. 仅移除 RocksDB，不影响其他依赖<br/>2. 全面回归测试<br/>3. 保留旧版本代码作为 fallback（首次发布） |
+| 风险项                | 概率 | 影响 | 应对措施                                                       |
+| ------------------ | -- | -- | ---------------------------------------------------------- |
+| **断点续传数据丢失**（仅发起方） | 低  | 高  | 1. 原子性写入保证一致性2. 定期备份关键元数据（可选）3. 监控任务失败率                    |
+| **迁移期间服务不可用**      | 低  | 高  | 1. 灰度发布，先在测试环境验证2. 选择低峰期进行切换3. 目标方无状态，迁移风险更低               |
+| **第三方组件不兼容**       | 极低 | 中  | 1. 仅移除 RocksDB，不影响其他依赖2. 全面回归测试3. 保留旧版本代码作为 fallback（首次发布） |
 
----
+***
 
 ## 10. 预期收益总结（更新版）
 
 ### 10.1 量化指标（更优）
 
-| 指标 | 当前值 | 优化后 | 改善幅度 | vs 原方案 |
-|------|-------|--------|---------|----------|
-| **总代码行数** | ~3117行 | ~1910行 | **-39%** ⬇️ | **多减少7%** |
-| **RocksDB 依赖大小** | 15MB | 0MB | **-100%** | 相同 |
-| **外部依赖数量** | 3个 | 2个 | **-33%** | 相同 |
-| **启动速度（发起方）** | ~500ms | ~50ms | **10x 提升** | 相同 |
-| **启动速度（目标方）** | ~500ms | **~10ms** | **50x 提升** | **⚡ 更优** |
-| **调试复杂度** | 需专用工具查看 DB | 直接 `cat` JSON 文件 | **极简** | 相同 |
-| **部署包体积** | 较大 | 减少 15MB | **显著减小** | 相同 |
-| **新增组件数量** | - | 2个 | - | **少1个** |
-| **实施周期** | - | 13天 | - | **快2天** |
+| 指标               | 当前值        | 优化后              | 改善幅度        | vs 原方案    |
+| ---------------- | ---------- | ---------------- | ----------- | --------- |
+| **总代码行数**        | \~3117行    | \~1910行          | **-39%** ⬇️ | **多减少7%** |
+| **RocksDB 依赖大小** | 15MB       | 0MB              | **-100%**   | 相同        |
+| **外部依赖数量**       | 3个         | 2个               | **-33%**    | 相同        |
+| **启动速度（发起方）**    | \~500ms    | \~50ms           | **10x 提升**  | 相同        |
+| **启动速度（目标方）**    | \~500ms    | **\~10ms**       | **50x 提升**  | **⚡ 更优**  |
+| **调试复杂度**        | 需专用工具查看 DB | 直接 `cat` JSON 文件 | **极简**      | 相同        |
+| **部署包体积**        | 较大         | 减少 15MB          | **显著减小**    | 相同        |
+| **新增组件数量**       | -          | 2个               | -           | **少1个**   |
+| **实施周期**         | -          | 13天              | -           | **快2天**   |
 
 ### 10.2 质量指标改善
 
-| 维度 | 当前评分 (1-5) | 优化后评分 | 说明 |
-|------|---------------|-----------|------|
-| **代码可维护性** | 2 | 4 | 消除重复，清晰分层 |
-| **可读性** | 2 | 5 | 模板方法模式，意图明确 |
-| **可测试性** | 2 | 4 | 依赖注入，易于 Mock |
-| **运维友好度** | 2 | 5 | JSON 文件，人类可读 |
-| **扩展性** | 3 | 4 | 松耦合，易于添加新功能 |
-| **目标方简洁度** | 2 | **5** | **⚡ 无状态设计，极简** |
+| 维度         | 当前评分 (1-5) | 优化后评分 | 说明             |
+| ---------- | ---------- | ----- | -------------- |
+| **代码可维护性** | 2          | 4     | 消除重复，清晰分层      |
+| **可读性**    | 2          | 5     | 模板方法模式，意图明确    |
+| **可测试性**   | 2          | 4     | 依赖注入，易于 Mock   |
+| **运维友好度**  | 2          | 5     | JSON 文件，人类可读   |
+| **扩展性**    | 3          | 4     | 松耦合，易于添加新功能    |
+| **目标方简洁度** | 2          | **5** | **⚡ 无状态设计，极简** |
 
 ### 10.3 功能保障矩阵
 
-| 核心功能 | 发起方 | 目标方 | 保障程度 | 实现方式 |
-|---------|--------|--------|---------|---------|
-| ✅ **断点续传** | ✅ JSON + 分块文件 | ✅ 内存 Map（可选） | **完全保留** | 发起方主导，目标方辅助查询 |
-| ✅ **分块传输** | ✅ | ✅ | **完全保留** | 不变 |
-| ✅ **多线程传输** | ✅ | ✅ | **完全保留** | 不变 |
-| ✅ **速率限制** | ✅ | - | **完全保留** | TrafficRateLimiter |
-| ✅ **任务重试** | ✅ | - | **完全保留** | maxRetries + retryDelayMs |
-| ✅ **进度监听** | ✅ | - | **完全保留** | Listener 回调机制 |
-| ✅ **Session 管理** | - | ✅ 纯内存 | **完全保留** | ConcurrentHashMap |
-| ✅ **过期清理** | ✅ JSON + 文件 | ✅ 内存 + 分块文件 | **完全保留** | 定时任务 |
-| ✅ **批量调度集成** | ✅ | - | **完全保留** | 公共 API 不变 |
-| ✅ **目标方可随时重启** | - | ✅ **新增能力** | **增强** | **无状态设计天然支持** |
+| 核心功能             | 发起方           | 目标方          | 保障程度     | 实现方式                      |
+| ---------------- | ------------- | ------------ | -------- | ------------------------- |
+| ✅ **断点续传**       | ✅ JSON + 分块文件 | ✅ 内存 Map（可选） | **完全保留** | 发起方主导，目标方辅助查询             |
+| ✅ **分块传输**       | ✅             | ✅            | **完全保留** | 不变                        |
+| ✅ **多线程传输**      | ✅             | ✅            | **完全保留** | 不变                        |
+| ✅ **速率限制**       | ✅             | -            | **完全保留** | TrafficRateLimiter        |
+| ✅ **任务重试**       | ✅             | -            | **完全保留** | maxRetries + retryDelayMs |
+| ✅ **进度监听**       | ✅             | -            | **完全保留** | Listener 回调机制             |
+| ✅ **Session 管理** | -             | ✅ 纯内存        | **完全保留** | ConcurrentHashMap         |
+| ✅ **过期清理**       | ✅ JSON + 文件   | ✅ 内存 + 分块文件  | **完全保留** | 定时任务                      |
+| ✅ **批量调度集成**     | ✅             | -            | **完全保留** | 公共 API 不变                 |
+| ✅ **目标方可随时重启**   | -             | ✅ **新增能力**   | **增强**   | **无状态设计天然支持**             |
 
----
+***
 
 ## 11. 附录
 
 ### 附录 A: 关键代码片段参考
 
 #### A.1 TransferMetaStore 核心接口（仅发起方使用）
+
 ```java
 public interface ITransferMetaStore<TASK> {
     void saveTask(TASK task) throws IOException;
@@ -1078,6 +1140,7 @@ public interface ITransferMetaStore<TASK> {
 ```
 
 #### A.2 ChunkedTransferService 简化后的核心结构
+
 ```java
 public class ChunkedTransferService {
     // 仅内存状态，无持久化
@@ -1104,6 +1167,7 @@ public class ChunkedTransferService {
 ```
 
 #### A.3 配置迁移对照表
+
 ```properties
 # ❌ 旧配置（全部删除）
 upload.queue.db.path=upload_queue_db
@@ -1112,19 +1176,20 @@ upload.sessions.db.path=upload_sessions_db  # 服务端配置，完全不需要
 download.queue.db.path=download_queue_db
 download.map.db.path=download_map_db
 
-# ✅ 新配置（仅1项，仅发起方使用）
-agent.transfer.transfers-meta-dir=./data/transfers
+# ✅ 新配置（仅2项，仅发起方使用）
+upload.meta.dir=./data/transfers/uploads       # 上传任务元数据目录
+download.meta.dir=./data/transfers/downloads   # 下载任务元数据目录
 ```
 
 ### 附录 B: 测试用例清单
 
 #### B.1 单元测试（必做）
+
 - [ ] AtomicFileWriterTest
   - testNormalWrite
   - testAtomicRename
   - testWriteFailureCleanup
   - testConcurrentWrites
-
 - [ ] TransferMetaStoreTest（仅发起方）
   - testSaveAndLoadTask
   - testRecoverPendingTasks
@@ -1133,18 +1198,17 @@ agent.transfer.transfers-meta-dir=./data/transfers
   - testConcurrentAccess
 
 #### B.2 集成测试（必做）
+
 - [ ] UploadIntegrationTest（发起方测试）
   - testSmallFileUpload
   - testLargeFileUpload
   - testResumableUploadAfterRestart  # 重启发起方
   - testConcurrentUploads
-
 - [ ] DownloadIntegrationTest（发起方测试）
   - testSmallFileDownload
   - testLargeFileDownload
   - testResumableDownloadAfterRestart  # 重启发起方
   - testConcurrentDownloads
-
 - [ ] ServerStatelessTest（**新增：目标方无状态测试**）
   - testServerRestartDuringUpload     # 上传过程中重启目标方
   - testServerRestartDuringDownload    # 下载过程中重启目标方
@@ -1152,11 +1216,11 @@ agent.transfer.transfers-meta-dir=./data/transfers
   - testServerCleanupAfterRestart      # 重启后清理是否正常
 
 #### B.3 性能测试（可选）
+
 - [ ] ThroughputBenchmark
   - 对比优化前后的上传/下载吞吐量
   - 测量发起方启动时间差异
   - 测量**目标方启动时间差异**（应该更快）
-
 - [ ] StabilityTest
   - 24小时连续运行
   - 多次重启**发起方**恢复测试
@@ -1168,16 +1232,18 @@ agent.transfer.transfers-meta-dir=./data/transfers
 #### 决策 1: 为什么目标方不持久化？
 
 **选项 A: 双端持久化（原方案 v2.0）**
+
 - 发起方：JSON 元数据
 - 目标方：JSON session 元数据
 - 优点：目标方重启后可恢复 session
 - 缺点：代码复杂度高，需要维护两套持久化逻辑
 
 **选项 B: 仅发起方持久化（最终方案 v2.1）✅**
+
 - 发起方：JSON 元数据 + 分块文件
 - 目标方：纯内存，无持久化
 - 优点：
-  - ✅ **代码更简单**（减少 ~180 行）
+  - ✅ **代码更简单**（减少 \~180 行）
   - ✅ **目标方启动更快**（50x 提升）
   - ✅ **运维更简单**（无需备份目标方状态）
   - ✅ **天然容错**（目标方可随时重启）
@@ -1193,6 +1259,7 @@ agent.transfer.transfers-meta-dir=./data/transfers
 **担忧**：目标方不持久化，重启后丢失 session，如何保证断点续传？
 
 **答案**：
+
 1. **发起方拥有完整上下文**：本地 JSON 记录了 transferId、文件路径、大小等所有必要信息
 2. **自动重新初始化**：发起方发现远程 session 不存在时，会自动调用 `/chunk/init` 创建新 session
 3. **智能恢复策略**：
@@ -1205,16 +1272,16 @@ agent.transfer.transfers-meta-dir=./data/transfers
 
 **结论**：断点续传功能完全可靠，目标方无状态设计是合理的架构选择。
 
----
+***
 
 ## 12. 审批记录
 
-| 日期 | 版本 | 作者 | 变更内容 | 审批人 | 状态 |
-|------|------|------|---------|--------|------|
-| 2026-01-15 | v1.0 | AI Assistant | 初稿，提出3种方案 | User | 待审核 |
-| 2026-01-15 | v2.0 | AI Assistant | 加入服务端优化 + 配置清理 | User | ✅ 已批准 |
+| 日期         | 版本   | 作者           | 变更内容                  | 审批人  | 状态    |
+| ---------- | ---- | ------------ | --------------------- | ---- | ----- |
+| 2026-01-15 | v1.0 | AI Assistant | 初稿，提出3种方案             | User | 待审核   |
+| 2026-01-15 | v2.0 | AI Assistant | 加入服务端优化 + 配置清理        | User | ✅ 已批准 |
 | 2026-01-15 | v2.1 | AI Assistant | **修订：仅发起方持久化，目标方无状态** | User | ✅ 已批准 |
 
----
+***
 
 **文档结束**

@@ -2,6 +2,7 @@ package com.cq.agent.client.upload;
 
 import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.client.RemoteAgentInfo;
+import com.cq.agent.client.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
 import com.google.gson.reflect.TypeToken;
@@ -15,6 +16,7 @@ import java.lang.reflect.Type;
 import java.net.URI;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -39,8 +41,9 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                 agentConfig.getUploadMaxQueueDepth(), agentConfig.getUploadWorkerCount(),
                 agentConfig.getUploadMaxRetries(), agentConfig.getUploadRetryDelayMs(),
                 agentConfig.getUploadConnectTimeoutSeconds(), agentConfig.getUploadRequestTimeoutSeconds(),
-                agentConfig.getUploadMetaDir(),
-                agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload");
+                agentConfig.getUploadSendingQueueDir(),
+                agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload",
+                agentConfig.getUploadFailRetryQueueDir());
         this.agentConfig = agentConfig;
     }
 
@@ -50,6 +53,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
         String traceId = task.getTraceId();
 
         try {
+            task.setScannedStartTime(Util.currentTime());
             updateTaskStatus(task, UploadTaskStatus.SCANNED);
             task.incrementRetryCount();
 
@@ -65,10 +69,12 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             if (fileCheck != null) {
                 throw new IOException(fileCheck);
             }
+            task.setScannedEndTime(Util.currentTime());
 
             File file = new File(task.getLocalFilePath());
 
             task.setStatus(UploadTaskStatus.INIT_UPLOADING);
+            task.setInitUploadStartTime(Util.currentTime());
             updateTaskStatus(task, UploadTaskStatus.INIT_UPLOADING);
 
             String transferId = task.getTransferId();
@@ -93,9 +99,11 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             task.setChunkSize(chunkSize);
             task.setTotalChunks(totalChunks);
             task.setMissingChunks(missingChunks);
+            task.setInitUploadEndTime(Util.currentTime());
             updateTaskStatus(task, UploadTaskStatus.INIT_UPLOAD_COMPLETED);
 
             try {
+                task.setUploadChunksStartTime(Util.currentTime());
                 updateTaskStatus(task, UploadTaskStatus.UPLOADING_CHUNKS);
                 uploadChunks(task, file, taskKey, task.getLocalFilePath(), task.getRemoteTargetPath(), traceId);
 
@@ -107,6 +115,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                         throw new IllegalStateException("Upload failed, missing chunks: " + finalMissingChunks);
                     }
                 }
+                task.setUploadChunksEndTime(Util.currentTime());
                 updateTaskStatus(task, UploadTaskStatus.UPLOAD_CHUNKS_COMPLETED);
             } catch (IOException e) {
                 ApiResponse<ChunkStatusResponse> latestStatus = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
@@ -115,8 +124,10 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             }
 
             try {
+                task.setMergeChunksStartTime(Util.currentTime());
                 updateTaskStatus(task, UploadTaskStatus.MERGING_CHUNKS);
                 mergeChunks(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
+                task.setMergeChunksEndTime(Util.currentTime());
                 updateTaskStatus(task, UploadTaskStatus.MERGE_CHUNKS_COMPLETED);
             } catch (IOException e) {
                 ApiResponse<ChunkStatusResponse> latestStatus = fetchLatestStatus(task.getRemoteAgentApiUrl(), task.getTransferId(), traceId);
@@ -124,7 +135,11 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                 throw e;
             }
 
+            task.setVerifyStartTime(Util.currentTime());
+            updateTaskStatus(task, UploadTaskStatus.VERIFYING_CHUNKS);
             if (verifyRemoteFileExists(task.getRemoteAgentApiUrl(), task.getRemoteTargetPath(), traceId)) {
+                task.setVerifyEndTime(Util.currentTime());
+                updateTaskStatus(task, UploadTaskStatus.VERIFY_CHUNKS_COMPLETED);
                 task.setUploadSuccessTime(Util.currentTime());
                 updateTaskStatus(task, UploadTaskStatus.UPLOAD_SUCCESS);
                 handleListenerSuccess(taskKey, task);
@@ -136,8 +151,17 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             logger.info("[traceId={}] Upload task completed: {}", traceId, taskKey);
         } catch (Exception e) {
             logger.error("[traceId={}] Upload task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
-            updateTaskStatus(task, UploadTaskStatus.FAILED);
             task.setExceptionDesc(e.getMessage());
+            updateTaskStatus(task, UploadTaskStatus.FAILED);
+
+            if (metaStore != null && failedQueueDir != null) {
+                try {
+                    metaStore.moveToFailedQueue(task.getTransferId(), failedQueueDir);
+                } catch (IOException ex) {
+                    logger.warn("[traceId={}] 移动失败任务到重试队列失败: {}", traceId, ex.getMessage());
+                }
+            }
+
             handleListenerError(taskKey, e.getMessage());
             inflightTasks.remove(task.getTransferId());
         } finally {
@@ -251,6 +275,11 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             task.setEnqueuedTime(Util.currentTime());
             task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
             task.updateTimestamp();
+
+            if (metaStore != null) {
+                metaStore.saveTask(task);
+            }
+
             if (!this.inflightTasks.containsKey(task.getTransferId())) {
                 this.inflightTasks.put(task.getTransferId(), task);
             }
@@ -269,9 +298,9 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
             return;
         }
 
-        AtomicInteger uploadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
+        int initialUploadedCount = task.getTotalChunks() - missingChunks.size();
         UploadListener listener = listenerCache.get(taskKey);
-        task.setUploadChunksCount(uploadedCount);
+        task.setUploadChunksCount(new AtomicInteger(initialUploadedCount));
 
         try (FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             CompletableFuture<?>[] uploadFutures = missingChunks.stream()
@@ -286,8 +315,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                             if (!uploadResponse.isSuccess()) {
                                 throw new IOException("Chunk upload failed: " + uploadResponse.getMsg());
                             }
-                            int currentUploaded = uploadedCount.incrementAndGet();
                             task.incrementUploadChunksCount();
+                            int currentUploaded = task.getUploadChunksCount().get();
                             task.updateTimestamp();
                             this.inflightTasks.put(task.getTransferId(), task);
                             if (listener != null) {
@@ -472,5 +501,42 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
 
     void clearAllInflightTasks() {
         inflightTasks.clear();
+    }
+
+    /**
+     * 重新提交失败的任务（内部方法，供 RetryManager 调用）
+     * 与 uploadFile() 的区别：
+     * - 不重新扫描文件
+     * - 直接使用已有的任务对象
+     * - 跳过文件存在性检查
+     *
+     * @param task 已有的 UploadTask 对象（包含 localFilePath, remoteTargetPath 等）
+     */
+    public void resubmitTask(UploadTask task) {
+        String taskKey = getTaskKey(task);
+        String traceId = task.getTraceId();
+
+        logger.info("[traceId={}] 🔄 重新提交失败任务: transferId={}, file={}, retryCount={}, remoteTarget={}",
+            traceId,
+            task.getTransferId(),
+            task.getLocalFilePath(),
+            task.getRetryCount(),
+            task.getRemoteTargetPath());
+
+        // 直接将任务对象放入工作队列（worker线程会自动poll并处理）
+        boolean offered = taskQueue.offer(task);
+
+        if (offered) {
+            logger.debug("✅ 任务已加入工作队列: taskKey={}", taskKey);
+        } else {
+            logger.error("❌ 任务加入工作队列失败: taskKey={}", taskKey);
+        }
+    }
+
+    /**
+     * 获取失败队列目录（用于日志和监控）
+     */
+    public Path getFailedQueueDir() {
+        return failedQueueDir;
     }
 }

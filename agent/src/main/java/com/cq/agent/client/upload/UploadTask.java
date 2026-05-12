@@ -1,6 +1,6 @@
 package com.cq.agent.client.upload;
 
-import com.cq.agent.client.TransferTask;
+import com.cq.agent.client.TaskInfo;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Getter
 @Setter
-public class UploadTask implements TransferTask<UploadTaskStatus> {
+public class UploadTask implements TaskInfo {
     private String localFilePath;
     private String remoteTargetPath;
     private String transferId;
@@ -27,6 +27,8 @@ public class UploadTask implements TransferTask<UploadTaskStatus> {
     private String createTime;
     private String updateTime;
     private String enqueuedTime;
+    private String scannedStartTime;
+    private String scannedEndTime;
     private String initUploadStartTime;
     private String initUploadEndTime;
     private String uploadChunksStartTime;
@@ -34,6 +36,9 @@ public class UploadTask implements TransferTask<UploadTaskStatus> {
     private String mergeChunksStartTime;
     private String mergeChunksEndTime;
     private String uploadSuccessTime;
+    private String verifyStartTime;
+    private String verifyEndTime;
+
     private int chunkSize;
     private int totalChunks;
     private final long totalSize;
@@ -87,6 +92,8 @@ public class UploadTask implements TransferTask<UploadTaskStatus> {
                 ", createTime='" + createTime + '\'' +
                 ", updateTime='" + updateTime + '\'' +
                 ", enqueuedTime='" + enqueuedTime + '\'' +
+                ", scannedStartTime='" + scannedStartTime + '\'' +
+                ", scannedEndTime='" + scannedEndTime + '\'' +
                 ", initUploadStartTime='" + initUploadStartTime + '\'' +
                 ", initUploadEndTime='" + initUploadEndTime + '\'' +
                 ", uploadChunksStartTime='" + uploadChunksStartTime + '\'' +
@@ -94,6 +101,8 @@ public class UploadTask implements TransferTask<UploadTaskStatus> {
                 ", mergeChunksStartTime='" + mergeChunksStartTime + '\'' +
                 ", mergeChunksEndTime='" + mergeChunksEndTime + '\'' +
                 ", uploadSuccessTime='" + uploadSuccessTime + '\'' +
+                ", verifyStartTime='" + verifyStartTime + '\'' +
+                ", verifyEndTime='" + verifyEndTime + '\'' +
                 ", chunkSize=" + chunkSize +
                 ", totalChunks=" + totalChunks +
                 ", totalSize=" + totalSize +

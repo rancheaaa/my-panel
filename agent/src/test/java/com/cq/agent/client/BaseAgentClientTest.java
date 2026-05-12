@@ -1,6 +1,5 @@
 package com.cq.agent.client;
 
-import com.cq.agent.client.upload.TransferMetaStore;
 import com.cq.agent.client.upload.UploadTask;
 import com.cq.agent.client.upload.UploadTaskStatus;
 import com.cq.agent.config.AgentConfig;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
@@ -156,9 +156,9 @@ class BaseAgentClientTest {
         public TestableBaseClient(Path metaDir) throws Exception {
             super(createMockConfig(), 2, 100, 1, 3, 1000,
                   10, 30, metaDir.toString(),
-                  0, UploadTask.class, "TEST");
+                  0, UploadTask.class, "TEST", metaDir.resolve("failed").toString());
 
-            this.metaStore = new TransferMetaStore<>(metaDir, UploadTask.class);
+            this.metaStore = new TransferMetaStore(metaDir, UploadTask.class);
             setMetaStore(this.metaStore);
             init();
         }
@@ -181,6 +181,25 @@ class BaseAgentClientTest {
                 inflightTasks.remove(getTaskKey(task));
             } catch (Exception e) {
                 logger.error("处理任务失败: {}", task.getTransferId(), e);
+            }
+        }
+
+        public void updateTaskStatus(UploadTask task, UploadTaskStatus status) {
+            try {
+                task.setStatus(status);
+                task.updateTimestamp();
+            } catch (Exception e) {
+                logger.error("更新任务状态失败: {}", e.getMessage());
+            }
+
+            inflightTasks.put(getTaskKey(task), task);
+
+            if (metaStore != null) {
+                try {
+                    metaStore.saveTask(task);
+                } catch (IOException e) {
+                    logger.warn("保存任务元数据失败: {}", e.getMessage());
+                }
             }
         }
 

@@ -1,6 +1,6 @@
 package com.cq.agent.handler.batch;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.dto.ApiCode;
@@ -44,7 +44,7 @@ public class BatchConfigReceiveHandler extends BaseHandler {
         }
 
         try {
-            BatchTransferTaskConfig config = parseBody(request, BatchTransferTaskConfig.class);
+            AgentTaskConfig config = parseBody(request, AgentTaskConfig.class);
 
             if (config == null || config.getTaskId() == null) {
                 sendResponse(ctx, request, io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST,

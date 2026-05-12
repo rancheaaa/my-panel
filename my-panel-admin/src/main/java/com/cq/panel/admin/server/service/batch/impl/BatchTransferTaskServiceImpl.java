@@ -388,7 +388,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
             event.setRetryCount(0);
             // 设置过期时间：24小时后
             event.setExpireAt(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000));
-            event.setPayload(configSerializer.serialize(task));
+            event.setPayload(configSerializer.serializeForAgent(task));
             eventMapper.insertEvent(event);
         } catch (Exception e) {
             log.error("创建同步事件失败: eventType={}, taskId={}", eventType, taskId, e);

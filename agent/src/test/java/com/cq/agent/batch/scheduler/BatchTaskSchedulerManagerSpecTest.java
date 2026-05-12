@@ -1,6 +1,7 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,9 +59,9 @@ class BatchTaskSchedulerManagerSpecTest {
     @DisplayName("1. [spec.md] 启动时应加载所有RUNNING状态的任务")
     void testStartAllRunningTasks_shouldLoadRunningTasks() {
         // Given: 2个RUNNING任务，1个PAUSED任务
-        BatchTransferTaskConfig runningTask1 = createConfig(1L, "RUNNING", "0 */5 * * * ?");
-        BatchTransferTaskConfig runningTask2 = createConfig(2L, "RUNNING", "0 0 * * * ?");
-        BatchTransferTaskConfig pausedTask = createConfig(3L, "PAUSED", "0 0 * * * ?");
+        AgentTaskConfig runningTask1 = createConfig(1L, "RUNNING", "0 */5 * * * ?");
+        AgentTaskConfig runningTask2 = createConfig(2L, "RUNNING", "0 0 * * * ?");
+        AgentTaskConfig pausedTask = createConfig(3L, "PAUSED", "0 0 * * * ?");
 
         when(configFileManager.loadAllTaskConfigs()).thenReturn(
             Arrays.asList(runningTask1, runningTask2, pausedTask)
@@ -70,7 +71,7 @@ class BatchTaskSchedulerManagerSpecTest {
         schedulerManager.startAllRunningTasks();
 
         // Then: 只有RUNNING任务被启动
-        verify(quartzTaskScheduler, times(2)).startTask(any(BatchTransferTaskConfig.class), any(Runnable.class));
+        verify(quartzTaskScheduler, times(2)).startTask(any(AgentTaskConfig.class), any(Runnable.class));
         verify(quartzTaskScheduler).startTask(argThat(c -> c.getTaskId().equals(1L)), any(Runnable.class));
         verify(quartzTaskScheduler).startTask(argThat(c -> c.getTaskId().equals(2L)), any(Runnable.class));
 
@@ -91,13 +92,14 @@ class BatchTaskSchedulerManagerSpecTest {
     @Test
     @DisplayName("3. [spec.md] 启动任务时应传入Cron表达式")
     void testStartTask_shouldPassCronExpression() {
-        BatchTransferTaskConfig config = createConfig(1L, "RUNNING", "0 */5 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "RUNNING", "0 */5 * * * ?");
 
         schedulerManager.startTask(config);
 
-        verify(quartzTaskScheduler).startTask(argThat(c -> 
-            c.getTaskId().equals(1L) && 
-            "0 */5 * * * ?".equals(c.getCronExpression())
+        verify(quartzTaskScheduler).startTask(argThat(c ->
+            c.getTaskId().equals(1L) &&
+            c.getScanConfig() != null &&
+            "0 */5 * * * ?".equals(c.getScanConfig().getCronExpression())
         ), any(Runnable.class));
 
         System.out.println("✅ Cron表达式验证: 正确传递给Quartz");
@@ -106,7 +108,7 @@ class BatchTaskSchedulerManagerSpecTest {
     @Test
     @DisplayName("4. [spec.md] 缺少Cron表达式的任务应跳过")
     void testStartTask_noCron_shouldSkip() {
-        BatchTransferTaskConfig config = createConfig(1L, "RUNNING", null);
+        AgentTaskConfig config = createConfig(1L, "RUNNING", null);
 
         schedulerManager.startTask(config);
 
@@ -135,7 +137,7 @@ class BatchTaskSchedulerManagerSpecTest {
     @Test
     @DisplayName("7. [spec.md] 应支持热更新任务")
     void testUpdateTask_shouldCallQuartzUpdate() {
-        BatchTransferTaskConfig config = createConfig(1L, "RUNNING", "0 */10 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "RUNNING", "0 */10 * * * ?");
         when(quartzTaskScheduler.isTaskRunning(1L)).thenReturn(true);
 
         schedulerManager.updateTask(config);
@@ -147,7 +149,7 @@ class BatchTaskSchedulerManagerSpecTest {
     @Test
     @DisplayName("8. [spec.md] 更新未运行任务时应启动它")
     void testUpdateTask_notRunning_shouldStart() {
-        BatchTransferTaskConfig config = createConfig(1L, "RUNNING", "0 */10 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "RUNNING", "0 */10 * * * ?");
         when(quartzTaskScheduler.isTaskRunning(1L)).thenReturn(false);
 
         schedulerManager.updateTask(config);
@@ -189,15 +191,19 @@ class BatchTaskSchedulerManagerSpecTest {
 
     // ==================== 辅助方法 ====================
 
-    private BatchTransferTaskConfig createConfig(Long taskId, String status, String cronExpression) {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createConfig(Long taskId, String status, String cronExpression) {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(taskId);
         config.setTaskName("任务" + taskId);
         config.setStatus(status);
-        config.setCronExpression(cronExpression);
+        if (cronExpression != null) {
+            ScanConfig scanConfig = new ScanConfig();
+            scanConfig.setCronExpression(cronExpression);
+            config.setScanConfig(scanConfig);
+        }
         config.setSourceAgentId("agent-001");
         config.setSourceDir("/var/log/app");
-        config.setVersion(1L);
+        config.setVersion(String.valueOf(1));
         return config;
     }
 }

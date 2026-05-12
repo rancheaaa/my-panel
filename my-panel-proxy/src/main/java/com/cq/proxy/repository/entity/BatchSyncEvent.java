@@ -47,4 +47,7 @@ public class BatchSyncEvent {
 
     /** 下次可重试时间 */
     private Date nextRetryAt;
+
+    /** 更新时间 */
+    private Date updateTime;
 }

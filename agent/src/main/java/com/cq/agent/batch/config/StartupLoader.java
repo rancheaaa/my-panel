@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+
 /**
  * 启动加载器
  * Agent启动时加载本地配置，恢复运行中任务的调度器
@@ -27,7 +29,7 @@ public class StartupLoader {
      * 加载所有本地任务配置
      * @return 任务配置列表（可能为空）
      */
-    public List<BatchTransferTaskConfig> load() {
+    public List<AgentTaskConfig> load() {
         log.info("🚀 开始加载本地配置...");
         
         TaskMetaInfo metaInfo = configFileManager.loadMetaInfo();
@@ -38,10 +40,10 @@ public class StartupLoader {
             return List.of();
         }
         
-        List<BatchTransferTaskConfig> loadedTasks = metaList.stream()
+        List<AgentTaskConfig> loadedTasks = metaList.stream()
             .map(meta -> {
                 try {
-                    BatchTransferTaskConfig config = configFileManager.loadTaskConfig(meta.getTaskId());
+                    AgentTaskConfig config = configFileManager.loadTaskConfig(meta.getTaskId());
                     if (config != null && "RUNNING".equals(config.getStatus())) {
                         recreateScheduler(meta.getTaskId());
                     }

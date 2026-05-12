@@ -1,6 +1,10 @@
 package com.cq.agent.handler.batch;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
+import com.cq.panel.common.dto.batch.TransferConfig;
+import com.cq.panel.common.dto.batch.RetryConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.service.ChunkedTransferService;
@@ -17,7 +21,7 @@ import org.junit.jupiter.api.*;
 import org.mockito.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -183,7 +187,7 @@ class BatchConfigReceiveHandlerSpecTest {
     @Test
     @DisplayName("6. [spec.md] taskId为null时应返回400错误")
     void testHandle_nullTaskId_returns400() {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+        AgentTaskConfig config = new AgentTaskConfig();
         // taskId is null
         String json = gson.toJson(config);
 
@@ -240,50 +244,51 @@ class BatchConfigReceiveHandlerSpecTest {
         ChannelHandlerContext ctx = mockContext(channel);
 
         // 创建完整配置
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(1L);
         config.setTaskName("日志备份任务");
         config.setSourceAgentId("agent-001");
         config.setSourceAgentName("root@10.0.0.1:7777");
         config.setSourceDir("/var/log/app");
-        config.setTargetDirs(List.of("/backup/logs"));
+
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setAgentId("agent-002");
+        target.setAgentName("root@10.0.0.2:7777");
+        target.setTargetDir("/backup/logs");
+        targets.add(target);
+        config.setTargetAgents(targets);
+
         config.setIncludePatterns(List.of("*.log"));
         config.setExcludePatterns(List.of("debug*"));
-        config.setTargetAgentIds(List.of("agent-002"));
-        config.setTargetAgentNames(List.of("root@10.0.0.2:7777"));
         config.setStatus("RUNNING");
-        config.setVersion(1L);
-        config.setMaxRetries(10);
+        config.setVersion(String.valueOf(1));
+
+        RetryConfig retryConfig = new RetryConfig();
+        retryConfig.setMaxRetryCount(Integer.valueOf(10));
+        config.setRetryConfig(retryConfig);
 
         // 嵌套配置
-        BatchTransferTaskConfig.ScanConfig scanConfig = new BatchTransferTaskConfig.ScanConfig();
+        ScanConfig scanConfig = new ScanConfig();
         scanConfig.setCronExpression("0 */5 * * * ?");
         scanConfig.setMaxScanFiles(10000);
         config.setScanConfig(scanConfig);
 
-        BatchTransferTaskConfig.TransferConfig transferConfig = new BatchTransferTaskConfig.TransferConfig();
+        TransferConfig transferConfig = new TransferConfig();
         transferConfig.setRoutingStrategy("BROADCAST");
         transferConfig.setMaxBandwidthKbS(10240);
         transferConfig.setPreserveDirStructure(true);
         transferConfig.setPostTransferAction("NONE");
         config.setTransferConfig(transferConfig);
 
-        BatchTransferTaskConfig.RetryConfig retryConfig = new BatchTransferTaskConfig.RetryConfig();
-        retryConfig.setEnabled(true);
-        retryConfig.setMaxDays(7);
-        retryConfig.setIntervalMin(30);
-        retryConfig.setMaxRetryCount(10);
-        retryConfig.setBackoffType("EXPONENTIAL");
-        config.setRetryConfig(retryConfig);
-
         FullHttpRequest request = createPostRequest(gson.toJson(config));
         handler.handle(ctx, request);
 
         // 验证ConfigChangeListener接收到了完整配置
-        ArgumentCaptor<BatchTransferTaskConfig> configCaptor = ArgumentCaptor.forClass(BatchTransferTaskConfig.class);
+        ArgumentCaptor<AgentTaskConfig> configCaptor = ArgumentCaptor.forClass(AgentTaskConfig.class);
         verify(configChangeListener).detectAndApplyChange(configCaptor.capture());
 
-        BatchTransferTaskConfig captured = configCaptor.getValue();
+        AgentTaskConfig captured = configCaptor.getValue();
         assertEquals(1L, captured.getTaskId());
         assertEquals("日志备份任务", captured.getTaskName());
         assertEquals("agent-001", captured.getSourceAgentId());
@@ -303,19 +308,28 @@ class BatchConfigReceiveHandlerSpecTest {
     // ==================== 辅助方法 ====================
 
     private String configJson() {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(1L);
         config.setTaskName("日志备份任务");
         config.setSourceAgentId("agent-001");
         config.setSourceDir("/var/log/app");
-        config.setTargetDirs(List.of("/backup/logs"));
+
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setAgentId("agent-002");
+        target.setAgentName("root@node2:7777");
+        target.setTargetDir("/backup/logs");
+        targets.add(target);
+        config.setTargetAgents(targets);
+
         config.setIncludePatterns(List.of("*.log"));
         config.setExcludePatterns(List.of("debug*"));
-        config.setTargetAgentIds(List.of("agent-002"));
-        config.setTargetAgentNames(List.of("root@node2:7777"));
         config.setStatus("RUNNING");
-        config.setVersion(1L);
-        config.setMaxRetries(10);
+        config.setVersion(String.valueOf(1));
+
+        RetryConfig retryConfig = new RetryConfig();
+        retryConfig.setMaxRetryCount(Integer.valueOf(10));
+        config.setRetryConfig(retryConfig);
         return gson.toJson(config);
     }
 

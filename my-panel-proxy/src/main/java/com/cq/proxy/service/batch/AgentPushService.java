@@ -1,25 +1,19 @@
 package com.cq.proxy.service.batch;
 
-import com.cq.panel.common.loadbalancer.HttpResponse;
-import com.cq.panel.common.loadbalancer.SimpleHttpClient;
 import com.cq.proxy.repository.entity.AgentRegistry;
 import com.cq.proxy.repository.mapper.AgentRegistryMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * Agent推送服务
  * 负责将任务配置推送到Source Agent
- * 符合spec.md设计要求：
- * - 根据source_agent_id查询AgentRegistry获取IP和端口
- * - 通过HTTP POST推送配置到Agent
- * - 验证Agent返回的configPersisted标志
+ * 使用Spring Boot内置RestTemplate替代common模块的SimpleHttpClient，避免HttpURLConnection的POST降级问题
  */
 @Service
 public class AgentPushService {
@@ -28,15 +22,14 @@ public class AgentPushService {
 
     private static final String AGENT_CONFIG_ENDPOINT = "/api/batch/task/config";
     private static final String AGENT_CONTROL_ENDPOINT = "/api/batch/task/control";
-    private static final int PUSH_TIMEOUT_MS = 5000;
 
     private final AgentRegistryMapper agentRegistryMapper;
-    private final SimpleHttpClient httpClient;
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public AgentPushService(AgentRegistryMapper agentRegistryMapper, SimpleHttpClient httpClient, ObjectMapper objectMapper) {
+    public AgentPushService(AgentRegistryMapper agentRegistryMapper, RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.agentRegistryMapper = agentRegistryMapper;
-        this.httpClient = httpClient;
+        this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
     }
 
@@ -57,17 +50,17 @@ public class AgentPushService {
         log.info("📤 推送配置到Agent: agentId={}, url={}", sourceAgentId, url);
 
         try {
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> requestEntity = new HttpEntity<>(payload, headers);
 
-            HttpResponse<String> response = httpClient.post(url, payload, headers, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
-            if (!response.isSuccess()) {
-                log.error("❌ 推送配置失败: agentId={}, statusCode={}", sourceAgentId, response.getStatusCode());
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.error("❌ 推送配置失败: agentId={}, statusCode={}", sourceAgentId, response.getStatusCode().value());
                 return false;
             }
 
-            // 解析响应，验证configPersisted标志
             String responseBody = response.getBody();
             if (isConfigPersisted(responseBody)) {
                 log.info("✅ Agent确认配置已持久化: agentId={}", sourceAgentId);
@@ -100,17 +93,17 @@ public class AgentPushService {
         log.info("📤 推送删除指令到Agent: agentId={}, url={}", sourceAgentId, url);
 
         try {
-            Map<String, String> headers = new HashMap<>();
-            headers.put("Content-Type", "application/json; charset=utf-8");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> requestEntity = new HttpEntity<>(payload, headers);
 
-            HttpResponse<String> response = httpClient.post(url, payload, headers, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
-            if (!response.isSuccess()) {
-                log.error("❌ 推送删除指令失败: agentId={}, statusCode={}", sourceAgentId, response.getStatusCode());
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.error("❌ 推送删除指令失败: agentId={}, statusCode={}", sourceAgentId, response.getStatusCode().value());
                 return false;
             }
 
-            // 解析响应，验证删除成功
             String responseBody = response.getBody();
             if (isDeleteConfirmed(responseBody)) {
                 log.info("✅ Agent确认删除指令: agentId={}", sourceAgentId);
@@ -172,11 +165,9 @@ public class AgentPushService {
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            // 验证顶层success=true
             if (!root.path("success").asBoolean(false)) {
                 return false;
             }
-            // 验证data.configPersisted=true
             JsonNode data = root.path("data");
             return data.path("configPersisted").asBoolean(false);
         } catch (Exception e) {
@@ -198,11 +189,9 @@ public class AgentPushService {
         }
         try {
             JsonNode root = objectMapper.readTree(responseBody);
-            // 验证顶层success=true
             if (!root.path("success").asBoolean(false)) {
                 return false;
             }
-            // 验证data.deleted=true
             JsonNode data = root.path("data");
             return data.path("deleted").asBoolean(false);
         } catch (Exception e) {

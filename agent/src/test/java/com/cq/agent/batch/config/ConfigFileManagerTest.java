@@ -1,11 +1,14 @@
 package com.cq.agent.batch.config;
 
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,7 +32,7 @@ class ConfigFileManagerTest {
     @Test
     @DisplayName("1. 保存任务配置 - 同时更新tasks.meta.json")
     void testSaveTaskConfig() {
-        BatchTransferTaskConfig config = createTestConfig(1001L, "日志备份");
+        AgentTaskConfig config = createTestConfig(1001L, "日志备份");
 
         configFileManager.saveTaskConfig(config);
 
@@ -47,8 +50,8 @@ class ConfigFileManagerTest {
     @Test
     @DisplayName("2. tasks.meta.json - 包含正确的元数据")
     void testTasksMetaJson() {
-        BatchTransferTaskConfig config1 = createTestConfig(1001L, "日志备份");
-        BatchTransferTaskConfig config2 = createTestConfig(1002L, "数据同步");
+        AgentTaskConfig config1 = createTestConfig(1001L, "日志备份");
+        AgentTaskConfig config2 = createTestConfig(1002L, "数据同步");
 
         configFileManager.saveTaskConfig(config1);
         configFileManager.saveTaskConfig(config2);
@@ -76,11 +79,11 @@ class ConfigFileManagerTest {
         configFileManager.saveTaskConfig(createTestConfig(1001L, "任务1"));
         configFileManager.saveTaskConfig(createTestConfig(1002L, "任务2"));
 
-        List<BatchTransferTaskConfig> configs = configFileManager.loadAllTaskConfigs();
+        List<AgentTaskConfig> configs = configFileManager.loadAllTaskConfigs();
 
         assertEquals(2, configs.size(), "应加载2个任务");
 
-        BatchTransferTaskConfig config1 = findConfig(configs, 1001L);
+        AgentTaskConfig config1 = findConfig(configs, 1001L);
         assertNotNull(config1);
         assertEquals("任务1", config1.getTaskName());
 
@@ -95,7 +98,7 @@ class ConfigFileManagerTest {
 
         configFileManager.deleteTaskConfig(1001L);
 
-        List<BatchTransferTaskConfig> configs = configFileManager.loadAllTaskConfigs();
+        List<AgentTaskConfig> configs = configFileManager.loadAllTaskConfigs();
         assertEquals(1, configs.size(), "应只剩1个任务");
 
         TaskMetaInfo meta = configFileManager.loadMetaInfo();
@@ -111,7 +114,7 @@ class ConfigFileManagerTest {
 
         configFileManager.updateTaskStatus(1001L, "PAUSED");
 
-        BatchTransferTaskConfig config = configFileManager.loadTaskConfig(1001L);
+        AgentTaskConfig config = configFileManager.loadTaskConfig(1001L);
         assertEquals("PAUSED", config.getStatus(), "状态应更新为PAUSED");
 
         TaskMetaInfo meta = configFileManager.loadMetaInfo();
@@ -121,32 +124,38 @@ class ConfigFileManagerTest {
         System.out.println("✅ 更新任务状态: RUNNING→PAUSED");
     }
 
-    private BatchTransferTaskConfig createTestConfig(Long taskId, String taskName) {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createTestConfig(Long taskId, String taskName) {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(taskId);
         config.setTaskName(taskName);
         config.setStatus("RUNNING");
-        config.setVersion(System.currentTimeMillis());
+        config.setVersion(String.valueOf(System.currentTimeMillis()));
         config.setReceivedAt("2026-05-09T10:30:00Z");
         config.setPersistedAt("2026-05-09T10:30:01Z");
         config.setSourceAgentId("agent-001");
         config.setSourceDir("/var/log/app");
-        config.setTargetAgentIds(List.of("agent-002"));
+
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setAgentId("agent-002");
+        targets.add(target);
+        config.setTargetAgents(targets);
+
         config.setIncludePatterns(List.of("*.log"));
         return config;
     }
 
     private TaskMetaInfo.TaskMeta findTaskMeta(TaskMetaInfo meta, Long taskId) {
         return meta.getTasks().stream()
-            .filter(t -> t.getTaskId().equals(taskId))
-            .findFirst()
-            .orElse(null);
+                .filter(t -> t.getTaskId().equals(taskId))
+                .findFirst()
+                .orElse(null);
     }
 
-    private BatchTransferTaskConfig findConfig(List<BatchTransferTaskConfig> configs, Long taskId) {
+    private AgentTaskConfig findConfig(List<AgentTaskConfig> configs, Long taskId) {
         return configs.stream()
-            .filter(c -> c.getTaskId().equals(taskId))
-            .findFirst()
-            .orElse(null);
+                .filter(c -> c.getTaskId().equals(taskId))
+                .findFirst()
+                .orElse(null);
     }
 }

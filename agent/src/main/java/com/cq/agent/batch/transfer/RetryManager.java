@@ -1,6 +1,6 @@
 package com.cq.agent.batch.transfer;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.client.download.AgentDownloader;
 import com.cq.agent.client.download.DownloadTask;
@@ -53,7 +53,7 @@ public class RetryManager {
     private AgentDownloader agentDownloader;
 
     // ===== 新增：任务配置缓存（从Proxy推送）=====
-    private final Map<Long, BatchTransferTaskConfig> taskConfigMap = new ConcurrentHashMap<>();
+    private final Map<Long, AgentTaskConfig> taskConfigMap = new ConcurrentHashMap<>();
 
     /**
      * -- SETTER --
@@ -108,7 +108,7 @@ public class RetryManager {
      * @param taskId 任务ID
      * @param config 批量任务配置（包含 RetryConfig）
      */
-    public void registerTaskConfig(Long taskId, BatchTransferTaskConfig config) {
+    public void registerTaskConfig(Long taskId, AgentTaskConfig config) {
         taskConfigMap.put(taskId, config);
 
         if (config.getRetryConfig() != null) {
@@ -126,7 +126,7 @@ public class RetryManager {
      * @param taskId 任务ID
      * @return 任务配置，如果不存在返回 null
      */
-    public BatchTransferTaskConfig findTaskConfigByTaskId(Long taskId) {
+    public AgentTaskConfig findTaskConfigByTaskId(Long taskId) {
         return taskConfigMap.get(taskId);
     }
 
@@ -183,7 +183,7 @@ public class RetryManager {
     public boolean shouldRetryFailedFile(UploadTask task) {
         int currentRetries = task.getRetryCount();
 
-        BatchTransferTaskConfig config = findTaskConfigForUpload(task);
+        AgentTaskConfig config = findTaskConfigForUpload(task);
 
         if (config == null) {
             log.warn("⚠️ 未找到任务配置，使用默认值: transferId={}", task.getTransferId());
@@ -292,7 +292,7 @@ public class RetryManager {
     /**
      * 辅助方法：根据 UploadTask 查找对应的任务配置
      */
-    private BatchTransferTaskConfig findTaskConfigForUpload(UploadTask task) {
+    private AgentTaskConfig findTaskConfigForUpload(UploadTask task) {
         if (!taskConfigMap.isEmpty()) {
             return taskConfigMap.values().iterator().next();
         }
@@ -303,7 +303,7 @@ public class RetryManager {
      * 获取任务的最大重试次数
      */
     private int getMaxRetriesForTask(UploadTask task) {
-        BatchTransferTaskConfig config = findTaskConfigForUpload(task);
+        AgentTaskConfig config = findTaskConfigForUpload(task);
         if (config != null && config.getRetryConfig() != null) {
             return config.getRetryConfig().getMaxRetryCount();
         }
@@ -360,7 +360,7 @@ public class RetryManager {
      */
     public void recordSuccess(Long subtaskId) {
         retryCountMap.remove(subtaskId);
-        log.info("✅ 重试成功，清除记录: subtaskId={}", subtaskId);
+        log.info("✅ 清除重试计数记录: subtaskId={}", subtaskId);
     }
 
     /**

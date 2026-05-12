@@ -1,6 +1,8 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
@@ -77,7 +79,7 @@ class BatchTaskExecutionTddTest {
     @DisplayName("1. [spec.md 4.5] 任务执行时应扫描源目录")
     void testExecuteTask_shouldScanSourceDirectory() {
         // Given: 创建任务配置
-        BatchTransferTaskConfig config = createTestConfig(tempDir.toString());
+        AgentTaskConfig config = createTestConfig(tempDir.toString());
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(Collections.emptyList());
 
@@ -100,7 +102,7 @@ class BatchTaskExecutionTddTest {
     @DisplayName("2. [spec.md 4.5] 应使用include_patterns过滤文件")
     void testExecuteTask_shouldApplyIncludePatterns() {
         // Given: 配置包含模式
-        BatchTransferTaskConfig config = createTestConfig(tempDir.toString());
+        AgentTaskConfig config = createTestConfig(tempDir.toString());
         config.setIncludePatterns(List.of("*.log"));
 
         when(fileScanner.scan(anyString(), eq(List.of("*.log")), isNull(), isNull()))
@@ -125,7 +127,7 @@ class BatchTaskExecutionTddTest {
     @DisplayName("3. [spec.md 4.5] 应使用exclude_patterns排除文件")
     void testExecuteTask_shouldApplyExcludePatterns() {
         // Given: 配置排除模式
-        BatchTransferTaskConfig config = createTestConfig(tempDir.toString());
+        AgentTaskConfig config = createTestConfig(tempDir.toString());
         config.setExcludePatterns(List.of("debug*", "temp*"));
 
         when(fileScanner.scan(anyString(), isNull(), eq(List.of("debug*", "temp*")), isNull()))
@@ -153,7 +155,7 @@ class BatchTaskExecutionTddTest {
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(Collections.emptyList());
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
+        AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -174,7 +176,7 @@ class BatchTaskExecutionTddTest {
         
         when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
+        AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -195,7 +197,7 @@ class BatchTaskExecutionTddTest {
         
         when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(false);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets(tempDir.toString());
+        AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -214,7 +216,7 @@ class BatchTaskExecutionTddTest {
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(createScannedFile("test.log", 1024L)));
 
-        BatchTransferTaskConfig config = createTestConfig(tempDir.toString());  // 不设置targetAgentIds
+        AgentTaskConfig config = createTestConfig(tempDir.toString());  // 不设置targetAgentIds
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -231,13 +233,21 @@ class BatchTaskExecutionTddTest {
     /**
      * 创建测试用的任务配置
      */
-    private BatchTransferTaskConfig createTestConfig(String sourceDir) {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createTestConfig(String sourceDir) {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(1001L);
         config.setTaskName("测试任务");
         config.setSourceDir(sourceDir);
-        config.setTargetDirs(List.of("/remote/target"));
-        config.setCronExpression("0 */5 * * * ?");
+
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setTargetDir("/remote/target");
+        targets.add(target);
+        config.setTargetAgents(targets);
+
+        ScanConfig scanConfig = new ScanConfig();
+        scanConfig.setCronExpression("0 */5 * * * ?");
+        config.setScanConfig(scanConfig);
         config.setStatus("RUNNING");
         return config;
     }
@@ -245,9 +255,13 @@ class BatchTaskExecutionTddTest {
     /**
      * 带目标Agent配置的任务
      */
-    private BatchTransferTaskConfig createTestConfigWithTargets(String sourceDir) {
-        BatchTransferTaskConfig config = createTestConfig(sourceDir);
-        config.setTargetAgentIds(List.of("target-agent-001"));
+    private AgentTaskConfig createTestConfigWithTargets(String sourceDir) {
+        AgentTaskConfig config = createTestConfig(sourceDir);
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setAgentId("target-agent-001");
+        targets.add(target);
+        config.setTargetAgents(targets);
         return config;
     }
 
@@ -266,9 +280,9 @@ class BatchTaskExecutionTddTest {
     /**
      * 通过反射调用私有的createTaskRunnable方法
      */
-    private Runnable invokeCreateTaskRunnable(BatchTransferTaskConfig config) {
+    private Runnable invokeCreateTaskRunnable(AgentTaskConfig config) {
         try {
-            var method = BatchTaskSchedulerManager.class.getDeclaredMethod("createTaskRunnable", BatchTransferTaskConfig.class);
+            var method = BatchTaskSchedulerManager.class.getDeclaredMethod("createTaskRunnable", AgentTaskConfig.class);
             method.setAccessible(true);
             return (Runnable) method.invoke(schedulerManager, config);
         } catch (Exception e) {

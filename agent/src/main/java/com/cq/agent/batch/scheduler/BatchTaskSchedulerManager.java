@@ -1,6 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressEvent;
 import com.cq.agent.batch.report.ProgressReporter;
@@ -104,10 +104,10 @@ public class BatchTaskSchedulerManager {
      */
     public void startAllRunningTasks() {
         log.info("🚀 启动所有RUNNING状态的任务...");
-        List<BatchTransferTaskConfig> allConfigs = configFileManager.loadAllTaskConfigs();
+        List<AgentTaskConfig> allConfigs = configFileManager.loadAllTaskConfigs();
         int startedCount = 0;
 
-        for (BatchTransferTaskConfig config : allConfigs) {
+        for (AgentTaskConfig config : allConfigs) {
             Long taskId = config.getTaskId();
 
             if ("RUNNING".equals(config.getStatus())) {
@@ -124,9 +124,9 @@ public class BatchTaskSchedulerManager {
     /**
      * 启动单个任务
      */
-    public void startTask(BatchTransferTaskConfig config) {
+    public void startTask(AgentTaskConfig config) {
         Long taskId = config.getTaskId();
-        String cronExpression = config.getCronExpression();
+        String cronExpression = config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null;
 
         if (cronExpression == null || cronExpression.isBlank()) {
             log.warn("⚠️  任务缺少Cron表达式，无法调度: taskId={}", taskId);
@@ -158,7 +158,7 @@ public class BatchTaskSchedulerManager {
     /**
      * 更新任务（热更新）
      */
-    public void updateTask(BatchTransferTaskConfig config) {
+    public void updateTask(AgentTaskConfig config) {
         Long taskId = config.getTaskId();
 
         if (quartzTaskScheduler.isTaskRunning(taskId)) {
@@ -218,6 +218,7 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 处理任务失败
+     * 
      * @return true表示应继续重试，false表示最终失败
      */
     public boolean failTask(Long taskId, String error) {
@@ -233,16 +234,16 @@ public class BatchTaskSchedulerManager {
 
         if (shouldRetry) {
             long delayMs = retryManager.calculateNextRetryDelay(taskId, retryManager.getRetryCount(taskId));
-            log.info("🔄 将在{}ms后重试: taskId={}, attempt={}/{}", delayMs, taskId, 
-                retryManager.getRetryCount(taskId), retryManager.getMaxRetries());
-            
+            log.info("🔄 将在{}ms后重试: taskId={}, attempt={}/{}", delayMs, taskId,
+                    retryManager.getRetryCount(taskId), retryManager.getMaxRetries());
+
             // 使用Quartz调度延迟重试
             scheduleDelayedRetry(taskId, delayMs);
-            
+
             return true;
         } else {
-            log.error("❌ 任务最终失败（超过最大重试次数）: taskId={}, maxRetries={}", 
-                taskId, retryManager.getMaxRetries());
+            log.error("❌ 任务最终失败（超过最大重试次数）: taskId={}, maxRetries={}",
+                    taskId, retryManager.getMaxRetries());
             return false;
         }
     }
@@ -252,40 +253,50 @@ public class BatchTaskSchedulerManager {
     /**
      * 创建任务执行Runnable
      * 执行流程：
-     * 1. 扫描源目录（FileScanner - spec.md 4.5）
-     * 2. P2P文件传输（AgentUploader - spec.md 4.6）
-     * 3. 记录结果并处理重试（spec.md 4.7）
+     * 1. 从ConfigFileManager加载最新配置（支持热更新）
+     * 2. 扫描源目录（FileScanner - spec.md 4.5）
+     * 3. P2P文件传输（AgentUploader - spec.md 4.6）
+     * 4. 记录结果并处理重试（spec.md 4.7）
      */
-    private Runnable createTaskRunnable(BatchTransferTaskConfig config) {
+    private Runnable createTaskRunnable(AgentTaskConfig initialConfig) {
+        Long initialTaskId = initialConfig.getTaskId();
+
         return () -> {
-            Long taskId = config.getTaskId();
-            
-            log.info("🚀 开始执行任务: taskId={}, sourceDir={}", taskId, config.getSourceDir());
+            // 🔑 关键：每次执行时从磁盘加载最新配置（热更新核心！）
+            AgentTaskConfig config = configFileManager.loadTaskConfig(initialTaskId);
+            if (config == null) {
+                log.warn("⚠️ 无法加载任务配置，使用初始配置: taskId={}", initialTaskId);
+                config = initialConfig;
+            }
+
+            log.info("🚀 开始执行任务: taskId={}, sourceDir={}, version={}",
+                    config.getTaskId(), config.getSourceDir(), config.getVersion());
 
             try {
-                // Step 1: 扫描源目录（spec.md 4.5）
                 List<FileScanner.ScannedFile> scannedFiles = scanSourceDirectory(config);
-                
-                // Step 2: P2P文件传输（spec.md 4.6）
-                processScannedFiles(taskId, config, scannedFiles);
-                
-                // Step 3: 标记任务完成
-                completeTask(taskId);
-                log.info("✅ 任务执行成功: taskId={}, processedFiles={}", taskId, scannedFiles.size());
-                
+                processScannedFiles(config.getTaskId(), config, scannedFiles);
+                completeTask(config.getTaskId());
+                log.info("✅ 任务执行成功: taskId={}, processedFiles={}", config.getTaskId(), scannedFiles.size());
             } catch (Exception e) {
-                log.error("❌ 任务执行异常: taskId={}, error={}", taskId, e.getMessage(), e);
-                failTask(taskId, e.getMessage());
+                log.error("❌ 任务执行异常: taskId={}, error={}", config.getTaskId(), e.getMessage(), e);
+                failTask(config.getTaskId(), e.getMessage());
             }
         };
     }
 
     /**
+     * 创建任务执行Runnable（供DelayedRetryJob等外部类调用）
+     */
+    public Runnable createTaskRunnableForRetry(AgentTaskConfig config) {
+        return createTaskRunnable(config);
+    }
+
+    /**
      * 扫描源目录（spec.md 4.5）
      */
-    private List<FileScanner.ScannedFile> scanSourceDirectory(BatchTransferTaskConfig config) {
+    private List<FileScanner.ScannedFile> scanSourceDirectory(AgentTaskConfig config) {
         String sourceDir = config.getSourceDir();
-        
+
         if (fileScanner == null) {
             log.warn("⚠️  FileScanner未配置，跳过文件扫描: taskId={}", config.getTaskId());
             return List.of();
@@ -301,11 +312,10 @@ public class BatchTaskSchedulerManager {
         }
 
         List<FileScanner.ScannedFile> scannedFiles = fileScanner.scan(
-            sourceDir,
-            config.getIncludePatterns(),
-            config.getExcludePatterns(),
-            maxScanFiles
-        );
+                sourceDir,
+                config.getIncludePatterns(),
+                config.getExcludePatterns(),
+                maxScanFiles);
 
         log.info("📁 文件扫描完成: dir={}, found={} files", sourceDir, scannedFiles.size());
         return scannedFiles;
@@ -318,8 +328,8 @@ public class BatchTaskSchedulerManager {
      * 通过BatchUploadListener捕获进度事件
      * 如果任何文件传输失败，抛出异常以触发重试机制
      */
-    private void processScannedFiles(Long taskId, BatchTransferTaskConfig config, 
-                                     List<FileScanner.ScannedFile> scannedFiles) {
+    private void processScannedFiles(Long taskId, AgentTaskConfig config,
+            List<FileScanner.ScannedFile> scannedFiles) {
         if (scannedFiles == null || scannedFiles.isEmpty()) {
             log.info("ℹ️  未扫描到文件，跳过传输: taskId={}", taskId);
             return;
@@ -343,8 +353,8 @@ public class BatchTaskSchedulerManager {
 
         for (FileScanner.ScannedFile scannedFile : scannedFiles) {
             try {
-                log.debug("📤 准备传输文件: fileName={}, size={}bytes", 
-                    scannedFile.getFileName(), scannedFile.getFileSize());
+                log.debug("📤 准备传输文件: fileName={}, size={}bytes",
+                        scannedFile.getFileName(), scannedFile.getFileSize());
 
                 // 构建本地路径
                 String localFilePath = scannedFile.getAbsolutePath();
@@ -352,8 +362,8 @@ public class BatchTaskSchedulerManager {
                 // 构建目标路径信息（格式：ip:port@username:destPath）
                 String remoteTargetInfo = buildRemoteTargetInfo(config, scannedFile);
 
-                // 创建上传监听器
-                UploadListener listener = new BatchUploadListener(taskId, scannedFile);
+                // 创建上传监听器（包含postTransferAction逻辑）
+                UploadListener listener = new BatchUploadListener(taskId, scannedFile, config, progressReporter);
 
                 // 调用AgentUploader进行P2P传输
                 boolean uploadSubmitted = agentUploader.uploadFile(localFilePath, remoteTargetInfo, listener);
@@ -364,12 +374,12 @@ public class BatchTaskSchedulerManager {
                 } else {
                     log.debug("✅ 文件上传已提交到队列: fileName={}", scannedFile.getFileName());
                 }
-                
+
             } catch (Exception e) {
-                log.error("❌ 文件传输异常: fileName={}, error={}", 
-                    scannedFile.getFileName(), e.getMessage());
+                log.error("❌ 文件传输异常: fileName={}, error={}",
+                        scannedFile.getFileName(), e.getMessage());
                 failedFiles.add(scannedFile.getFileName());
-                
+
                 // 单个文件失败继续处理其他文件，最后统一报告
             }
         }
@@ -379,8 +389,8 @@ public class BatchTaskSchedulerManager {
         // RetryManager 会定期扫描并重试这些文件
         if (!failedFiles.isEmpty()) {
             log.warn("⚠️ 部分文件传输失败 ({}/{}): {}",
-                failedFiles.size(), scannedFiles.size(),
-                String.join(", ", failedFiles));
+                    failedFiles.size(), scannedFiles.size(),
+                    String.join(", ", failedFiles));
             log.info("ℹ️ 失败的文件将进入失败队列，等待 RetryManager 定时扫描和重试");
 
             if (agentUploader != null) {
@@ -392,8 +402,8 @@ public class BatchTaskSchedulerManager {
     /**
      * 检查是否有目标Agent配置
      */
-    private boolean hasTargetAgents(BatchTransferTaskConfig config) {
-        return config.getTargetAgentIds() != null && !config.getTargetAgentIds().isEmpty();
+    private boolean hasTargetAgents(AgentTaskConfig config) {
+        return config.getTargetAgents() != null && !config.getTargetAgents().isEmpty();
     }
 
     /**
@@ -402,22 +412,26 @@ public class BatchTaskSchedulerManager {
      * 格式：ip:port@username:destFilePath
      * 示例：192.168.1.100:7777@root:/remote/target/app.log
      */
-    private String buildRemoteTargetInfo(BatchTransferTaskConfig config, FileScanner.ScannedFile scannedFile) {
+    private String buildRemoteTargetInfo(AgentTaskConfig config, FileScanner.ScannedFile scannedFile) {
         try {
-            // 从targetAgentNames解析目标信息
-            // 格式：username@ip:port
-            String targetAgentName = config.getTargetAgentNames().getFirst();  // 取第一个目标
-            
+            if (config.getTargetAgents() == null || config.getTargetAgents().isEmpty()) {
+                throw new IllegalArgumentException("目标Agent列表为空");
+            }
+            com.cq.panel.common.dto.batch.TargetAgentInfo firstAgent = config.getTargetAgents().get(0);
+            String targetAgentName = firstAgent.getAgentName();
+            if (targetAgentName == null || targetAgentName.isEmpty()) {
+                targetAgentName = firstAgent.getAgentId();
+            }
+
             String[] parts = targetAgentName.split("@");
             if (parts.length != 2) {
                 throw new IllegalArgumentException("目标Agent名称格式错误: " + targetAgentName);
             }
 
             String username = parts[0];
-            String ipPort = parts[1];  // ip:port
+            String ipPort = parts[1];
 
-            // 构建目标路径
-            String targetDir = config.getTargetDirs().getFirst();  // 取第一个目标目录
+            String targetDir = firstAgent.getTargetDir();
             String destPath = targetDir + "/" + scannedFile.getFileName();
 
             // 组装remoteTargetInfo
@@ -435,150 +449,38 @@ public class BatchTaskSchedulerManager {
     /**
      * 使用Quartz调度延迟重试（spec.md 4.7）
      * 
-     * @param taskId 任务ID
+     * @param taskId  任务ID
      * @param delayMs 延迟时间（毫秒）
      */
     private void scheduleDelayedRetry(Long taskId, long delayMs) {
         try {
             log.info("⏰ 调度延迟重试: taskId={}, delayMs={}", taskId, delayMs);
 
+            // 创建JobDataMap并放入依赖对象
+            JobDataMap jobDataMap = new JobDataMap();
+            jobDataMap.put("taskId", taskId);
+            jobDataMap.put(DelayedRetryJob.CONFIG_FILE_MANAGER_KEY, configFileManager);
+            jobDataMap.put(DelayedRetryJob.TASK_SCHEDULER_MANAGER_KEY, this);
+
             // 创建一次性触发器
             JobDetail jobDetail = JobBuilder.newJob(DelayedRetryJob.class)
-                .withIdentity("retry-job-" + taskId + "-" + System.currentTimeMillis())
-                .usingJobData("taskId", taskId)
-                .build();
+                    .withIdentity("retry-job-" + taskId + "-" + System.currentTimeMillis())
+                    .usingJobData(jobDataMap)
+                    .build();
 
             Trigger trigger = TriggerBuilder.newTrigger()
-                .withIdentity("retry-trigger-" + taskId + "-" + System.currentTimeMillis())
-                .startAt(new Date(System.currentTimeMillis() + delayMs))
-                .build();
+                    .withIdentity("retry-trigger-" + taskId + "-" + System.currentTimeMillis())
+                    .startAt(new Date(System.currentTimeMillis() + delayMs))
+                    .build();
 
             // 调度任务
             Scheduler scheduler = quartzTaskScheduler.getScheduler();
             scheduler.scheduleJob(jobDetail, trigger);
 
             log.info("✅ 延迟重试已调度: taskId={}, executeAt={}ms later", taskId, delayMs);
-            
+
         } catch (Exception e) {
             log.error("❌ 调度延迟重试失败: taskId={}, error={}", taskId, e.getMessage());
-        }
-    }
-
-    // ==================== 内部类 ====================
-
-    /**
-     * 批量上传监听器（spec.md 4.6）
-     * 桥接AgentUploader事件到任务管理器和进度上报
-     */
-    private class BatchUploadListener implements UploadListener {
-
-        private final Long taskId;
-        private final FileScanner.ScannedFile scannedFile;
-
-        public BatchUploadListener(Long taskId, FileScanner.ScannedFile scannedFile) {
-            this.taskId = taskId;
-            this.scannedFile = scannedFile;
-        }
-
-        @Override
-        public void onProgress(int totalChunks, int uploadedChunks, double progress) {
-            log.debug("📊 上传进度: taskId={}, file={}, {}/{} ({}%)",
-                taskId, scannedFile.getFileName(), uploadedChunks, totalChunks, progress);
-
-            if (progressReporter != null) {
-                ProgressEvent event = new ProgressEvent();
-                event.setSubtaskId(taskId);
-                event.setTaskId(taskId);
-                event.setStatus("SENDING");
-                event.setTransferredChunks(uploadedChunks);
-                event.setTotalChunks(totalChunks);
-                event.setTransferredBytes((long) (scannedFile.getFileSize() * progress));
-                event.setTimestamp(System.currentTimeMillis());
-                event.setSequenceNumber(uploadedChunks);
-
-                progressReporter.reportProgress(event);
-            }
-        }
-
-        @Override
-        public void onComplete(UploadTask task) {
-            log.info("✅ 文件上传完成: taskId={}, file={}, transferId={}",
-                taskId, scannedFile.getFileName(), task.getTransferId());
-
-            if (progressReporter != null) {
-                ProgressEvent event = new ProgressEvent();
-                event.setSubtaskId(taskId);
-                event.setTaskId(taskId);
-                event.setTransferId(task.getTransferId());
-                event.setStatus("COMPLETED");
-                event.setTransferredChunks(1);
-                event.setTotalChunks(1);
-                event.setTransferredBytes(scannedFile.getFileSize());
-                event.setTimestamp(System.currentTimeMillis());
-
-                progressReporter.reportProgress(event);
-            }
-        }
-
-        @Override
-        public void onError(String errorMessage) {
-            log.error("❌ 文件上传失败: taskId={}, file={}, error={}",
-                taskId, scannedFile.getFileName(), errorMessage);
-
-            if (progressReporter != null) {
-                ProgressEvent event = new ProgressEvent();
-                event.setSubtaskId(taskId);
-                event.setTaskId(taskId);
-                event.setStatus("FAILED");
-                event.setTimestamp(System.currentTimeMillis());
-
-                progressReporter.reportProgress(event);
-            }
-
-            // 注意：这里不直接调用failTask，因为单个文件失败不应导致整个任务失败
-            // 错误会在processScannedFiles中通过hasFailure标志处理
-        }
-    }
-
-    /**
-     * 延迟重试作业（Quartz Job）
-     */
-    public class DelayedRetryJob implements Job {
-
-        private static final Logger jobLog = LoggerFactory.getLogger(DelayedRetryJob.class);
-
-        @Override
-        public void execute(JobExecutionContext context) throws JobExecutionException {
-            JobDataMap dataMap = context.getMergedJobDataMap();
-            long taskId = dataMap.getLong("taskId");
-
-            jobLog.info("⏰ 执行延迟重试任务: taskId={}", taskId);
-
-            try {
-                BatchTransferTaskConfig config = configFileManager.loadTaskConfig(taskId);
-                
-                if (config == null) {
-                    jobLog.warn("⚠️  未找到任务配置: taskId={}, 跳过重试", taskId);
-                    return;
-                }
-                
-                if (!"RUNNING".equals(config.getStatus())) {
-                    jobLog.info("ℹ️  任务状态为{}，跳过重试: taskId={}", config.getStatus(), taskId);
-                    return;
-                }
-
-                jobLog.info("🔄 重新执行任务: taskId={}, sourceDir={}", taskId, config.getSourceDir());
-
-                Runnable task = createTaskRunnable(config);
-                task.run();
-
-                jobLog.info("✅ 延迟重试执行完成: taskId={}", taskId);
-                
-            } catch (Exception e) {
-                jobLog.error("❌ 延迟重试执行失败: taskId={}, error={}", taskId, e.getMessage(), e);
-                
-                failTask(taskId, "延迟重试失败: " + e.getMessage());
-            }
         }
     }
 }

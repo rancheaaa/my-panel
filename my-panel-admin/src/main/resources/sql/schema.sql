@@ -791,6 +791,7 @@ CREATE TABLE IF NOT EXISTS `batch_sync_event` (
     `expire_at` datetime DEFAULT NULL COMMENT '事件过期时间(超过此时间未处理则标记为FAILED)',
     `started_at` datetime DEFAULT NULL COMMENT '事件开始处理时间',
     `next_retry_at` datetime DEFAULT NULL COMMENT '下次可重试时间',
+    `update_time` datetime DEFAULT NULL COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_status_created` (`status`, `created_at`),
     KEY `idx_task_id` (`task_id`),

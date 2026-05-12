@@ -1,6 +1,5 @@
 package com.cq.proxy.config;
 
-import com.cq.panel.common.loadbalancer.SimpleHttpClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -8,6 +7,8 @@ import java.time.Clock;
 import java.util.concurrent.TimeUnit;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
 
 @Configuration
 public class ProxyBeansConfig {
@@ -32,8 +33,10 @@ public class ProxyBeansConfig {
   }
 
   @Bean
-  public SimpleHttpClient simpleHttpClient() {
-    return new SimpleHttpClient(5000, 5000);
+  public RestTemplate restTemplate() {
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(5000);
+    factory.setReadTimeout(5000);
+    return new RestTemplate(factory);
   }
 }
-

@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,7 +40,7 @@ public class ConfigFileManager {
      * 保存任务配置到本地JSON文件
      * 同时更新tasks.meta.json
      */
-    public void saveTaskConfig(BatchTransferTaskConfig config) {
+    public void saveTaskConfig(AgentTaskConfig config) {
         String filename = "task_" + config.getTaskId() + ".json";
         File file = new File(configDir, filename);
 
@@ -54,7 +55,7 @@ public class ConfigFileManager {
             meta.setTaskId(config.getTaskId());
             meta.setTaskName(config.getTaskName());
             meta.setStatus(config.getStatus());
-            meta.setVersion(config.getVersion());
+            meta.setVersion(config.getVersion() != null ? Long.parseLong(config.getVersion()) : null);
             meta.setReceivedAt(config.getReceivedAt());
             meta.setPersistedAt(config.getPersistedAt());
             meta.setLastModified(System.currentTimeMillis());
@@ -72,7 +73,7 @@ public class ConfigFileManager {
     /**
      * 加载指定任务的配置
      */
-    public BatchTransferTaskConfig loadTaskConfig(Long taskId) {
+    public AgentTaskConfig loadTaskConfig(Long taskId) {
         String filename = "task_" + taskId + ".json";
         File file = new File(configDir, filename);
 
@@ -82,7 +83,7 @@ public class ConfigFileManager {
         }
 
         try (FileReader reader = new FileReader(file)) {
-            return GSON.fromJson(reader, BatchTransferTaskConfig.class);
+            return GSON.fromJson(reader, AgentTaskConfig.class);
         } catch (IOException e) {
             log.error("❌ 加载配置失败: taskId={}, error={}", taskId, e.getMessage());
             return null;
@@ -92,15 +93,15 @@ public class ConfigFileManager {
     /**
      * 加载所有任务配置
      */
-    public List<BatchTransferTaskConfig> loadAllTaskConfigs() {
-        List<BatchTransferTaskConfig> configs = new ArrayList<>();
+    public List<AgentTaskConfig> loadAllTaskConfigs() {
+        List<AgentTaskConfig> configs = new ArrayList<>();
         File dir = new File(configDir);
         File[] files = dir.listFiles((d, name) -> name.startsWith("task_") && name.endsWith(".json"));
 
         if (files != null) {
             for (File file : files) {
                 try (FileReader reader = new FileReader(file)) {
-                    BatchTransferTaskConfig config = GSON.fromJson(reader, BatchTransferTaskConfig.class);
+                    AgentTaskConfig config = GSON.fromJson(reader, AgentTaskConfig.class);
                     if (config != null) {
                         configs.add(config);
                     }
@@ -136,7 +137,7 @@ public class ConfigFileManager {
      * 同时更新tasks.meta.json
      */
     public void updateTaskStatus(Long taskId, String status) {
-        BatchTransferTaskConfig config = loadTaskConfig(taskId);
+        AgentTaskConfig config = loadTaskConfig(taskId);
         if (config != null) {
             config.setStatus(status);
             saveTaskConfig(config);

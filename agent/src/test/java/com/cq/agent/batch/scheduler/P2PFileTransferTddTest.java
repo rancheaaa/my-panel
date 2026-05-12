@@ -1,6 +1,8 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
@@ -95,7 +97,7 @@ class P2PFileTransferTddTest {
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -123,7 +125,7 @@ class P2PFileTransferTddTest {
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -159,7 +161,7 @@ class P2PFileTransferTddTest {
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -192,7 +194,7 @@ class P2PFileTransferTddTest {
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -230,7 +232,7 @@ class P2PFileTransferTddTest {
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -257,7 +259,7 @@ class P2PFileTransferTddTest {
         // 新行为：不再调用 shouldRetry()，而是让失败的文件进入失败队列
         // RetryManager 会定时扫描并重试
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务（不应该抛出异常）
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -291,7 +293,7 @@ class P2PFileTransferTddTest {
         when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
             .thenReturn(true);
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -327,7 +329,7 @@ class P2PFileTransferTddTest {
                 return !path.contains("failed.log");
             });
 
-        BatchTransferTaskConfig config = createTestConfigWithTargets();
+        AgentTaskConfig config = createTestConfigWithTargets();
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -371,7 +373,7 @@ class P2PFileTransferTddTest {
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
 
-        BatchTransferTaskConfig config = createTestConfig();  // 不设置targetAgentIds
+        AgentTaskConfig config = createTestConfig();  // 不设置targetAgentIds
 
         // When: 执行任务
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
@@ -395,13 +397,21 @@ class P2PFileTransferTddTest {
     /**
      * 创建测试用的任务配置
      */
-    private BatchTransferTaskConfig createTestConfig() {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createTestConfig() {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(1001L);
         config.setTaskName("P2P测试任务");
         config.setSourceDir(tempDir.toString());
-        config.setTargetDirs(List.of("/remote/target"));
-        config.setCronExpression("0 */5 * * * ?");
+
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setTargetDir("/remote/target");
+        targets.add(target);
+        config.setTargetAgents(targets);
+
+        ScanConfig scanConfig = new ScanConfig();
+        scanConfig.setCronExpression("0 */5 * * * ?");
+        config.setScanConfig(scanConfig);
         config.setStatus("RUNNING");
         return config;
     }
@@ -409,10 +419,15 @@ class P2PFileTransferTddTest {
     /**
      * 带目标Agent配置的任务
      */
-    private BatchTransferTaskConfig createTestConfigWithTargets() {
-        BatchTransferTaskConfig config = createTestConfig();
-        config.setTargetAgentIds(List.of("target-agent-001"));
-        config.setTargetAgentNames(List.of("root@192.168.1.100:7777"));
+    private AgentTaskConfig createTestConfigWithTargets() {
+        AgentTaskConfig config = createTestConfig();
+        List<TargetAgentInfo> targets = new ArrayList<>();
+        TargetAgentInfo target = new TargetAgentInfo();
+        target.setAgentId("target-agent-001");
+        target.setAgentName("root@192.168.1.100:7777");
+        target.setTargetDir("/remote/target");
+        targets.add(target);
+        config.setTargetAgents(targets);
         return config;
     }
 
@@ -431,9 +446,9 @@ class P2PFileTransferTddTest {
     /**
      * 通过反射调用私有的createTaskRunnable方法
      */
-    private Runnable invokeCreateTaskRunnable(BatchTransferTaskConfig config) {
+    private Runnable invokeCreateTaskRunnable(AgentTaskConfig config) {
         try {
-            var method = BatchTaskSchedulerManager.class.getDeclaredMethod("createTaskRunnable", BatchTransferTaskConfig.class);
+            var method = BatchTaskSchedulerManager.class.getDeclaredMethod("createTaskRunnable", AgentTaskConfig.class);
             method.setAccessible(true);
             return (Runnable) method.invoke(schedulerManager, config);
         } catch (Exception e) {

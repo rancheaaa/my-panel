@@ -47,7 +47,7 @@ public interface BatchSyncEventMapper {
     @Update("""
         UPDATE batch_sync_event
         SET status = 'COMPLETED',
-            completed_at = NOW(),
+            processed_at = NOW(),
             update_time = NOW()
         WHERE id = #{id}
         """)

@@ -1,6 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
@@ -23,8 +23,6 @@ public class QuartzTaskScheduler {
     private static final Logger log = LoggerFactory.getLogger(QuartzTaskScheduler.class);
     private static final String JOB_GROUP = "batch-transfer";
     private static final String TRIGGER_GROUP = "batch-transfer-triggers";
-    private static final String TASK_DATA_KEY = "taskConfig";
-    private static final String TASK_RUNNABLE_KEY = "taskRunnable";
 
     private final Scheduler quartzScheduler;
     private final Map<Long, Runnable> taskRunnables = new ConcurrentHashMap<>();
@@ -38,7 +36,7 @@ public class QuartzTaskScheduler {
      * @param config 任务配置
      * @param task 要执行的任务
      */
-    public void startTask(BatchTransferTaskConfig config, Runnable task) {
+    public void startTask(AgentTaskConfig config, Runnable task) {
         Long taskId = config.getTaskId();
         String jobName = getJobName(taskId);
         String triggerName = getTriggerName(taskId);
@@ -52,8 +50,8 @@ public class QuartzTaskScheduler {
 
             // 创建JobDetail
             JobDataMap jobDataMap = new JobDataMap();
-            jobDataMap.put(TASK_DATA_KEY, config);
-            jobDataMap.put(TASK_RUNNABLE_KEY, task);
+            jobDataMap.put(BatchTransferJob.TASK_DATA_KEY, config);
+            jobDataMap.put(BatchTransferJob.TASK_RUNNABLE_KEY, task);
 
             JobDetail jobDetail = JobBuilder.newJob(BatchTransferJob.class)
                 .withIdentity(jobName, JOB_GROUP)
@@ -62,7 +60,7 @@ public class QuartzTaskScheduler {
 
             // 创建CronTrigger
             CronScheduleBuilder scheduleBuilder = CronScheduleBuilder
-                .cronSchedule(config.getCronExpression())
+                .cronSchedule(config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null)
                 .withMisfireHandlingInstructionDoNothing();
 
             CronTrigger trigger = TriggerBuilder.newTrigger()
@@ -76,7 +74,7 @@ public class QuartzTaskScheduler {
             // 立即执行一次（首次扫描）
             quartzScheduler.triggerJob(new JobKey(jobName, JOB_GROUP));
 
-            log.info("✅ Quartz任务启动: taskId={}, cron={}", taskId, config.getCronExpression());
+            log.info("✅ Quartz任务启动: taskId={}, cron={}", taskId, config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null);
 
         } catch (SchedulerException e) {
             log.error("❌ 启动Quartz任务失败: taskId={}, error={}", taskId, e.getMessage());
@@ -126,7 +124,7 @@ public class QuartzTaskScheduler {
      * 更新任务（热更新Cron表达式）
      * @param config 新的任务配置
      */
-    public void updateTask(BatchTransferTaskConfig config) {
+    public void updateTask(AgentTaskConfig config) {
         Long taskId = config.getTaskId();
         String triggerName = getTriggerName(taskId);
 
@@ -136,7 +134,7 @@ public class QuartzTaskScheduler {
             if (quartzScheduler.checkExists(triggerKey)) {
                 // 更新Trigger的Cron表达式
                 CronScheduleBuilder scheduleBuilder = CronScheduleBuilder
-                    .cronSchedule(config.getCronExpression())
+                    .cronSchedule(config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null)
                     .withMisfireHandlingInstructionDoNothing();
 
                 CronTrigger newTrigger = TriggerBuilder.newTrigger()
@@ -145,7 +143,7 @@ public class QuartzTaskScheduler {
                     .build();
 
                 quartzScheduler.rescheduleJob(triggerKey, newTrigger);
-                log.info("🔄 Quartz任务已更新: taskId={}, newCron={}", taskId, config.getCronExpression());
+                log.info("🔄 Quartz任务已更新: taskId={}, newCron={}", taskId, config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null);
             } else {
                 // Trigger不存在，重新启动任务
                 Runnable task = taskRunnables.get(taskId);
@@ -225,34 +223,5 @@ public class QuartzTaskScheduler {
 
     private String getTriggerName(Long taskId) {
         return "batch-trigger-" + taskId;
-    }
-
-    // ==================== Quartz Job 实现 ====================
-
-    /**
-     * 批量传输任务Job
-     */
-    public static class BatchTransferJob implements Job {
-
-        private static final Logger jobLog = LoggerFactory.getLogger(BatchTransferJob.class);
-
-        @Override
-        public void execute(JobExecutionContext context) throws JobExecutionException {
-            JobDataMap dataMap = context.getMergedJobDataMap();
-            BatchTransferTaskConfig config = (BatchTransferTaskConfig) dataMap.get(TASK_DATA_KEY);
-            Runnable task = (Runnable) dataMap.get(TASK_RUNNABLE_KEY);
-
-            if (task != null) {
-                try {
-                    jobLog.debug("🚀 执行批量传输任务: taskId={}", config.getTaskId());
-                    task.run();
-                } catch (Exception e) {
-                    jobLog.error("❌ 任务执行异常: taskId={}, error={}", config.getTaskId(), e.getMessage());
-                    throw new JobExecutionException(e);
-                }
-            } else {
-                jobLog.warn("⚠️  任务Runnable为空: taskId={}", config.getTaskId());
-            }
-        }
     }
 }

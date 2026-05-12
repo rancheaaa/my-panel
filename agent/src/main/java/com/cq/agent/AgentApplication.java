@@ -1,11 +1,12 @@
 package com.cq.agent;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
 import com.cq.agent.batch.scheduler.FailedQueueScannerJob;
+import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.download.AgentDownloader;
@@ -23,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 
- /**
+/**
  * Main entry point for the Agent application.
  * <p>
  * This agent provides HTTP interfaces for:
@@ -71,35 +72,35 @@ public class AgentApplication {
             return;
         }
 
-        // Initialize retry manager for batch transfers (10 retries, 30min initial, 2h max delay)
+        // Initialize retry manager for batch transfers (10 retries, 30min initial, 2h
+        // max delay)
         RetryManager retryManager = new RetryManager(10, 30, 2);
 
         // Initialize upload/download agents for failed task retry mechanism
         AgentUploader agentUploader = new AgentUploader(config);
         agentUploader.init();
-        
+
         AgentDownloader agentDownloader = new AgentDownloader(config);
         agentDownloader.init();
 
         // Initialize RetryManager with full dependencies (for failed queue scanning)
         try {
             TransferMetaStore<UploadTask> uploadMetaStore = new TransferMetaStore<>(
-                Path.of(config.getUploadSendingQueueDir()), UploadTask.class);
+                    Path.of(config.getUploadSendingQueueDir()), UploadTask.class);
             TransferMetaStore<DownloadTask> downloadMetaStore = new TransferMetaStore<>(
-                Path.of(config.getDownloadSendingQueueDir()), DownloadTask.class);
-            
+                    Path.of(config.getDownloadSendingQueueDir()), DownloadTask.class);
+
             Path uploadFailQueueDir = Path.of(config.getUploadFailRetryQueueDir());
             Path downloadFailQueueDir = Path.of(config.getDownloadFailRetryQueueDir());
-            
+
             retryManager.init(
-                uploadMetaStore,
-                downloadMetaStore,
-                uploadFailQueueDir,
-                downloadFailQueueDir,
-                agentUploader,
-                agentDownloader
-            );
-            
+                    uploadMetaStore,
+                    downloadMetaStore,
+                    uploadFailQueueDir,
+                    downloadFailQueueDir,
+                    agentUploader,
+                    agentDownloader);
+
             logger.info("✅ RetryManager 初始化完成，失败队列扫描间隔: {}ms", config.getFailedQueueScanIntervalMs());
         } catch (Exception e) {
             logger.warn("⚠️ RetryManager 初始化失败，将使用无持久化模式: {}", e.getMessage());
@@ -109,26 +110,30 @@ public class AgentApplication {
         taskSchedulerManager.setRetryManager(retryManager);
         taskSchedulerManager.setAgentUploader(agentUploader);
 
+        // Initialize and set FileScanner for batch file scanning (spec.md 4.5)
+        FileScanner fileScanner = new FileScanner();
+        taskSchedulerManager.setFileScanner(fileScanner);
+
         // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
         configChangeListener.onCronChange(taskId -> {
-            BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
+            AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
             if (taskConfig != null) {
                 taskSchedulerManager.updateTask(taskConfig);
-                retryManager.registerTaskConfig(taskId, taskConfig);  // Register for retry mechanism
+                retryManager.registerTaskConfig(taskId, taskConfig); // Register for retry mechanism
             }
         });
         configChangeListener.onAnyChange(ctx -> {
             if ("NEW_TASK".equals(ctx.field)) {
-                BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
+                AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                 if (taskConfig != null && "RUNNING".equals(taskConfig.getStatus())) {
                     taskSchedulerManager.startTask(taskConfig);
-                    retryManager.registerTaskConfig(ctx.taskId, taskConfig);  // Register for retry mechanism
+                    retryManager.registerTaskConfig(ctx.taskId, taskConfig); // Register for retry mechanism
                 }
             } else if ("CONFIG_UPDATED".equals(ctx.field)) {
-                BatchTransferTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
+                AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                 if (taskConfig != null) {
                     taskSchedulerManager.updateTask(taskConfig);
-                    retryManager.registerTaskConfig(ctx.taskId, taskConfig);  // Update retry config
+                    retryManager.registerTaskConfig(ctx.taskId, taskConfig); // Update retry config
                 }
             }
         });
@@ -155,24 +160,25 @@ public class AgentApplication {
             taskSchedulerManager.scheduleFailedQueueScannerJob(failedQueueScannerJob, failedQueueScannerTrigger);
 
             logger.info("✅ FailedQueueScannerJob 已注册，扫描间隔: {}ms ({}分钟)",
-                config.getFailedQueueScanIntervalMs(),
-                config.getFailedQueueScanIntervalMs() / 60000);
+                    config.getFailedQueueScanIntervalMs(),
+                    config.getFailedQueueScanIntervalMs() / 60000);
         } catch (Exception e) {
             logger.warn("⚠️ 注册 FailedQueueScannerJob 失败: {}", e.getMessage());
         }
 
-        HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService, configFileManager, configChangeListener, taskSchedulerManager);
-        
+        HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService,
+                configFileManager, configChangeListener, taskSchedulerManager);
+
         // Initialize registry service
         AgentRegistryService registryService = new AgentRegistryService(config);
 
         // Add shutdown hook
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                logger.info("Shutdown signal received");
-                registryService.stop();
-                taskSchedulerManager.shutdown();
-                server.stop();
-            }));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            logger.info("Shutdown signal received");
+            registryService.stop();
+            taskSchedulerManager.shutdown();
+            server.stop();
+        }));
 
         try {
             server.start();
@@ -180,10 +186,10 @@ public class AgentApplication {
 
             // Set actual port to registry service
             registryService.setActualPort(server.getActualPort());
-            
+
             // Start registry service after server is ready
             registryService.start();
-            
+
             logger.info("");
             logger.info("Command API Endpoints:");
             logger.info("  GET  /api/health   - Health check");

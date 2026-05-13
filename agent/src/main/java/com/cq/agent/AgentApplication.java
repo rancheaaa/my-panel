@@ -5,19 +5,14 @@ import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
+import com.cq.agent.batch.scheduler.FileRetryScheduler;
 import com.cq.agent.batch.scheduler.FailedQueueScannerJob;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
-import com.cq.agent.client.upload.UploadService;
 import com.cq.agent.client.upload.BatchListenerAwareAgentUploaderDecorator;
+import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.client.download.AgentDownloader;
-import com.cq.agent.client.download.DownloadService;
-import com.cq.agent.client.download.BatchListenerAwareAgentDownloaderDecorator;
-import com.cq.agent.client.TransferMetaStore;
-import com.cq.agent.client.upload.UploadTask;
-import com.cq.agent.client.download.DownloadTask;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.registry.AgentRegistryService;
@@ -28,189 +23,176 @@ import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
+import java.util.List;
 
-/**
- * Main entry point for the Agent application.
- * <p>
- * This agent provides HTTP interfaces for:
- * - Executing system commands (supports both Windows and Linux/Unix)
- * - File operations (FTP-like commands)
- * <p>
- * Configuration is loaded from agent.properties file.
- * The configuration file can be placed in:
- * - classpath (default)
- * - current working directory
- * - config/ subdirectory
- */
 public class AgentApplication {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentApplication.class);
 
     public static void main(String[] args) {
+        try {
+            AgentConfig config = initializeConfig();
+
+            CommandExecutor commandExecutor = new CommandExecutor(config);
+            FileService fileService = new FileService(config);
+            ChunkedTransferService chunkedTransferService = new ChunkedTransferService(config);
+
+            ConfigFileManager configFileManager = initializeBatchConfigManagement(config);
+            BatchTaskSchedulerManager taskSchedulerManager = initializeTaskScheduler(configFileManager);
+
+            RetryAwareUploaderDecorator retryAwareUploader = initializeUploadDownloadServices(config);
+            ConfigChangeListener configChangeListener = setupConfigChangeListener(configFileManager, taskSchedulerManager, retryAwareUploader);
+            
+            connectComponentsToScheduler(config, taskSchedulerManager, retryAwareUploader, configFileManager, configChangeListener);
+            taskSchedulerManager.startAllRunningTasks();
+            
+            // Initialize file-level retry scheduler with independent Quartz instance
+            FileRetryScheduler fileRetryScheduler;
+            try {
+                fileRetryScheduler = new FileRetryScheduler(retryAwareUploader, config.getFailedQueueScanIntervalMs());
+                logger.info("FileRetryScheduler initialized (independent Quartz instance)");
+            } catch (Exception e) {
+                logger.error("Failed to initialize FileRetryScheduler: {}", e.getMessage());
+                throw new RuntimeException("Unable to initialize file retry scheduler", e);
+            }
+
+            HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService,
+                    configFileManager, configChangeListener, taskSchedulerManager);
+            startServerAndRegister(server, config, taskSchedulerManager, fileRetryScheduler);
+        } catch (Exception e) {
+            logger.error("Failed to start agent", e);
+            System.exit(1);
+        }
+    }
+
+    private static AgentConfig initializeConfig() {
         logger.info("Starting Agent application...");
         AgentConfig config = new AgentConfig();
         logger.info("Configuration loaded: {}", config);
         logger.info("Agent ID: {}", config.getAgentId());
-
-        // Log OS type
+        
         String osName = System.getProperty("os.name");
         logger.info("Running on {} system", osName);
+        
+        return config;
+    }
 
-        CommandExecutor commandExecutor = new CommandExecutor(config);
-        FileService fileService = new FileService(config);
-        ChunkedTransferService chunkedTransferService = new ChunkedTransferService(config);
-        logger.info("ChunkedTransferService initialized successfully");
-
-        // Initialize batch config management
+    private static ConfigFileManager initializeBatchConfigManagement(AgentConfig config) {
         String batchConfigDir = Path.of(config.getFileBaseDirectory(), "batch-config").toString();
         ConfigFileManager configFileManager = new ConfigFileManager(batchConfigDir);
         VersionManager versionManager = new VersionManager();
-        ConfigChangeListener configChangeListener = new ConfigChangeListener(configFileManager, versionManager);
+        new ConfigChangeListener(configFileManager, versionManager);
+        logger.info("Batch configuration management initialized");
+        return configFileManager;
+    }
 
-        // Initialize batch task scheduler manager (Quartz)
-        BatchTaskSchedulerManager taskSchedulerManager;
+    private static BatchTaskSchedulerManager initializeTaskScheduler(ConfigFileManager configFileManager) {
         try {
-            taskSchedulerManager = new BatchTaskSchedulerManager(configFileManager);
+            BatchTaskSchedulerManager taskSchedulerManager = new BatchTaskSchedulerManager(configFileManager);
+            logger.info("BatchTaskSchedulerManager initialized successfully");
+            return taskSchedulerManager;
         } catch (Exception e) {
             logger.error("Failed to initialize BatchTaskSchedulerManager: {}", e.getMessage(), e);
             System.exit(1);
-            return;
+            throw new RuntimeException(e);
         }
+    }
 
-        // Initialize retry manager for batch transfers (10 retries, 30min initial, 2h
-        // max delay)
-        RetryManager retryManager = new RetryManager(10, 30, 2);
-
-        // Initialize upload/download agents (core instances)
+    private static RetryAwareUploaderDecorator initializeUploadDownloadServices(AgentConfig config) {
         AgentUploader coreUploader = new AgentUploader(config);
         coreUploader.init();
 
         AgentDownloader coreDownloader = new AgentDownloader(config);
         coreDownloader.init();
 
-        // Wrap with decorators for listener management (Decorator Pattern)
-        UploadService agentUploader = new BatchListenerAwareAgentUploaderDecorator(coreUploader);
-        DownloadService agentDownloader = new BatchListenerAwareAgentDownloaderDecorator(coreDownloader);
+        BatchListenerAwareAgentUploaderDecorator listenerAwareUploader =
+                new BatchListenerAwareAgentUploaderDecorator(coreUploader);
+        RetryAwareUploaderDecorator retryAwareUploader =
+                new RetryAwareUploaderDecorator(listenerAwareUploader, 10, 30, 2);
 
-        logger.info("✅ Upload/Download services initialized with decorator pattern");
+        retryAwareUploader.initWithConfig(config);
 
-        // Initialize RetryManager with full dependencies (for failed queue scanning)
-        try {
-            TransferMetaStore<UploadTask> uploadMetaStore = new TransferMetaStore<>(
-                    Path.of(config.getUploadSendingQueueDir()), UploadTask.class);
-            TransferMetaStore<DownloadTask> downloadMetaStore = new TransferMetaStore<>(
-                    Path.of(config.getDownloadSendingQueueDir()), DownloadTask.class);
+        logger.info("Upload/Download services initialized with decorator chain: Core → ListenerAware → RetryAware");
 
-            Path uploadFailQueueDir = Path.of(config.getUploadFailRetryQueueDir());
-            Path downloadFailQueueDir = Path.of(config.getDownloadFailRetryQueueDir());
+        return retryAwareUploader;
+    }
 
-            retryManager.init(
-                    uploadMetaStore,
-                    downloadMetaStore,
-                    uploadFailQueueDir,
-                    downloadFailQueueDir,
-                    coreUploader,  // RetryManager需要具体类（用于内部操作）
-                    coreDownloader);
+    private static ConfigChangeListener setupConfigChangeListener(ConfigFileManager configFileManager,
+                                                                     BatchTaskSchedulerManager taskSchedulerManager,
+                                                                     RetryAwareUploaderDecorator retryAwareUploader) {
+        VersionManager versionManager = new VersionManager();
+        ConfigChangeListener configChangeListener = new ConfigChangeListener(configFileManager, versionManager);
 
-            logger.info("✅ RetryManager 初始化完成，失败队列扫描间隔: {}ms", config.getFailedQueueScanIntervalMs());
-        } catch (Exception e) {
-            logger.warn("⚠️ RetryManager 初始化失败，将使用无持久化模式: {}", e.getMessage());
-        }
-
-        // Connect components to task scheduler manager
-        taskSchedulerManager.setRetryManager(retryManager);
-        taskSchedulerManager.setAgentUploader(agentUploader);
-
-        // Initialize and set FileScanner for batch file scanning (spec.md 4.5)
-        FileScanner fileScanner = new FileScanner();
-        taskSchedulerManager.setFileScanner(fileScanner);
-
-        // Initialize ProgressReporter for batch task progress reporting (spec.md 4.8)
-        // todo 这里只选择了固定配置的一个registry地址，实际应该从注册中心中，获取可能存在的多个proxy地址。
-        String registryUrl = config.getRegistryServerUrls() != null && 
-            !config.getRegistryServerUrls().isEmpty() ? 
-            config.getRegistryServerUrls().getFirst() : null;
-        
-        if (registryUrl != null && !registryUrl.isBlank()) {
-            ProgressReporter progressReporter = new ProgressReporter(registryUrl);
-            taskSchedulerManager.setProgressReporter(progressReporter);
-            
-            // 设置到装饰者（用于重启恢复场景的监听器状态恢复）
-            if (agentUploader instanceof BatchListenerAwareAgentUploaderDecorator uploaderDecorator) {
-                uploaderDecorator.setGlobalProgressReporter(progressReporter);
-            }
-            if (agentDownloader instanceof BatchListenerAwareAgentDownloaderDecorator downloaderDecorator) {
-                downloaderDecorator.setGlobalProgressReporter(progressReporter);
-            }
-            
-            logger.info("✅ ProgressReporter 初始化完成，上报地址: {}", registryUrl);
-        } else {
-            logger.warn("⚠️ 注册中心URL未配置，进度上报功能将不可用");
-        }
-
-        // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
         configChangeListener.onCronChange(taskId -> {
             AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
             if (taskConfig != null) {
                 taskSchedulerManager.updateTask(taskConfig);
-                retryManager.registerTaskConfig(taskId, taskConfig); // Register for retry mechanism
+                retryAwareUploader.registerTaskConfig(taskId, taskConfig);
             }
         });
+
         configChangeListener.onAnyChange(ctx -> {
             if ("NEW_TASK".equals(ctx.field)) {
                 AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                 if (taskConfig != null && "RUNNING".equals(taskConfig.getStatus())) {
                     taskSchedulerManager.startTask(taskConfig);
-                    retryManager.registerTaskConfig(ctx.taskId, taskConfig); // Register for retry mechanism
+                    retryAwareUploader.registerTaskConfig(ctx.taskId, taskConfig);
                 }
             } else if ("CONFIG_UPDATED".equals(ctx.field)) {
                 AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                 if (taskConfig != null) {
                     taskSchedulerManager.updateTask(taskConfig);
-                    retryManager.registerTaskConfig(ctx.taskId, taskConfig); // Update retry config
+                    retryAwareUploader.registerTaskConfig(ctx.taskId, taskConfig);
                 }
             }
         });
 
-        // Start all RUNNING tasks from local config
-        taskSchedulerManager.startAllRunningTasks();
+        return configChangeListener;
+    }
 
-        // Register FailedQueueScannerJob for automatic retry of failed tasks
-        try {
-            JobDetail failedQueueScannerJob = JobBuilder.newJob(FailedQueueScannerJob.class)
-                    .withIdentity("failedQueueScanner", "retry-group")
-                    .build();
+    private static void connectComponentsToScheduler(AgentConfig config,
+                                                      BatchTaskSchedulerManager taskSchedulerManager,
+                                                      RetryAwareUploaderDecorator retryAwareUploader,
+                                                      ConfigFileManager configFileManager,
+                                                      ConfigChangeListener configChangeListener) {
+        taskSchedulerManager.setRetryAwareUploader(retryAwareUploader);
+        taskSchedulerManager.setAgentUploader(retryAwareUploader);
 
-            // 将 RetryManager 放入 JobDataMap
-            failedQueueScannerJob.getJobDataMap().put("retryManager", retryManager);
+        FileScanner fileScanner = new FileScanner();
+        taskSchedulerManager.setFileScanner(fileScanner);
 
-            Trigger failedQueueScannerTrigger = TriggerBuilder.newTrigger()
-                    .withIdentity("failedQueueScannerTrigger", "retry-group")
-                    .withSchedule(SimpleScheduleBuilder.simpleSchedule()
-                            .withIntervalInMilliseconds(config.getFailedQueueScanIntervalMs())
-                            .repeatForever())
-                    .build();
+        List<String> registryUrls = config.getRegistryServerUrls();
+        String registryUrl = (registryUrls != null && !registryUrls.isEmpty()) ? registryUrls.getFirst() : null;
 
-            taskSchedulerManager.scheduleFailedQueueScannerJob(failedQueueScannerJob, failedQueueScannerTrigger);
-
-            logger.info("✅ FailedQueueScannerJob 已注册，扫描间隔: {}ms ({}分钟)",
-                    config.getFailedQueueScanIntervalMs(),
-                    config.getFailedQueueScanIntervalMs() / 60000);
-        } catch (Exception e) {
-            logger.warn("⚠️ 注册 FailedQueueScannerJob 失败: {}", e.getMessage());
+        if (registryUrl != null && !registryUrl.isBlank()) {
+            ProgressReporter progressReporter = new ProgressReporter(registryUrl);
+            taskSchedulerManager.setProgressReporter(progressReporter);
+            retryAwareUploader.setGlobalProgressReporter(progressReporter);
+            logger.info("ProgressReporter initialized, registry URL: {}", registryUrl);
+        } else {
+            logger.warn("Registry URL not configured, progress reporting will be disabled");
         }
 
-        HttpServer server = new HttpServer(config, commandExecutor, fileService, chunkedTransferService,
-                configFileManager, configChangeListener, taskSchedulerManager);
+        configChangeListener.onCronChange(taskId -> {
+            AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
+            if (taskConfig != null) {
+                taskSchedulerManager.updateTask(taskConfig);
+                retryAwareUploader.registerTaskConfig(taskId, taskConfig);
+            }
+        });
+    }
 
-        // Initialize registry service
+    private static void startServerAndRegister(HttpServer server,
+                                                AgentConfig config,
+                                                BatchTaskSchedulerManager taskSchedulerManager,
+                                                FileRetryScheduler fileRetryScheduler) {
         AgentRegistryService registryService = new AgentRegistryService(config);
 
-        // Add shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown signal received");
             registryService.stop();
-            taskSchedulerManager.shutdown();
+            taskSchedulerManager.shutdown();      // Close task scheduler
+            fileRetryScheduler.shutdown();        // Close file retry scheduler
             server.stop();
         }));
 
@@ -218,43 +200,10 @@ public class AgentApplication {
             server.start();
             logger.info("Agent started successfully on port {}", server.getActualPort());
 
-            // Set actual port to registry service
             registryService.setActualPort(server.getActualPort());
-
-            // Start registry service after server is ready
             registryService.start();
 
-            logger.info("");
-            logger.info("Command API Endpoints:");
-            logger.info("  GET  /api/health   - Health check");
-            logger.info("  POST /api/execute  - Execute command (timeout: {}s)", config.getDefaultTimeoutSeconds());
-            logger.info("");
-            logger.info("File API Endpoints (FTP-like):");
-            logger.info("  GET  /api/file/syst     - System info");
-            logger.info("  GET  /api/file/feat     - Supported features");
-            logger.info("  GET  /api/file/list     - List directory (LIST)");
-            logger.info("  GET  /api/file/nlst     - Name list (NLST)");
-            logger.info("  GET  /api/file/retr     - Retrieve file (RETR)");
-            logger.info("  POST /api/file/stor     - Store file (STOR)");
-            logger.info("  POST /api/file/stou     - Store unique (STOU)");
-            logger.info("  POST /api/file/appe     - Append to file (APPE)");
-            logger.info("  DELETE /api/file/dele   - Delete file (DELE)");
-            logger.info("  POST /api/file/mkd      - Make directory (MKD)");
-            logger.info("  DELETE /api/file/rmd    - Remove directory (RMD)");
-            logger.info("  GET  /api/file/pwd      - Print working directory (PWD)");
-            logger.info("  GET  /api/file/size     - Get file size (SIZE)");
-            logger.info("  GET  /api/file/mdtm     - Get modification time (MDTM)");
-            logger.info("  POST /api/file/mfmt     - Set modification time (MFMT)");
-            logger.info("  POST /api/file/rename   - Rename file (RNFR/RNTO)");
-            logger.info("  POST /api/file/copy     - Copy file");
-            logger.info("  GET  /api/file/stat     - File status (STAT)");
-            logger.info("  GET  /api/file/exists   - Check if exists");
-            logger.info("  POST /api/file/chmod    - Change permissions (CHMOD)");
-            logger.info("  GET  /api/file/checksum - Calculate checksum (MD5/SHA1/SHA256)");
-            logger.info("  GET  /api/file/search   - Search files");
-            logger.info("  GET  /api/file/disk     - Disk space info");
-            logger.info("");
-            logger.info("File base directory: {}", Path.of(config.getFileBaseDirectory()).toAbsolutePath().normalize());
+            printApiEndpoints(config);
             server.awaitTermination();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -263,5 +212,39 @@ public class AgentApplication {
             logger.error("Failed to start agent", e);
             System.exit(1);
         }
+    }
+
+    private static void printApiEndpoints(AgentConfig config) {
+        logger.info("");
+        logger.info("Command API Endpoints:");
+        logger.info("  GET  /api/health   - Health check");
+        logger.info("  POST /api/execute  - Execute command (timeout: {}s)", config.getDefaultTimeoutSeconds());
+        logger.info("");
+        logger.info("File API Endpoints (FTP-like):");
+        logger.info("  GET  /api/file/syst     - System info");
+        logger.info("  GET  /api/file/feat     - Supported features");
+        logger.info("  GET  /api/file/list     - List directory (LIST)");
+        logger.info("  GET  /api/file/nlst     - Name list (NLST)");
+        logger.info("  GET  /api/file/retr     - Retrieve file (RETR)");
+        logger.info("  POST /api/file/stor     - Store file (STOR)");
+        logger.info("  POST /api/file/stou     - Store unique (STOU)");
+        logger.info("  POST /api/file/appe     - Append to file (APPE)");
+        logger.info("  DELETE /api/file/dele   - Delete file (DELE)");
+        logger.info("  POST /api/file/mkd      - Make directory (MKD)");
+        logger.info("  DELETE /api/file/rmd    - Remove directory (RMD)");
+        logger.info("  GET  /api/file/pwd      - Print working directory (PWD)");
+        logger.info("  GET  /api/file/size     - Get file size (SIZE)");
+        logger.info("  GET  /api/file/mdtm     - Get modification time (MDTM)");
+        logger.info("  POST /api/file/mfmt     - Set modification time (MFMT)");
+        logger.info("  POST /api/file/rename   - Rename file (RNFR/RNTO)");
+        logger.info("  POST /api/file/copy     - Copy file");
+        logger.info("  GET  /api/file/stat     - File status (STAT)");
+        logger.info("  GET  /api/file/exists   - Check if exists");
+        logger.info("  POST /api/file/chmod    - Change permissions (CHMOD)");
+        logger.info("  GET  /api/file/checksum - Calculate checksum (MD5/SHA1/SHA256)");
+        logger.info("  GET  /api/file/search   - Search files");
+        logger.info("  GET  /api/file/disk     - Disk space info");
+        logger.info("");
+        logger.info("File base directory: {}", Path.of(config.getFileBaseDirectory()).toAbsolutePath().normalize());
     }
 }

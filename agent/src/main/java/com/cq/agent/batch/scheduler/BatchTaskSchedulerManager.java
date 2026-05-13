@@ -7,6 +7,7 @@ import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
+import com.cq.agent.client.upload.UploadService;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
 import lombok.Getter;
@@ -36,7 +37,7 @@ public class BatchTaskSchedulerManager {
     private RetryManager retryManager;
     private FileScanner fileScanner;
     @Getter
-    private AgentUploader agentUploader;
+    private UploadService agentUploader;  // 使用接口类型（支持装饰者）
     @Getter
     private ProgressReporter progressReporter;
 
@@ -63,10 +64,11 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 设置P2P上传器（spec.md 4.6）
+     * @param agentUploader 上传服务实例（支持装饰者包装）
      */
-    public void setAgentUploader(AgentUploader agentUploader) {
+    public void setAgentUploader(UploadService agentUploader) {
         this.agentUploader = agentUploader;
-        log.info("📤 已设置AgentUploader");
+        log.info("📤 已设置UploadService (支持装饰者模式)");
     }
 
     /**
@@ -394,7 +396,10 @@ public class BatchTaskSchedulerManager {
             log.info("ℹ️ 失败的文件将进入失败队列，等待 RetryManager 定时扫描和重试");
 
             if (agentUploader != null) {
-                log.info("ℹ️ 上传失败队列路径: {}", agentUploader.getFailedQueueDir());
+                // 使用具体类的方法（不在接口中的实现细节）
+                if (agentUploader instanceof AgentUploader uploader) {
+                    log.info("ℹ️ 上传失败队列路径: {}", uploader.getFailedQueueDir());
+                }
             }
         }
     }

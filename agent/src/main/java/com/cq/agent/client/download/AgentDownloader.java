@@ -24,9 +24,17 @@ import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> {
+/**
+ * Agent download client for chunked file transfer.
+ * Uses memory queue and JSON file-based persistence for durability.
+ * 
+ * Implements DownloadService interface for decorator pattern support.
+ */
+public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> implements DownloadService {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentDownloader.class);
+
+    private final AgentConfig agentConfig;
 
     public AgentDownloader(AgentConfig agentConfig) {
         super(agentConfig, agentConfig.getDownloadConcurrentDownloads(),
@@ -35,6 +43,16 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
                 agentConfig.getDownloadSendingQueueDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download",
                 agentConfig.getDownloadFailRetryQueueDir());
+        this.agentConfig = agentConfig;
+    }
+
+    /**
+     * 获取Agent配置信息（DownloadService接口实现）
+     * @return 配置对象
+     */
+    @Override
+    public AgentConfig getAgentConfig() {
+        return agentConfig;
     }
 
     @Override

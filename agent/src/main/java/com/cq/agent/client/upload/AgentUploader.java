@@ -31,8 +31,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Agent upload client for chunked file transfer.
  * Uses memory queue and JSON file-based persistence for durability.
+ * 
+ * Implements UploadService interface for decorator pattern support.
  */
-public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
+public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> implements UploadService {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentUploader.class);
 
@@ -50,6 +52,15 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> {
                 agentConfig.getMaxUploadRateKBPerSecond(), UploadTask.class, "upload",
                 agentConfig.getUploadFailRetryQueueDir());
         this.agentConfig = agentConfig;
+    }
+
+    /**
+     * 获取Agent配置信息（UploadService接口实现）
+     * @return 配置对象
+     */
+    @Override
+    public AgentConfig getAgentConfig() {
+        return agentConfig;
     }
 
     /**

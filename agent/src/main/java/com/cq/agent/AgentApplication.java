@@ -10,7 +10,11 @@ import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
+import com.cq.agent.client.upload.UploadService;
+import com.cq.agent.client.upload.BatchListenerAwareAgentUploaderDecorator;
 import com.cq.agent.client.download.AgentDownloader;
+import com.cq.agent.client.download.DownloadService;
+import com.cq.agent.client.download.BatchListenerAwareAgentDownloaderDecorator;
 import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.client.upload.UploadTask;
 import com.cq.agent.client.download.DownloadTask;
@@ -77,12 +81,18 @@ public class AgentApplication {
         // max delay)
         RetryManager retryManager = new RetryManager(10, 30, 2);
 
-        // Initialize upload/download agents for failed task retry mechanism
-        AgentUploader agentUploader = new AgentUploader(config);
-        agentUploader.init();
+        // Initialize upload/download agents (core instances)
+        AgentUploader coreUploader = new AgentUploader(config);
+        coreUploader.init();
 
-        AgentDownloader agentDownloader = new AgentDownloader(config);
-        agentDownloader.init();
+        AgentDownloader coreDownloader = new AgentDownloader(config);
+        coreDownloader.init();
+
+        // Wrap with decorators for listener management (Decorator Pattern)
+        UploadService agentUploader = new BatchListenerAwareAgentUploaderDecorator(coreUploader);
+        DownloadService agentDownloader = new BatchListenerAwareAgentDownloaderDecorator(coreDownloader);
+
+        logger.info("✅ Upload/Download services initialized with decorator pattern");
 
         // Initialize RetryManager with full dependencies (for failed queue scanning)
         try {
@@ -99,8 +109,8 @@ public class AgentApplication {
                     downloadMetaStore,
                     uploadFailQueueDir,
                     downloadFailQueueDir,
-                    agentUploader,
-                    agentDownloader);
+                    coreUploader,  // RetryManager需要具体类（用于内部操作）
+                    coreDownloader);
 
             logger.info("✅ RetryManager 初始化完成，失败队列扫描间隔: {}ms", config.getFailedQueueScanIntervalMs());
         } catch (Exception e) {
@@ -125,8 +135,13 @@ public class AgentApplication {
             ProgressReporter progressReporter = new ProgressReporter(registryUrl);
             taskSchedulerManager.setProgressReporter(progressReporter);
             
-            // 同时设置到AgentUploader（用于重启恢复场景）
-            agentUploader.setGlobalProgressReporter(progressReporter);
+            // 设置到装饰者（用于重启恢复场景的监听器状态恢复）
+            if (agentUploader instanceof BatchListenerAwareAgentUploaderDecorator uploaderDecorator) {
+                uploaderDecorator.setGlobalProgressReporter(progressReporter);
+            }
+            if (agentDownloader instanceof BatchListenerAwareAgentDownloaderDecorator downloaderDecorator) {
+                downloaderDecorator.setGlobalProgressReporter(progressReporter);
+            }
             
             logger.info("✅ ProgressReporter 初始化完成，上报地址: {}", registryUrl);
         } else {

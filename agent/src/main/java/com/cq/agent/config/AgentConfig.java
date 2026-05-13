@@ -405,8 +405,4 @@ public class AgentConfig {
         logger.info("Could not find a suitable non-loopback IP, defaulting to 0.0.0.0");
         return "0.0.0.0";
     }
-
-    public long getFailedQueueScanIntervalMs() {
-        return failedQueueScanIntervalMs;
-    }
 }

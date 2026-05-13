@@ -1,5 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
+import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressReporter;
@@ -76,26 +77,6 @@ public class BatchTaskSchedulerManager {
     public void setProgressReporter(ProgressReporter progressReporter) {
         this.progressReporter = progressReporter;
         log.info("📊 已设置ProgressReporter");
-    }
-
-    /**
-     * 获取指定任务的重试次数（委托给RetryAwareUploaderDecorator）
-     */
-    public int getRetryCount(Long taskId) {
-        if (retryAwareUploader == null) {
-            return 0;
-        }
-        return retryAwareUploader.getRetryCount(taskId);
-    }
-
-    /**
-     * 获取最大重试次数（委托给RetryAwareUploaderDecorator）
-     */
-    public int getMaxRetries() {
-        if (retryAwareUploader == null) {
-            return 10; // 默认值
-        }
-        return retryAwareUploader.getMaxRetries();
     }
 
     // ==================== 任务生命周期管理 ====================
@@ -245,7 +226,7 @@ public class BatchTaskSchedulerManager {
                     config.getTaskId(), config.getSourceDir(), config.getVersion());
 
             try {
-                List<FileScanner.ScannedFile> scannedFiles = scanSourceDirectory(config);
+                List<ScannedFile> scannedFiles = scanSourceDirectory(config);
                 processScannedFiles(config.getTaskId(), config, scannedFiles);
                 completeTask(config.getTaskId());
                 log.info("✅ 任务执行成功: taskId={}, processedFiles={}", config.getTaskId(), scannedFiles.size());
@@ -259,7 +240,7 @@ public class BatchTaskSchedulerManager {
     /**
      * 扫描源目录（spec.md 4.5）
      */
-    private List<FileScanner.ScannedFile> scanSourceDirectory(AgentTaskConfig config) {
+    private List<ScannedFile> scanSourceDirectory(AgentTaskConfig config) {
         String sourceDir = config.getSourceDir();
 
         if (fileScanner == null) {
@@ -276,7 +257,7 @@ public class BatchTaskSchedulerManager {
             maxScanFiles = config.getScanConfig().getMaxScanFiles();
         }
 
-        List<FileScanner.ScannedFile> scannedFiles = fileScanner.scan(
+        List<ScannedFile> scannedFiles = fileScanner.scan(
                 sourceDir,
                 config.getIncludePatterns(),
                 config.getExcludePatterns(),
@@ -293,7 +274,7 @@ public class BatchTaskSchedulerManager {
      * 如果任何文件传输失败，抛出异常以触发重试机制
      */
     private void processScannedFiles(Long taskId, AgentTaskConfig config,
-            List<FileScanner.ScannedFile> scannedFiles) {
+            List<ScannedFile> scannedFiles) {
         if (scannedFiles == null || scannedFiles.isEmpty()) {
             log.info("ℹ️  未扫描到文件，跳过传输: taskId={}", taskId);
             return;
@@ -315,7 +296,7 @@ public class BatchTaskSchedulerManager {
 
         List<String> failedFiles = new java.util.ArrayList<>();
 
-        for (FileScanner.ScannedFile scannedFile : scannedFiles) {
+        for (ScannedFile scannedFile : scannedFiles) {
             try {
                 log.debug("📤 准备传输文件: fileName={}, size={}bytes",
                         scannedFile.getFileName(), scannedFile.getFileSize());
@@ -377,7 +358,7 @@ public class BatchTaskSchedulerManager {
      * 格式：ip:port@username:destFilePath
      * 示例：192.168.1.100:7777@root:/remote/target/app.log
      */
-    private String buildRemoteTargetInfo(AgentTaskConfig config, FileScanner.ScannedFile scannedFile) {
+    private String buildRemoteTargetInfo(AgentTaskConfig config, ScannedFile scannedFile) {
         try {
             if (config.getTargetAgents() == null || config.getTargetAgents().isEmpty()) {
                 throw new IllegalArgumentException("目标Agent列表为空");

@@ -44,7 +44,7 @@ class FileScannerTddTest {
         createSubdirAndFile("sub", "access.log");
 
         // When: 扫描目录
-        List<FileScanner.ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
 
         // Then: 应返回3个文件
         assertEquals(3, files.size(), "应返回3个文件");
@@ -62,7 +62,7 @@ class FileScannerTddTest {
         createFile("data.json");
 
         // When: 只扫描*.log文件
-        List<FileScanner.ScannedFile> files = fileScanner.scan(
+        List<ScannedFile> files = fileScanner.scan(
             tempDir.toString(),
             List.of("*.log"),
             null,
@@ -87,7 +87,7 @@ class FileScannerTddTest {
         createFile("debug_error.log");
 
         // When: 排除debug*文件
-        List<FileScanner.ScannedFile> files = fileScanner.scan(
+        List<ScannedFile> files = fileScanner.scan(
             tempDir.toString(),
             null,
             List.of("debug*"),
@@ -113,7 +113,7 @@ class FileScannerTddTest {
         createFile("config.txt");
 
         // When: 包含*.log但排除debug*
-        List<FileScanner.ScannedFile> files = fileScanner.scan(
+        List<ScannedFile> files = fileScanner.scan(
             tempDir.toString(),
             List.of("*.log"),
             List.of("debug*"),
@@ -138,7 +138,7 @@ class FileScannerTddTest {
         }
 
         // When: 限制最多扫描3个
-        List<FileScanner.ScannedFile> files = fileScanner.scan(
+        List<ScannedFile> files = fileScanner.scan(
             tempDir.toString(),
             null,
             null,
@@ -158,11 +158,11 @@ class FileScannerTddTest {
         File createdFile = createFile("test.log");
 
         // When: 扫描目录
-        List<FileScanner.ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
 
         // Then: 结果应包含完整元信息
         assertEquals(1, files.size());
-        FileScanner.ScannedFile scannedFile = files.get(0);
+        ScannedFile scannedFile = files.get(0);
         
         assertEquals("test.log", scannedFile.getFileName());
         assertEquals(createdFile.length(), scannedFile.getFileSize());
@@ -178,7 +178,7 @@ class FileScannerTddTest {
     @DisplayName("7. [spec.md] 空目录应返回空列表")
     void testScan_emptyDirectory_returnsEmptyList() {
         // When: 扫描空目录
-        List<FileScanner.ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
 
         // Then: 返回空列表
         assertNotNull(files, "不应返回null");
@@ -208,7 +208,7 @@ class FileScannerTddTest {
         createFile("root.log");
 
         // When: 扫描根目录
-        List<FileScanner.ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
 
         // Then: 应找到所有层级的文件
         assertEquals(4, files.size(), "应找到所有4个文件（包括子目录）");
@@ -224,7 +224,7 @@ class FileScannerTddTest {
         createFile("readable.txt");
 
         // When: 扫描目录
-        List<FileScanner.ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
 
         // Then: 至少应返回可读文件
         assertTrue(files.size() >= 2, "应至少返回2个可读文件");

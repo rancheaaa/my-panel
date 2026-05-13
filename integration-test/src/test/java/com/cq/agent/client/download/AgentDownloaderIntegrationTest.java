@@ -12,6 +12,7 @@ import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 import java.io.*;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -303,7 +304,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
     }
 
     protected boolean verifyFileExists(String remotePath) throws IOException {
-        String url = AGENT_URL + "/api/file/exists?path=" + URLEncoder.encode(remotePath, "UTF-8");
+        String url = AGENT_URL + "/api/file/exists?path=" + URLEncoder.encode(remotePath, StandardCharsets.UTF_8);
         logger.info("Verifying file existence path: {}", url);
 
         JsonObject res = sendGetRequest(url);
@@ -314,7 +315,7 @@ class AgentDownloaderIntegrationTest extends BaseIntegrationTest {
 
     protected void cleanupRemoteFile(String remotePath) {
         try {
-            String url = AGENT_URL + "/api/file/dele?path=" + URLEncoder.encode(remotePath, "UTF-8");
+            String url = AGENT_URL + "/api/file/dele?path=" + URLEncoder.encode(remotePath, StandardCharsets.UTF_8);
             logger.info("Cleaning up remote file: {}", url);
             JsonObject res = sendGetRequest(url);
             logger.info("Cleanup response: {}", res.toString());

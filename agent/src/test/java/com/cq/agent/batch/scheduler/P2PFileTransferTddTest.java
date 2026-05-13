@@ -1,5 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
+import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
@@ -89,7 +90,7 @@ class P2PFileTransferTddTest {
     @DisplayName("1. [spec.md 4.6] 应调用AgentUploader.uploadFile进行P2P传输")
     void testProcessScannedFiles_shouldCallAgentUploader() {
         // Given: 模拟扫描到文件
-        FileScanner.ScannedFile scannedFile = createScannedFile("test.log", 1024L);
+        ScannedFile scannedFile = createScannedFile("test.log", 1024L);
         
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
@@ -117,7 +118,7 @@ class P2PFileTransferTddTest {
     @DisplayName("2. [spec.md 4.6] 应构建正确的remoteTargetInfo格式")
     void testProcessScannedFiles_shouldBuildCorrectRemoteTargetInfo() {
         // Given: 配置目标Agent信息
-        FileScanner.ScannedFile scannedFile = createScannedFile("app.log", 2048L);
+        ScannedFile scannedFile = createScannedFile("app.log", 2048L);
         
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
@@ -153,7 +154,7 @@ class P2PFileTransferTddTest {
     @DisplayName("3. [spec.md 4.6] 应传递正确的localFilePath给AgentUploader")
     void testProcessScannedFiles_shouldPassCorrectLocalPath() {
         // Given: 扫描到具体文件
-        FileScanner.ScannedFile scannedFile = createScannedFile("data.json", 4096L);
+        ScannedFile scannedFile = createScannedFile("data.json", 4096L);
         
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
@@ -186,7 +187,7 @@ class P2PFileTransferTddTest {
     @DisplayName("4. [spec.md 4.6] 应传递UploadListener以捕获进度事件")
     void testProcessScannedFiles_shouldPassUploadListener() {
         // Given: 准备文件和配置
-        FileScanner.ScannedFile scannedFile = createScannedFile("log.txt", 512L);
+        ScannedFile scannedFile = createScannedFile("log.txt", 512L);
         
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
@@ -224,7 +225,7 @@ class P2PFileTransferTddTest {
     @DisplayName("5. [spec.md 4.6] 上传成功时应标记任务完成")
     void testProcessScannedFiles_uploadSuccessShouldComplete() {
         // Given: 模拟上传成功
-        FileScanner.ScannedFile scannedFile = createScannedFile("success.log", 1024L);
+        ScannedFile scannedFile = createScannedFile("success.log", 1024L);
         
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
@@ -245,43 +246,10 @@ class P2PFileTransferTddTest {
     }
 
     @Test
-    @DisplayName("6. [spec.md 4.7] 上传失败时应进入失败队列而非整体重试")
-    void testProcessScannedFiles_uploadFailureShouldTriggerRetry() {
-        // Given: 模拟上传失败
-        FileScanner.ScannedFile scannedFile = createScannedFile("fail.log", 512L);
-
-        when(fileScanner.scan(anyString(), any(), any(), any()))
-            .thenReturn(List.of(scannedFile));
-
-        when(agentUploader.uploadFile(anyString(), anyString(), any(UploadListener.class)))
-            .thenReturn(false);  // 上传失败
-
-        // 新行为：不再调用 shouldRetry()，而是让失败的文件进入失败队列
-        // RetryManager 会定时扫描并重试
-
-        AgentTaskConfig config = createTestConfigWithTargets();
-
-        // When: 执行任务（不应该抛出异常）
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        
-        // Then: 任务应该正常完成（不抛出异常），失败的文件已进入失败队列
-        assertDoesNotThrow(() -> taskRunnable.run(),
-            "部分文件失败不应导致整个任务失败");
-
-        // 验证：不再调用旧的 shouldRetry 方法（因为改为异步重试机制）
-        verify(retryAwareUploader, never()).shouldRetry(anyLong(), anyString());
-
-        // 验证：任务完成时仍会记录成功（对于成功的文件）
-        verify(retryAwareUploader).recordSuccess(1001L);
-
-        System.out.println("✅ 失败重试验证: uploadFile返回false后不抛异常，失败文件进入队列等待定时重试");
-    }
-
-    @Test
     @DisplayName("7. [spec.md] 多个文件应逐个上传")
     void testProcessScannedFiles_shouldUploadAllFiles() {
         // Given: 模拟扫描到多个文件
-        List<FileScanner.ScannedFile> files = List.of(
+        List<ScannedFile> files = List.of(
             createScannedFile("file1.log", 1024L),
             createScannedFile("file2.log", 2048L),
             createScannedFile("file3.txt", 3072L)
@@ -313,7 +281,7 @@ class P2PFileTransferTddTest {
     @DisplayName("8. [spec.md] 单个文件失败不应影响其他文件上传")
     void testProcessScannedFiles_singleFailureShouldNotBlockOthers() {
         // Given: 第2个文件上传失败
-        List<FileScanner.ScannedFile> files = List.of(
+        List<ScannedFile> files = List.of(
             createScannedFile("success1.log", 1024L),
             createScannedFile("failed.log", 2048L),
             createScannedFile("success2.log", 3072L)
@@ -349,7 +317,7 @@ class P2PFileTransferTddTest {
     @DisplayName("10. [spec.md] 无目标Agent时应跳过传输")
     void testProcessScannedFiles_noTargetAgentsShouldSkip() {
         // Given: 无目标Agent配置
-        FileScanner.ScannedFile scannedFile = createScannedFile("test.log", 1024L);
+        ScannedFile scannedFile = createScannedFile("test.log", 1024L);
         
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenReturn(List.of(scannedFile));
@@ -415,8 +383,8 @@ class P2PFileTransferTddTest {
     /**
      * 创建扫描到的文件对象
      */
-    private FileScanner.ScannedFile createScannedFile(String fileName, long fileSize) {
-        FileScanner.ScannedFile scannedFile = new FileScanner.ScannedFile();
+    private ScannedFile createScannedFile(String fileName, long fileSize) {
+        ScannedFile scannedFile = new ScannedFile();
         scannedFile.setFileName(fileName);
         scannedFile.setFileSize(fileSize);
         scannedFile.setLastModified(System.currentTimeMillis());

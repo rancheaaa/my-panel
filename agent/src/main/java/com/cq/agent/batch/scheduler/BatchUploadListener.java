@@ -1,10 +1,10 @@
 package com.cq.agent.batch.scheduler;
 
+import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.TransferConfig;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.report.SubTaskEvent;
-import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
 import lombok.Getter;
@@ -32,8 +32,13 @@ public class BatchUploadListener implements UploadListener {
 
     private static final Logger log = LoggerFactory.getLogger(BatchUploadListener.class);
 
+    /**
+     * -- GETTER --
+     *  获取任务ID
+     */
+    @Getter
     private Long taskId;
-    private FileScanner.ScannedFile scannedFile;
+    private ScannedFile scannedFile;
     private AgentTaskConfig config;
     private ProgressReporter progressReporter;
 
@@ -50,13 +55,6 @@ public class BatchUploadListener implements UploadListener {
      */
     @Getter
     private boolean restored = false;
-
-    /**
-     * 获取任务ID
-     */
-    public Long getTaskId() {
-        return taskId;
-    }
 
     /**
      * 获取文件名（从scannedFile获取）
@@ -82,7 +80,7 @@ public class BatchUploadListener implements UploadListener {
     /**
      * 有参构造函数 - 正常创建新任务时使用
      */
-    public BatchUploadListener(Long taskId, FileScanner.ScannedFile scannedFile,
+    public BatchUploadListener(Long taskId, ScannedFile scannedFile,
             AgentTaskConfig config, ProgressReporter progressReporter) {
         this.taskId = taskId;
         this.scannedFile = scannedFile;
@@ -96,43 +94,6 @@ public class BatchUploadListener implements UploadListener {
         // 立即创建子任务到Proxy数据库
         createSubTaskOnProxy();
         log.info("✅ 新建上传监听器: subtaskId={}, file={}", subtaskId, scannedFile.getFileName());
-    }
-
-    /**
-     * 无参构造函数 - 从JSON恢复任务时使用（重启恢复场景）
-     * 用于满足反射实例化要求，后续需调用 restoreState() 恢复完整状态
-     */
-    @SuppressWarnings("all")
-    public BatchUploadListener() {
-        this.restored = true;
-        log.debug("🔄 创建恢复模式的上传监听器（无参构造函数）");
-    }
-
-    /**
-     * 恢复状态（从JSON反序列化后调用）
-     * @param taskId 任务ID
-     * @param subtaskId 子任务ID
-     * @param filePath 文件路径
-     * @param fileName 文件名
-     * @param fileSize 文件大小
-     * @param reporter 进度上报器
-     */
-    public void restoreState(Long taskId, Long subtaskId, String filePath,
-            String fileName, long fileSize, ProgressReporter reporter) {
-        this.taskId = taskId;
-        this.subtaskId = subtaskId;
-        this.progressReporter = reporter;
-        this.restored = true;
-
-        // 重建 ScannedFile 对象（使用setter方法）
-        FileScanner.ScannedFile restoredFile = new FileScanner.ScannedFile();
-        restoredFile.setFileName(fileName);
-        restoredFile.setFileSize(fileSize);
-        restoredFile.setLastModified(System.currentTimeMillis());
-        restoredFile.setAbsolutePath(filePath);
-        this.scannedFile = restoredFile;
-
-        log.info("🔄 上传监听器状态已恢复: subtaskId={}, file={}", subtaskId, fileName);
     }
 
     /**
@@ -319,7 +280,7 @@ public class BatchUploadListener implements UploadListener {
         if (config == null || config.getTargetAgents() == null
                 || config.getTargetAgents().isEmpty())
             return null;
-        return config.getTargetAgents().get(0).getAgentId();
+        return config.getTargetAgents().getFirst().getAgentId();
     }
 
     /**

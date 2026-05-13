@@ -47,7 +47,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1001L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
 
         Thread.sleep(1500); // 等待至少1次触发
 
@@ -61,7 +61,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1002L, "* * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
 
         Thread.sleep(1500);
 
@@ -75,7 +75,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1003L, "0/5 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
 
         Thread.sleep(6200); // 等待至少1次触发(5秒间隔)
 
@@ -91,7 +91,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1004L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
         Thread.sleep(1100); // 至少执行1次
 
         int countBeforePause = executionCount.get();
@@ -107,7 +107,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1005L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
         Thread.sleep(500);
         taskScheduler.pauseTask(1005L);
         Thread.sleep(500);
@@ -127,7 +127,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1006L, "0/2 * * * * ?"); // 每2秒
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
         Thread.sleep(2100); // 2秒内应执行1次
         int countWith2s = executionCount.get();
 
@@ -148,7 +148,7 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config = createConfig(1007L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
-        taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
+        taskScheduler.startTask(config, executionCount::incrementAndGet);
         Thread.sleep(1100);
 
         int countBeforeDelete = executionCount.get();
@@ -169,8 +169,8 @@ class QuartzTaskSchedulerTest {
         AgentTaskConfig config1 = createConfig(2001L, "0/1 * * * * ?");
         AgentTaskConfig config2 = createConfig(2002L, "0/1 * * * * ?");
 
-        taskScheduler.startTask(config1, () -> task1Count.incrementAndGet());
-        taskScheduler.startTask(config2, () -> task2Count.incrementAndGet());
+        taskScheduler.startTask(config1, task1Count::incrementAndGet);
+        taskScheduler.startTask(config2, task2Count::incrementAndGet);
 
         Thread.sleep(1500);
 

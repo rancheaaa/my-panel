@@ -6,11 +6,9 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
 import com.cq.agent.batch.scheduler.FileRetryScheduler;
-import com.cq.agent.batch.scheduler.FailedQueueScannerJob;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.client.upload.AgentUploader;
-import com.cq.agent.client.upload.BatchListenerAwareAgentUploaderDecorator;
 import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.client.download.AgentDownloader;
 import com.cq.agent.config.AgentConfig;
@@ -105,11 +103,8 @@ public class AgentApplication {
         AgentDownloader coreDownloader = new AgentDownloader(config);
         coreDownloader.init();
 
-        BatchListenerAwareAgentUploaderDecorator listenerAwareUploader =
-                new BatchListenerAwareAgentUploaderDecorator(coreUploader);
         RetryAwareUploaderDecorator retryAwareUploader =
-                new RetryAwareUploaderDecorator(listenerAwareUploader, 10, 30, 2);
-
+                new RetryAwareUploaderDecorator(coreUploader);
         retryAwareUploader.initWithConfig(config);
 
         logger.info("Upload/Download services initialized with decorator chain: Core → ListenerAware → RetryAware");

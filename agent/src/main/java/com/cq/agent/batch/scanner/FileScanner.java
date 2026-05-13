@@ -135,32 +135,4 @@ public class FileScanner {
 
         return scannedFile;
     }
-
-    /**
-     * 扫描结果数据类
-     */
-    public static class ScannedFile {
-        private String fileName;
-        private long fileSize;
-        private long lastModified;
-        private String absolutePath;
-
-        public String getFileName() { return fileName; }
-        public void setFileName(String fileName) { this.fileName = fileName; }
-
-        public long getFileSize() { return fileSize; }
-        public void setFileSize(long fileSize) { this.fileSize = fileSize; }
-
-        public long getLastModified() { return lastModified; }
-        public void setLastModified(long lastModified) { this.lastModified = lastModified; }
-
-        public String getAbsolutePath() { return absolutePath; }
-        public void setAbsolutePath(String absolutePath) { this.absolutePath = absolutePath; }
-
-        @Override
-        public String toString() {
-            return "ScannedFile{fileName='" + fileName + "', size=" + fileSize +
-                   ", modified=" + lastModified + ", path='" + absolutePath + "'}";
-        }
-    }
 }

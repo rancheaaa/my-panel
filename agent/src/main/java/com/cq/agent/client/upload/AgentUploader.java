@@ -1,7 +1,5 @@
 package com.cq.agent.client.upload;
 
-import com.cq.agent.batch.report.ProgressReporter;
-import com.cq.agent.batch.scheduler.BatchUploadListener;
 import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.client.RemoteAgentInfo;
 import com.cq.agent.client.Util;
@@ -31,7 +29,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Agent upload client for chunked file transfer.
  * Uses memory queue and JSON file-based persistence for durability.
- * 
  * Implements UploadService interface for decorator pattern support.
  */
 public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> implements UploadService {
@@ -39,9 +36,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
     private static final Logger logger = LoggerFactory.getLogger(AgentUploader.class);
 
     private final AgentConfig agentConfig;
-
-    /** 全局ProgressReporter实例（用于重启恢复场景） */
-    private ProgressReporter globalProgressReporter;
 
     public AgentUploader(AgentConfig agentConfig) {
         super(agentConfig, agentConfig.getUploadConcurrentUploads(),
@@ -63,18 +57,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         return agentConfig;
     }
 
-    /**
-     * 设置全局ProgressReporter（用于重启恢复场景）
-     * 应在AgentApplication启动时调用一次，避免每次恢复都新建实例
-     *
-     * @param progressReporter 全局唯一的进度上报器
-     */
-    public void setGlobalProgressReporter(com.cq.agent.batch.report.ProgressReporter progressReporter) {
-        this.globalProgressReporter = progressReporter;
-        logger.info("✅ 已设置全局ProgressReporter: {}", 
-            progressReporter != null ? "已配置" : "null");
-    }
-
     @Override
     protected void processTask(UploadTask task) {
         String taskKey = getTaskKey(task);
@@ -89,8 +71,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
                 UploadListener listener = createListenerInstance(listenerClassName, UploadListener.class);
                 if (listener != null) {
-                    // 尝试恢复监听器状态（用于重启恢复场景）
-                    restoreListenerState(listener, task);
                     listenerCache.put(taskKey, listener);
                 }
             }
@@ -245,7 +225,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
 
     public boolean uploadFile(String localFilePath, String remoteTargetInfo, UploadListener listener) {
         String traceId = java.util.UUID.randomUUID().toString().replace("-", "");
-
+        // todo 返回false，也要往失败队列中写入json
         try {
             if (taskQueue.size() > maxQueueDepth) {
                 handleListenerError(listener, "Download queue depth is reached: " + maxQueueDepth);
@@ -305,9 +285,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             task.setEnqueuedTime(Util.currentTime());
             task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
             task.updateTimestamp();
-
-            // ★ 设置监听器状态恢复字段（用于重启恢复场景）
-            populateRestoreFields(task, listener);
 
             if (metaStore != null) {
                 metaStore.saveTask(task);
@@ -537,168 +514,9 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
     }
 
     /**
-     * 填充监听器状态恢复字段到 UploadTask
-     * 用于重启恢复场景，确保从JSON反序列化后能正确恢复监听器状态
-     *
-     * @param task 上传任务对象
-     * @param listener 监听器实例（可能是BatchUploadListener）
-     */
-    private void populateRestoreFields(UploadTask task, UploadListener listener) {
-        if (task == null || listener == null) {
-            return;
-        }
-
-        // 只处理 BatchUploadListener 类型
-        if (listener instanceof BatchUploadListener batchListener) {
-            try {
-                // 从 BatchUploadListener 提取恢复字段
-                task.setTaskId(batchListener.getTaskId());
-                task.setSubtaskId(batchListener.getSubtaskId());
-                task.setFileName(batchListener.getFileName());
-                
-                // fileSize 已经在创建 UploadTask 时设置，这里从 listener 获取更准确的值
-                if (batchListener.getFileSize() > 0) {
-                    task.setFileSize(batchListener.getFileSize());
-                }
-
-                logger.debug("✅ 已填充恢复字段: taskId={}, subtaskId={}, fileName={}, size={}bytes",
-                    task.getTaskId(), task.getSubtaskId(), task.getFileName(), task.getFileSize());
-
-            } catch (Exception e) {
-                logger.warn("⚠️ 填充恢复字段失败（不影响正常上传）: {}", e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * 重新提交失败的任务（内部方法，供 RetryManager 调用）
-     * 与 uploadFile() 的区别：
-     * - 不重新扫描文件
-     * - 直接使用已有的任务对象
-     * - 跳过文件存在性检查
-     *
-     * @param task 已有的 UploadTask 对象（包含 localFilePath, remoteTargetPath 等）
-     */
-    public void resubmitTask(UploadTask task) {
-        String taskKey = getTaskKey(task);
-        String traceId = task.getTraceId();
-
-        logger.info("[traceId={}] 🔄 重新提交失败任务: transferId={}, file={}, retryCount={}, remoteTarget={}",
-            traceId,
-            task.getTransferId(),
-            task.getLocalFilePath(),
-            task.getRetryCount(),
-            task.getRemoteTargetPath());
-
-        // 直接将任务对象放入工作队列（worker线程会自动poll并处理）
-        boolean offered = taskQueue.offer(task);
-
-        if (offered) {
-            logger.debug("✅ 任务已加入工作队列: taskKey={}", taskKey);
-        } else {
-            logger.error("❌ 任务加入工作队列失败: taskKey={}", taskKey);
-        }
-    }
-
-    /**
      * 获取失败队列目录（用于日志和监控）
      */
     public Path getFailedQueueDir() {
         return failedQueueDir;
-    }
-
-    /**
-     * 恢复监听器状态（用于重启恢复场景）
-     * 当从JSON反序列化恢复任务时，Listener通过无参构造函数创建，
-     * 需要调用此方法恢复完整状态，包括taskId、subtaskId、文件信息等。
-     * 优先使用全局ProgressReporter实例（避免重复创建），如果未设置则创建新实例
-     *
-     * @param listener 通过反射创建的监听器实例
-     * @param task 包含恢复信息的任务对象
-     */
-    private void restoreListenerState(UploadListener listener, UploadTask task) {
-        if (listener == null || task == null) {
-            logger.debug("⚠️ listener或task为null，跳过状态恢复");
-            return;
-        }
-
-        // 只处理BatchUploadListener类型
-        if (listener instanceof BatchUploadListener batchListener) {
-            // 检查是否需要恢复（如果已经是有参构造函数创建的则跳过）
-            if (!batchListener.isRestored()) {
-                logger.debug("ℹ️ 监听器已通过有参构造函数初始化，跳过状态恢复: subtask={}",
-                    batchListener.getSubtaskId());
-                return;
-            }
-
-            Long taskId = task.getTaskId();
-            Long subtaskId = task.getSubtaskId();
-            String fileName = task.getFileName();
-            String filePath = task.getLocalFilePath();
-            long fileSize = task.getFileSize();
-
-            if (subtaskId == null) {
-                logger.warn("⚠️ subtaskId为null，无法恢复监听器状态: file={}", fileName);
-                return;
-            }
-
-            try {
-                // ★ 使用全局ProgressReporter，避免每次都新建
-                ProgressReporter reporter = getOrCreateGlobalProgressReporter();
-
-                // 恢复监听器状态
-                batchListener.restoreState(taskId, subtaskId, filePath, fileName, fileSize, reporter);
-
-                logger.info("✅ 上传监听器状态已恢复: subtaskId={}, file={}, size={}bytes",
-                    subtaskId, fileName, fileSize);
-
-            } catch (Exception e) {
-                logger.error("❌ 恢复上传监听器状态失败: subtaskId={}, file={}, error={}",
-                    subtaskId, fileName, e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * 获取或创建全局ProgressReporter实例
-     * 优先使用已设置的全局实例，避免重复创建浪费资源
-     */
-    private ProgressReporter getOrCreateGlobalProgressReporter() {
-        // 优先使用全局实例
-        if (globalProgressReporter != null) {
-            return globalProgressReporter;
-        }
-
-        // 全局实例未设置时，记录警告并创建临时实例（向后兼容）
-        logger.warn("⚠️ globalProgressReporter未设置，将创建临时实例（建议在AgentApplication中调用setGlobalProgressReporter）");
-        return createTemporaryProgressReporter();
-    }
-
-    /**
-     * 创建临时的ProgressReporter实例（仅作为降级方案）
-     */
-    private ProgressReporter createTemporaryProgressReporter() {
-        String proxyUrl = getRegistryServerUrl();
-        if (proxyUrl == null || proxyUrl.isBlank()) {
-            logger.debug("⚠️ proxyUrl未配置，使用空ProgressReporter");
-            return new ProgressReporter(null);
-        }
-
-        return new ProgressReporter(proxyUrl);
-    }
-
-    /**
-     * 获取注册中心/代理服务器URL（用于进度上报）
-     */
-    private String getRegistryServerUrl() {
-        if (agentConfig == null) return null;
-        
-        // 尝试获取第一个注册服务器URL
-        java.util.List<String> urls = agentConfig.getRegistryServerUrls();
-        if (urls != null && !urls.isEmpty()) {
-            return urls.getFirst();
-        }
-        
-        return null;
     }
 }

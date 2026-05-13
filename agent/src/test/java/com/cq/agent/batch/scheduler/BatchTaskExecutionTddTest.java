@@ -1,5 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
+import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
@@ -168,48 +169,6 @@ class BatchTaskExecutionTddTest {
     }
 
     @Test
-    @DisplayName("5. [refactor] 扫描失败时应记录错误日志（不再触发任务级重试）")
-    void testExecuteTask_scanFailureShouldLogError() {
-        // Given: 模拟扫描失败
-        when(fileScanner.scan(anyString(), any(), any(), any()))
-            .thenThrow(new RuntimeException("目录不存在"));
-
-        AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
-
-        // When: 执行任务
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
-
-        // Then: 应记录错误日志（不再调用 shouldRetry，因为已删除任务级重试）
-        // 验证没有调用 retryAwareUploader.shouldRetry()
-        verify(retryAwareUploader, never()).shouldRetry(anyLong(), anyString());
-        
-        // 验证任务正常完成（异常被捕获并记录日志）
-        System.out.println("✅ 错误处理验证: 扫描失败时仅记录日志，不触发任务级重试");
-    }
-
-    @Test
-    @DisplayName("6. [spec.md 4.7] 超过最大重试次数应标记最终失败")
-    void testExecuteTask_maxRetriesExceededShouldFail() {
-        // Given: 模拟失败且超过最大重试次数
-        when(fileScanner.scan(anyString(), any(), any(), any()))
-            .thenThrow(new RuntimeException("永久性错误"));
-        
-        when(retryAwareUploader.shouldRetry(anyLong(), anyString())).thenReturn(false);
-
-        AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
-
-        // When: 执行任务
-        Runnable taskRunnable = invokeCreateTaskRunnable(config);
-        taskRunnable.run();
-
-        // Then: 不再重试，标记最终失败
-        verify(retryAwareUploader, never()).calculateNextRetryDelay(anyLong(), anyInt());
-
-        System.out.println("✅ 最终失败验证: 超过最大重试次数不再调度");
-    }
-
-    @Test
     @DisplayName("7. [spec.md] 无目标Agent时应跳过传输")
     void testExecuteTask_noTargetAgentsShouldSkip() {
         // Given: 无目标Agent配置
@@ -268,8 +227,8 @@ class BatchTaskExecutionTddTest {
     /**
      * 创建扫描到的文件对象
      */
-    private FileScanner.ScannedFile createScannedFile(String fileName, long fileSize) {
-        FileScanner.ScannedFile scannedFile = new FileScanner.ScannedFile();
+    private ScannedFile createScannedFile(String fileName, long fileSize) {
+        ScannedFile scannedFile = new ScannedFile();
         scannedFile.setFileName(fileName);
         scannedFile.setFileSize(fileSize);
         scannedFile.setLastModified(System.currentTimeMillis());

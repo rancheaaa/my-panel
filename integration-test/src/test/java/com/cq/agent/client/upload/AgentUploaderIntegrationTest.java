@@ -9,6 +9,7 @@ import com.google.gson.JsonObject;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.*;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -117,7 +118,7 @@ class AgentUploaderIntegrationTest extends BaseIntegrationTest {
      * @throws IOException  IOException
      */
     protected boolean verifyFileExists(String remotePath) throws IOException {
-        String url = AGENT_URL + "/api/file/exists?path=" + URLEncoder.encode(remotePath, "UTF-8");
+        String url = AGENT_URL + "/api/file/exists?path=" + URLEncoder.encode(remotePath, StandardCharsets.UTF_8);
         logger.info("Verifying file existence path: {}", url);
 
         final JsonObject res = sendGetRequest(url);

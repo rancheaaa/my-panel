@@ -5,7 +5,7 @@ import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.RetryManager;
+import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
 
@@ -32,7 +32,7 @@ class BatchTaskExecutionTddTest {
     private ConfigFileManager configFileManager;
 
     @Mock
-    private RetryManager retryManager;
+    private RetryAwareUploaderDecorator retryAwareUploader;
 
     @Mock
     private FileScanner fileScanner;
@@ -45,7 +45,7 @@ class BatchTaskExecutionTddTest {
     void setUp() throws Exception {
         mocks = MockitoAnnotations.openMocks(this);
         schedulerManager = new BatchTaskSchedulerManager(configFileManager);
-        schedulerManager.setRetryManager(retryManager);
+        schedulerManager.setRetryAwareUploader(retryAwareUploader);
         schedulerManager.setFileScanner(fileScanner);
 
         // 创建临时目录用于测试
@@ -162,19 +162,17 @@ class BatchTaskExecutionTddTest {
         taskRunnable.run();
 
         // Then: 无文件时也应正常完成
-        verify(retryManager).recordSuccess(eq(1001L));
+        verify(retryAwareUploader).recordSuccess(eq(1001L));
 
         System.out.println("✅ 空目录验证: 无文件时也正常完成");
     }
 
     @Test
-    @DisplayName("5. [spec.md 4.7] 扫描失败时应触发重试机制")
-    void testExecuteTask_scanFailureShouldTriggerRetry() {
+    @DisplayName("5. [refactor] 扫描失败时应记录错误日志（不再触发任务级重试）")
+    void testExecuteTask_scanFailureShouldLogError() {
         // Given: 模拟扫描失败
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenThrow(new RuntimeException("目录不存在"));
-        
-        when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(true);
 
         AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
 
@@ -182,10 +180,12 @@ class BatchTaskExecutionTddTest {
         Runnable taskRunnable = invokeCreateTaskRunnable(config);
         taskRunnable.run();
 
-        // Then: 应调用failTask并检查是否需要重试
-        verify(retryManager).shouldRetry(eq(1001L), contains("目录不存在"));
-
-        System.out.println("✅ 重试机制验证: failTask检查是否需要重试");
+        // Then: 应记录错误日志（不再调用 shouldRetry，因为已删除任务级重试）
+        // 验证没有调用 retryAwareUploader.shouldRetry()
+        verify(retryAwareUploader, never()).shouldRetry(anyLong(), anyString());
+        
+        // 验证任务正常完成（异常被捕获并记录日志）
+        System.out.println("✅ 错误处理验证: 扫描失败时仅记录日志，不触发任务级重试");
     }
 
     @Test
@@ -195,7 +195,7 @@ class BatchTaskExecutionTddTest {
         when(fileScanner.scan(anyString(), any(), any(), any()))
             .thenThrow(new RuntimeException("永久性错误"));
         
-        when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(false);
+        when(retryAwareUploader.shouldRetry(anyLong(), anyString())).thenReturn(false);
 
         AgentTaskConfig config = createTestConfigWithTargets(tempDir.toString());
 
@@ -204,7 +204,7 @@ class BatchTaskExecutionTddTest {
         taskRunnable.run();
 
         // Then: 不再重试，标记最终失败
-        verify(retryManager, never()).calculateNextRetryDelay(anyLong(), anyInt());
+        verify(retryAwareUploader, never()).calculateNextRetryDelay(anyLong(), anyInt());
 
         System.out.println("✅ 最终失败验证: 超过最大重试次数不再调度");
     }
@@ -223,7 +223,7 @@ class BatchTaskExecutionTddTest {
         taskRunnable.run();
 
         // Then: 任务仍应完成（无目标时视为空操作）
-        verify(retryManager).recordSuccess(eq(1001L));
+        verify(retryAwareUploader).recordSuccess(eq(1001L));
 
         System.out.println("✅ 空目标验证: 无目标Agent时跳过传输");
     }

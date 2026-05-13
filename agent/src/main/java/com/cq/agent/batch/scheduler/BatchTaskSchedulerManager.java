@@ -13,7 +13,6 @@ import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -211,7 +210,6 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 处理任务执行失败（仅记录日志，不触发重试）
-     * 
      * 设计原则：
      * - 文件传输失败由 FileRetryScheduler + FailedQueueScannerJob 处理
      * - 任务级别失败（配置错误、目录不存在等）直接标记为最终失败

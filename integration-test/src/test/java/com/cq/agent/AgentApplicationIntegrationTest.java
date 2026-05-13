@@ -1,6 +1,9 @@
 package com.cq.agent;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
+import com.cq.panel.common.dto.batch.RetryConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scheduler.QuartzTaskScheduler;
 import org.junit.jupiter.api.*;
@@ -53,15 +56,15 @@ class AgentApplicationIntegrationTest {
     @DisplayName("1. 完整流程：接收配置→持久化→启动Quartz调度")
     void testFullFlow_receiveConfigAndStartScheduler() throws Exception {
         // 1. 创建任务配置
-        BatchTransferTaskConfig config = createConfig(1001L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(1001L, "0/1 * * * * ?");
 
         // 2. 持久化配置（模拟BatchConfigReceiveHandler的行为）
         configFileManager.saveTaskConfig(config);
 
         // 3. 验证配置已保存
-        BatchTransferTaskConfig loaded = configFileManager.loadTaskConfig(1001L);
+        AgentTaskConfig loaded = configFileManager.loadTaskConfig(1001L);
         assertNotNull(loaded);
-        assertEquals("0/1 * * * * ?", loaded.getCronExpression());
+        assertEquals("0/1 * * * * ?", loaded.getScanConfig().getCronExpression());
 
         // 4. 启动Quartz调度（模拟AgentApplication连接后的行为）
         AtomicInteger executionCount = new AtomicInteger(0);
@@ -79,12 +82,12 @@ class AgentApplicationIntegrationTest {
     @DisplayName("2. 启动加载：从本地文件恢复RUNNING任务")
     void testStartupLoader_restoreRunningTasks() throws Exception {
         // 1. 保存RUNNING状态的任务
-        BatchTransferTaskConfig config1 = createConfig(2001L, "0/1 * * * * ?");
+        AgentTaskConfig config1 = createConfig(2001L, "0/1 * * * * ?");
         config1.setStatus("RUNNING");
         configFileManager.saveTaskConfig(config1);
 
         // 2. 保存PAUSED状态的任务
-        BatchTransferTaskConfig config2 = createConfig(2002L, "0/1 * * * * ?");
+        AgentTaskConfig config2 = createConfig(2002L, "0/1 * * * * ?");
         config2.setStatus("PAUSED");
         configFileManager.saveTaskConfig(config2);
 
@@ -93,12 +96,12 @@ class AgentApplicationIntegrationTest {
         AtomicInteger task2Count = new AtomicInteger(0);
 
         // 4. 只恢复RUNNING状态的任务
-        BatchTransferTaskConfig loaded1 = configFileManager.loadTaskConfig(2001L);
+        AgentTaskConfig loaded1 = configFileManager.loadTaskConfig(2001L);
         if ("RUNNING".equals(loaded1.getStatus())) {
             taskScheduler.startTask(loaded1, task1Count::incrementAndGet);
         }
 
-        BatchTransferTaskConfig loaded2 = configFileManager.loadTaskConfig(2002L);
+        AgentTaskConfig loaded2 = configFileManager.loadTaskConfig(2002L);
         if ("RUNNING".equals(loaded2.getStatus())) {
             taskScheduler.startTask(loaded2, task2Count::incrementAndGet);
         }
@@ -113,7 +116,7 @@ class AgentApplicationIntegrationTest {
     @DisplayName("3. 热更新：Cron表达式变更后重新调度")
     void testHotUpdate_cronExpressionChanged() throws Exception {
         // 1. 启动任务（每2秒）
-        BatchTransferTaskConfig config = createConfig(3001L, "0/2 * * * * ?");
+        AgentTaskConfig config = createConfig(3001L, "0/2 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
         taskScheduler.startTask(config, executionCount::incrementAndGet);
 
@@ -121,7 +124,7 @@ class AgentApplicationIntegrationTest {
         int countWith2s = executionCount.get();
 
         // 2. 模拟配置变更（热更新为每1秒）
-        BatchTransferTaskConfig updatedConfig = createConfig(3001L, "0/1 * * * * ?");
+        AgentTaskConfig updatedConfig = createConfig(3001L, "0/1 * * * * ?");
         configFileManager.saveTaskConfig(updatedConfig);
         taskScheduler.updateTask(updatedConfig);
 
@@ -136,7 +139,7 @@ class AgentApplicationIntegrationTest {
     @DisplayName("4. 状态变更：PAUSED→RUNNING→调度恢复")
     void testStatusChange_pausedToRunning() throws Exception {
         // 1. 启动任务
-        BatchTransferTaskConfig config = createConfig(4001L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(4001L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
         taskScheduler.startTask(config, executionCount::incrementAndGet);
 
@@ -163,7 +166,7 @@ class AgentApplicationIntegrationTest {
     @DisplayName("5. 删除任务：停止调度并清理")
     void testDeleteTask_stopScheduling() throws Exception {
         // 1. 启动任务
-        BatchTransferTaskConfig config = createConfig(5001L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(5001L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
         taskScheduler.startTask(config, executionCount::incrementAndGet);
 
@@ -182,18 +185,29 @@ class AgentApplicationIntegrationTest {
 
     // ==================== 辅助方法 ====================
 
-    private BatchTransferTaskConfig createConfig(Long taskId, String cron) {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createConfig(Long taskId, String cron) {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(taskId);
         config.setTaskName("测试任务-" + taskId);
         config.setSourceAgentId("agent-001");
         config.setSourceDir(tempDir.resolve("source").toString());
-        config.setTargetDirs(List.of(tempDir.resolve("target").toString()));
+
+        TargetAgentInfo targetInfo = new TargetAgentInfo();
+        targetInfo.setTargetDir(tempDir.resolve("target").toString());
+        config.setTargetAgents(List.of(targetInfo));
+
         config.setIncludePatterns(List.of("*.log"));
         config.setStatus("RUNNING");
-        config.setCronExpression(cron);
-        config.setMaxRetries(10);
-        config.setVersion(System.currentTimeMillis());
+
+        ScanConfig scanConfig = new ScanConfig();
+        scanConfig.setCronExpression(cron);
+        config.setScanConfig(scanConfig);
+
+        RetryConfig retryConfig = new RetryConfig();
+        retryConfig.setMaxRetryCount(10);
+        config.setRetryConfig(retryConfig);
+
+        config.setVersion(String.valueOf(System.currentTimeMillis()));
         return config;
     }
 }

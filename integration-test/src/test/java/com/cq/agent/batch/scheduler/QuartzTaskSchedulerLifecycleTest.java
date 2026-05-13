@@ -1,6 +1,7 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
 import org.junit.jupiter.api.*;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
@@ -43,8 +44,8 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("1. [spec.md] 每个任务应有独立的Quartz Job")
     void testStartTask_eachTaskHasIndependentJob() throws SchedulerException {
         // Given: 启动两个任务
-        BatchTransferTaskConfig config1 = createConfig(1L, "0 */5 * * * ?");
-        BatchTransferTaskConfig config2 = createConfig(2L, "0 */10 * * * ?");
+        AgentTaskConfig config1 = createConfig(1L, "0 */5 * * * ?");
+        AgentTaskConfig config2 = createConfig(2L, "0 */10 * * * ?");
 
         AtomicInteger counter1 = new AtomicInteger(0);
         AtomicInteger counter2 = new AtomicInteger(0);
@@ -69,7 +70,7 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("2. [spec.md] 删除任务时应清理Quartz Job")
     void testDeleteTask_shouldRemoveQuartzJob() throws SchedulerException {
         // Given: 启动任务
-        BatchTransferTaskConfig config = createConfig(1L, "0 */5 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "0 */5 * * * ?");
         scheduler.startTask(config, () -> {});
         assertTrue(scheduler.isTaskRunning(1L), "任务应存在");
 
@@ -88,7 +89,7 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("3. [spec.md] 删除任务时应清理Runnable缓存")
     void testDeleteTask_shouldClearRunnableCache() {
         // Given: 启动任务
-        BatchTransferTaskConfig config = createConfig(1L, "0 */5 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "0 */5 * * * ?");
         AtomicInteger counter = new AtomicInteger(0);
         scheduler.startTask(config, counter::incrementAndGet);
 
@@ -117,8 +118,8 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("4. [spec.md] 删除任务A不应影响任务B")
     void testDeleteTask_shouldNotAffectOtherTasks() throws SchedulerException {
         // Given: 启动两个任务
-        BatchTransferTaskConfig config1 = createConfig(1L, "0 */5 * * * ?");
-        BatchTransferTaskConfig config2 = createConfig(2L, "0 */10 * * * ?");
+        AgentTaskConfig config1 = createConfig(1L, "0 */5 * * * ?");
+        AgentTaskConfig config2 = createConfig(2L, "0 */10 * * * ?");
         scheduler.startTask(config1, () -> {});
         scheduler.startTask(config2, () -> {});
 
@@ -139,7 +140,7 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("5. [spec.md] 重复启动同一任务应覆盖旧任务")
     void testStartTask_duplicate_shouldOverride() {
         // Given: 启动任务
-        BatchTransferTaskConfig config = createConfig(1L, "0 */5 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "0 */5 * * * ?");
         AtomicInteger counter1 = new AtomicInteger(0);
         scheduler.startTask(config, counter1::incrementAndGet);
 
@@ -186,8 +187,8 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("7. [spec.md] 多任务并行执行互不干扰")
     void testMultipleTasks_parallelExecution() throws Exception {
         // Given: 启动两个任务，使用快速Cron（每秒执行）
-        BatchTransferTaskConfig config1 = createConfig(1L, "0/1 * * * * ?");
-        BatchTransferTaskConfig config2 = createConfig(2L, "0/1 * * * * ?");
+        AgentTaskConfig config1 = createConfig(1L, "0/1 * * * * ?");
+        AgentTaskConfig config2 = createConfig(2L, "0/1 * * * * ?");
 
         AtomicInteger counter1 = new AtomicInteger(0);
         AtomicInteger counter2 = new AtomicInteger(0);
@@ -209,7 +210,7 @@ class QuartzTaskSchedulerLifecycleTest {
     @DisplayName("8. [spec.md] 任务与Quartz是一对一关系")
     void testTaskToQuartzRelationship_oneToOne() throws SchedulerException {
         // Given: 一个任务
-        BatchTransferTaskConfig config = createConfig(1L, "0 */5 * * * ?");
+        AgentTaskConfig config = createConfig(1L, "0 */5 * * * ?");
         scheduler.startTask(config, () -> {});
 
         // Then: 应只有一个Job和一个Trigger
@@ -224,15 +225,19 @@ class QuartzTaskSchedulerLifecycleTest {
 
     // ==================== 辅助方法 ====================
 
-    private BatchTransferTaskConfig createConfig(Long taskId, String cronExpression) {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createConfig(Long taskId, String cronExpression) {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(taskId);
         config.setTaskName("任务" + taskId);
         config.setStatus("RUNNING");
-        config.setCronExpression(cronExpression);
+
+        ScanConfig scanConfig = new ScanConfig();
+        scanConfig.setCronExpression(cronExpression);
+        config.setScanConfig(scanConfig);
+
         config.setSourceAgentId("agent-001");
         config.setSourceDir("/var/log/app");
-        config.setVersion(1L);
+        config.setVersion(String.valueOf(1L));
         return config;
     }
 }

@@ -1,6 +1,9 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.config.BatchTransferTaskConfig;
+import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.ScanConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
+import com.cq.panel.common.dto.batch.RetryConfig;
 import org.junit.jupiter.api.*;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
@@ -41,7 +44,7 @@ class QuartzTaskSchedulerTest {
     @Test
     @DisplayName("1. 启动任务 - 按taskId创建Quartz Job")
     void testStartTask_createsQuartzJob() throws Exception {
-        BatchTransferTaskConfig config = createConfig(1001L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(1001L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -55,7 +58,7 @@ class QuartzTaskSchedulerTest {
     @DisplayName("2. 启动任务 - 标准Cron表达式")
     void testStartTask_standardCronExpression() throws Exception {
         // 使用标准Cron: 每秒执行
-        BatchTransferTaskConfig config = createConfig(1002L, "* * * * * ?");
+        AgentTaskConfig config = createConfig(1002L, "* * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -69,7 +72,7 @@ class QuartzTaskSchedulerTest {
     @DisplayName("3. 启动任务 - 复杂Cron表达式")
     void testStartTask_complexCronExpression() throws Exception {
         // 使用复杂Cron: 每5秒执行
-        BatchTransferTaskConfig config = createConfig(1003L, "0/5 * * * * ?");
+        AgentTaskConfig config = createConfig(1003L, "0/5 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -85,7 +88,7 @@ class QuartzTaskSchedulerTest {
     @Test
     @DisplayName("4. 暂停任务 - 不再触发")
     void testPauseTask_noMoreTriggers() throws Exception {
-        BatchTransferTaskConfig config = createConfig(1004L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(1004L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -101,7 +104,7 @@ class QuartzTaskSchedulerTest {
     @Test
     @DisplayName("5. 恢复任务 - 重新开始调度")
     void testResumeTask_resumesScheduling() throws Exception {
-        BatchTransferTaskConfig config = createConfig(1005L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(1005L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -121,7 +124,7 @@ class QuartzTaskSchedulerTest {
     @Test
     @DisplayName("6. 更新Cron表达式 - 热更新")
     void testUpdateCronExpression_hotUpdate() throws Exception {
-        BatchTransferTaskConfig config = createConfig(1006L, "0/2 * * * * ?"); // 每2秒
+        AgentTaskConfig config = createConfig(1006L, "0/2 * * * * ?"); // 每2秒
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -129,7 +132,7 @@ class QuartzTaskSchedulerTest {
         int countWith2s = executionCount.get();
 
         // 热更新为每1秒
-        BatchTransferTaskConfig updatedConfig = createConfig(1006L, "0/1 * * * * ?");
+        AgentTaskConfig updatedConfig = createConfig(1006L, "0/1 * * * * ?");
         taskScheduler.updateTask(updatedConfig);
         Thread.sleep(2100); // 2秒内应执行约2次
         int countWith1s = executionCount.get();
@@ -142,7 +145,7 @@ class QuartzTaskSchedulerTest {
     @Test
     @DisplayName("7. 删除任务 - 停止调度")
     void testDeleteTask_stopsScheduling() throws Exception {
-        BatchTransferTaskConfig config = createConfig(1007L, "0/1 * * * * ?");
+        AgentTaskConfig config = createConfig(1007L, "0/1 * * * * ?");
         AtomicInteger executionCount = new AtomicInteger(0);
 
         taskScheduler.startTask(config, () -> executionCount.incrementAndGet());
@@ -163,8 +166,8 @@ class QuartzTaskSchedulerTest {
         AtomicInteger task1Count = new AtomicInteger(0);
         AtomicInteger task2Count = new AtomicInteger(0);
 
-        BatchTransferTaskConfig config1 = createConfig(2001L, "0/1 * * * * ?");
-        BatchTransferTaskConfig config2 = createConfig(2002L, "0/1 * * * * ?");
+        AgentTaskConfig config1 = createConfig(2001L, "0/1 * * * * ?");
+        AgentTaskConfig config2 = createConfig(2002L, "0/1 * * * * ?");
 
         taskScheduler.startTask(config1, () -> task1Count.incrementAndGet());
         taskScheduler.startTask(config2, () -> task2Count.incrementAndGet());
@@ -191,7 +194,7 @@ class QuartzTaskSchedulerTest {
     @DisplayName("9. 启动时立即执行一次")
     void testStartTask_immediateExecution() throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
-        BatchTransferTaskConfig config = createConfig(1008L, "0/10 * * * * ?"); // 10秒间隔
+        AgentTaskConfig config = createConfig(1008L, "0/10 * * * * ?"); // 10秒间隔
 
         taskScheduler.startTask(config, latch::countDown);
 
@@ -201,18 +204,29 @@ class QuartzTaskSchedulerTest {
 
     // ==================== 辅助方法 ====================
 
-    private BatchTransferTaskConfig createConfig(Long taskId, String cron) {
-        BatchTransferTaskConfig config = new BatchTransferTaskConfig();
+    private AgentTaskConfig createConfig(Long taskId, String cron) {
+        AgentTaskConfig config = new AgentTaskConfig();
         config.setTaskId(taskId);
         config.setTaskName("测试任务-" + taskId);
         config.setSourceAgentId("agent-001");
         config.setSourceDir("/tmp/test");
-        config.setTargetDirs(List.of("/tmp/backup"));
+
+        TargetAgentInfo targetInfo = new TargetAgentInfo();
+        targetInfo.setTargetDir("/tmp/backup");
+        config.setTargetAgents(List.of(targetInfo));
+
         config.setIncludePatterns(List.of("*.log"));
         config.setStatus("RUNNING");
-        config.setCronExpression(cron);
-        config.setMaxRetries(10);
-        config.setVersion(System.currentTimeMillis());
+
+        ScanConfig scanConfig = new ScanConfig();
+        scanConfig.setCronExpression(cron);
+        config.setScanConfig(scanConfig);
+
+        RetryConfig retryConfig = new RetryConfig();
+        retryConfig.setMaxRetryCount(10);
+        config.setRetryConfig(retryConfig);
+
+        config.setVersion(String.valueOf(System.currentTimeMillis()));
         return config;
     }
 }

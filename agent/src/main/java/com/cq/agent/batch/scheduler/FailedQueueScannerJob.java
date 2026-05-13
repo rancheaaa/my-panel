@@ -1,6 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.batch.transfer.RetryManager;
+import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 /**
  * 失败队列扫描 Job
  * 由 Quartz 定时触发，扫描失败队列并重试失败的文件
+ * 已从使用 RetryManager 改为使用 RetryAwareUploaderDecorator（装饰者模式）
  */
 public class FailedQueueScannerJob implements Job {
 
@@ -21,18 +22,15 @@ public class FailedQueueScannerJob implements Job {
         log.info("⏰ 开始扫描失败队列...");
 
         try {
-            RetryManager retryManager = getRetryManager(context);
+            RetryAwareUploaderDecorator retryDecorator = getRetryDecorator(context);
 
-            if (retryManager != null) {
-                // 扫描上传失败队列
-                retryManager.scanAndRetryFailedUploads();
-
-                // 扫描下载失败队列
-//                retryManager.scanAndRetryFailedDownloads();
+            if (retryDecorator != null) {
+                // 扫描上传失败队列（装饰者内部实现）
+                retryDecorator.scanAndRetryFailedUploads();
 
                 log.info("✅ 失败队列扫描完成");
             } else {
-                log.warn("⚠️ RetryManager 未初始化，跳过扫描");
+                log.warn("⚠️ RetryAwareUploaderDecorator 未初始化，跳过扫描");
             }
 
         } catch (Exception e) {
@@ -42,23 +40,19 @@ public class FailedQueueScannerJob implements Job {
     }
 
     /**
-     * 从执行上下文获取 RetryManager 实例
-     * 支持从 JobDataMap 或 Spring 容器获取
+     * 从执行上下文获取 RetryAwareUploaderDecorator 实例
      */
-    private RetryManager getRetryManager(JobExecutionContext context) {
+    private RetryAwareUploaderDecorator getRetryDecorator(JobExecutionContext context) {
         // 方式1: 从 JobDataMap 获取
         JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();
         if (jobDataMap != null) {
-            Object retryManager = jobDataMap.get("retryManager");
-            if (retryManager instanceof RetryManager) {
-                return (RetryManager) retryManager;
+            Object retryDecorator = jobDataMap.get("retryAwareUploader");
+            if (retryDecorator instanceof RetryAwareUploaderDecorator) {
+                return (RetryAwareUploaderDecorator) retryDecorator;
             }
         }
 
-        // 方式2: TODO: 从 Spring 容器获取（如果使用Spring集成）
-        // return ApplicationContext.getBean(RetryManager.class);
-
-        log.warn("⚠️ 无法从 JobDataMap 获取 RetryManager，请确保在调度时注入");
+        log.warn("⚠️ 无法从 JobDataMap 获取 RetryAwareUploaderDecorator，请确保在调度时注入");
         return null;
     }
 }

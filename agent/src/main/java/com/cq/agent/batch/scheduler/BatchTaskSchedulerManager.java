@@ -185,10 +185,7 @@ public class BatchTaskSchedulerManager {
      */
     public void shutdown() {
         quartzTaskScheduler.shutdown();
-        if (retryAwareUploader != null) {
-            retryAwareUploader.clearAll();
-        }
-        log.info("⏹️  所有任务已停止");
+        log.info("⏹️ BatchTaskSchedulerManager已关闭（FileRetryScheduler需单独关闭）");
     }
 
     /**
@@ -196,14 +193,6 @@ public class BatchTaskSchedulerManager {
      */
     public boolean isTaskRunning(Long taskId) {
         return quartzTaskScheduler.isTaskRunning(taskId);
-    }
-
-    /**
-     * 调度失败队列扫描 Job（供 AgentApplication 启动时调用）
-     */
-    public void scheduleFailedQueueScannerJob(JobDetail jobDetail, Trigger trigger) throws Exception {
-        Scheduler scheduler = quartzTaskScheduler.getScheduler();
-        scheduler.scheduleJob(jobDetail, trigger);
     }
 
     // ==================== 任务结果管理 ====================
@@ -215,38 +204,6 @@ public class BatchTaskSchedulerManager {
         if (retryAwareUploader != null) {
             retryAwareUploader.recordSuccess(taskId);
             log.info("✅ 任务已完成: taskId={}", taskId);
-        }
-    }
-
-    /**
-     * 处理任务失败
-     * 
-     * @return true表示应继续重试，false表示最终失败
-     */
-    public boolean failTask(Long taskId, String error) {
-        log.warn("⚠️  任务执行失败: taskId={}, error={}", taskId, error);
-
-        // 检查是否应重试
-        if (retryAwareUploader == null) {
-            log.warn("⚠️  RetryAwareUploader未设置，不进行重试");
-            return false;
-        }
-
-        boolean shouldRetry = retryAwareUploader.shouldRetry(taskId, error);
-
-        if (shouldRetry) {
-            long delayMs = retryAwareUploader.calculateNextRetryDelay(taskId, retryAwareUploader.getRetryCount(taskId));
-            log.info("🔄 将在{}ms后重试: taskId={}, attempt={}/{}", delayMs, taskId,
-                    retryAwareUploader.getRetryCount(taskId), retryAwareUploader.getMaxRetries());
-
-            // 使用Quartz调度延迟重试
-            scheduleDelayedRetry(taskId, delayMs);
-
-            return true;
-        } else {
-            log.error("❌ 任务最终失败（超过最大重试次数）: taskId={}, maxRetries={}",
-                    taskId, retryAwareUploader.getMaxRetries());
-            return false;
         }
     }
 
@@ -299,13 +256,6 @@ public class BatchTaskSchedulerManager {
                 handleTaskFailure(config.getTaskId(), e.getMessage());
             }
         };
-    }
-
-    /**
-     * 创建任务执行Runnable（供DelayedRetryJob等外部类调用）
-     */
-    public Runnable createTaskRunnableForRetry(AgentTaskConfig config) {
-        return createTaskRunnable(config);
     }
 
     /**
@@ -463,41 +413,5 @@ public class BatchTaskSchedulerManager {
         }
     }
 
-    /**
-     * 使用Quartz调度延迟重试（spec.md 4.7）
-     * 
-     * @param taskId  任务ID
-     * @param delayMs 延迟时间（毫秒）
-     */
-    private void scheduleDelayedRetry(Long taskId, long delayMs) {
-        try {
-            log.info("⏰ 调度延迟重试: taskId={}, delayMs={}", taskId, delayMs);
-
-            // 创建JobDataMap并放入依赖对象
-            JobDataMap jobDataMap = new JobDataMap();
-            jobDataMap.put("taskId", taskId);
-            jobDataMap.put(DelayedRetryJob.CONFIG_FILE_MANAGER_KEY, configFileManager);
-            jobDataMap.put(DelayedRetryJob.TASK_SCHEDULER_MANAGER_KEY, this);
-
-            // 创建一次性触发器
-            JobDetail jobDetail = JobBuilder.newJob(DelayedRetryJob.class)
-                    .withIdentity("retry-job-" + taskId + "-" + System.currentTimeMillis())
-                    .usingJobData(jobDataMap)
-                    .build();
-
-            Trigger trigger = TriggerBuilder.newTrigger()
-                    .withIdentity("retry-trigger-" + taskId + "-" + System.currentTimeMillis())
-                    .startAt(new Date(System.currentTimeMillis() + delayMs))
-                    .build();
-
-            // 调度任务
-            Scheduler scheduler = quartzTaskScheduler.getScheduler();
-            scheduler.scheduleJob(jobDetail, trigger);
-
-            log.info("✅ 延迟重试已调度: taskId={}, executeAt={}ms later", taskId, delayMs);
-
-        } catch (Exception e) {
-            log.error("❌ 调度延迟重试失败: taskId={}, error={}", taskId, e.getMessage());
-        }
-    }
 }
+

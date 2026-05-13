@@ -5,7 +5,7 @@ import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.RetryManager;
+import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
@@ -36,7 +36,7 @@ class P2PFileTransferTddTest {
     private ConfigFileManager configFileManager;
 
     @Mock
-    private RetryManager retryManager;
+    private RetryAwareUploaderDecorator retryAwareUploader;
 
     @Mock
     private FileScanner fileScanner;
@@ -52,7 +52,7 @@ class P2PFileTransferTddTest {
     void setUp() throws Exception {
         mocks = MockitoAnnotations.openMocks(this);
         schedulerManager = new BatchTaskSchedulerManager(configFileManager);
-        schedulerManager.setRetryManager(retryManager);
+        schedulerManager.setRetryAwareUploader(retryAwareUploader);
         schedulerManager.setFileScanner(fileScanner);
 
         // 注入AgentUploader
@@ -239,7 +239,7 @@ class P2PFileTransferTddTest {
         taskRunnable.run();
 
         // Then: 应调用completeTask记录成功
-        verify(retryManager).recordSuccess(eq(1001L));
+        verify(retryAwareUploader).recordSuccess(eq(1001L));
 
         System.out.println("✅ 成功完成验证: uploadFile返回true后任务完成");
     }
@@ -269,10 +269,10 @@ class P2PFileTransferTddTest {
             "部分文件失败不应导致整个任务失败");
 
         // 验证：不再调用旧的 shouldRetry 方法（因为改为异步重试机制）
-        verify(retryManager, never()).shouldRetry(anyLong(), anyString());
+        verify(retryAwareUploader, never()).shouldRetry(anyLong(), anyString());
 
         // 验证：任务完成时仍会记录成功（对于成功的文件）
-        verify(retryManager).recordSuccess(1001L);
+        verify(retryAwareUploader).recordSuccess(1001L);
 
         System.out.println("✅ 失败重试验证: uploadFile返回false后不抛异常，失败文件进入队列等待定时重试");
     }
@@ -346,25 +346,6 @@ class P2PFileTransferTddTest {
     }
 
     @Test
-    @DisplayName("9. [spec.md 4.7] 应使用Quartz调度延迟重试")
-    void testFailTask_shouldScheduleDelayedRetryWithQuartz() {
-        // Given: 允许重试
-        when(retryManager.shouldRetry(anyLong(), anyString())).thenReturn(true);
-        when(retryManager.calculateNextRetryDelay(anyLong(), anyInt())).thenReturn(5000L);  // 5秒延迟
-
-        // When: 任务失败并允许重试
-        boolean shouldContinue = schedulerManager.failTask(1001L, "连接超时");
-
-        // Then: 应返回true表示将重试
-        assertTrue(shouldContinue, "应继续重试");
-
-        // TODO: 验证Quartz调度器被调用来安排延迟任务
-        // （需要在实现后补充此断言）
-
-        System.out.println("✅ 延迟重试验证: 将在5秒后重试");
-    }
-
-    @Test
     @DisplayName("10. [spec.md] 无目标Agent时应跳过传输")
     void testProcessScannedFiles_noTargetAgentsShouldSkip() {
         // Given: 无目标Agent配置
@@ -387,7 +368,7 @@ class P2PFileTransferTddTest {
         );
 
         // 但任务仍应完成（无目标时视为空操作）
-        verify(retryManager).recordSuccess(eq(1001L));
+        verify(retryAwareUploader).recordSuccess(eq(1001L));
 
         System.out.println("✅ 空目标验证: 无目标Agent时跳过传输");
     }

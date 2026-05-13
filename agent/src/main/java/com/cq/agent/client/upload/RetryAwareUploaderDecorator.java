@@ -381,4 +381,58 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
         return maxRetries;  // 默认值
     }
+
+    // ==================== 任务管理查询方法（从 AgentUploader 迁移） ====================
+
+    /**
+     * 分页查询进行中的上传任务
+     */
+    public List<UploadTask> getInflightTasks(int page, int pageSize) {
+        return delegate.getInflightTasks(page, pageSize);
+    }
+
+    /**
+     * 获取所有进行中的上传任务
+     */
+    public List<UploadTask> getAllInflightTasks() {
+        return delegate.getAllInflightTasks();
+    }
+
+    /**
+     * 获取进行中的任务数量
+     */
+    public int getInflightTasksCount() {
+        return delegate.getInflightTasksCount();
+    }
+
+    /**
+     * 检查是否有进行中的任务
+     */
+    public boolean isInflightTasksEmpty() {
+        return delegate.isInflightTasksEmpty();
+    }
+
+    /**
+     * 清空所有进行中的任务
+     */
+    public void clearAllInflightTasks() {
+        delegate.clearAllInflightTasks();
+    }
+
+    // ==================== 重试相关方法（从 AgentUploader 迁移） ====================
+
+    /**
+     * 重新提交失败的上传任务
+     */
+    public void resubmitTask(UploadTask task) {
+        logger.info("[retry] 🔄 重新提交失败任务: transferId={}", task.getTransferId());
+        delegate.resubmitTask(task);
+    }
+
+    /**
+     * 获取失败队列目录路径
+     */
+    public Path getFailedQueueDir() {
+        return delegate.getFailedQueueDir();
+    }
 }

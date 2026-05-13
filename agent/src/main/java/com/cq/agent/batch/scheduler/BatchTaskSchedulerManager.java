@@ -2,20 +2,17 @@ package com.cq.agent.batch.scheduler;
 
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.batch.report.ProgressEvent;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
-import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadService;
+import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.client.upload.UploadListener;
-import com.cq.agent.client.upload.UploadTask;
 import lombok.Getter;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.Date;
 import java.util.List;
 
@@ -34,7 +31,7 @@ public class BatchTaskSchedulerManager {
     private final QuartzTaskScheduler quartzTaskScheduler;
 
     @Getter
-    private RetryManager retryManager;
+    private RetryAwareUploaderDecorator retryAwareUploader;  // 使用装饰者替代RetryManager
     private FileScanner fileScanner;
     @Getter
     private UploadService agentUploader;  // 使用接口类型（支持装饰者）
@@ -49,9 +46,12 @@ public class BatchTaskSchedulerManager {
         log.info("✅ BatchTaskSchedulerManager初始化完成");
     }
 
-    public void setRetryManager(RetryManager retryManager) {
-        this.retryManager = retryManager;
-        log.info("🔄 已设置RetryManager");
+    /**
+     * 设置重试感知的上传装饰者（替代原来的RetryManager）
+     */
+    public void setRetryAwareUploader(RetryAwareUploaderDecorator retryAwareUploader) {
+        this.retryAwareUploader = retryAwareUploader;
+        log.info("🔄 已设置RetryAwareUploaderDecorator (替代RetryManager)");
     }
 
     /**
@@ -80,23 +80,23 @@ public class BatchTaskSchedulerManager {
     }
 
     /**
-     * 获取指定任务的重试次数（委托给RetryManager）
+     * 获取指定任务的重试次数（委托给RetryAwareUploaderDecorator）
      */
     public int getRetryCount(Long taskId) {
-        if (retryManager == null) {
+        if (retryAwareUploader == null) {
             return 0;
         }
-        return retryManager.getRetryCount(taskId);
+        return retryAwareUploader.getRetryCount(taskId);
     }
 
     /**
-     * 获取最大重试次数（委托给RetryManager）
+     * 获取最大重试次数（委托给RetryAwareUploaderDecorator）
      */
     public int getMaxRetries() {
-        if (retryManager == null) {
-            return 0;
+        if (retryAwareUploader == null) {
+            return 10; // 默认值
         }
-        return retryManager.getMaxRetries();
+        return retryAwareUploader.getMaxRetries();
     }
 
     // ==================== 任务生命周期管理 ====================
@@ -185,8 +185,8 @@ public class BatchTaskSchedulerManager {
      */
     public void shutdown() {
         quartzTaskScheduler.shutdown();
-        if (retryManager != null) {
-            retryManager.clearAll();
+        if (retryAwareUploader != null) {
+            retryAwareUploader.clearAll();
         }
         log.info("⏹️  所有任务已停止");
     }
@@ -212,8 +212,8 @@ public class BatchTaskSchedulerManager {
      * 标记任务完成并释放资源
      */
     public void completeTask(Long taskId) {
-        if (retryManager != null) {
-            retryManager.recordSuccess(taskId);
+        if (retryAwareUploader != null) {
+            retryAwareUploader.recordSuccess(taskId);
             log.info("✅ 任务已完成: taskId={}", taskId);
         }
     }
@@ -227,17 +227,17 @@ public class BatchTaskSchedulerManager {
         log.warn("⚠️  任务执行失败: taskId={}, error={}", taskId, error);
 
         // 检查是否应重试
-        if (retryManager == null) {
-            log.warn("⚠️  RetryManager未设置，不进行重试");
+        if (retryAwareUploader == null) {
+            log.warn("⚠️  RetryAwareUploader未设置，不进行重试");
             return false;
         }
 
-        boolean shouldRetry = retryManager.shouldRetry(taskId, error);
+        boolean shouldRetry = retryAwareUploader.shouldRetry(taskId, error);
 
         if (shouldRetry) {
-            long delayMs = retryManager.calculateNextRetryDelay(taskId, retryManager.getRetryCount(taskId));
+            long delayMs = retryAwareUploader.calculateNextRetryDelay(taskId, retryAwareUploader.getRetryCount(taskId));
             log.info("🔄 将在{}ms后重试: taskId={}, attempt={}/{}", delayMs, taskId,
-                    retryManager.getRetryCount(taskId), retryManager.getMaxRetries());
+                    retryAwareUploader.getRetryCount(taskId), retryAwareUploader.getMaxRetries());
 
             // 使用Quartz调度延迟重试
             scheduleDelayedRetry(taskId, delayMs);
@@ -245,12 +245,27 @@ public class BatchTaskSchedulerManager {
             return true;
         } else {
             log.error("❌ 任务最终失败（超过最大重试次数）: taskId={}, maxRetries={}",
-                    taskId, retryManager.getMaxRetries());
+                    taskId, retryAwareUploader.getMaxRetries());
             return false;
         }
     }
 
     // ==================== 核心执行流程（spec.md 4.5-4.7）====================
+
+    /**
+     * 处理任务执行失败（仅记录日志，不触发重试）
+     * 
+     * 设计原则：
+     * - 文件传输失败由 FileRetryScheduler + FailedQueueScannerJob 处理
+     * - 任务级别失败（配置错误、目录不存在等）直接标记为最终失败
+     * - 不再进行任务级别的延迟重试
+     *
+     * @param taskId 任务ID
+     * @param error 错误信息
+     */
+    private void handleTaskFailure(Long taskId, String error) {
+        log.error("❌ 任务执行失败（最终失败）: taskId={}, error={}", taskId, error);
+    }
 
     /**
      * 创建任务执行Runnable
@@ -281,7 +296,7 @@ public class BatchTaskSchedulerManager {
                 log.info("✅ 任务执行成功: taskId={}, processedFiles={}", config.getTaskId(), scannedFiles.size());
             } catch (Exception e) {
                 log.error("❌ 任务执行异常: taskId={}, error={}", config.getTaskId(), e.getMessage(), e);
-                failTask(config.getTaskId(), e.getMessage());
+                handleTaskFailure(config.getTaskId(), e.getMessage());
             }
         };
     }
@@ -325,7 +340,6 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 处理扫描到的文件 - P2P传输（spec.md 4.6）
-     * 
      * 对每个文件调用AgentUploader进行P2P传输
      * 通过BatchUploadListener捕获进度事件
      * 如果任何文件传输失败，抛出异常以触发重试机制
@@ -390,11 +404,10 @@ public class BatchTaskSchedulerManager {
         // 失败的文件已经通过 moveToFailedQueue() 自动移入失败队列
         // RetryManager 会定期扫描并重试这些文件
         if (!failedFiles.isEmpty()) {
-            log.warn("⚠️ 部分文件传输失败 ({}/{}): {}",
+            log.warn("⚠️ 部分文件提交发送队列失败 ({}/{}): {}",
                     failedFiles.size(), scannedFiles.size(),
                     String.join(", ", failedFiles));
             log.info("ℹ️ 失败的文件将进入失败队列，等待 RetryManager 定时扫描和重试");
-
             if (agentUploader != null) {
                 // 使用具体类的方法（不在接口中的实现细节）
                 if (agentUploader instanceof AgentUploader uploader) {
@@ -413,7 +426,6 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 构建remoteTargetInfo字符串（spec.md 4.6）
-     * 
      * 格式：ip:port@username:destFilePath
      * 示例：192.168.1.100:7777@root:/remote/target/app.log
      */
@@ -422,7 +434,7 @@ public class BatchTaskSchedulerManager {
             if (config.getTargetAgents() == null || config.getTargetAgents().isEmpty()) {
                 throw new IllegalArgumentException("目标Agent列表为空");
             }
-            com.cq.panel.common.dto.batch.TargetAgentInfo firstAgent = config.getTargetAgents().get(0);
+            com.cq.panel.common.dto.batch.TargetAgentInfo firstAgent = config.getTargetAgents().getFirst();
             String targetAgentName = firstAgent.getAgentName();
             if (targetAgentName == null || targetAgentName.isEmpty()) {
                 targetAgentName = firstAgent.getAgentId();

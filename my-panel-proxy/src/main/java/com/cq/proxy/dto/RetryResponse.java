@@ -1,6 +1,9 @@
-package com.cq.proxy.controller.dto;
+package com.cq.proxy.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -8,6 +11,8 @@ import java.io.Serializable;
  * 重试响应
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class RetryResponse implements Serializable {
 
     @Serial
@@ -18,11 +23,4 @@ public class RetryResponse implements Serializable {
 
     /** 下次重试时间（时间戳毫秒） */
     private Long nextRetryAt;
-
-    public RetryResponse() {}
-
-    public RetryResponse(String status, Long nextRetryAt) {
-        this.status = status;
-        this.nextRetryAt = nextRetryAt;
-    }
 }

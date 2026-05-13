@@ -19,13 +19,7 @@ const TaskListPage = () => {
   };
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0, color: '#1f1f1f' }}>任务列表</Title>
-        <Button type="primary" icon={<PlusCircleOutlined />} onClick={() => setCreateModalOpen(true)} style={{ borderRadius: 6 }}>
-          新建任务
-        </Button>
-      </div>
+    <div>
       <TaskListTab 
         tasks={tasks} 
         loading={loading} 

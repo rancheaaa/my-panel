@@ -27,7 +27,7 @@ public class ConfigController {
             @Parameter(description = "环境") @RequestParam(required = false) String environment,
             @Parameter(description = "服务名称") @RequestParam(required = false) String serviceName) {
         ConfigValueResponse response = configService.getConfig(configKey, environment, serviceName);
-        return ApiResponse.ok(response);
+        return ApiResponse.success(response);
     }
 
     @Operation(summary = "更新配置", description = "更新配置值")
@@ -36,6 +36,6 @@ public class ConfigController {
             @Parameter(description = "配置键", required = true) @PathVariable String configKey,
             @RequestBody ConfigUpdateRequest request) {
         ConfigValueResponse response = configService.updateConfig(configKey, request);
-        return ApiResponse.ok("UPDATED", response);
+        return ApiResponse.success("UPDATED", response);
     }
 }

@@ -1,6 +1,6 @@
 package com.cq.proxy.service.batch;
 
-import com.cq.proxy.controller.dto.SubTaskDTO;
+import com.cq.proxy.dto.SubTaskDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

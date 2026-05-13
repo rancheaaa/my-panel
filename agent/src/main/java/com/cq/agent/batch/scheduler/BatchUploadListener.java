@@ -7,9 +7,9 @@ import com.cq.agent.batch.report.SubTaskEvent;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Files;
@@ -20,23 +20,57 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 批量上传监听器（spec.md 4.6）
- *
  * 功能：
  * 1. 完整的子任务生命周期管理：创建→进度→完成/失败
  * 2. 桥接AgentUploader事件到进度上报（ProgressReporter）
  * 3. 在onComplete回调中执行传输后操作（postTransferAction）
+ * 支持两种初始化方式：
+ * - 有参构造函数：正常创建新任务时使用
+ * - 无参构造函数：从JSON恢复任务时使用（重启恢复场景）
  */
 public class BatchUploadListener implements UploadListener {
 
     private static final Logger log = LoggerFactory.getLogger(BatchUploadListener.class);
 
-    private final Long taskId;
-    private final FileScanner.ScannedFile scannedFile;
-    private final AgentTaskConfig config;
-    private final ProgressReporter progressReporter;
+    private Long taskId;
+    private FileScanner.ScannedFile scannedFile;
+    private AgentTaskConfig config;
+    private ProgressReporter progressReporter;
 
-    /** 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳） */
-    private final Long subtaskId;
+    /** 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
+     * -- GETTER --
+     *  获取子任务ID
+     */
+    @Getter
+    private Long subtaskId;
+
+    /** 是否为恢复模式（从JSON反序列化）
+     * -- GETTER --
+     *  检查是否为恢复模式
+     */
+    @Getter
+    private boolean restored = false;
+
+    /**
+     * 获取任务ID
+     */
+    public Long getTaskId() {
+        return taskId;
+    }
+
+    /**
+     * 获取文件名（从scannedFile获取）
+     */
+    public String getFileName() {
+        return scannedFile != null ? scannedFile.getFileName() : null;
+    }
+
+    /**
+     * 获取文件大小（从scannedFile获取）
+     */
+    public long getFileSize() {
+        return scannedFile != null ? scannedFile.getFileSize() : 0L;
+    }
 
     /** 用于计算传输速度的变量 */
     private long lastTransferredBytes = 0;
@@ -45,6 +79,9 @@ public class BatchUploadListener implements UploadListener {
     /** 记录实际的分块数量 */
     private Integer actualTotalChunks = null;
 
+    /**
+     * 有参构造函数 - 正常创建新任务时使用
+     */
     public BatchUploadListener(Long taskId, FileScanner.ScannedFile scannedFile,
             AgentTaskConfig config, ProgressReporter progressReporter) {
         this.taskId = taskId;
@@ -54,9 +91,48 @@ public class BatchUploadListener implements UploadListener {
 
         // 生成全局唯一的subtaskId（避免重启后冲突）
         this.subtaskId = generateUniqueSubtaskId(taskId, scannedFile.getFileName());
+        this.restored = false;
 
         // 立即创建子任务到Proxy数据库
         createSubTaskOnProxy();
+        log.info("✅ 新建上传监听器: subtaskId={}, file={}", subtaskId, scannedFile.getFileName());
+    }
+
+    /**
+     * 无参构造函数 - 从JSON恢复任务时使用（重启恢复场景）
+     * 用于满足反射实例化要求，后续需调用 restoreState() 恢复完整状态
+     */
+    @SuppressWarnings("all")
+    public BatchUploadListener() {
+        this.restored = true;
+        log.debug("🔄 创建恢复模式的上传监听器（无参构造函数）");
+    }
+
+    /**
+     * 恢复状态（从JSON反序列化后调用）
+     * @param taskId 任务ID
+     * @param subtaskId 子任务ID
+     * @param filePath 文件路径
+     * @param fileName 文件名
+     * @param fileSize 文件大小
+     * @param reporter 进度上报器
+     */
+    public void restoreState(Long taskId, Long subtaskId, String filePath,
+            String fileName, long fileSize, ProgressReporter reporter) {
+        this.taskId = taskId;
+        this.subtaskId = subtaskId;
+        this.progressReporter = reporter;
+        this.restored = true;
+
+        // 重建 ScannedFile 对象（使用setter方法）
+        FileScanner.ScannedFile restoredFile = new FileScanner.ScannedFile();
+        restoredFile.setFileName(fileName);
+        restoredFile.setFileSize(fileSize);
+        restoredFile.setLastModified(System.currentTimeMillis());
+        restoredFile.setAbsolutePath(filePath);
+        this.scannedFile = restoredFile;
+
+        log.info("🔄 上传监听器状态已恢复: subtaskId={}, file={}", subtaskId, fileName);
     }
 
     /**
@@ -73,8 +149,14 @@ public class BatchUploadListener implements UploadListener {
 
     /**
      * 创建子任务并上报到Proxy（INSERT到batch_transfer_subtask表）
+     * 仅在非恢复模式下执行
      */
     private void createSubTaskOnProxy() {
+        if (restored) {
+            log.debug("恢复模式，跳过子任务创建");
+            return;
+        }
+
         if (progressReporter == null) {
             log.debug("ProgressReporter未设置，跳过子任务创建");
             return;
@@ -114,6 +196,11 @@ public class BatchUploadListener implements UploadListener {
 
     @Override
     public void onProgress(int totalChunks, int uploadedChunks, double progress) {
+        if (scannedFile == null || subtaskId == null) {
+            log.warn("⚠️ 状态不完整，跳过进度上报: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
+            return;
+        }
+
         log.debug("📊 上传进度: subtask={}, file={}, {}/{} ({}%)",
                 subtaskId, scannedFile.getFileName(), uploadedChunks, totalChunks, progress);
 
@@ -135,6 +222,11 @@ public class BatchUploadListener implements UploadListener {
 
     @Override
     public void onComplete(UploadTask task) {
+        if (scannedFile == null || subtaskId == null) {
+            log.warn("⚠️ 状态不完整，跳过完成通知: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
+            return;
+        }
+
         log.info("✅ 文件上传完成: subtask={}, file={}, transferId={}",
                 subtaskId, scannedFile.getFileName(), task.getTransferId());
 
@@ -157,8 +249,14 @@ public class BatchUploadListener implements UploadListener {
 
     @Override
     public void onError(String errorMessage) {
+        if (subtaskId == null) {
+            log.error("❌ 状态不完整，无法上报错误: subtaskId=null, error={}", errorMessage);
+            return;
+        }
+
+        String fileName = scannedFile != null ? scannedFile.getFileName() : "unknown";
         log.error("❌ 文件上传失败: subtask={}, file={}, error={}",
-                subtaskId, scannedFile.getFileName(), errorMessage);
+                subtaskId, fileName, errorMessage);
 
         if (progressReporter != null) {
             SubTaskEvent event = buildBaseEvent("FAILED");
@@ -185,7 +283,7 @@ public class BatchUploadListener implements UploadListener {
      * 计算传输速度（字节/秒）- 基于时间差的瞬时速度
      */
     private Long calculateSpeedBytesPerSec(int uploadedChunks, int totalChunks, double progress) {
-        if (scannedFile.getFileSize() <= 0 || progress <= 0)
+        if (scannedFile == null || scannedFile.getFileSize() <= 0 || progress <= 0)
             return null;
 
         long currentTransferredBytes = (long) (scannedFile.getFileSize() * progress);
@@ -231,13 +329,18 @@ public class BatchUploadListener implements UploadListener {
         if (config == null || config.getTargetAgents() == null
                 || config.getTargetAgents().isEmpty())
             return null;
-        return config.getTargetAgents().get(0).getAgentName();
+        return config.getTargetAgents().getFirst().getAgentName();
     }
 
     /**
      * 执行传输后操作（spec.md 4.6 - postTransferAction）
      */
     private void executePostTransferAction() {
+        if (scannedFile == null) {
+            log.warn("⚠️ scannedFile为null，跳过传输后操作");
+            return;
+        }
+
         String postTransferAction = "NONE";
         if (config != null && config.getTransferConfig() != null
                 && config.getTransferConfig().getPostTransferAction() != null) {

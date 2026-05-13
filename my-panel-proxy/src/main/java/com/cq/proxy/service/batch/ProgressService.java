@@ -1,8 +1,7 @@
 package com.cq.proxy.service.batch;
 
-import com.cq.proxy.controller.dto.SubTaskDTO;
+import com.cq.proxy.dto.SubTaskDTO;
 import com.cq.proxy.repository.entity.BatchTransferSubtask;
-import java.util.List;
 
 /**
  * 进度更新服务接口

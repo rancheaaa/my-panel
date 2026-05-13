@@ -1,10 +1,9 @@
 package com.cq.proxy.service.batch;
 
-import com.cq.proxy.controller.dto.SubTaskDTO;
+import com.cq.proxy.dto.SubTaskDTO;
 import org.junit.jupiter.api.*;
 import org.mockito.*;
 
-import java.util.*;
 import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;

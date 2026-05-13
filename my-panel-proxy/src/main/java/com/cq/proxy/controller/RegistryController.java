@@ -26,7 +26,7 @@ public class RegistryController {
     @PostMapping("/register")
     public ApiResponse<Void> register(@RequestBody ServiceRegisterRequest request) {
         registryService.register(request);
-        return ApiResponse.ok("REGISTERED", null);
+        return ApiResponse.success("REGISTERED", null);
     }
 
     @Operation(summary = "服务发现", description = "获取服务实例列表")
@@ -34,6 +34,6 @@ public class RegistryController {
     public ApiResponse<List<ServiceInstance>> discover(
             @Parameter(description = "服务名称", required = true) @RequestParam String serviceName,
             @Parameter(description = "环境", required = true) @RequestParam String environment) {
-        return ApiResponse.ok(registryService.discover(serviceName, environment));
+        return ApiResponse.success(registryService.discover(serviceName, environment));
     }
 }

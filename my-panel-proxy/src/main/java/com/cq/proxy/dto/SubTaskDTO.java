@@ -1,4 +1,4 @@
-package com.cq.proxy.controller.dto;
+package com.cq.proxy.dto;
 
 import lombok.Data;
 import java.io.Serial;

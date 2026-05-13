@@ -23,7 +23,7 @@ public class AgentRegistryController {
     @PostMapping("/register")
     public ApiResponse<AgentRegisterResponse> register(@RequestBody AgentRegisterRequest request) {
         AgentRegisterResponse response = registryService.registerAgent(request);
-        return ApiResponse.ok(response);
+        return ApiResponse.success(response);
     }
 
     @Operation(summary = "Agent心跳", description = "Agent客户端心跳接口")
@@ -33,9 +33,9 @@ public class AgentRegistryController {
             @RequestParam Integer agentPort) {
         boolean success = registryService.heartbeatAgent(agentIp, agentPort);
         if (success) {
-            return ApiResponse.ok("HEARTBEAT_OK", null);
+            return ApiResponse.success("HEARTBEAT_OK", null);
         } else {
-            return ApiResponse.fail(404, "Agent not found");
+            return ApiResponse.error(404, "Agent not found");
         }
     }
 }

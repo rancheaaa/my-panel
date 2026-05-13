@@ -78,7 +78,7 @@ public class ConfigFileManager {
         File file = new File(configDir, filename);
 
         if (!file.exists()) {
-            log.warn("⚠️  配置不存在: taskId={}", taskId);
+            log.info("配置不存在: taskId={}", taskId);
             return null;
         }
 

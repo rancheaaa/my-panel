@@ -1,6 +1,6 @@
 package com.cq.proxy.controller.batch;
 
-import com.cq.proxy.controller.dto.SubTaskDTO;
+import com.cq.proxy.dto.SubTaskDTO;
 import com.cq.proxy.service.batch.ProgressService;
 import com.cq.proxy.controller.ProgressReceiverController;
 import org.junit.jupiter.api.*;
@@ -9,8 +9,6 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import java.util.*;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;

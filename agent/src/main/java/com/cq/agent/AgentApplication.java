@@ -6,6 +6,7 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
 import com.cq.agent.batch.scheduler.FailedQueueScannerJob;
+import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.transfer.RetryManager;
 import com.cq.agent.client.upload.AgentUploader;
@@ -113,6 +114,24 @@ public class AgentApplication {
         // Initialize and set FileScanner for batch file scanning (spec.md 4.5)
         FileScanner fileScanner = new FileScanner();
         taskSchedulerManager.setFileScanner(fileScanner);
+
+        // Initialize ProgressReporter for batch task progress reporting (spec.md 4.8)
+        // todo 这里只选择了固定配置的一个registry地址，实际应该从注册中心中，获取可能存在的多个proxy地址。
+        String registryUrl = config.getRegistryServerUrls() != null && 
+            !config.getRegistryServerUrls().isEmpty() ? 
+            config.getRegistryServerUrls().getFirst() : null;
+        
+        if (registryUrl != null && !registryUrl.isBlank()) {
+            ProgressReporter progressReporter = new ProgressReporter(registryUrl);
+            taskSchedulerManager.setProgressReporter(progressReporter);
+            
+            // 同时设置到AgentUploader（用于重启恢复场景）
+            agentUploader.setGlobalProgressReporter(progressReporter);
+            
+            logger.info("✅ ProgressReporter 初始化完成，上报地址: {}", registryUrl);
+        } else {
+            logger.warn("⚠️ 注册中心URL未配置，进度上报功能将不可用");
+        }
 
         // Connect ConfigChangeListener to TaskSchedulerManager for hot updates
         configChangeListener.onCronChange(taskId -> {

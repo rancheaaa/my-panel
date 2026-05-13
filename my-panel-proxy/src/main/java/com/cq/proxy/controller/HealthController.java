@@ -15,6 +15,6 @@ public class HealthController {
     @Operation(summary = "健康检查", description = "服务健康状态检查")
     @GetMapping("/api/health")
     public ApiResponse<Map<String, String>> health() {
-        return ApiResponse.ok(Map.of("status", "UP"));
+        return ApiResponse.success(Map.of("status", "UP"));
     }
 }

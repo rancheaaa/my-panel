@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Button, Space, Popconfirm, Tag, Input, Tooltip, Card, Row, Col, Badge, Dropdown } from 'antd';
+import { Table, Button, Space, Popconfirm, Tag, Input, Tooltip, Card, Row, Col, Dropdown } from 'antd';
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -15,11 +15,8 @@ import {
   FilterOutlined,
   ClockCircleOutlined,
   SyncOutlined,
-  SwapOutlined,
-  SendOutlined,
-  QuestionCircleOutlined
+  SwapOutlined
 } from '@ant-design/icons';
-import TaskStatusBadge from './TaskStatusBadge';
 
 const { Search } = Input;
 
@@ -171,17 +168,7 @@ const TaskListTab = ({
       render: (status) => {
         const s = statusMap[status] || statusMap.READY;
         return (
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '3px 10px', borderRadius: 12, background: s.bg,
-            border: `1px solid ${s.color}40`
-          }}>
-            <span style={{
-              width: 7, height: 7, borderRadius: '50%', background: s.color,
-              boxShadow: `0 0 4px ${s.color}60`
-            }} />
-            <span style={{ fontSize: 12, fontWeight: 500, color: s.color }}>{s.text}</span>
-          </div>
+          <Tag color={s.color.replace('#', '')} style={{ margin: 0 }}>{s.text}</Tag>
         );
       }
     },
@@ -324,31 +311,31 @@ const TaskListTab = ({
       <div style={{ background: '#fafafa', borderRadius: 8, padding: '16px 20px', margin: -4 }}>
         <Row gutter={[32, 12]}>
           <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>📝 任务描述</div>
+            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>任务描述</div>
             <div style={{ fontSize: 13, color: '#333' }}>{record.taskDescription || '-'}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>📂 包含模式</div>
+            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>包含模式</div>
             <div>{includePatterns.length > 0 ? includePatterns.map(p => <Tag key={p} color="green" style={{ marginBottom: 3, fontSize: 11.5 }}>{p}</Tag>) : <span style={{ color: '#bfbfbf' }}>全部文件</span>}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>🚫 排除模式</div>
+            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>排除模式</div>
             <div>{excludePatterns.length > 0 ? excludePatterns.map(p => <Tag key={p} color="red" style={{ marginBottom: 3, fontSize: 11.5 }}>{p}</Tag>) : <span style={{ color: '#bfbfbf' }}>无排除</span>}</div>
           </Col>
         </Row>
         <Row gutter={[32, 12]} style={{ marginTop: 8 }}>
           <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>📋 最大扫描数</div>
+            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>最大扫描数</div>
             <div style={{ fontSize: 13, fontWeight: 500 }}>{record.maxScanFiles || '-'} 个文件</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>📦 目录结构</div>
+            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>目录结构</div>
             <Tag color={record.preserveDirStructure === 1 ? 'blue' : 'default'} style={{ fontSize: 11.5 }}>
               {record.preserveDirStructure === 1 ? '保持原始结构' : '扁平化'}
             </Tag>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>✅ 传输后操作</div>
+            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>传输后操作</div>
             <Tag color={
               record.postTransferAction === 'DELETE' ? 'red' :
               record.postTransferAction === 'BACKUP' ? 'orange' : 'default'
@@ -365,109 +352,72 @@ const TaskListTab = ({
 
   return (
     <div>
-      {/* 工具栏 */}
-      <Card size="small" style={{
-        borderRadius: 10, marginBottom: 12,
-        border: '1px solid #f0f0f0', boxShadow: 'none'
-      }} styles={{ body: { padding: '10px 16px' }}}>
-        <Row align="middle" justify="space-between">
-          <Col>
-            <Space size={12}>
-              <Search
-                placeholder="搜索任务名、Agent ID、目录..."
-                allowClear
-                size="middle"
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: 260, borderRadius: 6 }}
-              />
-              <Space.Compact>
-                {Object.entries(statusMap).map(([key, val]) => (
-                  <Button
-                    key={key}
-                    size="small"
-                    type={statusFilter === key ? 'primary' : 'default'}
-                    ghost={statusFilter === key}
-                    onClick={() => setStatusFilter(statusFilter === key ? null : key)}
-                    style={{
-                      borderRadius: 6,
-                      fontSize: 11.5,
-                      ...(statusFilter === key ? {} : { borderColor: '#f0f0f0', color: '#666' })
-                    }}
-                  >
-                    <span style={{
-                      width: 6, height: 6, borderRadius: '50%',
-                      background: val.color, display: 'inline-block', marginRight: 4
-                    }}/>
-                    {val.text}
-                  </Button>
-                ))}
-              </Space.Compact>
-            </Space>
-          </Col>
-          <Col>
-            <Space size={6}>
-              {onCreateClick && (
-                <Button type="primary" icon={<PlusCircleOutlined />} size="small"
-                  onClick={onCreateClick}
-                  style={{ borderRadius: 6 }}
-                >
-                  新建任务
-                </Button>
-              )}
-              <Button icon={<ReloadOutlined />} size="small"
-                onClick={() => fetchTasks()}
-                style={{ borderRadius: 6 }}
-              >
-                刷新
-              </Button>
-            </Space>
-          </Col>
-        </Row>
+      {/* 搜索卡片 */}
+      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+        <Search
+          placeholder="搜索任务名、Agent ID、目录..."
+          allowClear
+          size="middle"
+          prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{ width: 400 }}
+          onSearch={() => fetchTasks()}
+        />
       </Card>
 
-      {/* 表格 */}
-      <Table
-        columns={columns}
-        dataSource={filteredData}
-        rowKey="id"
-        loading={loading}
-        expandable={{
-          expandedRowRender,
-          rowExpandable: () => true
-        }}
-        pagination={{
-          ...pagination,
-          current: pagination.current,
-          total: filteredData.length,
-          pageSize: pagination.pageSize || 10,
-          showSizeChanger: true,
-          showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} 条`,
-          pageSizeOptions: ['10', '20', '50'],
-          size: 'small',
-          style: { marginTop: 12 }
-        }}
-        onChange={(pag) => fetchTasks({ page: pag.current, size: pag.pageSize })}
-        scroll={{ x: 1800 }}
-        size="middle"
-        rowClassName={(record) => record.status === 'RUNNING' ? 'table-row-running' : ''}
-        style={{
-          borderRadius: 10,
-          '.table-row-running': { animation: 'pulse-bg 2s infinite' }
-        }}
-      />
+      {/* 任务卡片 */}
+      <Card bordered={false}>
+        {/* 工具栏 */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <Space size="large">
+            <Button type="primary" icon={<PlusCircleOutlined />} onClick={onCreateClick}>新建任务</Button>
+          </Space>
+          <Space size="large">
+            <Tooltip title="刷新">
+              <Button icon={<ReloadOutlined />} onClick={() => fetchTasks()} shape="circle" />
+            </Tooltip>
+          </Space>
+        </div>
 
-      {/* 运行行动画 */}
-      <style>{`
-        .ant-table-tbody > tr.table-row-running > td {
-          background: #f6ffed !important;
-          transition: background 0.5s ease;
-        }
-        @keyframes pulse-bg {
-          0%, 100% { background: #f6ffed; }
-          50% { background: #ebfbee; }
-        }
-      `}</style>
+        {/* 表格 */}
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          loading={loading}
+          expandable={{
+            expandedRowRender,
+            rowExpandable: () => true
+          }}
+          pagination={{
+            ...pagination,
+            current: pagination.current,
+            total: filteredData.length,
+            pageSize: pagination.pageSize || 10,
+            showSizeChanger: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} 条`,
+            pageSizeOptions: ['10', '20', '50'],
+            size: "small",
+            style: { marginTop: 12 }
+          }}
+          onChange={(pag) => fetchTasks({ page: pag.current, size: pag.pageSize })}
+          scroll={{ x: 1800 }}
+          size="middle"
+          rowClassName={(record) => record.status === 'RUNNING' ? 'table-row-running' : ''}
+        />
+
+        {/* 运行行动画 */}
+        <style>{`
+          .ant-table-tbody > tr.table-row-running > td {
+            background: #f6ffed !important;
+            transition: background 0.5s ease;
+          }
+          @keyframes pulse-bg {
+            0%, 100% { background: #f6ffed; }
+            50% { background: #ebfbee; }
+          }
+        `}</style>
+      </Card>
     </div>
   );
 };

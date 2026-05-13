@@ -17,20 +17,20 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleBusinessException(BusinessException e) {
         log.warn("Business exception: {}", e.getMessage());
-        return ApiResponse.fail(e.getCode(), e.getMessage());
+        return ApiResponse.error(e.getCode(), e.getMessage());
     }
 
     @ExceptionHandler(SystemException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleSystemException(SystemException e) {
         log.error("System exception", e);
-        return ApiResponse.fail(500, "SYSTEM_ERROR");
+        return ApiResponse.error(500, "SYSTEM_ERROR");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleException(Exception e) {
         log.error("Unhandled exception", e);
-        return ApiResponse.fail(500, "SYSTEM_ERROR");
+        return ApiResponse.error(500, "SYSTEM_ERROR");
     }
 }

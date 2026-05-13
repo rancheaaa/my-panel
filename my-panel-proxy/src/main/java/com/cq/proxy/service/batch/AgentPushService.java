@@ -4,6 +4,7 @@ import com.cq.proxy.repository.entity.AgentRegistry;
 import com.cq.proxy.repository.mapper.AgentRegistryMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
@@ -205,6 +206,7 @@ public class AgentPushService {
     /**
      * Agent地址包装类
      */
+    @Getter
     public static class AgentAddress {
         private final String ip;
         private final int port;
@@ -214,13 +216,6 @@ public class AgentPushService {
             this.port = port;
         }
 
-        public String getIp() {
-            return ip;
-        }
-
-        public int getPort() {
-            return port;
-        }
     }
 
     /**

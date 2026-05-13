@@ -24,6 +24,12 @@ public class UploadTask implements TaskInfo {
     private final String remoteAgentApiUrl;
     private final String remoteAgentUsername;
 
+    /** 监听器状态恢复字段（用于重启恢复场景） */
+    private Long taskId;
+    private Long subtaskId;
+    private String fileName;
+    private long fileSize;
+
     private String createTime;
     private String updateTime;
     private String enqueuedTime;

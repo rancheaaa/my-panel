@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -74,7 +73,6 @@ public class RetryAwareUploaderDecorator implements UploadService {
     private Path uploadFailQueueDir;
 
     // ===== 状态跟踪 =====
-    private final Map<Long, AtomicInteger> retryCountMap = new ConcurrentHashMap<>();
     private final Map<Long, AgentTaskConfig> taskConfigMap = new ConcurrentHashMap<>();
 
     // ===== 重试执行器（可选）=====
@@ -465,6 +463,11 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
             UploadListener retryListener = createRetryListener(task);
 
+            // 上报重试状态到Proxy
+            if (retryListener instanceof BatchUploadListener) {
+                ((BatchUploadListener) retryListener).reportRetrying(newRetryCount);
+            }
+
             logger.info("🚀 重新提交上传任务: transferId={}, localPath={}, remoteTarget={}",
                 transferId, localFilePath, remoteTargetInfo);
 
@@ -580,27 +583,10 @@ public class RetryAwareUploaderDecorator implements UploadService {
     }
 
     /**
-     * 记录成功（清除重试计数）
+     * 记录成功
      */
     public void recordSuccess(Long subtaskId) {
-        retryCountMap.remove(subtaskId);
-        logger.info("✅ 清除重试计数记录: subtaskId={}", subtaskId);
-    }
-
-    /**
-     * 获取当前重试次数
-     */
-    public int getRetryCount(Long subtaskId) {
-        AtomicInteger count = retryCountMap.get(subtaskId);
-        return count != null ? count.get() : 0;
-    }
-
-    /**
-     * 清除所有重试记录
-     */
-    public void clearAll() {
-        retryCountMap.clear();
-        logger.info("🗑️ 所有重试记录已清除");
+        // todo 预留钩子函数，暂时不要实现任何逻辑
     }
 
     // ==================== 任务配置管理 ====================

@@ -21,12 +21,15 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * 批量上传监听器（spec.md 4.6）
  * 功能：
- * 1. 完整的子任务生命周期管理：创建→进度→完成/失败
+ * 1. 完整的子任务生命周期管理：创建→进度→完成/失败/重试
  * 2. 桥接AgentUploader事件到进度上报（ProgressReporter）
  * 3. 在onComplete回调中执行传输后操作（postTransferAction）
- * 支持两种初始化方式：
- * - 有参构造函数：正常创建新任务时使用
- * - 无参构造函数：从JSON恢复任务时使用（重启恢复场景）
+ * 使用的Proxy接口：
+ * - POST /api/batch/subtask/create    → 子任务创建（QUEUED状态）
+ * - POST /api/batch/subtask/progress  → 传输进度上报（SENDING状态，分块级进度）
+ * - POST /api/batch/subtask/complete  → 传输完成上报（COMPLETED状态）
+ * - POST /api/batch/subtask/failed    → 传输失败上报（FAILED状态）
+ * - POST /api/batch/subtask/retrying  → 重试状态上报（RETRYING状态）
  */
 public class BatchUploadListener implements UploadListener {
 
@@ -70,6 +73,9 @@ public class BatchUploadListener implements UploadListener {
     /** 记录实际的分块数量 */
     private Integer actualTotalChunks = null;
 
+    /** 传输开始时间戳（毫秒） */
+    private Long transferStartTime = null;
+
     /**
      * 有参构造函数 - 正常创建新任务时使用
      */
@@ -102,7 +108,7 @@ public class BatchUploadListener implements UploadListener {
 
     /**
      * 创建子任务并上报到Proxy（INSERT到batch_transfer_subtask表）
-     * 仅在非恢复模式下执行
+     * 使用接口：POST /api/batch/subtask/create
      */
     private void createSubTaskOnProxy() {
         if (progressReporter == null) {
@@ -190,13 +196,19 @@ public class BatchUploadListener implements UploadListener {
             actualTotalChunks = totalChunks;
         }
 
+        // 记录传输开始时间（第一次进度回调时）
+        if (transferStartTime == null) {
+            transferStartTime = System.currentTimeMillis();
+        }
+
         if (progressReporter != null) {
-            SubTaskEvent event = buildBaseEvent("SENDING");
+            SubTaskEvent event = buildProgressEvent();
             event.setTransferredChunks(uploadedChunks);
             event.setTotalChunks(totalChunks);
             event.setTransferredBytes((long) (scannedFile.getFileSize() * progress));
             event.setSpeedBytesPerSec(calculateSpeedBytesPerSec(progress));
 
+            // 使用POST /api/batch/subtask/progress接口
             progressReporter.reportProgress(event);
         }
     }
@@ -212,17 +224,10 @@ public class BatchUploadListener implements UploadListener {
                 subtaskId, scannedFile.getFileName(), task.getTransferId());
 
         if (progressReporter != null) {
-            SubTaskEvent event = buildBaseEvent("COMPLETED");
-            event.setTransferId(task.getTransferId());
-            // 使用实际的分块数量，如果从未收到onProgress则默认为1
-            int finalChunks = actualTotalChunks != null ? actualTotalChunks : 1;
-            event.setTransferredChunks(finalChunks);
-            event.setTotalChunks(finalChunks);
-            event.setTransferredBytes(scannedFile.getFileSize());
-            event.setSpeedBytesPerSec(null); // 传输完成时速度为null
-            event.setCompletedAt(new Date());
+            SubTaskEvent event = buildCompleteEvent(task);
 
-            progressReporter.reportSuccess(event);
+            // 使用POST /api/batch/subtask/complete接口
+            progressReporter.reportComplete(event);
         }
 
         executePostTransferAction();
@@ -240,11 +245,10 @@ public class BatchUploadListener implements UploadListener {
                 subtaskId, fileName, errorMessage);
 
         if (progressReporter != null) {
-            SubTaskEvent event = buildBaseEvent("FAILED");
-            event.setErrorCode("UPLOAD_ERROR");
-            event.setErrorMessage(errorMessage);
+            SubTaskEvent event = buildFailEvent(errorMessage);
 
-            progressReporter.reportFail(event);
+            // 使用POST /api/batch/subtask/failed接口
+            progressReporter.reportFailed(event);
         }
     }
 
@@ -256,8 +260,121 @@ public class BatchUploadListener implements UploadListener {
         event.setSubtaskId(subtaskId);
         event.setTaskId(taskId);
         event.setStatus(status);
-        event.setStartedAt(new Date());
+
+        // Agent信息
+        if (config != null) {
+            event.setSourceAgentId(config.getSourceAgentId());
+            event.setSourceAgentName(config.getSourceAgentName());
+            event.setTargetAgentId(getFirstTargetAgentId());
+            event.setTargetAgentName(getFirstTargetAgentName());
+        }
+
+        // 文件信息
+        if (scannedFile != null) {
+            event.setSourcePath(scannedFile.getAbsolutePath());
+            event.setFileName(scannedFile.getFileName());
+            event.setFileSizeBytes(scannedFile.getFileSize());
+            event.setFileLastModified(new Date(scannedFile.getLastModified()));
+        }
+
         return event;
+    }
+
+    /**
+     * 构建进度事件（用于/progress接口）
+     */
+    private SubTaskEvent buildProgressEvent() {
+        SubTaskEvent event = buildBaseEvent("SENDING");
+        event.setStartedAt(transferStartTime != null ? new Date(transferStartTime) : new Date());
+        return event;
+    }
+
+    /**
+     * 构建完成事件（用于/complete接口）
+     */
+    private SubTaskEvent buildCompleteEvent(UploadTask task) {
+        SubTaskEvent event = buildBaseEvent("COMPLETED");
+        event.setTransferId(task != null ? task.getTransferId() : null);
+
+        // 使用实际的分块数量，如果从未收到onProgress则默认为1
+        int finalChunks = actualTotalChunks != null ? actualTotalChunks : 1;
+        event.setTransferredChunks(finalChunks);
+        event.setTotalChunks(finalChunks);
+        event.setTransferredBytes(scannedFile.getFileSize());
+        event.setSpeedBytesPerSec(null);
+
+        long startTime = transferStartTime != null ? transferStartTime : System.currentTimeMillis();
+        long completedTime = System.currentTimeMillis();
+        event.setStartedAt(new Date(startTime));
+        event.setCompletedAt(new Date(completedTime));
+        event.setDurationMs(completedTime - startTime);
+
+        return event;
+    }
+
+    /**
+     * 构建失败事件（用于/failed接口）
+     */
+    private SubTaskEvent buildFailEvent(String errorMessage) {
+        SubTaskEvent event = buildBaseEvent("FAILED");
+        event.setErrorCode("UPLOAD_ERROR");
+        event.setErrorMessage(errorMessage);
+
+        if (transferStartTime != null) {
+            event.setStartedAt(new Date(transferStartTime));
+            event.setDurationMs(System.currentTimeMillis() - transferStartTime);
+        }
+
+        return event;
+    }
+
+    /**
+     * 构建重试事件（用于/retrying接口）
+     * 从RetryAwareUploaderDecorator调用
+     */
+    public SubTaskEvent buildRetryingEvent(int retryCount) {
+        SubTaskEvent event = buildBaseEvent("RETRYING");
+        event.setRetryCount(retryCount);
+        event.setLastRetryAt(new Date());
+        event.setNextRetryAfter(new Date(calculateNextRetryAfter(retryCount)));
+        return event;
+    }
+
+    /**
+     * 上报重试事件
+     */
+    public void reportRetrying(int retryCount) {
+        if (progressReporter != null) {
+            SubTaskEvent event = buildRetryingEvent(retryCount);
+            // 使用POST /api/batch/subtask/retrying接口
+            progressReporter.reportRetrying(event);
+        }
+    }
+
+    /**
+     * 计算下次重试时间（毫秒时间戳）
+     */
+    private Long calculateNextRetryAfter(int retryCount) {
+        if (config == null || config.getRetryConfig() == null || !config.getRetryConfig().isEnabled()) {
+            return System.currentTimeMillis() + 30 * 60 * 1000L; // 默认30分钟
+        }
+
+        int intervalMin = config.getRetryConfig().getIntervalMin() != null
+                ? config.getRetryConfig().getIntervalMin() : 30;
+        String backoffType = config.getRetryConfig().getBackoffType();
+
+        long baseIntervalMs = intervalMin * 60_000L;
+        long delay;
+
+        if ("EXPONENTIAL".equalsIgnoreCase(backoffType)) {
+            delay = baseIntervalMs * (long) Math.pow(2, retryCount);
+        } else if ("LINEAR".equalsIgnoreCase(backoffType)) {
+            delay = baseIntervalMs * (retryCount + 1);
+        } else {
+            delay = baseIntervalMs;
+        }
+
+        return System.currentTimeMillis() + delay;
     }
 
     /**

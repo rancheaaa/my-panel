@@ -233,6 +233,108 @@ class ProgressReceiverControllerTest {
         System.out.println("✅ 超出范围进度值自动修正");
     }
 
+    // ==================== Agent兼容性测试 ====================
+
+    @Test
+    @DisplayName("11. POST /api/batch/subtask/create - Agent Date格式时间字段解析成功")
+    void testCreateSubTask_agentDateFormat_parsedSuccessfully() throws Exception {
+        when(progressService.createSubTask(any())).thenReturn(7639652894243020632L);
+
+        String agentJson = """
+                {
+                    "subtaskId": 7639652894243020632,
+                    "taskId": 1,
+                    "status": "QUEUED",
+                    "sourceAgentId": "agent-001",
+                    "sourceAgentName": "agent@192.168.1.100:8080",
+                    "targetAgentId": "target-001",
+                    "targetName": "target@192.168.1.200:8080",
+                    "sourcePath": "/data/upload/a7.txt",
+                    "targetPath": "/backup/a7.txt",
+                    "fileName": "a7.txt",
+                    "fileSizeBytes": 1024,
+                    "fileLastModified": "2026-05-14 15:55:00"
+                }
+                """;
+
+        mockMvc.perform(post("/api/batch/subtask/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(agentJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.subtaskId").value(7639652894243020632L));
+
+        verify(progressService).createSubTask(argThat(subtask ->
+                subtask.getFileLastModified() != null &&
+                        subtask.getFileName().equals("a7.txt")
+        ));
+        System.out.println("✅ Agent Date格式时间字段解析成功");
+    }
+
+    @Test
+    @DisplayName("12. POST /api/batch/subtask/status - Agent完成状态上报Date格式解析成功")
+    void testReceiveStatus_agentCompletedWithDateFormat_success() throws Exception {
+        doNothing().when(progressService).updateSubTaskStatus(any());
+
+        String agentStatusJson = """
+                {
+                    "subtaskId": 7639652894243020632,
+                    "taskId": 1,
+                    "status": "COMPLETED",
+                    "transferId": "3a74a7db991a4ee8aa13f8dce353d83c",
+                    "startedAt": "2026-05-14 15:54:50",
+                    "completedAt": "2026-05-14 15:55:00",
+                    "transferredChunks": 1,
+                    "totalChunks": 1,
+                    "transferredBytes": 1024
+                }
+                """;
+
+        mockMvc.perform(post("/api/batch/subtask/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(agentStatusJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(progressService).updateSubTaskStatus(argThat(subtask ->
+                subtask.getStartedAt() != null &&
+                        subtask.getCompletedAt() != null &&
+                        subtask.getStatus().equals("COMPLETED") &&
+                        subtask.getTransferId().equals("3a74a7db991a4ee8aa13f8dce353d83c")
+        ));
+        System.out.println("✅ Agent完成状态上报Date格式解析成功");
+    }
+
+    @Test
+    @DisplayName("13. 时间戳毫秒格式也支持（向后兼容）")
+    void testTimestampFormat_backwardCompatible() throws Exception {
+        when(progressService.createSubTask(any())).thenReturn(12345L);
+
+        String timestampJson = """
+                {
+                    "subtaskId": 12345,
+                    "taskId": 1,
+                    "status": "QUEUED",
+                    "fileName": "test.txt",
+                    "fileSizeBytes": 512,
+                    "fileLastModified": "1778746500000",
+                    "startedAt": "1778746490000"
+                }
+                """;
+
+        mockMvc.perform(post("/api/batch/subtask/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(timestampJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(progressService).createSubTask(argThat(subtask ->
+                subtask.getFileLastModified() != null &&
+                        subtask.getStartedAt() != null
+        ));
+        System.out.println("✅ 时间戳毫秒格式向后兼容");
+    }
+
     // ==================== 辅助方法 ====================
 
     private String createProgressJson(Long subtaskId, int transferredBytes, int totalBytes) {

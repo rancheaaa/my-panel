@@ -151,6 +151,7 @@ public class ProgressReporter {
 
     /**
      * 创建子任务（上报到Proxy并保存到数据库）
+     * POST /api/batch/subtask/create
      */
     public boolean createSubTask(SubTaskEvent event) {
         if (httpClient == null) {
@@ -167,53 +168,127 @@ public class ProgressReporter {
                 log.info("✅ 子任务创建成功: subtaskId={}, file={}", event.getSubtaskId(), event.getFileName());
             } else {
                 log.warn("❌ 子任务创建失败(4xx): {}", event.getSubtaskId());
+                fallbackToLocal(event);
             }
             return success;
         } catch (Exception e) {
             log.error("❌ 子任务创建异常: {}, error={}", event.getSubtaskId(), e.getMessage());
-            throw e;
+            fallbackToLocal(event);
+            return false;
         }
     }
 
     /**
-     * 上报完整子任务状态更新（包含所有字段）
+     * 上报传输进度（分块进度）
+     * POST /api/batch/subtask/progress
      */
-    void report(SubTaskEvent event, boolean fallback) {
+    public boolean reportProgress(SubTaskEvent event) {
         if (httpClient == null) {
-            log.error("HTTP客户端未设置，上报失败");
+            log.debug("HTTP客户端未设置，模拟进度上报成功");
+            return true;
         }
 
-        String url = proxyBaseUrl + "/api/batch/subtask/status";
+        String url = proxyBaseUrl + "/api/batch/subtask/progress";
         String data = GSON.toJson(event);
 
         try {
             boolean success = httpClient.apply(url, data);
             if (success) {
-                log.debug("✅ 子任务状态上报: subtaskId={}, status={}", event.getSubtaskId(), event.getStatus());
+                log.debug("✅ 子任务进度上报: subtaskId={}, chunks={}/{}, bytes={}",
+                        event.getSubtaskId(), event.getTransferredChunks(), event.getTotalChunks(), event.getTransferredBytes());
             } else {
-                log.warn("❌ 子任务状态上报失败(4xx): {}", event.getSubtaskId());
-                if(fallback) {
-                    fallbackToLocal(event);
-                }
+                log.warn("❌ 子任务进度上报失败: {}", event.getSubtaskId());
             }
+            return success;
         } catch (Exception e) {
-            log.error("❌ 子任务状态上报异常: {}, error={}", event.getSubtaskId(), e.getMessage());
-            if(fallback) {
-                fallbackToLocal(event);
-            }
+            log.warn("⚠️ 子任务进度上报异常(非致命): subtaskId={}, error={}", event.getSubtaskId(), e.getMessage());
+            return false;
         }
     }
 
-    public void reportSuccess(SubTaskEvent event) {
-        report(event, true);
+    /**
+     * 上报子任务完成
+     * POST /api/batch/subtask/complete
+     */
+    public boolean reportComplete(SubTaskEvent event) {
+        if (httpClient == null) {
+            log.debug("HTTP客户端未设置，模拟完成上报成功");
+            return true;
+        }
+
+        String url = proxyBaseUrl + "/api/batch/subtask/complete";
+        String data = GSON.toJson(event);
+
+        try {
+            boolean success = httpClient.apply(url, data);
+            if (success) {
+                log.info("✅ 子任务完成上报: subtaskId={}, transferId={}", event.getSubtaskId(), event.getTransferId());
+            } else {
+                log.warn("❌ 子任务完成上报失败: {}", event.getSubtaskId());
+                fallbackToLocal(event);
+            }
+            return success;
+        } catch (Exception e) {
+            log.error("❌ 子任务完成上报异常: {}, error={}", event.getSubtaskId(), e.getMessage());
+            fallbackToLocal(event);
+            return false;
+        }
     }
 
-    public void reportFail(SubTaskEvent event) {
-        report(event, true);
+    /**
+     * 上报子任务失败
+     * POST /api/batch/subtask/failed
+     */
+    public boolean reportFailed(SubTaskEvent event) {
+        if (httpClient == null) {
+            log.debug("HTTP客户端未设置，模拟失败上报成功");
+            return true;
+        }
+
+        String url = proxyBaseUrl + "/api/batch/subtask/failed";
+        String data = GSON.toJson(event);
+
+        try {
+            boolean success = httpClient.apply(url, data);
+            if (success) {
+                log.warn("⚠️ 子任务失败上报: subtaskId={}, errorCode={}", event.getSubtaskId(), event.getErrorCode());
+            } else {
+                log.error("❌ 子任务失败上报失败: {}", event.getSubtaskId());
+                fallbackToLocal(event);
+            }
+            return success;
+        } catch (Exception e) {
+            log.error("❌ 子任务失败上报异常: {}, error={}", event.getSubtaskId(), e.getMessage());
+            fallbackToLocal(event);
+            return false;
+        }
     }
 
-    public void reportProgress(SubTaskEvent event) {
-        report(event, false);
+    /**
+     * 上报子任务重试
+     * POST /api/batch/subtask/retrying
+     */
+    public boolean reportRetrying(SubTaskEvent event) {
+        if (httpClient == null) {
+            log.debug("HTTP客户端未设置，模拟重试上报成功");
+            return true;
+        }
+
+        String url = proxyBaseUrl + "/api/batch/subtask/retrying";
+        String data = GSON.toJson(event);
+
+        try {
+            boolean success = httpClient.apply(url, data);
+            if (success) {
+                log.info("🔄 子任务重试上报: subtaskId={}, retryCount={}", event.getSubtaskId(), event.getRetryCount());
+            } else {
+                log.warn("❌ 子任务重试上报失败: {}", event.getSubtaskId());
+            }
+            return success;
+        } catch (Exception e) {
+            log.error("❌ 子任务重试上报异常: {}, error={}", event.getSubtaskId(), e.getMessage());
+            return false;
+        }
     }
 
     private void fallbackToLocal(SubTaskEvent event) {

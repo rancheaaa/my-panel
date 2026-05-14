@@ -8,6 +8,9 @@ import java.io.Serializable;
  * 子任务上报DTO
  * 用于接收Agent上报的子任务创建、状态更新、进度更新等请求
  * 替代原来的Map<String, Object>，提供类型安全
+ *
+ * 注意：时间字段使用String类型以兼容Agent端Gson序列化的Date格式
+ * Agent端使用Gson配置 setDateFormat("yyyy-MM-dd HH:mm:ss") 序列化Date
  */
 @Data
 public class SubTaskDTO implements Serializable {
@@ -55,8 +58,11 @@ public class SubTaskDTO implements Serializable {
     /** 文件大小（字节） */
     private Long fileSizeBytes;
 
-    /** 文件最后修改时间（时间戳毫秒） */
-    private Long fileLastModified;
+    /**
+     * 文件最后修改时间
+     * 兼容两种格式：Long时间戳毫秒 或 Date字符串(yyyy-MM-dd HH:mm:ss)
+     */
+    private String fileLastModified;
 
     // ==================== 传输状态 ====================
 
@@ -81,11 +87,17 @@ public class SubTaskDTO implements Serializable {
 
     // ==================== 时间信息 ====================
 
-    /** 开始时间（时间戳毫秒） */
-    private Long startedAt;
+    /**
+     * 开始时间
+     * 兼容两种格式：Long时间戳毫秒 或 Date字符串(yyyy-MM-dd HH:mm:ss)
+     */
+    private String startedAt;
 
-    /** 完成时间（时间戳毫秒） */
-    private Long completedAt;
+    /**
+     * 完成时间
+     * 兼容两种格式：Long时间戳毫秒 或 Date字符串(yyyy-MM-dd HH:mm:ss)
+     */
+    private String completedAt;
 
     /** 耗时（毫秒） */
     private Long durationMs;
@@ -106,11 +118,17 @@ public class SubTaskDTO implements Serializable {
     /** 重试次数 */
     private Integer retryCount;
 
-    /** 上次重试时间（时间戳毫秒） */
-    private Long lastRetryAt;
+    /**
+     * 上次重试时间
+     * 兼容两种格式：Long时间戳毫秒 或 Date字符串(yyyy-MM-dd HH:mm:ss)
+     */
+    private String lastRetryAt;
 
-    /** 下次重试时间（时间戳毫秒） */
-    private Long nextRetryAfter;
+    /**
+     * 下次重试时间
+     * 兼容两种格式：Long时间戳毫秒 或 Date字符串(yyyy-MM-dd HH:mm:ss)
+     */
+    private String nextRetryAfter;
 
     // ==================== 进度专用字段（用于/progress接口）====================
 

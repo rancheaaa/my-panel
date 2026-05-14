@@ -161,7 +161,7 @@ public class AgentApplication {
         retryAwareUploader.setGlobalProgressReporter(progressReporter);
 
         FallbackPersistenceService fallbackPersistenceService = new FallbackPersistenceService(
-            config.getFileBaseDirectory() + "/progress-fallback"
+            config.getFileBaseDirectory() + "transfers/progress-fallback"
         );
         
         // 设置ProgressReporter到FallbackPersistenceService，用于自动补报

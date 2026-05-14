@@ -278,8 +278,17 @@ public class FallbackPersistenceService {
     private boolean retrySingleEvent(SubTaskEvent event) {
         try {
             log.debug("🔄 尝试补报: subtaskId={}, status={}", event.getSubtaskId(), event.getStatus());
-            progressReporter.report(event, true);
-            return true;
+            boolean success;
+            if ("COMPLETED".equalsIgnoreCase(event.getStatus())) {
+                success = progressReporter.reportComplete(event);
+            } else if ("FAILED".equalsIgnoreCase(event.getStatus())) {
+                success = progressReporter.reportFailed(event);
+            } else if ("RETRYING".equalsIgnoreCase(event.getStatus())) {
+                success = progressReporter.reportRetrying(event);
+            } else {
+                success = progressReporter.reportProgress(event);
+            }
+            return success;
         } catch (Exception e) {
             log.error("❌ 补报异常: subtaskId={}, error={}", event.getSubtaskId(), e.getMessage());
             return false;

@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 
 @RestController
@@ -14,6 +16,8 @@ import java.util.Date;
 public class ProgressReceiverController {
 
     private static final Logger log = LoggerFactory.getLogger(ProgressReceiverController.class);
+
+    private static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ss";
 
     private final ProgressService progressService;
 
@@ -196,7 +200,7 @@ public class ProgressReceiverController {
         if (dto.getFileSizeBytes() != null)
             subtask.setFileSizeBytes(dto.getFileSizeBytes());
         if (dto.getFileLastModified() != null)
-            subtask.setFileLastModified(new Date(dto.getFileLastModified()));
+            subtask.setFileLastModified(parseDateTime(dto.getFileLastModified()));
 
         if (dto.getStatus() != null && !dto.getStatus().isBlank())
             subtask.setStatus(dto.getStatus());
@@ -213,9 +217,9 @@ public class ProgressReceiverController {
             subtask.setSpeedBytesPerSec(dto.getSpeedBytesPerSec());
 
         if (dto.getStartedAt() != null)
-            subtask.setStartedAt(new Date(dto.getStartedAt()));
+            subtask.setStartedAt(parseDateTime(dto.getStartedAt()));
         if (dto.getCompletedAt() != null)
-            subtask.setCompletedAt(new Date(dto.getCompletedAt()));
+            subtask.setCompletedAt(parseDateTime(dto.getCompletedAt()));
         if (dto.getDurationMs() != null)
             subtask.setDurationMs(dto.getDurationMs());
 
@@ -229,10 +233,35 @@ public class ProgressReceiverController {
         if (dto.getRetryCount() != null)
             subtask.setRetryCount(dto.getRetryCount());
         if (dto.getLastRetryAt() != null)
-            subtask.setLastRetryAt(new Date(dto.getLastRetryAt()));
+            subtask.setLastRetryAt(parseDateTime(dto.getLastRetryAt()));
         if (dto.getNextRetryAfter() != null)
-            subtask.setNextRetryAfter(new Date(dto.getNextRetryAfter()));
+            subtask.setNextRetryAfter(parseDateTime(dto.getNextRetryAfter()));
 
         return subtask;
+    }
+
+    /**
+     * 解析时间字符串为Date对象
+     * 支持两种格式：
+     * 1. Long类型的时间戳毫秒（如 "1778746500000"）
+     * 2. 日期字符串（如 "2026-05-14 15:55:00"）
+     */
+    private Date parseDateTime(String timeStr) {
+        if (timeStr == null || timeStr.isBlank()) {
+            return null;
+        }
+
+        try {
+            long timestamp = Long.parseLong(timeStr);
+            return new Date(timestamp);
+        } catch (NumberFormatException e) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT_PATTERN);
+                return sdf.parse(timeStr);
+            } catch (ParseException ex) {
+                log.warn("⚠️ 无法解析时间字符串: {}", timeStr);
+                return null;
+            }
+        }
     }
 }

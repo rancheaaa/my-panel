@@ -93,7 +93,7 @@
         </encoder>
     </appender>
 
-	<root level="info">
+	<root level="debug">
 		<appender-ref ref="console" />
         <appender-ref ref="file_info" />
         <appender-ref ref="file_warn" />

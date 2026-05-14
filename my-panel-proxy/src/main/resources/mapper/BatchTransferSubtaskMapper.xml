@@ -10,6 +10,7 @@
             <if test="targetPath != null">target_path = #{targetPath},</if>
             <if test="fileName != null">file_name = #{fileName},</if>
             <if test="fileSizeBytes != null">file_size_bytes = #{fileSizeBytes},</if>
+            <if test="fileLastModified != null">file_last_modified = #{fileLastModified},</if>
             <if test="transferId != null">transfer_id = #{transferId},</if>
             <if test="transferredChunks != null">transferred_chunks = #{transferredChunks},</if>
             <if test="totalChunks != null">total_chunks = #{totalChunks},</if>

@@ -35,6 +35,27 @@ public class ProgressServiceImpl implements ProgressService {
             if (subtask.getStatus() == null) {
                 subtask.setStatus("QUEUED");
             }
+            if (subtask.getTransferredChunks() == null) {
+                subtask.setTransferredChunks(0);
+            }
+            if (subtask.getTotalChunks() == null) {
+                subtask.setTotalChunks(0);
+            }
+            if (subtask.getTransferredBytes() == null) {
+                subtask.setTransferredBytes(0L);
+            }
+            if (subtask.getSpeedBytesPerSec() == null) {
+                subtask.setSpeedBytesPerSec(0L);
+            }
+            if (subtask.getRetryCount() == null) {
+                subtask.setRetryCount(0);
+            }
+            if (subtask.getCreateBy() == null || subtask.getCreateBy().isBlank()) {
+                subtask.setCreateBy(subtask.getSourceAgentId() != null ? subtask.getSourceAgentId() : "system");
+            }
+            if (subtask.getUpdateBy() == null || subtask.getUpdateBy().isBlank()) {
+                subtask.setUpdateBy(subtask.getSourceAgentId() != null ? subtask.getSourceAgentId() : "system");
+            }
             if (subtask.getCreateTime() == null) {
                 subtask.setCreateTime(new Date());
             }
@@ -72,7 +93,7 @@ public class ProgressServiceImpl implements ProgressService {
             }
 
             subtaskMapper.updateProgress(subtaskId, transferredChunks,
-                    transferredBytes, speedBytesPerSec);
+                    totalChunks, transferredBytes, speedBytesPerSec);
             lastUpdateTimeMap.put(subtaskId, System.currentTimeMillis());
 
             log.debug("✅ 进度已更新到DB: subtask={}", subtaskId);

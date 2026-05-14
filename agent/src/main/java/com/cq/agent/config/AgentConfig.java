@@ -76,6 +76,12 @@ public class AgentConfig {
     private String uploadSendingQueueDir;
     private String downloadSendingQueueDir;
 
+    // Success task archive queue directories
+    private String uploadSuccessQueueDir;
+
+    // Progress fallback directory
+    private String progressFallbackDir;
+
     // Failed task retry queue directories
     private String uploadFailRetryQueueDir;
     private String downloadFailRetryQueueDir;
@@ -159,7 +165,8 @@ public class AgentConfig {
         this.portProbeMaxSteps = getIntProperty("server.port.probe.max.steps", 10);
 
         // Registry server configuration
-        String registryServerUrlStr = getStringProperty("registry.server.url", "http://localhost:9876,http://localhost:9876");
+        String registryServerUrlStr = getStringProperty("registry.server.url",
+                "http://localhost:9876,http://localhost:9876");
         if (registryServerUrlStr != null && !registryServerUrlStr.isEmpty()) {
             String[] urls = registryServerUrlStr.split(",");
             List<String> urlList = new ArrayList<>();
@@ -219,12 +226,24 @@ public class AgentConfig {
         this.downloadRequestTimeoutSeconds = getIntProperty("download.request.timeout.seconds", 60);
 
         // Transfer metadata directories
-        this.uploadSendingQueueDir = getStringProperty("upload.sending.queue.dir", "/tmp/my-panel/admin/data/transfers/uploadSendingQueue");
-        this.downloadSendingQueueDir = getStringProperty("download.sending.queue.dir", "/tmp/my-panel/admin/data/transfers/downloadSendingQueue");
+        this.uploadSendingQueueDir = getStringProperty("upload.sending.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadSendingQueue");
+        this.downloadSendingQueueDir = getStringProperty("download.sending.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/downloadSendingQueue");
+
+        // Success task archive queue directories
+        this.uploadSuccessQueueDir = getStringProperty("upload.success.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadSuccessQueue");
+
+        // Progress fallback directory
+        this.progressFallbackDir = getStringProperty("progress.fallback.dir",
+                "/tmp/my-panel/admin/data/transfers/progress-fallback");
 
         // Failed task retry queue directories
-        this.uploadFailRetryQueueDir = getStringProperty("upload.fail.retry.queue.dir", "/tmp/my-panel/admin/data/transfers/uploadFailRetryQueue");
-        this.downloadFailRetryQueueDir = getStringProperty("download.fail.retry.queue.dir", "/tmp/my-panel/admin/data/transfers/downloadFailRetryQueue");
+        this.uploadFailRetryQueueDir = getStringProperty("upload.fail.retry.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadFailRetryQueue");
+        this.downloadFailRetryQueueDir = getStringProperty("download.fail.retry.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/downloadFailRetryQueue");
 
         // Failed queue scan interval (default: 5 minutes)
         this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 5 * 60 * 1000L);
@@ -261,7 +280,8 @@ public class AgentConfig {
         }
 
         if (maxFileSize > 0 && chunkSize > maxFileSize) {
-            logger.warn("file.chunk.size.bytes ({}) is greater than file.max.size ({}), adjusting", chunkSize, maxFileSize);
+            logger.warn("file.chunk.size.bytes ({}) is greater than file.max.size ({}), adjusting", chunkSize,
+                    maxFileSize);
             chunkSize = (int) Math.min(maxFileSize, Integer.MAX_VALUE);
         }
 
@@ -271,7 +291,8 @@ public class AgentConfig {
         }
 
         if (maxContentLength < chunkSize) {
-            logger.warn("connection.max.content.length ({}) is less than file.chunk.size.bytes ({}), adjusting", maxContentLength, chunkSize);
+            logger.warn("connection.max.content.length ({}) is less than file.chunk.size.bytes ({}), adjusting",
+                    maxContentLength, chunkSize);
             maxContentLength = chunkSize;
         }
     }
@@ -281,11 +302,11 @@ public class AgentConfig {
         if (value != null) {
             return parseIntegerValue(key, value, defaultValue);
         }
-        
+
         logger.debug("Using default value for {}: {}", key, defaultValue);
         return defaultValue;
     }
-    
+
     private int parseIntegerValue(String key, String value, int defaultValue) {
         try {
             return Integer.parseInt(value.trim());
@@ -300,11 +321,11 @@ public class AgentConfig {
         if (value != null) {
             return parseLongValue(key, value, defaultValue);
         }
-        
+
         logger.debug("Using default Long value for {}: {}", key, defaultValue);
         return defaultValue;
     }
-    
+
     private long parseLongValue(String key, String value, long defaultValue) {
         try {
             return Long.parseLong(value.trim());
@@ -319,7 +340,7 @@ public class AgentConfig {
         if (value != null) {
             return value.trim();
         }
-        
+
         logger.debug("Using default String value for {}: {}", key, defaultValue);
         return defaultValue;
     }
@@ -330,23 +351,25 @@ public class AgentConfig {
         if (value != null) {
             return parseBooleanValue(key, value, defaultValue);
         }
-        
+
         logger.debug("Using default Boolean value for {}: {}", key, defaultValue);
         return defaultValue;
     }
-    
+
     private boolean parseBooleanValue(String key, String value, boolean defaultValue) {
         String trimmedValue = value.trim().toLowerCase();
-        if ("true".equals(trimmedValue) || "1".equals(trimmedValue) || "yes".equals(trimmedValue) || "on".equals(trimmedValue)) {
+        if ("true".equals(trimmedValue) || "1".equals(trimmedValue) || "yes".equals(trimmedValue)
+                || "on".equals(trimmedValue)) {
             return true;
-        } else if ("false".equals(trimmedValue) || "0".equals(trimmedValue) || "no".equals(trimmedValue) || "off".equals(trimmedValue)) {
+        } else if ("false".equals(trimmedValue) || "0".equals(trimmedValue) || "no".equals(trimmedValue)
+                || "off".equals(trimmedValue)) {
             return false;
         } else {
             logger.warn("Invalid boolean value for {}: {}, using default: {}", key, value, defaultValue);
             return defaultValue;
         }
     }
-    
+
     /**
      * 公共配置获取方法 - 按照优先级顺序获取配置值
      * 优先级: 系统属性 -> 环境变量 -> 配置文件
@@ -356,14 +379,14 @@ public class AgentConfig {
      */
     private String getConfigValue(String key) {
         String value;
-        
+
         // 1. 首先检查系统属性
         value = System.getProperty(key);
         if (value != null && !value.trim().isEmpty()) {
             logger.debug("Using system property for {}: {}", key, value);
             return value;
         }
-        
+
         // 2. 检查环境变量（将点转换为下划线，并转为大写）
         String envKey = key.replace('.', '_').toUpperCase();
         value = System.getenv(envKey);
@@ -371,14 +394,14 @@ public class AgentConfig {
             logger.debug("Using environment variable for {} ({}): {}", key, envKey, value);
             return value;
         }
-        
+
         // 3. 检查配置文件
         value = properties.getProperty(key);
         if (value != null && !value.trim().isEmpty()) {
             logger.debug("Using config file for {}: {}", key, value);
             return value;
         }
-        
+
         // 所有来源都没有找到配置值
         return null;
     }

@@ -9,6 +9,9 @@ import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.UploadService;
 import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.client.upload.UploadListener;
+import com.cq.agent.config.AgentConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
+import com.cq.panel.common.dto.batch.TransferConfig;
 import lombok.Getter;
 import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
@@ -31,12 +34,13 @@ public class BatchTaskSchedulerManager {
     private final QuartzTaskScheduler quartzTaskScheduler;
 
     @Getter
-    private RetryAwareUploaderDecorator retryAwareUploader;  // 使用装饰者替代RetryManager
+    private RetryAwareUploaderDecorator retryAwareUploader; // 使用装饰者替代RetryManager
     private FileScanner fileScanner;
     @Getter
-    private UploadService agentUploader;  // 使用接口类型（支持装饰者）
+    private UploadService agentUploader; // 使用接口类型（支持装饰者）
     @Getter
     private ProgressReporter progressReporter;
+    private AgentConfig agentConfig;
 
     public BatchTaskSchedulerManager(ConfigFileManager configFileManager) throws SchedulerException {
         this.configFileManager = configFileManager;
@@ -64,6 +68,7 @@ public class BatchTaskSchedulerManager {
 
     /**
      * 设置P2P上传器（spec.md 4.6）
+     * 
      * @param agentUploader 上传服务实例（支持装饰者包装）
      */
     public void setAgentUploader(UploadService agentUploader) {
@@ -77,6 +82,11 @@ public class BatchTaskSchedulerManager {
     public void setProgressReporter(ProgressReporter progressReporter) {
         this.progressReporter = progressReporter;
         log.info("📊 已设置ProgressReporter");
+    }
+
+    public void setAgentConfig(AgentConfig agentConfig) {
+        this.agentConfig = agentConfig;
+        log.info("⚙️ 已设置AgentConfig");
     }
 
     // ==================== 任务生命周期管理 ====================
@@ -197,7 +207,7 @@ public class BatchTaskSchedulerManager {
      * - 不再进行任务级别的延迟重试
      *
      * @param taskId 任务ID
-     * @param error 错误信息
+     * @param error  错误信息
      */
     private void handleTaskFailure(Long taskId, String error) {
         log.error("❌ 任务执行失败（最终失败）: taskId={}, error={}", taskId, error);
@@ -292,56 +302,72 @@ public class BatchTaskSchedulerManager {
             return;
         }
 
-        log.info("📦 开始P2P传输{}个文件: taskId={}", scannedFiles.size(), taskId);
+        List<TargetAgentInfo> allTargets = config.getTargetAgents();
+        TransferConfig transferConfig = config.getTransferConfig();
+        String routingStrategy = transferConfig != null && transferConfig.getRoutingStrategy() != null
+                ? transferConfig.getRoutingStrategy()
+                : "BROADCAST";
 
+        TargetRouter router = new TargetRouter();
+
+        int totalSubtasks = 0;
         List<String> failedFiles = new java.util.ArrayList<>();
 
         for (ScannedFile scannedFile : scannedFiles) {
-            try {
-                log.debug("📤 准备传输文件: fileName={}, size={}bytes",
-                        scannedFile.getFileName(), scannedFile.getFileSize());
+            List<TargetAgentInfo> routedTargets = router.route(allTargets, transferConfig);
+            totalSubtasks += routedTargets.size();
 
-                String localFilePath = scannedFile.getAbsolutePath();
+            for (TargetAgentInfo targetAgent : routedTargets) {
+                try {
+                    log.debug("📤 准备传输文件: fileName={}, size={}bytes, target={}, strategy={}",
+                            scannedFile.getFileName(), scannedFile.getFileSize(),
+                            targetAgent.getAgentId(), routingStrategy);
 
-                String remoteTargetInfo = buildRemoteTargetInfo(config, scannedFile);
+                    String localFilePath = scannedFile.getAbsolutePath();
 
-                if (agentUploader instanceof RetryAwareUploaderDecorator uploader) {
-                    if (uploader.isFileAlreadyQueued(localFilePath, remoteTargetInfo)) {
-                        log.info("⏭️ 文件已在传输队列中，跳过: fileName={}", scannedFile.getFileName());
-                        continue;
+                    String remoteTargetInfo = buildRemoteTargetInfo(targetAgent, scannedFile);
+
+                    if (agentUploader instanceof RetryAwareUploaderDecorator uploader) {
+                        if (uploader.isFileAlreadyQueued(localFilePath, remoteTargetInfo)) {
+                            log.info("⏭️ 文件已在传输队列中，跳过: fileName={}, target={}",
+                                    scannedFile.getFileName(), targetAgent.getAgentId());
+                            continue;
+                        }
                     }
+
+                    UploadListener listener = new BatchUploadListener(
+                            taskId, scannedFile, config, targetAgent, progressReporter,
+                            agentConfig != null ? agentConfig.getUploadSuccessQueueDir() : null,
+                            agentConfig != null ? agentConfig.getUploadSendingQueueDir() : null);
+
+                    boolean uploadSubmitted = agentUploader.uploadFile(localFilePath, remoteTargetInfo, listener);
+
+                    if (!uploadSubmitted) {
+                        log.warn("⚠️  文件上传提交失败: fileName={}, target={}",
+                                scannedFile.getFileName(), targetAgent.getAgentId());
+                        failedFiles.add(scannedFile.getFileName() + "->" + targetAgent.getAgentId());
+                    } else {
+                        log.debug("✅ 文件上传已提交到队列: fileName={}, target={}",
+                                scannedFile.getFileName(), targetAgent.getAgentId());
+                    }
+
+                } catch (Exception e) {
+                    log.error("❌ 文件传输异常: fileName={}, target={}, error={}",
+                            scannedFile.getFileName(), targetAgent.getAgentId(), e.getMessage());
+                    failedFiles.add(scannedFile.getFileName() + "->" + targetAgent.getAgentId());
                 }
-
-                UploadListener listener = new BatchUploadListener(taskId, scannedFile, config, progressReporter);
-
-                boolean uploadSubmitted = agentUploader.uploadFile(localFilePath, remoteTargetInfo, listener);
-
-                if (!uploadSubmitted) {
-                    log.warn("⚠️  文件上传提交失败: fileName={}", scannedFile.getFileName());
-                    failedFiles.add(scannedFile.getFileName());
-                } else {
-                    log.debug("✅ 文件上传已提交到队列: fileName={}", scannedFile.getFileName());
-                }
-
-            } catch (Exception e) {
-                log.error("❌ 文件传输异常: fileName={}, error={}",
-                        scannedFile.getFileName(), e.getMessage());
-                failedFiles.add(scannedFile.getFileName());
-
-                // 单个文件失败继续处理其他文件，最后统一报告
             }
         }
 
-        // 如果有任何文件失败，记录日志但不抛出异常
-        // 失败的文件已经通过 moveToFailedQueue() 自动移入失败队列
-        // RetryManager 会定期扫描并重试这些文件
+        log.info("📦 P2P传输调度完成: {}个文件, strategy={}, 总子任务={}, taskId={}",
+                scannedFiles.size(), routingStrategy, totalSubtasks, taskId);
+
         if (!failedFiles.isEmpty()) {
-            log.warn("⚠️ 部分文件提交发送队列失败 ({}/{}): {}",
-                    failedFiles.size(), scannedFiles.size(),
+            log.warn("⚠️ 部分子任务提交发送队列失败 ({}/{}): {}",
+                    failedFiles.size(), totalSubtasks,
                     String.join(", ", failedFiles));
             log.info("ℹ️ 失败的文件将进入失败队列，等待 RetryManager 定时扫描和重试");
             if (agentUploader != null) {
-                // 使用具体类的方法（不在接口中的实现细节）
                 if (agentUploader instanceof AgentUploader uploader) {
                     log.info("ℹ️ 上传失败队列路径: {}", uploader.getFailedQueueDir());
                 }
@@ -356,20 +382,11 @@ public class BatchTaskSchedulerManager {
         return config.getTargetAgents() != null && !config.getTargetAgents().isEmpty();
     }
 
-    /**
-     * 构建remoteTargetInfo字符串（spec.md 4.6）
-     * 格式：ip:port@username:destFilePath
-     * 示例：192.168.1.100:7777@root:/remote/target/app.log
-     */
-    private String buildRemoteTargetInfo(AgentTaskConfig config, ScannedFile scannedFile) {
+    private String buildRemoteTargetInfo(TargetAgentInfo targetAgent, ScannedFile scannedFile) {
         try {
-            if (config.getTargetAgents() == null || config.getTargetAgents().isEmpty()) {
-                throw new IllegalArgumentException("目标Agent列表为空");
-            }
-            com.cq.panel.common.dto.batch.TargetAgentInfo firstAgent = config.getTargetAgents().getFirst();
-            String targetAgentName = firstAgent.getAgentName();
+            String targetAgentName = targetAgent.getAgentName();
             if (targetAgentName == null || targetAgentName.isEmpty()) {
-                targetAgentName = firstAgent.getAgentId();
+                targetAgentName = targetAgent.getAgentId();
             }
 
             String[] parts = targetAgentName.split("@");
@@ -380,10 +397,9 @@ public class BatchTaskSchedulerManager {
             String username = parts[0];
             String ipPort = parts[1];
 
-            String targetDir = firstAgent.getTargetDir();
+            String targetDir = targetAgent.getTargetDir();
             String destPath = targetDir + "/" + scannedFile.getFileName();
 
-            // 组装remoteTargetInfo
             String remoteTargetInfo = ipPort + "@" + username + ":" + destPath;
 
             log.debug("🎯 构建目标路径: {}", remoteTargetInfo);
@@ -396,4 +412,3 @@ public class BatchTaskSchedulerManager {
     }
 
 }
-

@@ -103,6 +103,40 @@ public class TransferMetaStore<T extends TaskInfo> {
         }
     }
 
+    public void moveToSuccessQueue(String transferId, Path successQueueDir) throws IOException {
+        if (successQueueDir == null) {
+            logger.debug("成功队列目录未配置，跳过移动: transferId={}", transferId);
+            return;
+        }
+
+        if (!Files.exists(successQueueDir)) {
+            try {
+                Files.createDirectories(successQueueDir);
+                logger.info("已创建成功队列目录: dir={}", successQueueDir.toAbsolutePath());
+            } catch (IOException e) {
+                logger.error("创建成功队列目录失败: dir={}, error={}", successQueueDir, e.getMessage());
+                return;
+            }
+        }
+
+        Path latestFile = findLatestMetaFile(transferId);
+        if (latestFile == null || !Files.exists(latestFile)) {
+            logger.debug("未找到任务元数据文件，无需移动: transferId={}", transferId);
+            return;
+        }
+
+        Path targetFile = successQueueDir.resolve(latestFile.getFileName());
+
+        try {
+            Files.move(latestFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
+            logger.info("已将成功任务移动到成功队列: source={}, target={}", latestFile, targetFile);
+        } catch (IOException e) {
+            logger.error("移动成功任务文件到成功队列失败: source={}, target={}, error={}",
+                    latestFile, targetFile, e.getMessage());
+            throw e;
+        }
+    }
+
     public List<T> recoverPendingTasks() {
         List<T> pendingTasks = new ArrayList<>();
         

@@ -47,8 +47,8 @@ public class ProgressReceiverController {
                 return ApiResponse.badRequest("缺少必填字段: subtaskId");
             }
 
-            if (dto.getTransferredBytes() == null || dto.getTotalBytes() == null) {
-                return ApiResponse.badRequest("缺少必填字段: transferredBytes, totalBytes");
+            if (dto.getTransferredBytes() == null) {
+                return ApiResponse.badRequest("缺少必填字段: transferredBytes");
             }
 
             Long timestamp = dto.getTimestamp() != null ? dto.getTimestamp() : System.currentTimeMillis();
@@ -63,6 +63,13 @@ public class ProgressReceiverController {
                     dto.getTotalChunks(),
                     dto.getTransferredBytes(),
                     dto.getSpeedBytesPerSec());
+
+            if (dto.getTransferId() != null) {
+                BatchTransferSubtask update = new BatchTransferSubtask();
+                update.setId(dto.getSubtaskId());
+                update.setTransferId(dto.getTransferId());
+                progressService.updateSubTaskStatus(update);
+            }
 
             log.debug("✅ 子任务进度更新: subtaskId={}, {}/{} bytes",
                     dto.getSubtaskId(), dto.getTransferredBytes(), dto.getTotalBytes());
@@ -122,7 +129,22 @@ public class ProgressReceiverController {
                 return ApiResponse.badRequest("缺少必填字段: subtaskId");
             }
 
-            progressService.markCompleted(dto.getSubtaskId(), dto.getTargetPath());
+            BatchTransferSubtask subtask = new BatchTransferSubtask();
+            subtask.setId(dto.getSubtaskId());
+            subtask.setStatus("COMPLETED");
+            subtask.setTransferId(dto.getTransferId());
+            subtask.setTransferredChunks(dto.getTransferredChunks());
+            subtask.setTotalChunks(dto.getTotalChunks());
+            subtask.setTransferredBytes(dto.getTransferredBytes());
+            subtask.setSpeedBytesPerSec(dto.getSpeedBytesPerSec());
+            subtask.setStartedAt(dto.getStartedAt() != null ? parseDateTime(dto.getStartedAt()) : null);
+            subtask.setCompletedAt(dto.getCompletedAt() != null ? parseDateTime(dto.getCompletedAt()) : new Date());
+            subtask.setDurationMs(dto.getDurationMs());
+            if (dto.getTargetPath() != null) {
+                subtask.setTargetPath(dto.getTargetPath());
+            }
+
+            progressService.updateSubTaskStatus(subtask);
 
             log.info("✅ 子任务完成: subtaskId={}, path={}", dto.getSubtaskId(), dto.getTargetPath());
             return ApiResponse.success(new SubTaskStatusResponse("COMPLETED"));
@@ -140,11 +162,20 @@ public class ProgressReceiverController {
                 return ApiResponse.badRequest("缺少必填字段: subtaskId");
             }
 
-            progressService.markFailed(
-                    dto.getSubtaskId(),
-                    dto.getErrorCode(),
-                    dto.getErrorMessage(),
-                    dto.getErrorStackTrace());
+            BatchTransferSubtask subtask = new BatchTransferSubtask();
+            subtask.setId(dto.getSubtaskId());
+            subtask.setStatus("FAILED");
+            subtask.setErrorCode(dto.getErrorCode());
+            subtask.setErrorMessage(dto.getErrorMessage());
+            subtask.setErrorStackTrace(dto.getErrorStackTrace());
+            subtask.setTransferredChunks(dto.getTransferredChunks());
+            subtask.setTotalChunks(dto.getTotalChunks());
+            subtask.setTransferredBytes(dto.getTransferredBytes());
+            subtask.setStartedAt(dto.getStartedAt() != null ? parseDateTime(dto.getStartedAt()) : null);
+            subtask.setCompletedAt(new Date());
+            subtask.setDurationMs(dto.getDurationMs());
+
+            progressService.updateSubTaskStatus(subtask);
 
             log.warn("⚠️  子任务失败: subtaskId={}, error=[{}]: {}",
                     dto.getSubtaskId(), dto.getErrorCode(), dto.getErrorMessage());
@@ -177,8 +208,12 @@ public class ProgressReceiverController {
     private BatchTransferSubtask convertToSubtask(SubTaskDTO dto) {
         BatchTransferSubtask subtask = new BatchTransferSubtask();
 
-        if (dto.getId() != null)
+        if (dto.getId() != null) {
             subtask.setId(dto.getId());
+        } else if (dto.getSubtaskId() != null) {
+            subtask.setId(dto.getSubtaskId());
+        }
+
         if (dto.getTaskId() != null)
             subtask.setTaskId(dto.getTaskId());
 

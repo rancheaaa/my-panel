@@ -7,7 +7,6 @@ import java.io.Serializable;
 
 /**
  * 传输配置 (transferConfig)
- * 
  * 细分为4个子类别：
  * 1. 基础设置 - 传输模式、目录结构
  * 2. 路由控制 - 策略选择与详细配置
@@ -48,7 +47,6 @@ public class TransferConfig implements Serializable {
 
     /**
      * 路由策略详细配置 (JSON格式)
-     * 
      * 示例：
      * - REGION_BASED: {"regionMapping": {"region-a": ["agent-001","agent-002"],
      * "region-b": ["agent-003"]}}

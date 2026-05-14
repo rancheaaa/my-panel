@@ -39,11 +39,13 @@ public class AgentApplication {
             BatchTaskSchedulerManager taskSchedulerManager = initializeTaskScheduler(configFileManager);
 
             RetryAwareUploaderDecorator retryAwareUploader = initializeUploadDownloadServices(config);
-            ConfigChangeListener configChangeListener = setupConfigChangeListener(configFileManager, taskSchedulerManager, retryAwareUploader);
-            
-            connectComponentsToScheduler(config, taskSchedulerManager, retryAwareUploader, configFileManager, configChangeListener);
+            ConfigChangeListener configChangeListener = setupConfigChangeListener(configFileManager,
+                    taskSchedulerManager, retryAwareUploader);
+
+            connectComponentsToScheduler(config, taskSchedulerManager, retryAwareUploader, configFileManager,
+                    configChangeListener);
             taskSchedulerManager.startAllRunningTasks();
-            
+
             // Initialize file-level retry scheduler with independent Quartz instance
             FileRetryScheduler fileRetryScheduler;
             try {
@@ -68,10 +70,10 @@ public class AgentApplication {
         AgentConfig config = new AgentConfig();
         logger.info("Configuration loaded: {}", config);
         logger.info("Agent ID: {}", config.getAgentId());
-        
+
         String osName = System.getProperty("os.name");
         logger.info("Running on {} system", osName);
-        
+
         return config;
     }
 
@@ -103,8 +105,7 @@ public class AgentApplication {
         AgentDownloader coreDownloader = new AgentDownloader(config);
         coreDownloader.init();
 
-        RetryAwareUploaderDecorator retryAwareUploader =
-                new RetryAwareUploaderDecorator(coreUploader);
+        RetryAwareUploaderDecorator retryAwareUploader = new RetryAwareUploaderDecorator(coreUploader);
         retryAwareUploader.initWithConfig(config);
 
         logger.info("Upload/Download services initialized with decorator chain: Core → ListenerAware → RetryAware");
@@ -113,8 +114,8 @@ public class AgentApplication {
     }
 
     private static ConfigChangeListener setupConfigChangeListener(ConfigFileManager configFileManager,
-                                                                     BatchTaskSchedulerManager taskSchedulerManager,
-                                                                     RetryAwareUploaderDecorator retryAwareUploader) {
+            BatchTaskSchedulerManager taskSchedulerManager,
+            RetryAwareUploaderDecorator retryAwareUploader) {
         VersionManager versionManager = new VersionManager();
         ConfigChangeListener configChangeListener = new ConfigChangeListener(configFileManager, versionManager);
 
@@ -146,12 +147,13 @@ public class AgentApplication {
     }
 
     private static void connectComponentsToScheduler(AgentConfig config,
-                                                      BatchTaskSchedulerManager taskSchedulerManager,
-                                                      RetryAwareUploaderDecorator retryAwareUploader,
-                                                      ConfigFileManager configFileManager,
-                                                      ConfigChangeListener configChangeListener) {
+            BatchTaskSchedulerManager taskSchedulerManager,
+            RetryAwareUploaderDecorator retryAwareUploader,
+            ConfigFileManager configFileManager,
+            ConfigChangeListener configChangeListener) {
         taskSchedulerManager.setRetryAwareUploader(retryAwareUploader);
         taskSchedulerManager.setAgentUploader(retryAwareUploader);
+        taskSchedulerManager.setAgentConfig(config);
 
         FileScanner fileScanner = new FileScanner();
         taskSchedulerManager.setFileScanner(fileScanner);
@@ -161,29 +163,28 @@ public class AgentApplication {
         retryAwareUploader.setGlobalProgressReporter(progressReporter);
 
         FallbackPersistenceService fallbackPersistenceService = new FallbackPersistenceService(
-            config.getFileBaseDirectory() + "transfers/progress-fallback"
-        );
-        
+                config.getProgressFallbackDir());
+
         // 设置ProgressReporter到FallbackPersistenceService，用于自动补报
         fallbackPersistenceService.setProgressReporter(progressReporter);
-        
+
         // 配置自动补报参数（30秒扫描一次，每次处理10个，每个事件最多重试3次）
         fallbackPersistenceService.configureAutoRetry(30, 10);
-        
+
         progressReporter.setFallbackHandler(event -> {
             try {
                 fallbackPersistenceService.persist(event);
                 logger.info("🔄 进度事件已回退到本地存储: subtaskId={}, status={}",
-                    event.getSubtaskId(), event.getStatus());
+                        event.getSubtaskId(), event.getStatus());
             } catch (Exception e) {
                 logger.error("❌ 本地持久化失败: subtaskId={}, error={}", event.getSubtaskId(), e.getMessage());
             }
         });
-        
+
         // 启动定时自动补报任务（网络恢复后自动重试）
         fallbackPersistenceService.startAutoRetry();
         logger.info("✅ FallbackPersistenceService已集成并启动自动补报: storageDir={}",
-            config.getFileBaseDirectory() + "/progress-fallback");
+                config.getProgressFallbackDir());
 
         configChangeListener.onCronChange(taskId -> {
             AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
@@ -195,16 +196,16 @@ public class AgentApplication {
     }
 
     private static void startServerAndRegister(HttpServer server,
-                                                AgentConfig config,
-                                                BatchTaskSchedulerManager taskSchedulerManager,
-                                                FileRetryScheduler fileRetryScheduler) {
+            AgentConfig config,
+            BatchTaskSchedulerManager taskSchedulerManager,
+            FileRetryScheduler fileRetryScheduler) {
         AgentRegistryService registryService = new AgentRegistryService(config);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown signal received");
             registryService.stop();
-            taskSchedulerManager.shutdown();      // Close task scheduler
-            fileRetryScheduler.shutdown();        // Close file retry scheduler
+            taskSchedulerManager.shutdown(); // Close task scheduler
+            fileRetryScheduler.shutdown(); // Close file retry scheduler
             server.stop();
         }));
 

@@ -2,6 +2,7 @@ package com.cq.agent.batch.scheduler;
 
 import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.TransferConfig;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.report.SubTaskEvent;
@@ -25,11 +26,11 @@ import java.util.concurrent.ThreadLocalRandom;
  * 2. 桥接AgentUploader事件到进度上报（ProgressReporter）
  * 3. 在onComplete回调中执行传输后操作（postTransferAction）
  * 使用的Proxy接口：
- * - POST /api/batch/subtask/create    → 子任务创建（QUEUED状态）
- * - POST /api/batch/subtask/progress  → 传输进度上报（SENDING状态，分块级进度）
- * - POST /api/batch/subtask/complete  → 传输完成上报（COMPLETED状态）
- * - POST /api/batch/subtask/failed    → 传输失败上报（FAILED状态）
- * - POST /api/batch/subtask/retrying  → 重试状态上报（RETRYING状态）
+ * - POST /api/batch/subtask/create → 子任务创建（QUEUED状态）
+ * - POST /api/batch/subtask/progress → 传输进度上报（SENDING状态，分块级进度）
+ * - POST /api/batch/subtask/complete → 传输完成上报（COMPLETED状态）
+ * - POST /api/batch/subtask/failed → 传输失败上报（FAILED状态）
+ * - POST /api/batch/subtask/retrying → 重试状态上报（RETRYING状态）
  */
 public class BatchUploadListener implements UploadListener {
 
@@ -37,17 +38,21 @@ public class BatchUploadListener implements UploadListener {
 
     /**
      * -- GETTER --
-     *  获取任务ID
+     * 获取任务ID
      */
     @Getter
     private Long taskId;
     private final ScannedFile scannedFile;
     private final AgentTaskConfig config;
+    private final TargetAgentInfo targetAgent;
     private final ProgressReporter progressReporter;
+    private final String successQueueDir;
+    private final String sendingQueueDir;
 
-    /** 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
+    /**
+     * 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
      * -- GETTER --
-     *  获取子任务ID
+     * 获取子任务ID
      */
     @Getter
     private Long subtaskId;
@@ -76,32 +81,48 @@ public class BatchUploadListener implements UploadListener {
     /** 传输开始时间戳（毫秒） */
     private Long transferStartTime = null;
 
+    /** 传输ID（从UploadTask获取） */
+    private String currentTransferId = null;
+
     /**
      * 有参构造函数 - 正常创建新任务时使用
+     * 
+     * @param taskId           任务ID
+     * @param scannedFile      扫描到的文件
+     * @param config           任务配置
+     * @param targetAgent      目标Agent信息（一个源文件发给一个目标Agent对应一个子任务）
+     * @param progressReporter 进度上报器
      */
     public BatchUploadListener(Long taskId, ScannedFile scannedFile,
-            AgentTaskConfig config, ProgressReporter progressReporter) {
+            AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
+            String successQueueDir, String sendingQueueDir) {
         this.taskId = taskId;
         this.scannedFile = scannedFile;
         this.config = config;
+        this.targetAgent = targetAgent;
         this.progressReporter = progressReporter;
+        this.successQueueDir = successQueueDir;
+        this.sendingQueueDir = sendingQueueDir;
 
         // 生成全局唯一的subtaskId（避免重启后冲突）
-        this.subtaskId = generateUniqueSubtaskId(taskId, scannedFile.getFileName());
+        this.subtaskId = generateUniqueSubtaskId(taskId, scannedFile.getFileName(),
+                targetAgent != null ? targetAgent.getAgentId() : null);
 
         // 立即创建子任务到Proxy数据库
         createSubTaskOnProxy();
-        log.info("✅ 新建上传监听器: subtaskId={}, file={}", subtaskId, scannedFile.getFileName());
+        log.info("✅ 新建上传监听器: subtaskId={}, file={}, target={}",
+                subtaskId, scannedFile.getFileName(),
+                targetAgent != null ? targetAgent.getAgentId() : "null");
     }
 
     /**
      * 生成全局唯一的子任务ID
      * 使用taskId + fileName哈希 + 时间戳 + 随机数确保唯一性
      */
-    private static Long generateUniqueSubtaskId(Long taskId, String fileName) {
-        long hashPart = Objects.hash(taskId, fileName) & 0xFFFFFFFFL; // 取低32位
-        long timePart = (System.currentTimeMillis() / 1000) << 32; // 时间戳（秒级）左移32位
-        long randomPart = ThreadLocalRandom.current().nextInt(0, 10000); // 随机数0-9999
+    private static Long generateUniqueSubtaskId(Long taskId, String fileName, String targetAgentId) {
+        long hashPart = Objects.hash(taskId, fileName, targetAgentId) & 0xFFFFFFFFL;
+        long timePart = (System.currentTimeMillis() / 1000) << 32;
+        long randomPart = ThreadLocalRandom.current().nextInt(0, 10000);
 
         return timePart | hashPart | randomPart;
     }
@@ -126,12 +147,15 @@ public class BatchUploadListener implements UploadListener {
             if (config != null) {
                 event.setSourceAgentId(config.getSourceAgentId());
                 event.setSourceAgentName(config.getSourceAgentName());
-                event.setTargetAgentId(getFirstTargetAgentId());
-                event.setTargetAgentName(getFirstTargetAgentName());
+            }
+            if (targetAgent != null) {
+                event.setTargetAgentId(targetAgent.getAgentId());
+                event.setTargetAgentName(targetAgent.getAgentName());
             }
 
             // 文件信息
             event.setSourcePath(scannedFile.getAbsolutePath());
+            event.setTargetPath(computeTargetPath());
             event.setFileName(scannedFile.getFileName());
             event.setFileSizeBytes(scannedFile.getFileSize());
             event.setFileLastModified(new Date(scannedFile.getLastModified()));
@@ -161,6 +185,10 @@ public class BatchUploadListener implements UploadListener {
 
         if (subtaskId != null && task.getSubtaskId() == null) {
             task.setSubtaskId(subtaskId);
+        }
+
+        if (task.getTransferId() != null) {
+            this.currentTransferId = task.getTransferId();
         }
 
         if (scannedFile != null) {
@@ -206,9 +234,12 @@ public class BatchUploadListener implements UploadListener {
             event.setTransferredChunks(uploadedChunks);
             event.setTotalChunks(totalChunks);
             event.setTransferredBytes((long) (scannedFile.getFileSize() * progress));
+            event.setTotalBytes(scannedFile.getFileSize());
             event.setSpeedBytesPerSec(calculateSpeedBytesPerSec(progress));
+            if (currentTransferId != null) {
+                event.setTransferId(currentTransferId);
+            }
 
-            // 使用POST /api/batch/subtask/progress接口
             progressReporter.reportProgress(event);
         }
     }
@@ -231,6 +262,7 @@ public class BatchUploadListener implements UploadListener {
         }
 
         executePostTransferAction();
+        moveControlFileToSuccessQueue();
     }
 
     @Override
@@ -265,13 +297,16 @@ public class BatchUploadListener implements UploadListener {
         if (config != null) {
             event.setSourceAgentId(config.getSourceAgentId());
             event.setSourceAgentName(config.getSourceAgentName());
-            event.setTargetAgentId(getFirstTargetAgentId());
-            event.setTargetAgentName(getFirstTargetAgentName());
+        }
+        if (targetAgent != null) {
+            event.setTargetAgentId(targetAgent.getAgentId());
+            event.setTargetAgentName(targetAgent.getAgentName());
         }
 
         // 文件信息
         if (scannedFile != null) {
             event.setSourcePath(scannedFile.getAbsolutePath());
+            event.setTargetPath(computeTargetPath());
             event.setFileName(scannedFile.getFileName());
             event.setFileSizeBytes(scannedFile.getFileSize());
             event.setFileLastModified(new Date(scannedFile.getLastModified()));
@@ -301,6 +336,7 @@ public class BatchUploadListener implements UploadListener {
         event.setTransferredChunks(finalChunks);
         event.setTotalChunks(finalChunks);
         event.setTransferredBytes(scannedFile.getFileSize());
+        event.setTotalBytes(scannedFile.getFileSize());
         event.setSpeedBytesPerSec(null);
 
         long startTime = transferStartTime != null ? transferStartTime : System.currentTimeMillis();
@@ -360,7 +396,8 @@ public class BatchUploadListener implements UploadListener {
         }
 
         int intervalMin = config.getRetryConfig().getIntervalMin() != null
-                ? config.getRetryConfig().getIntervalMin() : 30;
+                ? config.getRetryConfig().getIntervalMin()
+                : 30;
         String backoffType = config.getRetryConfig().getBackoffType();
 
         long baseIntervalMs = intervalMin * 60_000L;
@@ -410,24 +447,65 @@ public class BatchUploadListener implements UploadListener {
         return speedBytesPerSec > 0 ? speedBytesPerSec : null;
     }
 
-    /**
-     * 获取第一个目标Agent ID
-     */
-    private String getFirstTargetAgentId() {
-        if (config == null || config.getTargetAgents() == null
-                || config.getTargetAgents().isEmpty())
+    private String computeTargetPath() {
+        if (targetAgent == null || scannedFile == null) {
             return null;
-        return config.getTargetAgents().getFirst().getAgentId();
+        }
+        String targetDir = targetAgent.getTargetDir();
+        if (targetDir == null) {
+            return null;
+        }
+        String sourceDir = config != null ? config.getSourceDir() : null;
+        String relativePath;
+        if (sourceDir != null && scannedFile.getAbsolutePath().startsWith(sourceDir)) {
+            relativePath = scannedFile.getAbsolutePath().substring(sourceDir.length());
+            if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
+                relativePath = relativePath.substring(1);
+            }
+        } else {
+            relativePath = scannedFile.getFileName();
+        }
+        String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
+        return targetDir + separator + relativePath;
     }
 
     /**
-     * 获取第一个目标Agent名称
+     * 传输成功后，将uploadSendingQueue目录下的UPLOAD_SUCCESS-upload-*.json控制文件
+     * 移动到uploadSuccessQueue目录下（如果目录不存在则新建）
      */
-    private String getFirstTargetAgentName() {
-        if (config == null || config.getTargetAgents() == null
-                || config.getTargetAgents().isEmpty())
-            return null;
-        return config.getTargetAgents().getFirst().getAgentName();
+    private void moveControlFileToSuccessQueue() {
+        if (sendingQueueDir == null || sendingQueueDir.isBlank()
+                || successQueueDir == null || successQueueDir.isBlank()) {
+            log.debug("sendingQueueDir或successQueueDir未配置，跳过控制文件移动");
+            return;
+        }
+
+        try {
+            Path sendingDir = Paths.get(sendingQueueDir);
+            Path successDir = Paths.get(successQueueDir);
+
+            if (!Files.exists(sendingDir)) {
+                log.debug("上传发送队列目录不存在，跳过控制文件移动: {}", sendingQueueDir);
+                return;
+            }
+
+            if (!Files.exists(successDir)) {
+                Files.createDirectories(successDir);
+                log.info("📁 创建上传成功队列目录: {}", successQueueDir);
+            }
+
+            // 查找UPLOAD_SUCCESS-upload-*.json控制文件并移动
+            try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(sendingDir,
+                    "UPLOAD_SUCCESS-upload-*.json")) {
+                for (Path controlFile : stream) {
+                    Path targetPath = successDir.resolve(controlFile.getFileName());
+                    Files.move(controlFile, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    log.info("✅ 控制文件已移动到成功队列: {} -> {}", controlFile, targetPath);
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ 移动控制文件到成功队列失败: error={}", e.getMessage());
+        }
     }
 
     /**

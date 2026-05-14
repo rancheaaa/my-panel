@@ -42,6 +42,7 @@ public class SubTaskEvent {
     private Integer transferredChunks;
     private Integer totalChunks;
     private Long transferredBytes;
+    private Long totalBytes;
     private Long speedBytesPerSec;
 
     /** 时间信息 */

@@ -60,7 +60,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
     /** 委托对象（必须实现 UploadService 接口） */
     @Getter
     private final UploadService delegate;
-    
+
     /** 全局ProgressReporter实例 */
     @Getter
     private ProgressReporter globalProgressReporter;
@@ -84,6 +84,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
     /**
      * 构造函数（使用默认重试配置）
+     * 
      * @param delegate 被装饰的上传服务实例
      */
     public RetryAwareUploaderDecorator(UploadService delegate) {
@@ -143,7 +144,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
             }
 
             for (AgentTaskConfig taskConfig : allConfigs) {
-                if(taskConfig.getTaskId() == id) {
+                if (taskConfig.getTaskId() == id) {
                     return taskConfig;
                 }
             }
@@ -175,7 +176,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 if (retryConfig != null && retryConfig.isEnabled()) {
                     registerTaskConfig(taskConfig.getTaskId(), taskConfig);
                     logger.info("✅ 从持久化配置加载重试参数: taskId={}, maxRetries={}, intervalMin={}min",
-                        taskConfig.getTaskId(), retryConfig.getMaxRetryCount(), retryConfig.getIntervalMin());
+                            taskConfig.getTaskId(), retryConfig.getMaxRetryCount(), retryConfig.getIntervalMin());
                     return;
                 }
             }
@@ -193,7 +194,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
     public void initRetryDependencies(TransferMetaStore<UploadTask> metaStore, Path failQueueDir) {
         this.uploadMetaStore = metaStore;
         this.uploadFailQueueDir = failQueueDir;
-        
+
         logger.info("✅ 重试依赖初始化完成: failQueueDir={}", failQueueDir);
     }
 
@@ -303,7 +304,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
         boolean isReached = currentTimeMs >= nextRetryTimeMs;
 
         logger.debug("重试时间检查: transferId={}, currentRetries={}, backoffType={}, " +
-                        "intervalMin={}min, nextRetryTime={}, currentTime={}, isReached={}",
+                "intervalMin={}min, nextRetryTime={}, currentTime={}, isReached={}",
                 task.getTransferId(), currentRetries, backoffType,
                 intervalMin, LocalDateTime.ofInstant(
                         java.time.Instant.ofEpochMilli(nextRetryTimeMs),
@@ -357,7 +358,6 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
     }
 
-
     /**
      * 扫描上传失败队列并重试（Quartz Job 调用）
      */
@@ -391,12 +391,12 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     }
                 } catch (Exception e) {
                     logger.error("❌ 处理失败任务异常: transferId={}, error={}",
-                        task.getTransferId(), e.getMessage());
+                            task.getTransferId(), e.getMessage());
                 }
             }
 
             logger.info("📊 上传失败队列扫描完成: 总数={}, 重试={}, 最终失败={}",
-                failedTasks.size(), retriedCount, finalFailureCount);
+                    failedTasks.size(), retriedCount, finalFailureCount);
 
         } catch (Exception e) {
             logger.error("❌ 扫描上传失败队列异常: {}", e.getMessage(), e);
@@ -425,7 +425,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
         boolean shouldRetry = currentRetries < maxAllowed;
 
         logger.debug("🔍 重试检查: transferId={}, current={}, max={}, shouldRetry={}",
-            task.getTransferId(), currentRetries, maxAllowed, shouldRetry);
+                task.getTransferId(), currentRetries, maxAllowed, shouldRetry);
 
         return shouldRetry;
     }
@@ -441,13 +441,13 @@ public class RetryAwareUploaderDecorator implements UploadService {
             int newRetryCount = task.getRetryCount();
 
             logger.info("🔄 准备重试: transferId={}, file={}, retryCount={}/{}, status={}",
-                transferId, task.getLocalFilePath(),
-                newRetryCount, getMaxRetriesForTask(task),
-                task.getStatus());
+                    transferId, task.getLocalFilePath(),
+                    newRetryCount, getMaxRetriesForTask(task),
+                    task.getStatus());
 
             task.setStatus(UploadTaskStatus.PREPARED);
             task.setExceptionDesc(null);
-            
+
             // 更新时间戳
             task.updateTimestamp();
 
@@ -455,7 +455,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 uploadMetaStore.saveTask(task);
 
                 logger.info("💾 已更新任务状态: transferId={}, retryCount={}, 状态已重置为PREPARED",
-                    transferId, newRetryCount);
+                        transferId, newRetryCount);
             }
 
             String localFilePath = task.getLocalFilePath();
@@ -469,7 +469,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
             }
 
             logger.info("🚀 重新提交上传任务: transferId={}, localPath={}, remoteTarget={}",
-                transferId, localFilePath, remoteTargetInfo);
+                    transferId, localFilePath, remoteTargetInfo);
 
             boolean submitted = delegate.uploadFile(localFilePath, remoteTargetInfo, retryListener);
 
@@ -482,7 +482,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
         } catch (Exception e) {
             logger.error("❌ 重试失败文件异常: transferId={}, error={}",
-                task.getTransferId(), e.getMessage());
+                    task.getTransferId(), e.getMessage());
         }
     }
 
@@ -540,15 +540,46 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 }
             }
 
-            BatchUploadListener retryListener = new BatchUploadListener(taskId, restoredFile, agentTaskConfig, getGlobalProgressReporter());
+            BatchUploadListener retryListener = new BatchUploadListener(
+                    taskId, restoredFile, agentTaskConfig,
+                    findTargetAgentForTask(agentTaskConfig, task),
+                    getGlobalProgressReporter(),
+                    getAgentConfig() != null ? getAgentConfig().getUploadSuccessQueueDir() : null,
+                    getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null);
             logger.info("✅ 创建重试监听器(恢复模式): transferId={}, file={}",
-                task.getTransferId(), fileName);
+                    task.getTransferId(), fileName);
             return retryListener;
 
         } catch (Exception e) {
             logger.warn("⚠️ 创建BatchUploadListener失败: error={}", e.getMessage());
             throw new IllegalStateException("创建BatchUploadListener失败");
         }
+    }
+
+    private com.cq.panel.common.dto.batch.TargetAgentInfo findTargetAgentForTask(
+            AgentTaskConfig config, UploadTask task) {
+        if (config == null || config.getTargetAgents() == null || config.getTargetAgents().isEmpty()) {
+            return null;
+        }
+        String remoteAgentApiUrl = task.getRemoteAgentApiUrl();
+        if (remoteAgentApiUrl != null) {
+            try {
+                java.net.URI uri = new java.net.URI(remoteAgentApiUrl);
+                String host = uri.getHost();
+                int port = uri.getPort();
+                String ipPort = port > 0 ? host + ":" + port : host;
+                String username = task.getRemoteAgentUsername() != null ? task.getRemoteAgentUsername() : "root";
+                String reconstructedName = username + "@" + ipPort;
+                for (com.cq.panel.common.dto.batch.TargetAgentInfo agent : config.getTargetAgents()) {
+                    if (reconstructedName.equals(agent.getAgentName())) {
+                        return agent;
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("无法从remoteAgentApiUrl匹配目标Agent，使用第一个: {}", e.getMessage());
+            }
+        }
+        return config.getTargetAgents().getFirst();
     }
 
     /**
@@ -559,11 +590,11 @@ public class RetryAwareUploaderDecorator implements UploadService {
             String transferId = task.getTransferId();
 
             logger.error("❌ 达到最大重试次数，标记为最终失败: transferId={}, file={}, retryCount={}/{}",
-                transferId, task.getLocalFilePath(),
-                task.getRetryCount(), getMaxRetriesForTask(task));
+                    transferId, task.getLocalFilePath(),
+                    task.getRetryCount(), getMaxRetriesForTask(task));
 
             task.setStatus(UploadTaskStatus.FAILED);
-            
+
             // 更新时间戳
             task.updateTimestamp();
 
@@ -578,7 +609,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
         } catch (Exception e) {
             logger.error("❌ 标记最终失败异常: transferId={}, error={}",
-                task.getTransferId(), e.getMessage());
+                    task.getTransferId(), e.getMessage());
         }
     }
 
@@ -600,14 +631,14 @@ public class RetryAwareUploaderDecorator implements UploadService {
         taskConfigMap.put(taskId, config);
         if (config.getRetryConfig() != null && config.getRetryConfig().isEnabled()) {
             logger.info("✅ 注册任务重试配置(已应用): taskId={}, maxRetries={}次, intervalMin={}min, backoff={}, enabled={}",
-                taskId,
-                config.getRetryConfig().getMaxRetryCount(),
-                config.getRetryConfig().getIntervalMin(),
-                config.getRetryConfig().getBackoffType(),
-                config.getRetryConfig().isEnabled());
+                    taskId,
+                    config.getRetryConfig().getMaxRetryCount(),
+                    config.getRetryConfig().getIntervalMin(),
+                    config.getRetryConfig().getBackoffType(),
+                    config.getRetryConfig().isEnabled());
         } else {
             logger.info("✅ 注册任务配置(未启用重试): taskId={}, enabled={}",
-                taskId, config.getRetryConfig() != null ? config.getRetryConfig().isEnabled() : "null");
+                    taskId, config.getRetryConfig() != null ? config.getRetryConfig().isEnabled() : "null");
         }
     }
 
@@ -622,8 +653,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
     public void setGlobalProgressReporter(ProgressReporter progressReporter) {
         this.globalProgressReporter = progressReporter;
-        logger.info("✅ 已设置全局ProgressReporter: {}", 
-            progressReporter != null ? "已配置" : "null");
+        logger.info("✅ 已设置全局ProgressReporter: {}",
+                progressReporter != null ? "已配置" : "null");
     }
 
     private AgentTaskConfig findTaskConfigForUpload(long taskId) {
@@ -635,7 +666,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
         if (config != null && config.getRetryConfig() != null) {
             return config.getRetryConfig().getMaxRetryCount();
         }
-        return 50;  // 默认值
+        return 50; // 默认值
     }
 
     public boolean isFileAlreadyQueued(String localFilePath, String remoteTargetInfo) {

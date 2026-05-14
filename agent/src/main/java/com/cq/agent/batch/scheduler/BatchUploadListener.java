@@ -38,9 +38,9 @@ public class BatchUploadListener implements UploadListener {
      */
     @Getter
     private Long taskId;
-    private ScannedFile scannedFile;
-    private AgentTaskConfig config;
-    private ProgressReporter progressReporter;
+    private final ScannedFile scannedFile;
+    private final AgentTaskConfig config;
+    private final ProgressReporter progressReporter;
 
     /** 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
      * -- GETTER --
@@ -48,13 +48,6 @@ public class BatchUploadListener implements UploadListener {
      */
     @Getter
     private Long subtaskId;
-
-    /** 是否为恢复模式（从JSON反序列化）
-     * -- GETTER --
-     *  检查是否为恢复模式
-     */
-    @Getter
-    private boolean restored = false;
 
     /**
      * 获取文件名（从scannedFile获取）
@@ -89,7 +82,6 @@ public class BatchUploadListener implements UploadListener {
 
         // 生成全局唯一的subtaskId（避免重启后冲突）
         this.subtaskId = generateUniqueSubtaskId(taskId, scannedFile.getFileName());
-        this.restored = false;
 
         // 立即创建子任务到Proxy数据库
         createSubTaskOnProxy();
@@ -113,11 +105,6 @@ public class BatchUploadListener implements UploadListener {
      * 仅在非恢复模式下执行
      */
     private void createSubTaskOnProxy() {
-        if (restored) {
-            log.debug("恢复模式，跳过子任务创建");
-            return;
-        }
-
         if (progressReporter == null) {
             log.debug("ProgressReporter未设置，跳过子任务创建");
             return;
@@ -156,6 +143,39 @@ public class BatchUploadListener implements UploadListener {
     }
 
     @Override
+    public void onBeforeSend(UploadTask task) {
+        if (task == null) {
+            log.warn("⚠️ UploadTask为空，跳过onBeforeSend处理");
+            return;
+        }
+
+        if (taskId != null && task.getTaskId() == null) {
+            task.setTaskId(taskId);
+        }
+
+        if (subtaskId != null && task.getSubtaskId() == null) {
+            task.setSubtaskId(subtaskId);
+        }
+
+        if (scannedFile != null) {
+            String fileName = scannedFile.getFileName();
+            long fileSize = scannedFile.getFileSize();
+
+            if (fileName != null && task.getFileName() == null) {
+                task.setFileName(fileName);
+            }
+
+            if (fileSize > 0 && task.getFileSize() <= 0) {
+                task.setFileSize(fileSize);
+            }
+        }
+
+        log.debug("📝 onBeforeSend已设置任务信息: transferId={}, taskId={}, subtaskId={}, fileName={}",
+                task.getTransferId(), taskId, subtaskId,
+                scannedFile != null ? scannedFile.getFileName() : "null");
+    }
+
+    @Override
     public void onProgress(int totalChunks, int uploadedChunks, double progress) {
         if (scannedFile == null || subtaskId == null) {
             log.warn("⚠️ 状态不完整，跳过进度上报: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
@@ -175,9 +195,9 @@ public class BatchUploadListener implements UploadListener {
             event.setTransferredChunks(uploadedChunks);
             event.setTotalChunks(totalChunks);
             event.setTransferredBytes((long) (scannedFile.getFileSize() * progress));
-            event.setSpeedBytesPerSec(calculateSpeedBytesPerSec(uploadedChunks, totalChunks, progress));
+            event.setSpeedBytesPerSec(calculateSpeedBytesPerSec(progress));
 
-            progressReporter.reportSubTaskStatus(event);
+            progressReporter.reportProgress(event);
         }
     }
 
@@ -202,7 +222,7 @@ public class BatchUploadListener implements UploadListener {
             event.setSpeedBytesPerSec(null); // 传输完成时速度为null
             event.setCompletedAt(new Date());
 
-            progressReporter.reportSubTaskStatus(event);
+            progressReporter.reportSuccess(event);
         }
 
         executePostTransferAction();
@@ -224,7 +244,7 @@ public class BatchUploadListener implements UploadListener {
             event.setErrorCode("UPLOAD_ERROR");
             event.setErrorMessage(errorMessage);
 
-            progressReporter.reportSubTaskStatus(event);
+            progressReporter.reportFail(event);
         }
     }
 
@@ -243,7 +263,7 @@ public class BatchUploadListener implements UploadListener {
     /**
      * 计算传输速度（字节/秒）- 基于时间差的瞬时速度
      */
-    private Long calculateSpeedBytesPerSec(int uploadedChunks, int totalChunks, double progress) {
+    private Long calculateSpeedBytesPerSec(double progress) {
         if (scannedFile == null || scannedFile.getFileSize() <= 0 || progress <= 0)
             return null;
 

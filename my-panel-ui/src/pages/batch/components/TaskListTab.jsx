@@ -4,7 +4,6 @@ import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   CaretRightOutlined,
-  StopOutlined,
   DeleteOutlined,
   SearchOutlined,
   ReloadOutlined,
@@ -271,17 +270,9 @@ const TaskListTab = ({
         }
         if (record.status === 'RUNNING') {
           items.push({ key: 'pause', label: (<><PauseCircleOutlined /> 暂停</>), onClick: () => pauseTask(record.id) });
-          items.push({
-            key: 'stop', label: (<span style={{ color: '#ff4d4f' }}><StopOutlined /> 停止</span>),
-            onClick: () => stopTask(record.id)
-          });
         }
         if (record.status === 'PAUSED') {
           items.push({ key: 'resume', label: (<><CaretRightOutlined /> 恢复</>), onClick: () => resumeTask(record.id) });
-          items.push({
-            key: 'stop', label: (<span style={{ color: '#ff4d4f' }}><StopOutlined /> 停止</span>),
-            onClick: () => stopTask(record.id)
-          });
         }
 
         return (
@@ -294,7 +285,9 @@ const TaskListTab = ({
             <Popconfirm title="确定删除该任务？" description="删除后不可恢复" onConfirm={() => deleteTask([record.id])}
               okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
             >
-              <Button type="link" danger size="small" icon={<DeleteOutlined />} style={{ padding: '0 4px' }} />
+              <Button type="link" danger size="small" icon={<DeleteOutlined />} style={{ padding: '0 4px' }}>
+                删除
+              </Button>
             </Popconfirm>
           </Space>
         );

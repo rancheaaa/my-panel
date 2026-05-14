@@ -1,7 +1,5 @@
 package com.cq.agent.client.upload;
 
-import com.cq.agent.client.download.DownloadTask;
-
 /**
  * Listener for tracking upload progress.
  */

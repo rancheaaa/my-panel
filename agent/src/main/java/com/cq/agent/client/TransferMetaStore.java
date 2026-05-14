@@ -9,6 +9,7 @@ import com.google.gson.JsonSyntaxException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -100,37 +101,6 @@ public class TransferMetaStore<T extends TaskInfo> {
                     latestFile, targetFile, e.getMessage());
             throw e;
         }
-    }
-
-    public List<T> recoverFailedTasks(Path failedQueueDir) {
-        List<T> failedTasks = new ArrayList<>();
-
-        if (failedQueueDir == null || !Files.exists(failedQueueDir)) {
-            logger.debug("失败队列目录不存在: dir={}", failedQueueDir);
-            return failedTasks;
-        }
-
-        try (Stream<Path> paths = Files.list(failedQueueDir)) {
-            paths.filter(Files::isRegularFile)
-                  .filter(path -> path.toString().endsWith(".json"))
-                  .forEach(path -> {
-                      try {
-                          String json = Files.readString(path);
-                          T task = gson.fromJson(json, taskClass);
-
-                          if (task != null) {
-                              failedTasks.add(task);
-                          }
-                      } catch (IOException | JsonSyntaxException e) {
-                          logger.warn("加载失败任务失败，跳过损坏的文件: path={}", path, e);
-                      }
-                  });
-        } catch (IOException e) {
-            logger.error("扫描失败队列目录失败: dir={}", failedQueueDir, e);
-        }
-
-        logger.info("从失败队列恢复任务数: count={}", failedTasks.size());
-        return failedTasks;
     }
 
     public List<T> recoverPendingTasks() {
@@ -325,5 +295,72 @@ public class TransferMetaStore<T extends TaskInfo> {
         }
 
         return false;
+    }
+
+    public boolean existsTaskWithLocalPath(String localFilePath, String targetAgentKey) {
+        if (localFilePath == null || metaDir == null || !Files.exists(metaDir)) {
+            return false;
+        }
+
+        try (Stream<Path> paths = Files.list(metaDir)) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .anyMatch(path -> {
+                        try {
+                            String json = Files.readString(path);
+                            T task = gson.fromJson(json, taskClass);
+
+                            if (task == null) {
+                                return false;
+                            }
+
+                            String taskLocalPath = getLocalFilePath(task);
+                            if (!localFilePath.equals(taskLocalPath)) {
+                                return false;
+                            }
+
+                            String taskTargetAgent = extractTargetAgentFromTask(task);
+                            return targetAgentKey.equals(taskTargetAgent);
+
+                        } catch (Exception e) {
+                            logger.warn("解析任务文件失败，跳过: path={}", path, e);
+                            return false;
+                        }
+                    });
+        } catch (IOException e) {
+            logger.error("查询任务失败: localPath={}, error={}", localFilePath, e.getMessage());
+            return false;
+        }
+    }
+
+    private String getLocalFilePath(T task) {
+        if (task instanceof UploadTask uploadTask) {
+            return uploadTask.getLocalFilePath();
+        } else if (task instanceof DownloadTask downloadTask) {
+            return downloadTask.getLocalFilePath();
+        }
+        return null;
+    }
+
+    private String extractTargetAgentFromTask(T task) {
+        String remotePath;
+        if (task instanceof UploadTask uploadTask) {
+            remotePath = uploadTask.getRemoteAgentApiUrl();
+        } else if (task instanceof DownloadTask downloadTask) {
+            remotePath = downloadTask.getRemoteAgentApiUrl();
+        } else {
+            return null;
+        }
+
+        if (remotePath != null && remotePath.startsWith("http://")) {
+            try {
+                URI uri = new URI(remotePath);
+                return uri.getHost() + ":" + uri.getPort();
+            } catch (Exception e) {
+                return remotePath;
+            }
+        }
+
+        return remotePath;
     }
 }

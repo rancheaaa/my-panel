@@ -6,6 +6,7 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
 import com.cq.agent.batch.scheduler.FileRetryScheduler;
+import com.cq.agent.batch.report.FallbackPersistenceService;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.client.upload.AgentUploader;
@@ -21,7 +22,6 @@ import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
-import java.util.List;
 
 public class AgentApplication {
 
@@ -156,17 +156,34 @@ public class AgentApplication {
         FileScanner fileScanner = new FileScanner();
         taskSchedulerManager.setFileScanner(fileScanner);
 
-        List<String> registryUrls = config.getRegistryServerUrls();
-        String registryUrl = (registryUrls != null && !registryUrls.isEmpty()) ? registryUrls.getFirst() : null;
+        ProgressReporter progressReporter = new ProgressReporter(config);
+        taskSchedulerManager.setProgressReporter(progressReporter);
+        retryAwareUploader.setGlobalProgressReporter(progressReporter);
 
-        if (registryUrl != null && !registryUrl.isBlank()) {
-            ProgressReporter progressReporter = new ProgressReporter(registryUrl);
-            taskSchedulerManager.setProgressReporter(progressReporter);
-            retryAwareUploader.setGlobalProgressReporter(progressReporter);
-            logger.info("ProgressReporter initialized, registry URL: {}", registryUrl);
-        } else {
-            logger.warn("Registry URL not configured, progress reporting will be disabled");
-        }
+        FallbackPersistenceService fallbackPersistenceService = new FallbackPersistenceService(
+            config.getFileBaseDirectory() + "/progress-fallback"
+        );
+        
+        // 设置ProgressReporter到FallbackPersistenceService，用于自动补报
+        fallbackPersistenceService.setProgressReporter(progressReporter);
+        
+        // 配置自动补报参数（30秒扫描一次，每次处理10个，每个事件最多重试3次）
+        fallbackPersistenceService.configureAutoRetry(30, 10);
+        
+        progressReporter.setFallbackHandler(event -> {
+            try {
+                fallbackPersistenceService.persist(event);
+                logger.info("🔄 进度事件已回退到本地存储: subtaskId={}, status={}",
+                    event.getSubtaskId(), event.getStatus());
+            } catch (Exception e) {
+                logger.error("❌ 本地持久化失败: subtaskId={}, error={}", event.getSubtaskId(), e.getMessage());
+            }
+        });
+        
+        // 启动定时自动补报任务（网络恢复后自动重试）
+        fallbackPersistenceService.startAutoRetry();
+        logger.info("✅ FallbackPersistenceService已集成并启动自动补报: storageDir={}",
+            config.getFileBaseDirectory() + "/progress-fallback");
 
         configChangeListener.onCronChange(taskId -> {
             AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);

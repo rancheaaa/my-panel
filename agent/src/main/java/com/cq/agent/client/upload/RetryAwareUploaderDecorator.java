@@ -8,16 +8,29 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.config.AgentConfig;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 import lombok.Getter;
 import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * 重试感知的上传装饰者（基于接口）
@@ -27,6 +40,7 @@ import java.util.function.Function;
  * - 最大重试次数控制
  * - 任务配置管理
  * 设计原则：
+ * - 统一AgentTaskConfig获取的方法，全部从taskConfigMap中获取
  * - 实现 UploadService 接口（与核心类相同的契约）
  * - 通过组合包装原始 UploadService
  * - 单一职责：只关注重试逻辑
@@ -34,6 +48,15 @@ import java.util.function.Function;
 public class RetryAwareUploaderDecorator implements UploadService {
 
     private static final Logger logger = LoggerFactory.getLogger(RetryAwareUploaderDecorator.class);
+
+    private static final Gson gson = new GsonBuilder()
+            .setPrettyPrinting()
+            .serializeNulls()
+            .create();
+
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
+    private static final int DEFAULT_MAX_SCAN_COUNT = 100;
 
     /** 委托对象（必须实现 UploadService 接口） */
     @Getter
@@ -58,6 +81,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
     @Getter
     @Setter
     private Function<Long, Long> retryExecutor;
+
+    private TransferMetaStore<UploadTask> metaStore;
 
     /**
      * 构造函数（使用默认重试配置）
@@ -99,6 +124,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 loadRetryConfigFromPersistence();
                 logger.info("✅ 配置文件管理器已初始化: configDir={}", configDir);
             }
+            this.metaStore = uploadMetaStore;
             logger.info("✅ 重试装饰者初始化完成（使用配置自动创建依赖）");
         } catch (Exception e) {
             logger.warn("⚠️ 重试装饰者初始化失败，将使用无持久化模式: {}", e.getMessage());
@@ -174,6 +200,165 @@ public class RetryAwareUploaderDecorator implements UploadService {
     }
 
     // ==================== 核心重试方法（从RetryManager移植）====================
+    public List<UploadTask> recoverFailedTasks(Path failedQueueDir) {
+        List<UploadTask> failedTasks = new ArrayList<>();
+
+        if (failedQueueDir == null || !Files.exists(failedQueueDir)) {
+            logger.debug("失败队列目录不存在: dir={}", failedQueueDir);
+            return failedTasks;
+        }
+
+        int maxScanCount = DEFAULT_MAX_SCAN_COUNT;
+        long currentTimeMs = System.currentTimeMillis();
+
+        PriorityQueue<Path> oldestFilesHeap = new PriorityQueue<>(maxScanCount + 1,
+                Comparator.comparingLong(path -> {
+                    try {
+                        return Files.getLastModifiedTime(path).toMillis();
+                    } catch (IOException e) {
+                        return Long.MAX_VALUE;
+                    }
+                }));
+
+        try (Stream<Path> paths = Files.list(failedQueueDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .forEach(path -> {
+                        oldestFilesHeap.offer(path);
+                        if (oldestFilesHeap.size() > maxScanCount) {
+                            oldestFilesHeap.poll();
+                        }
+                    });
+        } catch (IOException e) {
+            logger.error("扫描失败队列目录失败: dir={}", failedQueueDir, e);
+            return failedTasks;
+        }
+
+        if (oldestFilesHeap.isEmpty()) {
+            logger.debug("失败队列为空");
+            return failedTasks;
+        }
+
+        List<Path> sortedOldestFiles = new ArrayList<>(oldestFilesHeap);
+        sortedOldestFiles.sort(Comparator.comparingLong(path -> {
+            try {
+                return Files.getLastModifiedTime(path).toMillis();
+            } catch (IOException e) {
+                return Long.MAX_VALUE;
+            }
+        }));
+
+        for (Path path : sortedOldestFiles) {
+            try {
+                String json = Files.readString(path);
+                UploadTask task = gson.fromJson(json, UploadTask.class);
+
+                if (task == null || task.getTaskId() == null) {
+                    logger.warn("跳过无效的失败任务文件: path={}", path);
+                    continue;
+                }
+
+                if (!isRetryTimeReached(task, currentTimeMs)) {
+                    continue;
+                }
+
+                refreshFileTimestamp(path);
+                failedTasks.add(task);
+
+            } catch (IOException | JsonSyntaxException e) {
+                logger.warn("加载失败任务失败，跳过损坏的文件: path={}", path, e);
+            }
+        }
+
+        logger.info("从失败队列恢复任务数: count={}, 总扫描上限={}, 堆大小={}",
+                failedTasks.size(), maxScanCount, oldestFilesHeap.size());
+        return failedTasks;
+    }
+
+    private boolean isRetryTimeReached(UploadTask task, long currentTimeMs) {
+        AgentTaskConfig config = taskConfigMap.get(task.getTaskId());
+        if (config == null || config.getRetryConfig() == null || !config.getRetryConfig().isEnabled()) {
+            logger.debug("任务未启用重试或配置不存在: taskId={}, transferId={}",
+                    task.getTaskId(), task.getTransferId());
+            return false;
+        }
+
+        RetryConfig retryConfig = config.getRetryConfig();
+        int currentRetries = task.getRetryCount();
+        int intervalMin = retryConfig.getIntervalMin() != null ? retryConfig.getIntervalMin() : 1;
+
+        long nextRetryTimeMs;
+        String backoffType = retryConfig.getBackoffType();
+
+        if ("EXPONENTIAL".equalsIgnoreCase(backoffType)) {
+            long baseIntervalMs = intervalMin * 60_000L;
+            long exponentialDelay = baseIntervalMs * (long) Math.pow(2, currentRetries);
+            nextRetryTimeMs = parseUpdateTimeToMs(task.getUpdateTime()) + exponentialDelay;
+        } else if ("LINEAR".equalsIgnoreCase(backoffType)) {
+            long linearDelay = intervalMin * 60_000L * (currentRetries + 1);
+            nextRetryTimeMs = parseUpdateTimeToMs(task.getUpdateTime()) + linearDelay;
+        } else {
+            long fixedDelay = intervalMin * 60_000L;
+            nextRetryTimeMs = parseUpdateTimeToMs(task.getUpdateTime()) + fixedDelay;
+        }
+
+        boolean isReached = currentTimeMs >= nextRetryTimeMs;
+
+        logger.debug("重试时间检查: transferId={}, currentRetries={}, backoffType={}, " +
+                        "intervalMin={}min, nextRetryTime={}, currentTime={}, isReached={}",
+                task.getTransferId(), currentRetries, backoffType,
+                intervalMin, LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(nextRetryTimeMs),
+                        java.time.ZoneId.systemDefault()).format(FORMATTER),
+                LocalDateTime.now().format(FORMATTER), isReached);
+
+        return isReached;
+    }
+
+    private long parseUpdateTimeToMs(String updateTimeStr) {
+        if (updateTimeStr == null || updateTimeStr.isEmpty()) {
+            return System.currentTimeMillis();
+        }
+
+        try {
+            LocalDateTime updateTime = LocalDateTime.parse(updateTimeStr, FORMATTER);
+            return updateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+        } catch (Exception e) {
+            logger.warn("解析更新时间失败: {}, 使用当前时间", updateTimeStr);
+            return System.currentTimeMillis();
+        }
+    }
+
+    private void refreshFileTimestamp(Path filePath) {
+        try {
+            Files.setLastModifiedTime(filePath, java.nio.file.attribute.FileTime.from(java.time.Instant.now()));
+        } catch (IOException e) {
+            logger.warn("刷新文件时间戳失败: path={}", filePath, e);
+        }
+    }
+
+    private void deleteFailedTaskJsonFile(String transferId) {
+        if (uploadFailQueueDir == null || transferId == null || transferId.isEmpty()) {
+            return;
+        }
+
+        try (Stream<Path> paths = Files.list(uploadFailQueueDir)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .filter(path -> path.getFileName().toString().contains(transferId))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                            logger.info("🗑️ 已删除失败任务JSON文件: path={}", path);
+                        } catch (IOException e) {
+                            logger.error("❌ 删除失败任务JSON文件失败: path={}", path, e);
+                        }
+                    });
+        } catch (IOException e) {
+            logger.error("❌ 扫描失败队列目录删除文件失败: dir={}", uploadFailQueueDir, e);
+        }
+    }
+
 
     /**
      * 扫描上传失败队列并重试（Quartz Job 调用）
@@ -185,7 +370,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
 
         try {
-            List<UploadTask> failedTasks = uploadMetaStore.recoverFailedTasks(uploadFailQueueDir);
+            List<UploadTask> failedTasks = recoverFailedTasks(uploadFailQueueDir);
 
             if (failedTasks.isEmpty()) {
                 logger.debug("📭 上传失败队列为空");
@@ -286,6 +471,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
             boolean submitted = delegate.uploadFile(localFilePath, remoteTargetInfo, retryListener);
 
             if (submitted) {
+                deleteFailedTaskJsonFile(transferId);
                 logger.info("✅ 重试任务提交成功: transferId={}, retryCount={}", transferId, newRetryCount);
             } else {
                 logger.warn("⚠️ 重试任务提交失败: transferId={}, retryCount={}", transferId, newRetryCount);
@@ -333,7 +519,6 @@ public class RetryAwareUploaderDecorator implements UploadService {
     private UploadListener createRetryListener(UploadTask task) {
         try {
             Long taskId = task.getTaskId();
-            Long subtaskId = task.getSubtaskId();
             String filePath = task.getLocalFilePath();
             String fileName = task.getFileName();
             long fileSize = task.getFileSize() > 0 ? task.getFileSize() : task.getTotalSize();
@@ -344,10 +529,17 @@ public class RetryAwareUploaderDecorator implements UploadService {
             restoredFile.setLastModified(System.currentTimeMillis());
             restoredFile.setAbsolutePath(filePath);
 
-            final AgentTaskConfig agentTaskConfig = loadRetryConfigFromPersistenceByTaskId(taskId);
+            AgentTaskConfig agentTaskConfig = findTaskConfigForUpload(taskId);
+            if (agentTaskConfig == null) {
+                agentTaskConfig = loadRetryConfigFromPersistenceByTaskId(taskId);
+                if (agentTaskConfig != null) {
+                    registerTaskConfig(taskId, agentTaskConfig);
+                }
+            }
+
             BatchUploadListener retryListener = new BatchUploadListener(taskId, restoredFile, agentTaskConfig, getGlobalProgressReporter());
-            logger.info("✅ 创建重试监听器(恢复模式): transferId={}, subtaskId={}, file={}",
-                task.getTransferId(), subtaskId, fileName);
+            logger.info("✅ 创建重试监听器(恢复模式): transferId={}, file={}",
+                task.getTransferId(), fileName);
             return retryListener;
 
         } catch (Exception e) {
@@ -458,5 +650,94 @@ public class RetryAwareUploaderDecorator implements UploadService {
             return config.getRetryConfig().getMaxRetryCount();
         }
         return 50;  // 默认值
+    }
+
+    public boolean isFileAlreadyQueued(String localFilePath, String remoteTargetInfo) {
+        if (localFilePath == null || remoteTargetInfo == null) {
+            return false;
+        }
+
+        String targetAgentKey = extractTargetAgentKey(remoteTargetInfo);
+
+        if (metaStore != null) {
+            boolean inSendingQueue = metaStore.existsTaskWithLocalPath(localFilePath, targetAgentKey);
+            if (inSendingQueue) {
+                logger.debug("📋 文件已在发送队列中: file={}, target={}", localFilePath, targetAgentKey);
+                return true;
+            }
+        }
+
+        boolean inFailedQueue = existsInFailedQueue(localFilePath, targetAgentKey);
+        if (inFailedQueue) {
+            logger.debug("📋 文件已在失败重试队列中: file={}, target={}", localFilePath, targetAgentKey);
+            return true;
+        }
+
+        return false;
+    }
+
+    private String extractTargetAgentKey(String remoteTargetInfo) {
+        try {
+            if (remoteTargetInfo.contains("@")) {
+                String[] parts = remoteTargetInfo.split("@");
+                if (parts.length >= 1) {
+                    return parts[0].trim();
+                }
+            }
+            return remoteTargetInfo;
+        } catch (Exception e) {
+            logger.warn("提取目标Agent标识失败: remoteTargetInfo={}", remoteTargetInfo, e);
+            return remoteTargetInfo;
+        }
+    }
+
+    private boolean existsInFailedQueue(String localFilePath, String targetAgentKey) {
+        final String uploadFailRetryQueueDir = getAgentConfig().getUploadFailRetryQueueDir();
+        final Path uploadFailRetryQueuePath = Paths.get(uploadFailRetryQueueDir);
+        if (!Files.exists(uploadFailRetryQueuePath)) {
+            return false;
+        }
+
+        try (Stream<Path> paths = Files.list(uploadFailRetryQueuePath)) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".json"))
+                    .anyMatch(path -> {
+                        try {
+                            String json = Files.readString(path);
+                            UploadTask task = gson.fromJson(json, UploadTask.class);
+
+                            if (task == null) {
+                                return false;
+                            }
+
+                            if (!localFilePath.equals(task.getLocalFilePath())) {
+                                return false;
+                            }
+
+                            String taskTargetAgent = extractTargetAgentFromTask(task);
+                            return targetAgentKey.equals(taskTargetAgent);
+
+                        } catch (Exception e) {
+                            return false;
+                        }
+                    });
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private String extractTargetAgentFromTask(UploadTask task) {
+        String remotePath = task.getRemoteAgentApiUrl();
+
+        if (remotePath != null && remotePath.startsWith("http://")) {
+            try {
+                URI uri = new URI(remotePath);
+                return uri.getHost() + ":" + uri.getPort();
+            } catch (Exception e) {
+                return remotePath;
+            }
+        }
+
+        return remotePath;
     }
 }

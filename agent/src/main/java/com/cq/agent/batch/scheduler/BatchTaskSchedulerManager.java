@@ -301,16 +301,19 @@ public class BatchTaskSchedulerManager {
                 log.debug("📤 准备传输文件: fileName={}, size={}bytes",
                         scannedFile.getFileName(), scannedFile.getFileSize());
 
-                // 构建本地路径
                 String localFilePath = scannedFile.getAbsolutePath();
 
-                // 构建目标路径信息（格式：ip:port@username:destPath）
                 String remoteTargetInfo = buildRemoteTargetInfo(config, scannedFile);
 
-                // 创建上传监听器（包含postTransferAction逻辑）
+                if (agentUploader instanceof RetryAwareUploaderDecorator uploader) {
+                    if (uploader.isFileAlreadyQueued(localFilePath, remoteTargetInfo)) {
+                        log.info("⏭️ 文件已在传输队列中，跳过: fileName={}", scannedFile.getFileName());
+                        continue;
+                    }
+                }
+
                 UploadListener listener = new BatchUploadListener(taskId, scannedFile, config, progressReporter);
 
-                // 调用AgentUploader进行P2P传输
                 boolean uploadSubmitted = agentUploader.uploadFile(localFilePath, remoteTargetInfo, listener);
 
                 if (!uploadSubmitted) {

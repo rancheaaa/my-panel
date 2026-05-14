@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
 /**
  * Agent download client for chunked file transfer.
  * Uses memory queue and JSON file-based persistence for durability.
- * 
  * Implements DownloadService interface for decorator pattern support.
  */
 public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> implements DownloadService {
@@ -57,7 +56,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
     @Override
     protected void processTask(DownloadTask task) {
-        String taskKey = getTaskKey(task);
+        String transferId = task.getTransferId();
         String traceId = task.getTraceId();
 
         try {
@@ -66,10 +65,10 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             task.incrementRetryCount();
 
             String listenerClassName = task.getListenerClassName();
-            if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
+            if (listenerClassName != null && !listenerCache.containsKey(transferId)) {
                 DownloadListener listener = createListenerInstance(listenerClassName, DownloadListener.class);
                 if (listener != null) {
-                    listenerCache.put(taskKey, listener);
+                    listenerCache.put(transferId, listener);
                 }
             }
 
@@ -108,7 +107,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             try {
                 task.setDownloadChunksStartTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOADING_CHUNKS);
-                downloadChunks(task, localFile, taskKey, traceId);
+                downloadChunks(task);
                 task.setDownloadChunksEndTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_CHUNKS_COMPLETED);
             } catch (IOException e) {
@@ -130,22 +129,22 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             try {
                 task.setVerifyStartTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.VERIFYING_CHUNKS);
-                verifyDownload(task, traceId);
+                verifyDownload(task);
                 task.setVerifyEndTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.VERIFY_CHUNKS_COMPLETED);
 
                 task.setDownloadSuccessTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_SUCCESS);
-                handleListenerSuccess(taskKey, task);
+                handleListenerSuccess(transferId, task);
                 inflightTasks.remove(task.getTransferId());
             } catch (IOException e) {
                 logger.error("[traceId={}] Verify download failed", traceId, e);
                 throw e;
             }
 
-            logger.info("[traceId={}] Download task completed: {}", traceId, taskKey);
+            logger.info("[traceId={}] Download task completed: {}", traceId, transferId);
         } catch (Exception e) {
-            logger.error("[traceId={}] Download task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
+            logger.error("[traceId={}] Download task failed: {} - {}", traceId, transferId, e.getMessage(), e);
             task.setExceptionDesc(e.getMessage());
             updateTaskStatus(task, DownloadTaskStatus.FAILED);
 
@@ -157,10 +156,10 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 }
             }
 
-            handleListenerError(taskKey, e.getMessage());
+            handleListenerError(transferId, e.getMessage());
             inflightTasks.remove(task.getTransferId());
         } finally {
-            listenerCache.remove(taskKey);
+            listenerCache.remove(transferId);
         }
     }
 
@@ -172,7 +171,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             logger.error("更新任务状态失败: {}", e.getMessage());
         }
 
-        inflightTasks.put(getTaskKey(task), task);
+        inflightTasks.put(task.getTransferId(), task);
 
         if (metaStore != null) {
             try {
@@ -267,10 +266,8 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
             task.updateTimestamp();
 
-            String taskKey = getTaskKey(task);
-
             if (listener != null) {
-                listenerCache.put(taskKey, listener);
+                listenerCache.put(task.getTransferId(), listener);
             }
 
             if (metaStore != null) {
@@ -329,7 +326,8 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         return postApi(task.getRemoteAgentApiUrl(), "api/file/chunk/download/info", req, API_RESPONSE_DOWNLOAD_INIT, task.getTraceId());
     }
 
-    private File downloadChunk(DownloadTask task, int chunkIndex, String traceId) throws IOException, InterruptedException {
+    private File downloadChunk(DownloadTask task, int chunkIndex) throws IOException, InterruptedException {
+        String traceId = task.getTraceId();
         logger.debug("[traceId={}] Downloading chunk {} for transferId: {} using zero-copy", traceId, chunkIndex, task.getTransferId());
 
         File destFile = Paths.get(task.getRemoteFilePath()).toFile();
@@ -397,7 +395,8 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
     }
 
-    private void verifyDownload(DownloadTask task, String traceId) throws IOException {
+    private void verifyDownload(DownloadTask task) throws IOException {
+        String traceId = task.getTraceId();
         File localFile = new File(task.getLocalFilePath());
         if (!localFile.exists()) {
             throw new IOException("Downloaded file does not exist: " + task.getLocalFilePath());
@@ -556,17 +555,20 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
     }
 
-    private void downloadChunks(DownloadTask task, File file, String taskKey, String traceId) throws IOException {
+    private void downloadChunks(DownloadTask task) throws IOException {
+        String transferId = task.getTransferId();
+        String traceId = task.getTraceId();
+        File file = new File(task.getLocalFilePath());
         final String tmpLocalFilePath = task.getTmpLocalFilePath();
         File tmpDir = new File(tmpLocalFilePath);
-        
+
         if (!tmpDir.exists()) {
             tmpDir.mkdirs();
         }
-        
+
         List<Integer> missingChunks = scanDownloadedChunks(tmpDir, file.getName(), task.getChunkSize(), task.getTotalSize(), task.getTotalChunks(), traceId);
         int initialDownloadedCount = task.getTotalChunks() - missingChunks.size();
-        DownloadListener listener = listenerCache.get(taskKey);
+        DownloadListener listener = listenerCache.get(transferId);
         task.setDownloadedChunksCount(initialDownloadedCount);
 
         logger.debug("[traceId={}] Scanned tmp directory: downloaded={}, missing={}",
@@ -576,9 +578,9 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                     .map(chunkIndex -> CompletableFuture.runAsync(() -> {
                         try {
                             if (listener != null) {
-                                handleListenerBeforeSend(taskKey, task);
+                                handleListenerBeforeSend(transferId, task);
                             }
-                            File chunkFile = downloadChunk(task, chunkIndex, traceId);
+                            File chunkFile = downloadChunk(task, chunkIndex);
 
                             long chunkSize = chunkFile.length();
                             if (chunkSize == 0) {
@@ -601,7 +603,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
 
                             if (listener != null) {
                                 double progress = (double) currentDownloaded / task.getTotalChunks() * 100.0;
-                                handleListenerProgress(taskKey, task.getTotalChunks(), currentDownloaded, progress);
+                                handleListenerProgress(transferId, task.getTotalChunks(), currentDownloaded, progress);
                             }
                         } catch (Exception e) {
                              throw new CompletionException("Failed to download chunk " + chunkIndex, e);
@@ -688,7 +690,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
      * @param task 已有的 DownloadTask 对象（包含 remoteSourcePath, localTargetPath 等）
      */
     public void resubmitTask(DownloadTask task) {
-        String taskKey = getTaskKey(task);
+        String transferId = task.getTransferId();
         String traceId = task.getTraceId();
 
         logger.info("[traceId={}] 🔄 重新提交失败下载任务: transferId={}, file={}, retryCount={}",
@@ -697,13 +699,12 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             task.getLocalFilePath(),
             task.getRetryCount());
 
-        // 直接将任务对象放入工作队列（worker线程会自动poll并处理）
         boolean offered = taskQueue.offer(task);
 
         if (offered) {
-            logger.debug("✅ 任务已加入工作队列: taskKey={}", taskKey);
+            logger.debug("✅ 任务已加入工作队列: transferId={}", transferId);
         } else {
-            logger.error("❌ 任务加入工作队列失败: taskKey={}", taskKey);
+            logger.error("❌ 任务加入工作队列失败: transferId={}", transferId);
         }
     }
 

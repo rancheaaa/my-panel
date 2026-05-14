@@ -15,7 +15,6 @@ import java.util.stream.Stream;
 
 /**
  * 文件扫描器 - 按spec.md 4.5设计实现
- * 
  * 功能：
  * 1. 递归扫描指定目录
  * 2. 应用include_patterns通配符过滤

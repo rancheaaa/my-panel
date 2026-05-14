@@ -145,16 +145,25 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
           </Form.Item>
         </Card>
 
-        {/* 第二行：源节点 + 目标节点 并排（各占50%） */}
-        <Row gutter={16}>
-          <Col span={12}>
-            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-              <div style={headerStyle('#52c41a')}>
-                <span style={iconStyle('#52c41a')}><CloudServerOutlined /></span>
-                <span style={titleStyle}>源节点</span>
-                <Tooltip title="文件来源"><InfoCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c', cursor: 'pointer', fontSize: 13 }} /></Tooltip>
-              </div>
-              <Form.Item label="源节点" name="sourceAgentId" rules={[{ required: true, message: '请选择源节点' }]} style={formItemStyle}>
+        {/* 第二行：源节点（独立一行，全宽） */}
+        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+          <div style={headerStyle('#52c41a')}>
+            <span style={iconStyle('#52c41a')}><CloudServerOutlined /></span>
+            <span style={titleStyle}>源节点</span>
+            <Tooltip title="文件来源"><InfoCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c', cursor: 'pointer', fontSize: 13 }} /></Tooltip>
+            <Tag color="green" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
+          </div>
+          <div style={{
+            display: 'flex', gap: 8, alignItems: 'flex-start',
+            padding: 12, borderRadius: 6, border: '1px solid #f0f8f0',
+            background: '#f6ffed'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#f0fff0'}
+          onMouseLeave={(e) => e.currentTarget.style.background = '#f6ffed'}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>源节点</div>
+              <Form.Item name="sourceAgentId" rules={[{ required: true, message: '请选择源节点' }]} noStyle>
                 <Select
                   showSearch
                   placeholder="搜索并选择源节点 (例如: root@172.17.0.1:7777)"
@@ -162,105 +171,110 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                   filterOption={(input, option) =>
                     (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                   }
-                  style={inputStyle}
+                  size="small"
+                  style={{ width: '100%', borderRadius: 5, height: 30 }}
                 >
                   {agentList.map(agent => (
                     <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
                       <Space size="small">
-                        <CloudServerOutlined style={{ color: '#52c41a' }} />
+                        <CloudServerOutlined style={{ color: '#52c41a', fontSize: 12 }} />
                         <span style={{ fontWeight: 500 }}>{agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}</span>
-                        {agent.nodeStatus === 1 && <Tag color="green" style={{ fontSize: 10, marginLeft: 4 }}>在线</Tag>}
-                        {agent.nodeStatus === 0 && <Tag color="red" style={{ fontSize: 10, marginLeft: 4 }}>离线</Tag>}
+                        {agent.nodeStatus === 1 && <Tag color="green" style={{ fontSize: 10 }}>在线</Tag>}
+                        {agent.nodeStatus === 0 && <Tag color="red" style={{ fontSize: 10 }}>离线</Tag>}
                         {agent.osType && <Tag color="blue" style={{ fontSize: 10 }}>{agent.osType}</Tag>}
                       </Space>
                     </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
-              <Form.Item label="源目录" name="sourceDir" rules={[{ required: true }]} style={formItemStyle}>
-                <Input placeholder="/var/log/app" style={inputStyle} prefix={<FilterOutlined style={{ color: '#52c41a', fontSize: 13 }} />} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>源目录</div>
+              <Form.Item name="sourceDir" rules={[{ required: true, message: '请输入源目录' }]} noStyle>
+                <Input placeholder="/var/log/app" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<FilterOutlined style={{ color: '#52c41a', fontSize: 12 }} />} />
               </Form.Item>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-              <div style={headerStyle('#722ed1')}>
-                <span style={iconStyle('#722ed1')}><ClusterOutlined /></span>
-                <span style={titleStyle}>目标节点</span>
-                <Tooltip title="每个目标包含Agent ID与接收目录"><InfoCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c', cursor: 'pointer', fontSize: 13 }} /></Tooltip>
-              </div>
-              <Form.List name="targets" initialValue={[{ agentId: undefined, dir: undefined }]}>
-                {(fields, { add, remove }) => (
-                  <div>
-                    {fields.map(({ key, name, ...restField }) => (
-                      <div key={key} style={{
-                        display: 'flex', gap: 8, alignItems: 'flex-start',
-                        marginBottom: fields.length > 1 ? 8 : 0,
-                        padding: 8, borderRadius: 6, border: '1px solid #f0f0f8',
-                        background: key % 2 === 0 ? '#fafafe' : '#fff'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0ff'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = key % 2 === 0 ? '#fafafe' : '#fff'}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>目标节点</div>
-                          <Form.Item {...restField} name={[name, 'agentId']} rules={[{ required: true, message: '请选择目标节点' }]} noStyle>
-                            <Select
-                              showSearch
-                              placeholder="搜索并选择目标节点 (例如: root@172.17.0.1:7777)"
-                              optionFilterProp="label"
-                              filterOption={(input, option) =>
-                                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                              }
-                              size="small"
-                              style={{ width: '100%', borderRadius: 5, height: 30 }}
-                            >
-                              {agentList.map(agent => (
-                                <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
-                                  <Space size="small">
-                                    <CloudServerOutlined style={{ color: '#722ed1', fontSize: 12 }} />
-                                    <span style={{ fontWeight: 500 }}>{agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}</span>
-                                    {agent.nodeStatus === 1 && <Tag color="green" style={{ fontSize: 10 }}>在线</Tag>}
-                                    {agent.nodeStatus === 0 && <Tag color="red" style={{ fontSize: 10 }}>离线</Tag>}
-                                    {agent.osType && <Tag color="blue" style={{ fontSize: 10 }}>{agent.osType}</Tag>}
-                                  </Space>
-                                </Select.Option>
-                              ))}
-                            </Select>
-                          </Form.Item>
-                        </div>
-                        <div style={{ width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d9d9d9', paddingTop: 17, flexShrink: 0, fontSize: 14 }}>→</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>接收目录</div>
-                          <Form.Item {...restField} name={[name, 'dir']} rules={[{ required: true }]} noStyle>
-                            <Input placeholder="/backup/node-02/logs" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<FilterOutlined style={{ color: '#722ed1', fontSize: 12 }} />} />
-                          </Form.Item>
-                        </div>
-                        {fields.length > 1 && (
-                          <div style={{ paddingTop: 15, flexShrink: 0, paddingLeft: 2 }}>
-                            <MinusCircleOutlined onClick={() => remove(name)} style={{ fontSize: 16, color: '#ff4d4f', cursor: 'pointer' }} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    <Button type="dashed" onClick={() => add({ agentId: undefined, dir: undefined })} block icon={<PlusOutlined />} size="small"
-                      style={{ borderRadius: 6, borderColor: '#722ed1', color: '#722ed1', height: 32, marginTop: 8 }}>
-                      添加目标节点
-                    </Button>
-                  </div>
-                )}
-              </Form.List>
-            </Card>
-          </Col>
-        </Row>
+            </div>
+          </div>
+        </Card>
 
-        {/* 第三行：传输策略 + 文件匹配规则（各占50%） */}
+        {/* 第三行：目标节点（独立一行，全宽） */}
+        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+          <div style={headerStyle('#722ed1')}>
+            <span style={iconStyle('#722ed1')}><ClusterOutlined /></span>
+            <span style={titleStyle}>目标节点</span>
+            <Tooltip title="每个目标包含Agent ID与接收目录"><InfoCircleOutlined style={{ marginLeft: 4, color: '#8c8c8c', cursor: 'pointer', fontSize: 13 }} /></Tooltip>
+            <Tag color="purple" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
+          </div>
+          <Form.List name="targets" initialValue={[{ agentId: undefined, dir: undefined }]}>
+            {(fields, { add, remove }) => (
+              <div>
+                {fields.map(({ key, name, ...restField }) => (
+                  <div key={key} style={{
+                    display: 'flex', gap: 8, alignItems: 'flex-start',
+                    marginBottom: fields.length > 1 ? 8 : 0,
+                    padding: 8, borderRadius: 6, border: '1px solid #f0f0f8',
+                    background: key % 2 === 0 ? '#fafafe' : '#fff'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0ff'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = key % 2 === 0 ? '#fafafe' : '#fff'}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>目标节点</div>
+                      <Form.Item {...restField} name={[name, 'agentId']} rules={[{ required: true, message: '请选择目标节点' }]} noStyle>
+                        <Select
+                          showSearch
+                          placeholder="搜索并选择目标节点 (例如: root@172.17.0.1:7777)"
+                          optionFilterProp="label"
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          size="small"
+                          style={{ width: '100%', borderRadius: 5, height: 30 }}
+                        >
+                          {agentList.map(agent => (
+                            <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
+                              <Space size="small">
+                                <CloudServerOutlined style={{ color: '#722ed1', fontSize: 12 }} />
+                                <span style={{ fontWeight: 500 }}>{agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}</span>
+                                {agent.nodeStatus === 1 && <Tag color="green" style={{ fontSize: 10 }}>在线</Tag>}
+                                {agent.nodeStatus === 0 && <Tag color="red" style={{ fontSize: 10 }}>离线</Tag>}
+                                {agent.osType && <Tag color="blue" style={{ fontSize: 10 }}>{agent.osType}</Tag>}
+                              </Space>
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>接收目录</div>
+                      <Form.Item {...restField} name={[name, 'dir']} rules={[{ required: true, message: '请输入接收目录' }]} noStyle>
+                        <Input placeholder="/backup/node-02/logs" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<FilterOutlined style={{ color: '#722ed1', fontSize: 12 }} />} />
+                      </Form.Item>
+                    </div>
+                    {fields.length > 1 && (
+                      <div style={{ paddingTop: 15, flexShrink: 0, paddingLeft: 2 }}>
+                        <MinusCircleOutlined onClick={() => remove(name)} style={{ fontSize: 16, color: '#ff4d4f', cursor: 'pointer' }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <Button type="dashed" onClick={() => add({ agentId: undefined, dir: undefined })} block icon={<PlusOutlined />} size="small"
+                  style={{ borderRadius: 6, borderColor: '#722ed1', color: '#722ed1', height: 32, marginTop: 8 }}>
+                  添加目标节点
+                </Button>
+              </div>
+            )}
+          </Form.List>
+        </Card>
+
+        {/* 第四行：传输策略 + 重试策略（各占50%） */}
         <Row gutter={16}>
           <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#fa8c16')}>
                 <span style={iconStyle('#fa8c16')}><ToolOutlined /></span>
                 <span style={titleStyle}>传输策略</span>
+                <Tag color="orange" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
               </div>
               <Row gutter={12}>
                 <Col span={12}><Form.Item label="传输模式" name="transferMode" initialValue="ONE_TO_MANY" style={{ ...formItemStyle, marginBottom: 10 }}>
@@ -282,135 +296,207 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
           </Col>
           <Col span={12}>
             <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-              <div style={headerStyle('#13c2c2')}>
-                <span style={iconStyle('#13c2c2')}><FilterOutlined /></span>
-                <span style={titleStyle}>文件匹配规则</span>
-              </div>
-              <Row gutter={12}>
-                <Col span={8}><Form.Item label="包含模式" name="includePatterns" style={{ ...formItemStyle, marginBottom: 10 }}>
-                  <Select mode="tags" size="small" placeholder="*.log" tokenSeparators={[',']} style={{ width: '100%' }} />
-                </Form.Item></Col>
-                <Col span={8}><Form.Item label="排除模式" name="excludePatterns" style={{ ...formItemStyle, marginBottom: 10 }}>
-                  <Select mode="tags" size="small" placeholder="temp*" tokenSeparators={[',']} style={{ width: '100%' }} />
-                </Form.Item></Col>
-                <Col span={8}><Form.Item label="最大扫描数" name="maxScanFiles" initialValue={1000} style={{ ...formItemStyle, marginBottom: 10 }}>
-                  <InputNumber min={1} max={100000} size="small" style={{ width: '100%', height: 30 }} addonAfter="个" />
-                </Form.Item></Col>
-              </Row>
-            </Card>
-          </Col>
-        </Row>
-
-        {/* 第四行：定时调度 + 重试策略（各占50%） */}
-        <Row gutter={16}>
-          <Col span={12}>
-            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-              <div style={headerStyle('#eb2f96')}>
-                <span style={iconStyle('#eb2f96')}><ScheduleOutlined /></span>
-                <span style={titleStyle}>定时调度</span>
-                <Tag color="magenta" style={{ marginLeft: 'auto', fontSize: 11 }}>可选</Tag>
-              </div>
-              <Form.Item label="执行频率" name="scanCronExpression" style={{ ...formItemStyle, marginBottom: 0 }}>
-                <Select
-                  placeholder="选择执行频率（留空则手动触发）"
-                  allowClear
-                  style={inputStyle}
-                  optionLabelProp="label"
-                >
-                  <Select.OptGroup label="常用间隔">
-                    <Select.Option value="0 */1 * * * ?" label={<Space><ClockCircleOutlined />每隔 1 分钟</Space>}>
-                      <div><strong>每隔 1 分钟</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */1 * * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 */5 * * * ?" label={<Space><ClockCircleOutlined />每隔 5 分钟</Space>}>
-                      <div><strong>每隔 5 分钟</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */5 * * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 */10 * * * ?" label={<Space><ClockCircleOutlined />每隔 10 分钟</Space>}>
-                      <div><strong>每隔 10 分钟</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */10 * * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 */30 * * * ?" label={<Space><ClockCircleOutlined />每隔 30 分钟</Space>}>
-                      <div><strong>每隔 30 分钟</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */30 * * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 0 */1 * * ?" label={<Space><ClockCircleOutlined />每隔 1 小时</Space>}>
-                      <div><strong>每隔 1 小时</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 */1 * * ?</div>
-                    </Select.Option>
-                  </Select.OptGroup>
-                  <Select.OptGroup label="每日定时">
-                    <Select.Option value="0 0 0 * * ?" label={<Space><ClockCircleOutlined />每天 00:00</Space>}>
-                      <div><strong>每天 00:00 (午夜)</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 0 * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 0 2 * * ?" label={<Space><ClockCircleOutlined />每天 02:00</Space>}>
-                      <div><strong>每天 02:00 (凌晨)</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 0 12 * * ?" label={<Space><ClockCircleOutlined />每天 12:00</Space>}>
-                      <div><strong>每天 12:00 (中午)</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 12 * * ?</div>
-                    </Select.Option>
-                    <Select.Option value="0 0 18 * * ?" label={<Space><ClockCircleOutlined />每天 18:00</Space>}>
-                      <div><strong>每天 18:00 (傍晚)</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 18 * * ?</div>
-                    </Select.Option>
-                  </Select.OptGroup>
-                  <Select.OptGroup label="每周定时">
-                    <Select.Option value="0 0 2 ? * MON" label={<Space><ClockCircleOutlined />每周一 02:00</Space>}>
-                      <div><strong>每周一 02:00</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * MON</div>
-                    </Select.Option>
-                    <Select.Option value="0 0 2 ? * SUN" label={<Space><ClockCircleOutlined />每周日 02:00</Space>}>
-                      <div><strong>每周日 02:00</strong></div>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * SUN</div>
-                    </Select.Option>
-                  </Select.OptGroup>
-                </Select>
-              </Form.Item>
-              <div style={{ marginTop: 6, padding: '6px 10px', background: '#fafafa', borderRadius: 4, border: '1px solid #f0f0f0' }}>
-                <Tooltip title="选择预设频率后自动生成Cron表达式，留空表示手动触发任务">
-                  <span style={{ fontSize: 11.5, color: '#8c8c8c' }}>
-                    <InfoCircleOutlined style={{ marginRight: 4 }} />
-                    选择预设频率自动生成Cron表达式，也可留空手动触发
-                  </span>
-                </Tooltip>
-              </div>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
               <div style={headerStyle('#fa541c')}>
                 <span style={iconStyle('#fa541c')}><ReloadOutlined /></span>
                 <span style={titleStyle}>重试策略</span>
-                <Form.Item name="retryEnabled" valuePropName="checked" initialValue={true} noStyle style={{ marginLeft: 'auto', marginBottom: 0 }}>
+                <Tag color="default" style={{ marginLeft: 'auto', fontSize: 11 }}>选填</Tag>
+                <Form.Item name="retryEnabled" valuePropName="checked" initialValue={true} noStyle style={{ marginLeft: 8, marginBottom: 0 }}>
                   <Switch size="small" checkedChildren="开" unCheckedChildren="关" />
                 </Form.Item>
               </div>
-              <Row gutter={10}>
-                <Col span={8}><Form.Item label="最大次数" name="maxRetryCount" initialValue={3} style={{ ...formItemStyle, marginBottom: 8 }}>
-                  <InputNumber min={0} max={10} size="small" style={{ width: '100%' }} />
-                </Form.Item></Col>
-                <Col span={8}><Form.Item label="间隔(分)" name="retryIntervalMin" initialValue={5} style={{ ...formItemStyle, marginBottom: 8 }}>
-                  <InputNumber min={1} max={60} size="small" style={{ width: '100%' }} />
-                </Form.Item></Col>
-                <Col span={8}><Form.Item label="保留天数" name="retryMaxDays" initialValue={7} style={{ ...formItemStyle, marginBottom: 8 }}>
-                  <InputNumber min={1} max={30} size="small" style={{ width: '100%' }} />
-                </Form.Item></Col>
-              </Row>
-              <Form.Item label="退避方式" name="retryBackoffType" initialValue="EXPONENTIAL" style={{ ...formItemStyle, marginBottom: 0 }}>
-                <Select size="small"><Select.Option value="LINEAR">线性</Select.Option><Select.Option value="EXPONENTIAL">指数</Select.Option></Select>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.retryEnabled !== cur.retryEnabled}>
+                {({ getFieldValue }) => {
+                  const retryEnabled = getFieldValue('retryEnabled');
+                  if (!retryEnabled) {
+                    return (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '20px 0',
+                        color: '#bfbfbf',
+                        fontSize: 13,
+                        background: '#fafafa',
+                        borderRadius: 6,
+                        border: '1px dashed #d9d9d9'
+                      }}>
+                        <ReloadOutlined style={{ marginRight: 6, fontSize: 14 }} />
+                        重试功能已关闭
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      <Row gutter={10}>
+                        <Col span={8}><Form.Item label="最大次数" name="maxRetryCount" initialValue={3} style={{ ...formItemStyle, marginBottom: 8 }}>
+                          <InputNumber min={0} max={10} size="small" style={{ width: '100%' }} />
+                        </Form.Item></Col>
+                        <Col span={8}><Form.Item label="间隔(分)" name="retryIntervalMin" initialValue={5} style={{ ...formItemStyle, marginBottom: 8 }}>
+                          <InputNumber min={1} max={60} size="small" style={{ width: '100%' }} />
+                        </Form.Item></Col>
+                        <Col span={8}><Form.Item label="保留天数" name="retryMaxDays" initialValue={7} style={{ ...formItemStyle, marginBottom: 8 }}>
+                          <InputNumber min={1} max={30} size="small" style={{ width: '100%' }} />
+                        </Form.Item></Col>
+                      </Row>
+                      <Form.Item label="退避方式" name="retryBackoffType" initialValue="EXPONENTIAL" style={{ ...formItemStyle, marginBottom: 0 }}>
+                        <Select size="small"><Select.Option value="LINEAR">线性</Select.Option><Select.Option value="EXPONENTIAL">指数</Select.Option></Select>
+                      </Form.Item>
+                    </>
+                  );
+                }}
               </Form.Item>
             </Card>
           </Col>
         </Row>
 
-        {/* 第五行：传输后操作（全宽） */}
+        {/* 第五行：文件匹配规则（独立一行，全宽） */}
+        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+          <div style={headerStyle('#13c2c2')}>
+            <span style={iconStyle('#13c2c2')}><FilterOutlined /></span>
+            <span style={titleStyle}>文件匹配规则</span>
+            <Tag color="cyan" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
+          </div>
+          <Row gutter={16}>
+            <Col span={10}>
+              <Form.Item
+                label={<span>包含模式 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                name="includePatterns"
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      const excludePatterns = form.getFieldValue('excludePatterns');
+                      if ((!value || value.length === 0) && (!excludePatterns || excludePatterns.length === 0)) {
+                        return Promise.reject(new Error('包含模式和排除模式至少填写一项'));
+                      }
+                      return Promise.resolve();
+                    }
+                  }
+                ]}
+                style={formItemStyle}
+              >
+                <Select mode="tags" placeholder="例如: *.log, *.txt" tokenSeparators={[',']} style={{ width: '100%', borderRadius: 6 }} />
+              </Form.Item>
+              <div style={{ fontSize: 11.5, color: '#8c8c8c', marginTop: -6, marginBottom: 4 }}>
+                <InfoCircleOutlined style={{ marginRight: 4 }} />
+                匹配的文件才会被传输，支持通配符 * 和 ?
+              </div>
+            </Col>
+            <Col span={10}>
+              <Form.Item
+                label={<span>排除模式 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                name="excludePatterns"
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      const includePatterns = form.getFieldValue('includePatterns');
+                      if ((!value || value.length === 0) && (!includePatterns || includePatterns.length === 0)) {
+                        return Promise.reject(new Error('包含模式和排除模式至少填写一项'));
+                      }
+                      return Promise.resolve();
+                    }
+                  }
+                ]}
+                style={formItemStyle}
+              >
+                <Select mode="tags" placeholder="例如: temp*, *.bak" tokenSeparators={[',']} style={{ width: '100%', borderRadius: 6 }} />
+              </Form.Item>
+              <div style={{ fontSize: 11.5, color: '#8c8c8c', marginTop: -6, marginBottom: 4 }}>
+                <InfoCircleOutlined style={{ marginRight: 4 }} />
+                排除的文件不会被传输，优先级高于包含模式
+              </div>
+            </Col>
+            <Col span={4}>
+              <Form.Item label="最大扫描数" name="maxScanFiles" initialValue={1000} style={formItemStyle}>
+                <InputNumber min={1} max={100000} style={{ width: '100%', height: 34, borderRadius: 6 }} addonAfter="个" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* 第六行：定时调度（独立一行，全宽，必填） */}
+        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+          <div style={headerStyle('#eb2f96')}>
+            <span style={iconStyle('#eb2f96')}><ScheduleOutlined /></span>
+            <span style={titleStyle}>定时调度</span>
+            <Tag color="magenta" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
+          </div>
+          <Form.Item
+            label={<span>执行频率 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+            name="scanCronExpression"
+            rules={[{ required: true, message: '请选择执行频率' }]}
+            style={{ ...formItemStyle, marginBottom: 8 }}
+          >
+            <Select
+              placeholder="请选择执行频率"
+              style={inputStyle}
+              optionLabelProp="label"
+            >
+              <Select.OptGroup label="常用间隔">
+                <Select.Option value="0 */1 * * * ?" label={<Space><ClockCircleOutlined />每隔 1 分钟</Space>}>
+                  <div><strong>每隔 1 分钟</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */1 * * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 */5 * * * ?" label={<Space><ClockCircleOutlined />每隔 5 分钟</Space>}>
+                  <div><strong>每隔 5 分钟</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */5 * * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 */10 * * * ?" label={<Space><ClockCircleOutlined />每隔 10 分钟</Space>}>
+                  <div><strong>每隔 10 分钟</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */10 * * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 */30 * * * ?" label={<Space><ClockCircleOutlined />每隔 30 分钟</Space>}>
+                  <div><strong>每隔 30 分钟</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */30 * * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 0 */1 * * ?" label={<Space><ClockCircleOutlined />每隔 1 小时</Space>}>
+                  <div><strong>每隔 1 小时</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 */1 * * ?</div>
+                </Select.Option>
+              </Select.OptGroup>
+              <Select.OptGroup label="每日定时">
+                <Select.Option value="0 0 0 * * ?" label={<Space><ClockCircleOutlined />每天 00:00</Space>}>
+                  <div><strong>每天 00:00 (午夜)</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 0 * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 0 2 * * ?" label={<Space><ClockCircleOutlined />每天 02:00</Space>}>
+                  <div><strong>每天 02:00 (凌晨)</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 0 12 * * ?" label={<Space><ClockCircleOutlined />每天 12:00</Space>}>
+                  <div><strong>每天 12:00 (中午)</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 12 * * ?</div>
+                </Select.Option>
+                <Select.Option value="0 0 18 * * ?" label={<Space><ClockCircleOutlined />每天 18:00</Space>}>
+                  <div><strong>每天 18:00 (傍晚)</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 18 * * ?</div>
+                </Select.Option>
+              </Select.OptGroup>
+              <Select.OptGroup label="每周定时">
+                <Select.Option value="0 0 2 ? * MON" label={<Space><ClockCircleOutlined />每周一 02:00</Space>}>
+                  <div><strong>每周一 02:00</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * MON</div>
+                </Select.Option>
+                <Select.Option value="0 0 2 ? * SUN" label={<Space><ClockCircleOutlined />每周日 02:00</Space>}>
+                  <div><strong>每周日 02:00</strong></div>
+                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * SUN</div>
+                </Select.Option>
+              </Select.OptGroup>
+            </Select>
+          </Form.Item>
+          <div style={{ padding: '6px 10px', background: '#fff0f6', borderRadius: 4, border: '1px solid #ffadd2' }}>
+            <Tooltip title="选择预设频率后自动生成Cron表达式">
+              <span style={{ fontSize: 11.5, color: '#c41d7f' }}>
+                <InfoCircleOutlined style={{ marginRight: 4 }} />
+                请选择任务的执行频率，支持常用间隔、每日定时、每周定时等预设选项
+              </span>
+            </Tooltip>
+          </div>
+        </Card>
+
+        {/* 第七行：传输后操作（全宽） */}
         <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
           <div style={headerStyle('#2f54eb')}>
             <span style={iconStyle('#2f54eb')}><SendOutlined /></span>
             <span style={titleStyle}>传输后操作</span>
+            <Tag color="blue" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
           </div>
           <Row gutter={16}>
             <Col span={12}>

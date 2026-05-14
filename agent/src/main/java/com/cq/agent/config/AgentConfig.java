@@ -1,17 +1,14 @@
 package com.cq.agent.config;
 
+import com.cq.panel.common.utils.IpUtils;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.*;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -147,7 +144,11 @@ public class AgentConfig {
 
         this.agentIp = getStringProperty("agent.ip", null);
         if (this.agentIp == null || this.agentIp.isBlank()) {
-            this.agentIp = findFirstNonLoopbackAddress();
+            try {
+                this.agentIp = IpUtils.getLocalHost();
+            } catch (Exception e) {
+                logger.error("get local ip failed", e);
+            }
             logger.info("agent.ip is {}", this.agentIp);
         }
 
@@ -380,29 +381,5 @@ public class AgentConfig {
         
         // 所有来源都没有找到配置值
         return null;
-    }
-
-    private String findFirstNonLoopbackAddress() {
-        try {
-            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-            while (networkInterfaces.hasMoreElements()) {
-                NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
-                    continue;
-                }
-                Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
-                while (inetAddresses.hasMoreElements()) {
-                    InetAddress inetAddress = inetAddresses.nextElement();
-                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof java.net.Inet4Address) {
-                        logger.info("No agent.ip configured, automatically detected IP: {}", inetAddress.getHostAddress());
-                        return inetAddress.getHostAddress();
-                    }
-                }
-            }
-        } catch (SocketException e) {
-            logger.warn("Failed to get network interfaces, defaulting to 0.0.0.0", e);
-        }
-        logger.info("Could not find a suitable non-loopback IP, defaulting to 0.0.0.0");
-        return "0.0.0.0";
     }
 }

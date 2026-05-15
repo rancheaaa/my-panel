@@ -27,6 +27,12 @@ public class SubTaskDTO implements Serializable {
     /** 主任务ID */
     private Long taskId;
 
+    /** 扫描批次ID(一次调度触发扫描到的N个文件共享) */
+    private Long scanBatchId;
+
+    /** 文件批次ID(同一文件传输到多个Agent共享) */
+    private Long fileBatchId;
+
     /** 传输ID（UUID） */
     private String transferId;
 

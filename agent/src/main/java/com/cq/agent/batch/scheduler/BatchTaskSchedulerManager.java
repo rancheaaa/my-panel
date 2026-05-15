@@ -17,6 +17,8 @@ import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -238,9 +240,13 @@ public class BatchTaskSchedulerManager {
 
             try {
                 List<ScannedFile> scannedFiles = scanSourceDirectory(config);
-                processScannedFiles(config.getTaskId(), config, scannedFiles);
+
+                Long scanBatchId = generateScanBatchId(config.getTaskId());
+
+                processScannedFiles(config.getTaskId(), config, scannedFiles, scanBatchId);
                 completeTask(config.getTaskId());
-                log.info("✅ 任务执行成功: taskId={}, processedFiles={}", config.getTaskId(), scannedFiles.size());
+                log.info("✅ 任务执行成功: taskId={}, processedFiles={}, scanBatchId={}",
+                        config.getTaskId(), scannedFiles.size(), scanBatchId);
             } catch (Exception e) {
                 log.error("❌ 任务执行异常: taskId={}, error={}", config.getTaskId(), e.getMessage(), e);
                 handleTaskFailure(config.getTaskId(), e.getMessage());
@@ -285,7 +291,7 @@ public class BatchTaskSchedulerManager {
      * 如果任何文件传输失败，抛出异常以触发重试机制
      */
     private void processScannedFiles(Long taskId, AgentTaskConfig config,
-            List<ScannedFile> scannedFiles) {
+            List<ScannedFile> scannedFiles, Long scanBatchId) {
         if (scannedFiles == null || scannedFiles.isEmpty()) {
             log.info("ℹ️  未扫描到文件，跳过传输: taskId={}", taskId);
             return;
@@ -312,9 +318,11 @@ public class BatchTaskSchedulerManager {
         TargetRouter router = new TargetRouter();
 
         int totalSubtasks = 0;
-        List<String> failedFiles = new java.util.ArrayList<>();
+        List<String> failedFiles = new ArrayList<>();
 
         for (ScannedFile scannedFile : scannedFiles) {
+            Long fileBatchId = generateFileBatchId(taskId, scannedFile.getFileName(), scanBatchId);
+
             List<TargetAgentInfo> routedTargets = router.route(allTargets, transferConfig);
             totalSubtasks += routedTargets.size();
 
@@ -326,7 +334,7 @@ public class BatchTaskSchedulerManager {
 
                     String localFilePath = scannedFile.getAbsolutePath();
 
-                    String remoteTargetInfo = buildRemoteTargetInfo(targetAgent, scannedFile);
+                    String remoteTargetInfo = buildRemoteTargetInfo(config, targetAgent, scannedFile);
 
                     if (agentUploader instanceof RetryAwareUploaderDecorator uploader) {
                         if (uploader.isFileAlreadyQueued(localFilePath, remoteTargetInfo)) {
@@ -339,7 +347,8 @@ public class BatchTaskSchedulerManager {
                     UploadListener listener = new BatchUploadListener(
                             taskId, scannedFile, config, targetAgent, progressReporter,
                             agentConfig != null ? agentConfig.getUploadSuccessQueueDir() : null,
-                            agentConfig != null ? agentConfig.getUploadSendingQueueDir() : null);
+                            agentConfig != null ? agentConfig.getUploadSendingQueueDir() : null,
+                            scanBatchId, fileBatchId);
 
                     boolean uploadSubmitted = agentUploader.uploadFile(localFilePath, remoteTargetInfo, listener);
 
@@ -383,7 +392,7 @@ public class BatchTaskSchedulerManager {
         return config.getTargetAgents() != null && !config.getTargetAgents().isEmpty();
     }
 
-    private String buildRemoteTargetInfo(TargetAgentInfo targetAgent, ScannedFile scannedFile) {
+    private String buildRemoteTargetInfo(AgentTaskConfig config, TargetAgentInfo targetAgent, ScannedFile scannedFile) {
         try {
             String targetAgentName = targetAgent.getAgentName();
             if (targetAgentName == null || targetAgentName.isEmpty()) {
@@ -399,11 +408,45 @@ public class BatchTaskSchedulerManager {
             String ipPort = parts[1];
 
             String targetDir = targetAgent.getTargetDir();
-            String destPath = targetDir + "/" + scannedFile.getFileName();
+            if (targetDir == null) {
+                targetDir = "/";
+            }
+
+            TransferConfig transferConfig = config.getTransferConfig();
+            boolean preserveDir = transferConfig != null && transferConfig.isPreserveDirStructure();
+
+            String relativePath;
+            if (preserveDir) {
+                String sourceDir = config.getSourceDir();
+                if (sourceDir != null && !sourceDir.trim().isEmpty()) {
+                    String absPath = normalizePath(scannedFile.getAbsolutePath());
+                    String normSourceDir = normalizePath(sourceDir);
+
+                    if (absPath.startsWith(normSourceDir)) {
+                        relativePath = absPath.substring(normSourceDir.length());
+                        if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
+                            relativePath = relativePath.substring(1);
+                        }
+                        relativePath = relativePath.replace("\\", "/");
+                    } else {
+                        log.warn("⚠️ preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}",
+                                sourceDir, scannedFile.getAbsolutePath());
+                        relativePath = scannedFile.getFileName();
+                    }
+                } else {
+                    relativePath = scannedFile.getFileName();
+                }
+            } else {
+                relativePath = scannedFile.getFileName();
+            }
+
+            String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
+            String destPath = targetDir + separator + relativePath;
 
             String remoteTargetInfo = ipPort + "@" + username + ":" + destPath;
 
-            log.debug("🎯 构建目标路径: {}", remoteTargetInfo);
+            log.debug("🎯 构建目标路径: preserveDir={}, sourceDir={}, sourceFile={}, destPath={}",
+                    preserveDir, config.getSourceDir(), scannedFile.getAbsolutePath(), destPath);
             return remoteTargetInfo;
 
         } catch (Exception e) {
@@ -412,4 +455,24 @@ public class BatchTaskSchedulerManager {
         }
     }
 
+    private String normalizePath(String path) {
+        if (path == null) return null;
+        return path.replace("/", "\\").trim();
+    }
+
+    private Long generateScanBatchId(Long taskId) {
+        long timePart = System.currentTimeMillis() % 100000000000L;
+        long taskPart = (taskId != null ? taskId : 0L) % 10000;
+        long randomPart = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 10000);
+        return timePart * 1000000 + taskPart * 100 + randomPart;
+    }
+
+    private Long generateFileBatchId(Long taskId, String fileName, Long scanBatchId) {
+        long scanBatchPrefix = scanBatchId != null ? scanBatchId / 1000000 : System.currentTimeMillis() % 100000000000L;
+        int nameHash = Math.abs(fileName.hashCode());
+        long taskPart = (taskId != null ? taskId : 0L) % 10000;
+        long randomPart = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 1000);
+        long fileHashPart = (nameHash % 10000L) * 100000L + taskPart * 1000L + randomPart;
+        return scanBatchPrefix * 100000000L + fileHashPart;
+    }
 }

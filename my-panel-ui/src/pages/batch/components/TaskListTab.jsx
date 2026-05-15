@@ -414,29 +414,66 @@ const TaskListTab = ({
         const items = [];
           if (t.status === 'READY') {
               items.push({
-                  key: 'start', label: (<><PlayCircleOutlined /> 启动</>), onClick: () => startTask(t.id)
+                  key: 'start',
+                  type: 'confirm',
+                  title: '确定启动该任务？',
+                  description: '任务启动后将按照设定的调度策略开始执行',
+                  onConfirm: () => startTask(t.id),
+                  content: <><PlayCircleOutlined /> 启动</>
               });
           }
           if (t.status === 'RUNNING') {
-              items.push({ key: 'pause', label: (<><PauseCircleOutlined /> 暂停</>), onClick: () => pauseTask(t.id) });
+              items.push({
+                  key: 'pause',
+                  type: 'confirm',
+                  title: '确定暂停该任务？',
+                  description: '任务暂停后将停止执行，可通过恢复按钮重新启动',
+                  onConfirm: () => pauseTask(t.id),
+                  content: <><PauseCircleOutlined /> 暂停</>
+              });
           }
           if (t.status === 'PAUSED') {
-              items.push({ key: 'resume', label: (<><CaretRightOutlined /> 恢复</>), onClick: () => resumeTask(t.id) });
+              items.push({
+                  key: 'resume',
+                  type: 'confirm',
+                  title: '确定恢复该任务？',
+                  description: '任务恢复后将继续执行',
+                  onConfirm: () => resumeTask(t.id),
+                  content: <><CaretRightOutlined /> 恢复</>
+              });
           }
         items.push({
-          key: 'edit', label: (<><EditOutlined /> 修改</>), onClick: () => onEditClick(t)
+          key: 'edit', content: <><EditOutlined /> 修改</>, onClick: () => onEditClick(t)
         });
         items.push({
-          key: 'view', label: (<><EyeOutlined /> 详情</>), onClick: () => onViewClick(t)
+          key: 'view', content: <><EyeOutlined /> 详情</>, onClick: () => onViewClick(t)
         });
 
         return (
           <Space size={2}>
-            {items.map(item => (
-              <Button key={item.key} type="link" size="small" onClick={item.onClick} style={{ padding: '0 4px' }}>
-                {item.label}
-              </Button>
-            ))}
+            {items.map(item => {
+              if (item.type === 'confirm') {
+                return (
+                  <Popconfirm
+                    key={item.key}
+                    title={item.title}
+                    description={item.description}
+                    onConfirm={item.onConfirm}
+                    okText="确定"
+                    cancelText="取消"
+                  >
+                    <Button type="link" size="small" style={{ padding: '0 4px' }}>
+                      {item.content}
+                    </Button>
+                  </Popconfirm>
+                );
+              }
+              return (
+                <Button key={item.key} type="link" size="small" onClick={item.onClick} style={{ padding: '0 4px' }}>
+                  {item.content}
+                </Button>
+              );
+            })}
             <Popconfirm title="确定删除该任务？" description="删除后不可恢复" onConfirm={() => deleteTask([t.id])}
               okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
             >

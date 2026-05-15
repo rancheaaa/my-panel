@@ -739,6 +739,8 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
 CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `id` bigint NOT NULL COMMENT '主键ID',
     `task_id` bigint NOT NULL COMMENT '关联的批量任务ID',
+    `scan_batch_id` bigint DEFAULT NULL COMMENT '扫描批次ID(一次调度触发扫描到的N个文件共享)',
+    `file_batch_id` bigint DEFAULT NULL COMMENT '文件批次ID(同一文件传输到多个Agent共享)',
     `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID',
     `source_agent_name` varchar(100) DEFAULT NULL COMMENT '源节点名称，格式：user@ip:port',
     `target_agent_id` varchar(50) NOT NULL COMMENT '目标Agent ID',
@@ -769,6 +771,8 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `remark` varchar(500) DEFAULT NULL COMMENT '备注',
     PRIMARY KEY (`id`),
+    KEY `idx_scan_batch_id` (`scan_batch_id`),
+    KEY `idx_file_batch_id` (`file_batch_id`),
     KEY `idx_task_source_target` (`task_id`, `source_path`(255), `target_agent_id`),
     KEY `idx_task_id` (`task_id`),
     KEY `idx_target_status` (`target_agent_id`, `status`),

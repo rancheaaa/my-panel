@@ -539,6 +539,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
     private UploadListener createRetryListener(UploadTask task) {
         try {
             Long taskId = task.getTaskId();
+            Long scanBatchId = task.getScanBatchId();
+            Long fileBatchId = task.getFileBatchId();
             String filePath = task.getLocalFilePath();
             String fileName = task.getFileName();
             long fileSize = task.getFileSize() > 0 ? task.getFileSize() : task.getTotalSize();
@@ -562,9 +564,10 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     findTargetAgentForTask(agentTaskConfig, task),
                     getGlobalProgressReporter(),
                     getAgentConfig() != null ? getAgentConfig().getUploadSuccessQueueDir() : null,
-                    getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null);
-            logger.info("✅ 创建重试监听器(恢复模式): transferId={}, file={}",
-                    task.getTransferId(), fileName);
+                    getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null,
+                    scanBatchId, fileBatchId);
+            logger.info("✅ 创建重试监听器(恢复模式): transferId={}, file={}, scanBatch={}, fileBatch={}",
+                    task.getTransferId(), fileName, scanBatchId, fileBatchId);
             return retryListener;
 
         } catch (Exception e) {

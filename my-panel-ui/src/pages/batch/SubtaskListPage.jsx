@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button } from 'antd';
 import {
   SearchOutlined,
@@ -66,13 +66,32 @@ function getProgressPercent(record) {
   return Math.min(100, Math.round((record.transferredBytes || 0) / record.fileSizeBytes * 100));
 }
 
+function calculateDuration(record, now) {
+  if (record.durationMs && record.durationMs > 0) {
+    return record.durationMs;
+  }
+  if (record.startedAt && (record.status === 'SENDING' || record.status === 'RETRYING')) {
+    const start = new Date(record.startedAt).getTime();
+    return now - start;
+  }
+  return null;
+}
+
 const SubtaskListPage = () => {
   const [taskIdFilter, setTaskIdFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [filePathSearch, setFilePathSearch] = useState('');
   const [agentIdSearch, setAgentIdSearch] = useState('');
+  const [now, setNow] = useState(() => Date.now());
 
   const { subtasks, loading, pagination, fetchSubtasks } = useSubtasks();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSearch = () => {
     fetchSubtasks({
@@ -248,18 +267,21 @@ const SubtaskListPage = () => {
       title: '时间信息',
       key: 'timeInfo',
       width: 170,
-      render: (_, record) => (
-        <div style={{ lineHeight: '16px' }}>
-          <div><Text type="secondary" style={{ fontSize: 10 }}>开始:</Text> {record.startedAt?.substring(11, 19) || '-'}</div>
-          <div><Text type="secondary" style={{ fontSize: 10 }}>完成:</Text> {record.completedAt?.substring(11, 19) || '-'}</div>
-          <div><Text type="secondary" style={{ fontSize: 10 }}>耗时:</Text> 
-            <Text style={{ fontSize: 10, color: record.durationMs > 300000 ? '#ff4d4f' : undefined }}>
-              {formatDuration(record.durationMs)}
-            </Text>
+      render: (_, record) => {
+        const duration = calculateDuration(record, now);
+        return (
+          <div style={{ lineHeight: '16px' }}>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>开始:</Text> {record.startedAt?.substring(11, 19) || '-'}</div>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>完成:</Text> {record.completedAt?.substring(11, 19) || '-'}</div>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>耗时:</Text> 
+              <Text style={{ fontSize: 10, color: duration > 300000 ? '#ff4d4f' : undefined }}>
+                {formatDuration(duration)}
+              </Text>
+            </div>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>修改:</Text> {record.fileLastModified?.substring(0, 10) || '-'}</div>
           </div>
-          <div><Text type="secondary" style={{ fontSize: 10 }}>修改:</Text> {record.fileLastModified?.substring(0, 10) || '-'}</div>
-        </div>
-      )
+        );
+      }
     },
     {
       title: '重试信息',

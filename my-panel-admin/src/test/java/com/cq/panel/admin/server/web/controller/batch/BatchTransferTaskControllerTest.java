@@ -3,6 +3,7 @@ package com.cq.panel.admin.server.web.controller.batch;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -12,6 +13,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.*;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -29,6 +31,9 @@ class BatchTransferTaskControllerTest {
     @Mock
     private IBatchTransferTaskService batchTransferTaskService;
 
+    @Mock
+    private AgentDirectoryChecker directoryChecker;
+
     private BatchTransferTaskController controller;
 
     @BeforeEach
@@ -36,7 +41,7 @@ class BatchTransferTaskControllerTest {
         MockitoAnnotations.openMocks(this);
 
         // 创建控制器实例
-        controller = new BatchTransferTaskController(batchTransferTaskService);
+        controller = new BatchTransferTaskController(batchTransferTaskService, directoryChecker);
         
         // 使用spy包装控制器以支持mock getUserId()
         controller = spy(controller);
@@ -298,6 +303,62 @@ class BatchTransferTaskControllerTest {
             .andExpect(jsonPath("$.data.length()").value(1));
 
         System.out.println("✅ 状态过滤查询正常");
+    }
+
+    // ==================== 目录检查接口测试 ====================
+
+    @Test
+    @DisplayName("18. GET /batch/task/check-dir - 目录存在")
+    void testCheckDirectory_exists() throws Exception {
+        when(directoryChecker.checkDirectoryExists("agent-001", "/var/log/app"))
+            .thenReturn(true);
+
+        mockMvc.perform(get("/batch/task/check-dir")
+                .param("agentId", "agent-001")
+                .param("dirPath", "/var/log/app"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.exists").value(true))
+            .andExpect(jsonPath("$.data.status").value("exists"))
+            .andExpect(jsonPath("$.data.message").value("目录存在"));
+
+        System.out.println("✅ 目录存在检查正常");
+    }
+
+    @Test
+    @DisplayName("19. GET /batch/task/check-dir - 目录不存在")
+    void testCheckDirectory_notExists() throws Exception {
+        when(directoryChecker.checkDirectoryExists("agent-001", "/nonexistent/path"))
+            .thenReturn(false);
+
+        mockMvc.perform(get("/batch/task/check-dir")
+                .param("agentId", "agent-001")
+                .param("dirPath", "/nonexistent/path"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.exists").value(false))
+            .andExpect(jsonPath("$.data.status").value("not_exists"))
+            .andExpect(jsonPath("$.data.message").value("目录不存在"));
+
+        System.out.println("✅ 目录不存在检查正常");
+    }
+
+    @Test
+    @DisplayName("20. GET /batch/task/check-dir - 检查失败(未知)")
+    void testCheckDirectory_unknown() throws Exception {
+        when(directoryChecker.checkDirectoryExists("agent-001", "/var/log/app"))
+            .thenReturn(null);
+
+        mockMvc.perform(get("/batch/task/check-dir")
+                .param("agentId", "agent-001")
+                .param("dirPath", "/var/log/app"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.exists").value(nullValue()))
+            .andExpect(jsonPath("$.data.status").value("unknown"))
+            .andExpect(jsonPath("$.data.message").value("无法检查（Agent离线或网络异常）"));
+
+        System.out.println("✅ 目录检查未知状态正常");
     }
 
     // ==================== 辅助方法 ====================

@@ -4,6 +4,7 @@ import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
+import com.cq.panel.common.dto.batch.TransferConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
@@ -362,6 +363,12 @@ class P2PFileTransferTddTest {
         scanConfig.setCronExpression("0 */5 * * * ?");
         config.setScanConfig(scanConfig);
         config.setStatus("RUNNING");
+
+        TransferConfig transferConfig = new TransferConfig();
+        transferConfig.setTransferMode("ONE_TO_ONE");
+        transferConfig.setPreserveDirStructure(false);
+        config.setTransferConfig(transferConfig);
+
         return config;
     }
 

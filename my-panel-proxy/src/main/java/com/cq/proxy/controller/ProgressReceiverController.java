@@ -217,6 +217,11 @@ public class ProgressReceiverController {
         if (dto.getTaskId() != null)
             subtask.setTaskId(dto.getTaskId());
 
+        if (dto.getScanBatchId() != null)
+            subtask.setScanBatchId(dto.getScanBatchId());
+        if (dto.getFileBatchId() != null)
+            subtask.setFileBatchId(dto.getFileBatchId());
+
         if (dto.getSourceAgentId() != null)
             subtask.setSourceAgentId(dto.getSourceAgentId());
         if (dto.getSourceAgentName() != null)

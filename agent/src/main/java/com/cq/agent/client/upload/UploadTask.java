@@ -27,6 +27,8 @@ public class UploadTask implements TaskInfo {
     /** 监听器状态恢复字段（用于重启恢复场景） */
     private Long taskId;
     private Long subtaskId;
+    private Long scanBatchId;
+    private Long fileBatchId;
     private String fileName;
     private long fileSize;
 

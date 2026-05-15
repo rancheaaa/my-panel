@@ -18,7 +18,8 @@ public interface BatchTransferSubtaskMapper {
      */
     @Insert("""
             INSERT INTO batch_transfer_subtask (
-                id, task_id, source_agent_id, source_agent_name,
+                id, task_id, scan_batch_id, file_batch_id,
+                source_agent_id, source_agent_name,
                 target_agent_id, target_agent_name,
                 source_path, target_path, file_name, file_size_bytes, file_last_modified,
                 status, transfer_id,
@@ -28,7 +29,8 @@ public interface BatchTransferSubtaskMapper {
                 retry_count, last_retry_at, next_retry_after,
                 create_by, create_time, update_by, update_time, remark
             ) VALUES (
-                #{id}, #{taskId}, #{sourceAgentId}, #{sourceAgentName},
+                #{id}, #{taskId}, #{scanBatchId}, #{fileBatchId},
+                #{sourceAgentId}, #{sourceAgentName},
                 #{targetAgentId}, #{targetAgentName},
                 #{sourcePath}, #{targetPath}, #{fileName}, #{fileSizeBytes}, #{fileLastModified},
                 #{status}, #{transferId},

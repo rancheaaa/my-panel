@@ -42,6 +42,8 @@ public class BatchUploadListener implements UploadListener {
      */
     @Getter
     private Long taskId;
+    private final Long scanBatchId;
+    private final Long fileBatchId;
     private final ScannedFile scannedFile;
     private final AgentTaskConfig config;
     private final TargetAgentInfo targetAgent;
@@ -92,11 +94,18 @@ public class BatchUploadListener implements UploadListener {
      * @param config           任务配置
      * @param targetAgent      目标Agent信息（一个源文件发给一个目标Agent对应一个子任务）
      * @param progressReporter 进度上报器
+     * @param successQueueDir  上传成功队列目录
+     * @param sendingQueueDir  发送中队列目录
+     * @param scanBatchId      扫描批次ID
+     * @param fileBatchId      文件批次ID
      */
     public BatchUploadListener(Long taskId, ScannedFile scannedFile,
             AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
-            String successQueueDir, String sendingQueueDir) {
+            String successQueueDir, String sendingQueueDir,
+            Long scanBatchId, Long fileBatchId) {
         this.taskId = taskId;
+        this.scanBatchId = scanBatchId;
+        this.fileBatchId = fileBatchId;
         this.scannedFile = scannedFile;
         this.config = config;
         this.targetAgent = targetAgent;
@@ -110,9 +119,34 @@ public class BatchUploadListener implements UploadListener {
 
         // 立即创建子任务到Proxy数据库
         createSubTaskOnProxy();
-        log.info("✅ 新建上传监听器: subtaskId={}, file={}, target={}",
+        log.info("✅ 新建上传监听器: subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
                 subtaskId, scannedFile.getFileName(),
-                targetAgent != null ? targetAgent.getAgentId() : "null");
+                targetAgent != null ? targetAgent.getAgentId() : "null",
+                scanBatchId, fileBatchId);
+    }
+
+    /**
+     * 测试用构造函数 - 仅用于单元测试，不触发子任务创建
+     */
+    BatchUploadListener(Long taskId, ScannedFile scannedFile,
+            AgentTaskConfig config, TargetAgentInfo targetAgent) {
+        this.taskId = taskId;
+        this.scanBatchId = null;
+        this.fileBatchId = null;
+        this.scannedFile = scannedFile;
+        this.config = config;
+        this.targetAgent = targetAgent;
+        this.progressReporter = null;
+        this.successQueueDir = null;
+        this.sendingQueueDir = null;
+        this.subtaskId = null;
+    }
+
+    /**
+     * 测试用方法 - 暴露computeTargetPath供单元测试调用
+     */
+    String computeTargetPathForTest() {
+        return computeTargetPath();
     }
 
     /**
@@ -141,6 +175,8 @@ public class BatchUploadListener implements UploadListener {
             SubTaskEvent event = new SubTaskEvent();
             event.setSubtaskId(subtaskId);
             event.setTaskId(taskId);
+            event.setScanBatchId(scanBatchId);
+            event.setFileBatchId(fileBatchId);
             event.setStatus("QUEUED");
 
             // Agent信息
@@ -187,6 +223,14 @@ public class BatchUploadListener implements UploadListener {
             task.setSubtaskId(subtaskId);
         }
 
+        if (scanBatchId != null && task.getScanBatchId() == null) {
+            task.setScanBatchId(scanBatchId);
+        }
+
+        if (fileBatchId != null && task.getFileBatchId() == null) {
+            task.setFileBatchId(fileBatchId);
+        }
+
         if (task.getTransferId() != null) {
             this.currentTransferId = task.getTransferId();
         }
@@ -204,27 +248,29 @@ public class BatchUploadListener implements UploadListener {
             }
         }
 
-        log.debug("📝 onBeforeSend已设置任务信息: transferId={}, taskId={}, subtaskId={}, fileName={}",
-                task.getTransferId(), taskId, subtaskId,
+        log.debug("📝 onBeforeSend已设置任务信息: transferId={}, taskId={}, subtaskId={}, scanBatch={}, fileBatch={}, fileName={}",
+                task.getTransferId(), taskId, subtaskId, scanBatchId, fileBatchId,
                 scannedFile != null ? scannedFile.getFileName() : "null");
     }
 
     @Override
     public void onProgress(int totalChunks, int uploadedChunks, double progress) {
         if (scannedFile == null || subtaskId == null) {
-            log.warn("⚠️ 状态不完整，跳过进度上报: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
+            log.warn("️ 状态不完整，跳过进度上报: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
             return;
         }
 
-        log.debug("📊 上传进度: subtask={}, file={}, {}/{} ({}%)",
-                subtaskId, scannedFile.getFileName(), uploadedChunks, totalChunks, progress);
+        // progress来自AgentUploader，是0-100的百分比，需转为0-1的比例
+        double clampedProgress = Math.min(1.0, Math.max(0.0, progress / 100.0));
 
-        // 记录实际的分块数量（第一次调用时）
+        log.debug(" 上传进度: subtask={}, file={}, {}/{} ({}%)",
+                subtaskId, scannedFile.getFileName(), uploadedChunks, totalChunks,
+                String.format("%.1f", clampedProgress * 100));
+
         if (actualTotalChunks == null && totalChunks > 0) {
             actualTotalChunks = totalChunks;
         }
 
-        // 记录传输开始时间（第一次进度回调时）
         if (transferStartTime == null) {
             transferStartTime = System.currentTimeMillis();
         }
@@ -233,9 +279,10 @@ public class BatchUploadListener implements UploadListener {
             SubTaskEvent event = buildProgressEvent();
             event.setTransferredChunks(uploadedChunks);
             event.setTotalChunks(totalChunks);
-            event.setTransferredBytes((long) (scannedFile.getFileSize() * progress));
+            long transferredBytes = (long) (scannedFile.getFileSize() * clampedProgress);
+            event.setTransferredBytes(transferredBytes);
             event.setTotalBytes(scannedFile.getFileSize());
-            event.setSpeedBytesPerSec(calculateSpeedBytesPerSec(progress));
+            event.setSpeedBytesPerSec(calculateSpeedBytesPerSec(clampedProgress));
             if (currentTransferId != null) {
                 event.setTransferId(currentTransferId);
             }
@@ -424,27 +471,14 @@ public class BatchUploadListener implements UploadListener {
         long currentTransferredBytes = (long) (scannedFile.getFileSize() * progress);
         long currentTime = System.currentTimeMillis();
 
-        // 首次调用时，只记录不返回速度
-        if (lastTransferredBytes == 0 && progress < 1.0) {
-            lastTransferredBytes = currentTransferredBytes;
-            lastUpdateTime = currentTime;
-            return null;
-        }
-
-        long timeDiffMs = currentTime - lastUpdateTime;
-        if (timeDiffMs == 0)
+        if (transferStartTime == null)
             return null;
 
-        long bytesDiff = currentTransferredBytes - lastTransferredBytes;
-        long speedBytesPerSec = bytesDiff * 1000 / timeDiffMs;
+        long elapsedMs = currentTime - transferStartTime;
+        if (elapsedMs <= 0)
+            return null;
 
-        // 更新状态（只在进度增加时更新）
-        if (bytesDiff > 0) {
-            lastTransferredBytes = currentTransferredBytes;
-            lastUpdateTime = currentTime;
-        }
-
-        return speedBytesPerSec > 0 ? speedBytesPerSec : null;
+        return currentTransferredBytes * 1000L / elapsedMs;
     }
 
     private String computeTargetPath() {
@@ -461,13 +495,23 @@ public class BatchUploadListener implements UploadListener {
 
         String relativePath;
         if (preserveDir) {
-            String sourceDir = config != null ? config.getSourceDir() : null;
-            if (sourceDir != null && scannedFile.getAbsolutePath().startsWith(sourceDir)) {
-                relativePath = scannedFile.getAbsolutePath().substring(sourceDir.length());
-                if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
-                    relativePath = relativePath.substring(1);
+            String sourceDir = config.getSourceDir();
+            if (sourceDir != null && !sourceDir.trim().isEmpty()) {
+                String absPath = normalizePathSeparator(scannedFile.getAbsolutePath());
+                String normSourceDir = normalizePathSeparator(sourceDir);
+
+                if (absPath.startsWith(normSourceDir)) {
+                    relativePath = absPath.substring(normSourceDir.length());
+                    if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
+                        relativePath = relativePath.substring(1);
+                    }
+                    relativePath = relativePath.replace("\\", "/");
+                } else {
+                    log.warn("⚠️ preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}", sourceDir, scannedFile.getAbsolutePath());
+                    relativePath = scannedFile.getFileName();
                 }
             } else {
+                log.warn("⚠️ preserveDirStructure=true但sourceDir为空，使用文件名");
                 relativePath = scannedFile.getFileName();
             }
         } else {
@@ -475,7 +519,16 @@ public class BatchUploadListener implements UploadListener {
         }
 
         String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
-        return targetDir + separator + relativePath;
+        String result = targetDir + separator + relativePath;
+        log.debug("📁 computeTargetPath: preserveDir={}, sourceDir={}, sourceFile={}, relativePath={}, targetPath={}",
+                preserveDir, config != null ? config.getSourceDir() : "null",
+                scannedFile.getAbsolutePath(), relativePath, result);
+        return result;
+    }
+
+    private String normalizePathSeparator(String path) {
+        if (path == null) return null;
+        return path.replace("/", "\\").trim();
     }
 
     /**

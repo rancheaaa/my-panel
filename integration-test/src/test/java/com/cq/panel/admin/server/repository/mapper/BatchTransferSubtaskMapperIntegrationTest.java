@@ -166,6 +166,8 @@ class BatchTransferSubtaskMapperIntegrationTest {
             CREATE TABLE IF NOT EXISTS batch_transfer_subtask (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 task_id BIGINT NOT NULL,
+                scan_batch_id BIGINT,
+                file_batch_id BIGINT,
                 source_agent_id VARCHAR(50) NOT NULL,
                 source_agent_name VARCHAR(100),
                 target_agent_id VARCHAR(50) NOT NULL,

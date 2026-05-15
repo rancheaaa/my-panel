@@ -20,6 +20,8 @@ public class SubTaskEvent {
 
     private Long subtaskId;
     private Long taskId;
+    private Long scanBatchId;
+    private Long fileBatchId;
     private String transferId;
 
     /** Agent信息 */

@@ -2,13 +2,16 @@ package com.cq.panel.admin.server.service.batch.impl;
 
 import com.cq.panel.admin.server.repository.domain.BatchSyncEvent;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
+import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
 import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
 import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
 import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 
@@ -42,14 +45,20 @@ class BatchTransferTaskTransactionTest {
         configSerializer = mock(BatchConfigSerializer.class);
         WildcardConflictDetector conflictDetector = mock(WildcardConflictDetector.class);
         CronExpressionValidator cronValidator = mock(CronExpressionValidator.class);
+        AgentRegistryMapper agentRegistryMapper = mock(AgentRegistryMapper.class);
+        AgentDirectoryChecker directoryChecker = mock(AgentDirectoryChecker.class);
+        ObjectMapper objectMapper = mock(ObjectMapper.class);
 
         service = new BatchTransferTaskServiceImpl(
             taskMapper,
             mock(BatchTransferSubtaskMapper.class),
             eventMapper,
+            agentRegistryMapper,
+            directoryChecker,
             conflictDetector,
             cronValidator,
-            configSerializer
+            configSerializer,
+            objectMapper
         );
 
         // 默认行为：无冲突

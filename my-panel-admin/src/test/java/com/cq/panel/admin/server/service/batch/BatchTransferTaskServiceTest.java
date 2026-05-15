@@ -2,14 +2,17 @@ package com.cq.panel.admin.server.service.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchSyncEvent;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
+import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
 import com.cq.panel.admin.server.service.batch.impl.BatchTransferTaskServiceImpl;
+import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
 import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
 import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
 import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -37,11 +40,20 @@ class BatchTransferTaskServiceTest {
     @Mock
     private BatchSyncEventMapper eventMapper;
 
+    @Mock
+    private AgentRegistryMapper agentRegistryMapper;
+
+    @Mock
+    private AgentDirectoryChecker directoryChecker;
+
     private WildcardConflictDetector conflictDetector;
     private CronExpressionValidator cronValidator;
 
     @Mock
     private BatchConfigSerializer configSerializer;
+
+    @Mock
+    private ObjectMapper objectMapper;
     
     private IBatchTransferTaskService taskService;
 
@@ -56,9 +68,12 @@ class BatchTransferTaskServiceTest {
             taskMapper,
             subtaskMapper,
             eventMapper,
+            agentRegistryMapper,
+            directoryChecker,
             conflictDetector,
             cronValidator,
-            configSerializer
+            configSerializer,
+            objectMapper
         );
     }
 

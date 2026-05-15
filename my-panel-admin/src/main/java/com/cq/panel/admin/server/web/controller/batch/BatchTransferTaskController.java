@@ -5,7 +5,9 @@ import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
+import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,9 +30,12 @@ import java.util.Map;
 public class BatchTransferTaskController extends BaseController {
 
     private final IBatchTransferTaskService batchTransferTaskService;
+    private final AgentDirectoryChecker directoryChecker;
 
-    public BatchTransferTaskController(IBatchTransferTaskService batchTransferTaskService) {
+    public BatchTransferTaskController(IBatchTransferTaskService batchTransferTaskService,
+                                       AgentDirectoryChecker directoryChecker) {
         this.batchTransferTaskService = batchTransferTaskService;
+        this.directoryChecker = directoryChecker;
     }
 
     /**
@@ -123,6 +128,22 @@ public class BatchTransferTaskController extends BaseController {
     }
 
     /**
+     * 查询任务列表（包含节点在线状态和目录存在状态）
+     */
+    @Operation(summary = "查询任务列表（带节点状态）", description = "查询任务列表，同时返回源节点和目标节点的在线状态及目录是否存在")
+    @RequirePermission("batch:task:list")
+    @GetMapping("/list-with-status")
+    public Result<List<TaskListWithStatusVO>> listWithStatus(
+            @Parameter(description = "任务状态(可选): READY/RUNNING/PAUSED") @RequestParam(required = false) String status,
+            @Parameter(description = "源Agent ID(可选)") @RequestParam(required = false) String sourceAgentId,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
+            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer pageSize) {
+        
+        List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(status, sourceAgentId, pageNum, pageSize);
+        return Result.success(list);
+    }
+
+    /**
      * 获取全局任务统计信息
      */
     @Operation(summary = "获取全局任务统计", description = "获取各状态的任务数量统计")
@@ -147,6 +168,37 @@ public class BatchTransferTaskController extends BaseController {
         } catch (IllegalArgumentException e) {
             return Result.error("参数错误: " + e.getMessage());
         }
+    }
+
+    /**
+     * 检查目录是否存在
+     */
+    @Operation(summary = "检查目录是否存在", description = "通过调用Agent接口检查指定目录是否存在")
+    @RequirePermission("batch:task:query")
+    @GetMapping("/check-dir")
+    public Result<Map<String, Object>> checkDirectory(
+            @Parameter(description = "Agent节点ID", required = true) @RequestParam String agentId,
+            @Parameter(description = "目录路径", required = true) @RequestParam String dirPath) {
+        
+        Boolean exists = directoryChecker.checkDirectoryExists(agentId, dirPath);
+        
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("agentId", agentId);
+        result.put("dirPath", dirPath);
+        result.put("exists", exists);
+        
+        if (exists == null) {
+            result.put("status", "unknown");
+            result.put("message", "无法检查（Agent离线或网络异常）");
+        } else if (exists) {
+            result.put("status", "exists");
+            result.put("message", "目录存在");
+        } else {
+            result.put("status", "not_exists");
+            result.put("message", "目录不存在");
+        }
+        
+        return Result.success(result);
     }
 
     // ==================== 状态管理接口 ====================

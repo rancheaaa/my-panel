@@ -455,16 +455,25 @@ public class BatchUploadListener implements UploadListener {
         if (targetDir == null) {
             return null;
         }
-        String sourceDir = config != null ? config.getSourceDir() : null;
+
+        TransferConfig transferConfig = config != null ? config.getTransferConfig() : null;
+        boolean preserveDir = transferConfig != null && transferConfig.isPreserveDirStructure();
+
         String relativePath;
-        if (sourceDir != null && scannedFile.getAbsolutePath().startsWith(sourceDir)) {
-            relativePath = scannedFile.getAbsolutePath().substring(sourceDir.length());
-            if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
-                relativePath = relativePath.substring(1);
+        if (preserveDir) {
+            String sourceDir = config != null ? config.getSourceDir() : null;
+            if (sourceDir != null && scannedFile.getAbsolutePath().startsWith(sourceDir)) {
+                relativePath = scannedFile.getAbsolutePath().substring(sourceDir.length());
+                if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
+                    relativePath = relativePath.substring(1);
+                }
+            } else {
+                relativePath = scannedFile.getFileName();
             }
         } else {
             relativePath = scannedFile.getFileName();
         }
+
         String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
         return targetDir + separator + relativePath;
     }

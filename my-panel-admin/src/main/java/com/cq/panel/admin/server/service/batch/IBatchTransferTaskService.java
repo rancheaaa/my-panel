@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.service.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
 
 import java.util.List;
 import java.util.Map;
@@ -32,4 +33,6 @@ public interface IBatchTransferTaskService {
     Map<String, Object> getStatistics();
 
     Map<String, Object> getTaskStatistics(Long taskId);
+
+    List<TaskListWithStatusVO> getTaskListWithNodeStatus(String status, String sourceAgentId, Integer pageNum, Integer pageSize);
 }

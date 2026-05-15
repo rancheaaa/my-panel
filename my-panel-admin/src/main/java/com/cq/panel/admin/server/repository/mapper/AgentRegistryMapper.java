@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.repository.mapper;
 
 import java.util.List;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * Agent注册信息Mapper接口
@@ -80,4 +81,12 @@ public interface AgentRegistryMapper
      * @return 在线节点列表
      */
     List<AgentRegistry> selectOnlineNodes();
+
+    /**
+     * 根据ID列表批量查询Agent注册信息
+     * 
+     * @param ids Agent ID列表
+     * @return Agent注册信息集合
+     */
+    List<AgentRegistry> selectAgentRegistryByIds(@Param("ids") List<String> ids);
 }

@@ -81,7 +81,7 @@ public class AgentPushService {
      * 推送删除指令到Agent
      *
      * @param sourceAgentId 源Agent ID
-     * @param payload       删除指令JSON
+     * @param payload       任务配置JSON(从中提取taskId)
      * @return 是否推送成功
      */
     public boolean pushDeleteToAgent(String sourceAgentId, String payload) {
@@ -90,32 +90,41 @@ public class AgentPushService {
             throw new AgentNotFoundException("Agent not found or offline: " + sourceAgentId);
         }
 
+        Long taskId;
+        try {
+            taskId = objectMapper.readTree(payload).path("taskId").asLong();
+        } catch (Exception e) {
+            log.error("解析payload失败: agentId={}, error={}", sourceAgentId, e.getMessage());
+            throw new RuntimeException("Parse payload failed: " + e.getMessage(), e);
+        }
+
+        String deleteBody = String.format("{\"taskId\":%d,\"action\":\"DELETE\"}", taskId);
+
         String url = buildAgentUrl(address, AGENT_CONTROL_ENDPOINT);
-        log.info("📤 推送删除指令到Agent: agentId={}, url={}", sourceAgentId, url);
+        log.info("推送删除指令到Agent: agentId={}, taskId={}, url={}", sourceAgentId, taskId, url);
 
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> requestEntity = new HttpEntity<>(payload, headers);
+            HttpEntity<String> requestEntity = new HttpEntity<>(deleteBody, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful()) {
-                log.error("❌ 推送删除指令失败: agentId={}, statusCode={}", sourceAgentId, response.getStatusCode().value());
+                log.error("推送删除指令失败: agentId={}, statusCode={}", sourceAgentId, response.getStatusCode().value());
                 return false;
             }
 
-            String responseBody = response.getBody();
-            if (isDeleteConfirmed(responseBody)) {
-                log.info("✅ Agent确认删除指令: agentId={}", sourceAgentId);
+            if (isDeleteConfirmed(response.getBody())) {
+                log.info("Agent确认删除指令: agentId={}, taskId={}", sourceAgentId, taskId);
                 return true;
             }
 
-            log.warn("⚠️ Agent未确认删除: agentId={}, response={}", sourceAgentId, responseBody);
+            log.warn("Agent未确认删除: agentId={}, response={}", sourceAgentId, response.getBody());
             return false;
 
         } catch (Exception e) {
-            log.error("❌ 推送删除指令异常: agentId={}, error={}", sourceAgentId, e.getMessage());
+            log.error("推送删除指令异常: agentId={}, error={}", sourceAgentId, e.getMessage());
             throw new RuntimeException("Push delete failed: " + e.getMessage(), e);
         }
     }
@@ -179,7 +188,7 @@ public class AgentPushService {
 
     /**
      * 解析Agent响应，验证删除指令是否被确认
-     * 符合spec.md格式：{"success":true,"data":{"deleted":true}}
+     * Agent实际返回格式：{"success":true,"data":{"success":true,"taskId":xxx,"action":"DELETE","message":"任务已删除"}}
      *
      * @param responseBody 响应体JSON字符串
      * @return 是否确认删除
@@ -194,7 +203,7 @@ public class AgentPushService {
                 return false;
             }
             JsonNode data = root.path("data");
-            return data.path("deleted").asBoolean(false);
+            return data.path("success").asBoolean(false) || data.path("deleted").asBoolean(false);
         } catch (Exception e) {
             log.warn("⚠️ 解析Agent删除响应失败: {}, error={}", responseBody, e.getMessage());
             return false;

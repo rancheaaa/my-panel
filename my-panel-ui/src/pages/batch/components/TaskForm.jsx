@@ -15,9 +15,11 @@ import {
   PlusOutlined,
   MinusCircleOutlined,
   SearchOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  LoadingOutlined
 } from '@ant-design/icons';
 import { listAgentRegistry } from '../../../api/agent';
+import { batchApi } from '../../../api/batch';
 
 const { TextArea } = Input;
 
@@ -64,9 +66,99 @@ const inputStyle = {
   height: 34
 };
 
-const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
+const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'create' }) => {
   const [form] = Form.useForm();
   const [agentList, setAgentList] = useState([]);
+  const [transferMode, setTransferMode] = useState('ONE_TO_ONE');
+  const [sourceDirStatus, setSourceDirStatus] = useState(null);
+  const [targetDirStatuses, setTargetDirStatuses] = useState({});
+  const isDisabled = mode === 'detail';
+  const isCreate = mode === 'create';
+
+  const checkDirectory = async (agentId, dirPath, type, index = null) => {
+    if (!agentId || !dirPath) {
+      if (type === 'source') {
+        setSourceDirStatus(null);
+      } else {
+        setTargetDirStatuses(prev => {
+          const next = { ...prev };
+          delete next[index];
+          return next;
+        });
+      }
+      return;
+    }
+
+    try {
+      const res = await batchApi.checkDirectory(agentId, dirPath);
+      if (res.data) {
+        const status = res.data.status;
+        if (type === 'source') {
+          setSourceDirStatus(status);
+        } else {
+          setTargetDirStatuses(prev => ({ ...prev, [index]: status }));
+        }
+      }
+    } catch (error) {
+      console.error('检查目录失败:', error);
+      if (type === 'source') {
+        setSourceDirStatus('unknown');
+      } else {
+        setTargetDirStatuses(prev => ({ ...prev, [index]: 'unknown' }));
+      }
+    }
+  };
+
+  const renderDirStatusTag = (status) => {
+    if (!status) return null;
+
+    if (status === 'exists') {
+      return <Tag color="success" style={{ marginLeft: 8, fontSize: 11 }}>目录存在</Tag>;
+    }
+    if (status === 'not_exists') {
+      return <Tag color="error" style={{ marginLeft: 8, fontSize: 11 }}>目录不存在</Tag>;
+    }
+    return <Tag color="default" style={{ marginLeft: 8, fontSize: 11 }}>未知</Tag>;
+  };
+
+  const handleTargetsChange = (targets) => {
+    const count = targets?.filter(t => t && t.agentId !== undefined).length || 0;
+    const mode = count <= 1 ? 'ONE_TO_ONE' : 'ONE_TO_MANY';
+    setTransferMode(mode);
+    form.setFieldsValue({ transferMode: mode });
+  };
+
+  useEffect(() => {
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      const transformed = { ...initialValues };
+      if (initialValues.includePatterns && typeof initialValues.includePatterns === 'string') {
+        try { transformed.includePatterns = JSON.parse(initialValues.includePatterns); } catch (e) { transformed.includePatterns = []; }
+      }
+      if (initialValues.excludePatterns && typeof initialValues.excludePatterns === 'string') {
+        try { transformed.excludePatterns = JSON.parse(initialValues.excludePatterns); } catch (e) { transformed.excludePatterns = []; }
+      }
+      if (initialValues.retryEnabled !== undefined && typeof initialValues.retryEnabled !== 'boolean') {
+        transformed.retryEnabled = initialValues.retryEnabled === 1;
+      }
+      if (initialValues.preserveDirStructure !== undefined && typeof initialValues.preserveDirStructure !== 'boolean') {
+        transformed.preserveDirStructure = initialValues.preserveDirStructure === 1;
+      }
+      if (initialValues.targetAgentIds) {
+        const targetAgentIds = Array.isArray(initialValues.targetAgentIds)
+          ? initialValues.targetAgentIds
+          : (() => { try { return JSON.parse(initialValues.targetAgentIds); } catch (e) { return []; } })();
+        const targetDirs = (initialValues.targetDirs || '').split(';').filter(Boolean);
+        transformed.targets = targetAgentIds.map((id, idx) => ({
+          agentId: id,
+          dir: targetDirs[idx] || ''
+        }));
+      }
+      form.setFieldsValue(transformed);
+      if (transformed.transferMode) {
+        setTransferMode(transformed.transferMode);
+      }
+    }
+  }, [initialValues]);
 
   const loadAgentList = async () => {
     try {
@@ -105,6 +197,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
 
     const data = {
       ...values,
+      transferMode: transferMode,
       includePatterns: values.includePatterns || [],
       excludePatterns: values.excludePatterns || [],
       sourceAgentName,
@@ -121,15 +214,20 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
 
   return (
     <div style={{ width: '100%' }}>
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={initialValues}
-        onFinish={onFinish}
-        requiredMark={false}
-        size="middle"
-        style={{ marginTop: 4 }}
-      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={initialValues}
+          onFinish={onFinish}
+          requiredMark={false}
+          size="middle"
+          style={{ marginTop: 4 }}
+          onValuesChange={(changedValues, allValues) => {
+            if (changedValues.targets !== undefined) {
+              handleTargetsChange(allValues.targets);
+            }
+          }}
+        >
         {/* 第一行：基本信息 */}
         <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
           <div style={headerStyle('#1890ff')}>
@@ -138,10 +236,10 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
             <Tag color="blue" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
           </div>
           <Form.Item label={<span>任务名称 <span style={{ color: '#ff4d4f' }}>*</span></span>} name="taskName" rules={[{ required: true }]} style={formItemStyle}>
-            <Input placeholder="例如: 生产环境日志文件备份任务" maxLength={100} showCount prefix={<FileTextOutlined style={{ color: '#bfbfbf' }} />} style={inputStyle} />
+            <Input placeholder="例如: 生产环境日志文件备份任务" maxLength={100} showCount prefix={<FileTextOutlined style={{ color: '#bfbfbf' }} />} style={inputStyle} disabled={isDisabled} />
           </Form.Item>
           <Form.Item label="任务描述" name="taskDescription" style={formItemStyle}>
-            <TextArea rows={2} placeholder="简要描述此任务的用途和注意事项..." maxLength={500} showCount style={{ borderRadius: 6 }} />
+            <TextArea rows={2} placeholder="简要描述此任务的用途和注意事项..." maxLength={500} showCount style={{ borderRadius: 6 }} disabled={isDisabled} />
           </Form.Item>
         </Card>
 
@@ -173,6 +271,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                   }
                   size="small"
                   style={{ width: '100%', borderRadius: 5, height: 30 }}
+                  disabled={isDisabled}
                 >
                   {agentList.map(agent => (
                     <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
@@ -191,8 +290,19 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 2 }}>源目录</div>
               <Form.Item name="sourceDir" rules={[{ required: true, message: '请输入源目录' }]} noStyle>
-                <Input placeholder="/var/log/app" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<FilterOutlined style={{ color: '#52c41a', fontSize: 12 }} />} />
+                <Input
+                  placeholder="/var/log/app"
+                  size="small"
+                  style={{ borderRadius: 5, height: 30 }}
+                  prefix={<FilterOutlined style={{ color: '#52c41a', fontSize: 12 }} />}
+                  disabled={isDisabled}
+                  onBlur={(e) => {
+                    const sourceAgentId = form.getFieldValue('sourceAgentId');
+                    checkDirectory(sourceAgentId, e.target.value, 'source');
+                  }}
+                />
               </Form.Item>
+              {renderDirStatusTag(sourceDirStatus)}
             </div>
           </div>
         </Card>
@@ -230,6 +340,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                           }
                           size="small"
                           style={{ width: '100%', borderRadius: 5, height: 30 }}
+                          disabled={isDisabled}
                         >
                           {agentList.map(agent => (
                             <Select.Option key={agent.id} value={agent.id} label={agent.nodeName || `${agent.agentIp}:${agent.agentPort}`}>
@@ -248,20 +359,34 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, color: '#aaa', marginBottom: 2 }}>接收目录</div>
                       <Form.Item {...restField} name={[name, 'dir']} rules={[{ required: true, message: '请输入接收目录' }]} noStyle>
-                        <Input placeholder="/backup/node-02/logs" size="small" style={{ borderRadius: 5, height: 30 }} prefix={<FilterOutlined style={{ color: '#722ed1', fontSize: 12 }} />} />
+                        <Input
+                          placeholder="/backup/node-02/logs"
+                          size="small"
+                          style={{ borderRadius: 5, height: 30 }}
+                          prefix={<FilterOutlined style={{ color: '#722ed1', fontSize: 12 }} />}
+                          disabled={isDisabled}
+                          onBlur={(e) => {
+                            const targets = form.getFieldValue('targets');
+                            const targetAgentId = targets?.[name]?.agentId;
+                            checkDirectory(targetAgentId, e.target.value, 'target', key);
+                          }}
+                        />
                       </Form.Item>
+                      {renderDirStatusTag(targetDirStatuses[key])}
                     </div>
-                    {fields.length > 1 && (
+                    {fields.length > 1 && !isDisabled && (
                       <div style={{ paddingTop: 15, flexShrink: 0, paddingLeft: 2 }}>
                         <MinusCircleOutlined onClick={() => remove(name)} style={{ fontSize: 16, color: '#ff4d4f', cursor: 'pointer' }} />
                       </div>
                     )}
                   </div>
                 ))}
-                <Button type="dashed" onClick={() => add({ agentId: undefined, dir: undefined })} block icon={<PlusOutlined />} size="small"
-                  style={{ borderRadius: 6, borderColor: '#722ed1', color: '#722ed1', height: 32, marginTop: 8 }}>
-                  添加目标节点
-                </Button>
+                {!isDisabled && (
+                  <Button type="dashed" onClick={() => add({ agentId: undefined, dir: undefined })} block icon={<PlusOutlined />} size="small"
+                    style={{ borderRadius: 6, borderColor: '#722ed1', color: '#722ed1', height: 32, marginTop: 8 }}>
+                    添加目标节点
+                  </Button>
+                )}
               </div>
             )}
           </Form.List>
@@ -277,11 +402,14 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                 <Tag color="orange" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
               </div>
               <Row gutter={12}>
-                <Col span={12}><Form.Item label="传输模式" name="transferMode" initialValue="ONE_TO_MANY" style={{ ...formItemStyle, marginBottom: 10 }}>
-                  <Select size="small"><Select.Option value="ONE_TO_ONE">一对一</Select.Option><Select.Option value="ONE_TO_MANY">一对多</Select.Option></Select>
+                <Col span={12}><Form.Item label="传输模式" name="transferMode" initialValue={transferMode} style={{ ...formItemStyle, marginBottom: 10 }}>
+                  <Select size="small" disabled>
+                    <Select.Option value="ONE_TO_ONE">一对一</Select.Option>
+                    <Select.Option value="ONE_TO_MANY">一对多</Select.Option>
+                  </Select>
                 </Form.Item></Col>
                 <Col span={12}><Form.Item label="路由策略" name="routingStrategy" initialValue="ROUND_ROBIN" style={{ ...formItemStyle, marginBottom: 10 }}>
-                  <Select size="small">
+                  <Select size="small" disabled={isDisabled}>
                     <Select.Option value="ROUND_ROBIN"><Tag color="blue" style={{ fontSize: 11, marginRight: 0 }}>轮询</Tag></Select.Option>
                     <Select.Option value="RANDOM"><Tag color="geekblue" style={{ fontSize: 11, marginRight: 0 }}>随机</Tag></Select.Option>
                     <Select.Option value="REGION_BASED"><Tag color="purple" style={{ fontSize: 11, marginRight: 0 }}>区域</Tag></Select.Option>
@@ -290,7 +418,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                 </Form.Item></Col>
               </Row>
               <Form.Item label="保持目录结构" name="preserveDirStructure" valuePropName="checked" initialValue={true} style={{ ...formItemStyle, marginBottom: 0 }}>
-                <Switch checkedChildren="保持" unCheckedChildren="扁平" size="small" />
+                <Switch checkedChildren="保持" unCheckedChildren="扁平" size="small" disabled={isDisabled} />
               </Form.Item>
             </Card>
           </Col>
@@ -301,7 +429,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                 <span style={titleStyle}>重试策略</span>
                 <Tag color="default" style={{ marginLeft: 'auto', fontSize: 11 }}>选填</Tag>
                 <Form.Item name="retryEnabled" valuePropName="checked" initialValue={true} noStyle style={{ marginLeft: 8, marginBottom: 0 }}>
-                  <Switch size="small" checkedChildren="开" unCheckedChildren="关" />
+                  <Switch size="small" checkedChildren="开" unCheckedChildren="关" disabled={isDisabled} />
                 </Form.Item>
               </div>
               <Form.Item noStyle shouldUpdate={(prev, cur) => prev.retryEnabled !== cur.retryEnabled}>
@@ -326,18 +454,18 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                   return (
                     <>
                       <Row gutter={10}>
-                        <Col span={8}><Form.Item label="最大次数" name="maxRetryCount" initialValue={3} style={{ ...formItemStyle, marginBottom: 8 }}>
-                          <InputNumber min={0} max={10} size="small" style={{ width: '100%' }} />
+                        <Col span={8}><Form.Item label="最大次数" name="maxRetryCount" initialValue={100} style={{ ...formItemStyle, marginBottom: 8 }}>
+                          <InputNumber min={0} max={999999999} size="small" style={{ width: '100%' }} disabled={isDisabled} />
                         </Form.Item></Col>
-                        <Col span={8}><Form.Item label="间隔(分)" name="retryIntervalMin" initialValue={5} style={{ ...formItemStyle, marginBottom: 8 }}>
-                          <InputNumber min={1} max={60} size="small" style={{ width: '100%' }} />
+                        <Col span={8}><Form.Item label="间隔(分)" name="retryIntervalMin" initialValue={1} style={{ ...formItemStyle, marginBottom: 8 }}>
+                          <InputNumber min={1} max={1440} size="small" style={{ width: '100%' }} disabled={isDisabled} />
                         </Form.Item></Col>
-                        <Col span={8}><Form.Item label="保留天数" name="retryMaxDays" initialValue={7} style={{ ...formItemStyle, marginBottom: 8 }}>
-                          <InputNumber min={1} max={30} size="small" style={{ width: '100%' }} />
+                        <Col span={8}><Form.Item label="保留天数" name="retryMaxDays" initialValue={3} style={{ ...formItemStyle, marginBottom: 8 }}>
+                          <InputNumber min={1} max={365} size="small" style={{ width: '100%' }} disabled={isDisabled} />
                         </Form.Item></Col>
                       </Row>
                       <Form.Item label="退避方式" name="retryBackoffType" initialValue="EXPONENTIAL" style={{ ...formItemStyle, marginBottom: 0 }}>
-                        <Select size="small"><Select.Option value="LINEAR">线性</Select.Option><Select.Option value="EXPONENTIAL">指数</Select.Option></Select>
+                        <Select size="small" disabled={isDisabled}><Select.Option value="LINEAR">线性</Select.Option><Select.Option value="EXPONENTIAL">指数</Select.Option></Select>
                       </Form.Item>
                     </>
                   );
@@ -372,7 +500,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                 ]}
                 style={formItemStyle}
               >
-                <Select mode="tags" placeholder="例如: *.log, *.txt" tokenSeparators={[',']} style={{ width: '100%', borderRadius: 6 }} />
+                <Select mode="tags" placeholder="例如: *.log, *.txt" tokenSeparators={[',']} style={{ width: '100%', borderRadius: 6 }} disabled={isDisabled} />
               </Form.Item>
               <div style={{ fontSize: 11.5, color: '#8c8c8c', marginTop: -6, marginBottom: 4 }}>
                 <InfoCircleOutlined style={{ marginRight: 4 }} />
@@ -396,7 +524,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                 ]}
                 style={formItemStyle}
               >
-                <Select mode="tags" placeholder="例如: temp*, *.bak" tokenSeparators={[',']} style={{ width: '100%', borderRadius: 6 }} />
+                <Select mode="tags" placeholder="例如: temp*, *.bak" tokenSeparators={[',']} style={{ width: '100%', borderRadius: 6 }} disabled={isDisabled} />
               </Form.Item>
               <div style={{ fontSize: 11.5, color: '#8c8c8c', marginTop: -6, marginBottom: 4 }}>
                 <InfoCircleOutlined style={{ marginRight: 4 }} />
@@ -405,10 +533,14 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
             </Col>
             <Col span={4}>
               <Form.Item label="最大扫描数" name="maxScanFiles" initialValue={1000} style={formItemStyle}>
-                <InputNumber min={1} max={100000} style={{ width: '100%', height: 34, borderRadius: 6 }} addonAfter="个" />
+                <InputNumber min={1} max={100000} style={{ width: '100%', height: 34, borderRadius: 6 }} addonAfter="个" disabled={isDisabled} />
               </Form.Item>
             </Col>
           </Row>
+          <div style={{ fontSize: 12, color: '#faad14', marginTop: 12, padding: '8px 12px', background: '#fffbe6', borderRadius: 6, border: '1px solid #ffe58f' }}>
+            <InfoCircleOutlined style={{ marginRight: 6 }} />
+            通配符规则：<span style={{ fontWeight: 500 }}>包含模式</span> 或 <span style={{ fontWeight: 500 }}>排除模式</span> 至少填写一项
+          </div>
         </Card>
 
         {/* 第六行：定时调度（独立一行，全宽，必填） */}
@@ -428,6 +560,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
               placeholder="请选择执行频率"
               style={inputStyle}
               optionLabelProp="label"
+              disabled={isDisabled}
             >
               <Select.OptGroup label="常用间隔">
                 <Select.Option value="0 */1 * * * ?" label={<Space><ClockCircleOutlined />每隔 1 分钟</Space>}>
@@ -501,7 +634,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label="成功后操作" name="postTransferAction" initialValue="NONE" style={formItemStyle}>
-                <Select size="small" style={inputStyle}>
+                <Select size="small" style={inputStyle} disabled={isDisabled}>
                   <Select.Option value="NONE">无操作</Select.Option>
                   <Select.Option value="DELETE"><span style={{ color: '#ff4d4f' }}>删除源文件</span></Select.Option>
                   <Select.Option value="BACKUP">备份源文件</Select.Option>
@@ -515,10 +648,10 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
                     <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6, padding: '10px 14px' }}>
                       <Row gutter={12}>
                         <Col span={12}><Form.Item label="备份目录" name="backupDir" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
-                          <Input placeholder="/backup/archive" size="small" />
+                          <Input placeholder="/backup/archive" size="small" disabled={isDisabled} />
                         </Form.Item></Col>
                         <Col span={12}><Form.Item label="备份模式" name="backupMode" initialValue="COPY" style={{ marginBottom: 0 }}>
-                          <Select size="small" style={{ width: '100%' }}><Select.Option value="COPY">复制</Select.Option><Select.Option value="MOVE">移动</Select.Option></Select>
+                          <Select size="small" style={{ width: '100%' }} disabled={isDisabled}><Select.Option value="COPY">复制</Select.Option><Select.Option value="MOVE">移动</Select.Option></Select>
                         </Form.Item></Col>
                       </Row>
                     </div>
@@ -530,15 +663,17 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false }) => {
         </Card>
 
         {/* 提交按钮 */}
-        <div style={{ textAlign: 'center', paddingTop: 16, paddingBottom: 4 }}>
-          <Button type="primary" htmlType="submit" loading={loading} size="large" icon={<CheckCircleOutlined />}
-            style={{ minWidth: 180, height: 42, borderRadius: 8, fontSize: 15, fontWeight: 600, boxShadow: '0 4px 14px rgba(24,144,255,.35)' }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-          >
-            创建任务
-          </Button>
-        </div>
+        {!isDisabled && (
+          <div style={{ textAlign: 'center', paddingTop: 16, paddingBottom: 4 }}>
+            <Button type="primary" htmlType="submit" loading={loading} size="large" icon={<CheckCircleOutlined />}
+              style={{ minWidth: 180, height: 42, borderRadius: 8, fontSize: 15, fontWeight: 600, boxShadow: '0 4px 14px rgba(24,144,255,.35)' }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              {isCreate ? '创建任务' : '保存修改'}
+            </Button>
+          </div>
+        )}
       </Form>
     </div>
   );

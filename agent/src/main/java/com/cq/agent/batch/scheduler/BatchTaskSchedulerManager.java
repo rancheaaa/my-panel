@@ -167,7 +167,8 @@ public class BatchTaskSchedulerManager {
      */
     public void deleteTask(Long taskId) {
         quartzTaskScheduler.deleteTask(taskId);
-        log.info("🗑️  任务已删除: taskId={}", taskId);
+        configFileManager.deleteTaskConfig(taskId);
+        log.info("任务已删除: taskId={}", taskId);
     }
 
     /**

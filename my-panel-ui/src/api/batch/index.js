@@ -110,5 +110,32 @@ export const batchApi = {
       url: '/batch/task/statistics',
       method: 'get'
     });
+  },
+
+  /**
+   * 获取任务列表（带节点在线状态和目录存在状态）
+   */
+  getTaskListWithStatus(params) {
+    return request({
+      url: '/batch/task/list-with-status',
+      method: 'get',
+      params: {
+        pageNum: params?.page || 1,
+        pageSize: params?.size || 10,
+        status: params?.status || undefined,
+        taskName: params?.keyword || undefined
+      }
+    });
+  },
+
+  /**
+   * 检查目录是否存在
+   */
+  checkDirectory(agentId, dirPath) {
+    return request({
+      url: '/batch/task/check-dir',
+      method: 'get',
+      params: { agentId, dirPath }
+    });
   }
 };

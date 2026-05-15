@@ -1,16 +1,23 @@
 package com.cq.panel.admin.server.service.batch.impl;
 
+import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.domain.BatchSyncEvent;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
+import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
 import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
 import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
 import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
 import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
+import com.cq.panel.admin.server.web.domain.vo.batch.TaskNodeStatusVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,23 +34,32 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
     private final BatchTransferTaskMapper taskMapper;
     private final BatchTransferSubtaskMapper subtaskMapper;
     private final BatchSyncEventMapper eventMapper;
+    private final AgentRegistryMapper agentRegistryMapper;
+    private final AgentDirectoryChecker directoryChecker;
     private final WildcardConflictDetector conflictDetector;
     private final CronExpressionValidator cronValidator;
     private final BatchConfigSerializer configSerializer;
+    private final ObjectMapper objectMapper;
 
     public BatchTransferTaskServiceImpl(
             BatchTransferTaskMapper taskMapper,
             BatchTransferSubtaskMapper subtaskMapper,
             BatchSyncEventMapper eventMapper,
+            AgentRegistryMapper agentRegistryMapper,
+            AgentDirectoryChecker directoryChecker,
             WildcardConflictDetector conflictDetector,
             CronExpressionValidator cronValidator,
-            BatchConfigSerializer configSerializer) {
+            BatchConfigSerializer configSerializer,
+            ObjectMapper objectMapper) {
         this.taskMapper = taskMapper;
         this.subtaskMapper = subtaskMapper;
         this.eventMapper = eventMapper;
+        this.agentRegistryMapper = agentRegistryMapper;
+        this.directoryChecker = directoryChecker;
         this.conflictDetector = conflictDetector;
         this.cronValidator = cronValidator;
         this.configSerializer = configSerializer;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -201,6 +217,112 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
 
         int offset = (pageNum - 1) * pageSize;
         return taskMapper.selectPageList(query, offset, pageSize);
+    }
+
+    @Override
+    public List<TaskListWithStatusVO> getTaskListWithNodeStatus(String status, String sourceAgentId, Integer pageNum, Integer pageSize) {
+        List<BatchTransferTask> tasks = getTaskList(status, sourceAgentId, pageNum, pageSize);
+        List<TaskListWithStatusVO> result = new ArrayList<>();
+
+        for (BatchTransferTask task : tasks) {
+            TaskListWithStatusVO vo = new TaskListWithStatusVO();
+            vo.setTask(task);
+
+            // 查询源节点状态
+            TaskNodeStatusVO sourceStatus = buildNodeStatus(task.getSourceAgentId(), task.getSourceDir());
+            vo.setSourceNodeStatus(sourceStatus);
+
+            // 查询目标节点状态
+            List<TaskNodeStatusVO> targetStatusList = buildTargetNodeStatusList(task);
+            vo.setTargetNodeStatusList(targetStatusList);
+
+            result.add(vo);
+        }
+
+        return result;
+    }
+
+    /**
+     * 构建单个节点状态
+     */
+    private TaskNodeStatusVO buildNodeStatus(String agentId, String dirPath) {
+        TaskNodeStatusVO status = new TaskNodeStatusVO();
+        status.setAgentId(agentId);
+        status.setDirPath(dirPath);
+
+        AgentRegistry agent = agentRegistryMapper.selectAgentRegistryById(agentId);
+        if (agent != null) {
+            status.setAgentName(agent.getNodeName());
+            status.setNodeStatus(agent.getNodeStatus());
+
+            if (agent.getNodeStatus() != null && agent.getNodeStatus() == 1) {
+                Boolean dirExists = directoryChecker.checkDirectoryExists(agentId, dirPath);
+                status.setDirExists(dirExists != null ? dirExists : Boolean.TRUE);
+            } else {
+                status.setDirExists(Boolean.FALSE);
+            }
+        } else {
+            status.setAgentName(null);
+            status.setNodeStatus(0);
+            status.setDirExists(Boolean.FALSE);
+        }
+
+        return status;
+    }
+
+    /**
+     * 构建目标节点状态列表
+     */
+    private List<TaskNodeStatusVO> buildTargetNodeStatusList(BatchTransferTask task) {
+        List<TaskNodeStatusVO> statusList = new ArrayList<>();
+
+        try {
+            List<String> targetAgentIds = parseJsonArray(task.getTargetAgentIds());
+            List<String> targetAgentNames = parseJsonArray(task.getTargetAgentNames());
+            List<String> targetDirs = parseTargetDirs(task.getTargetDirs());
+
+            for (int i = 0; i < targetAgentIds.size(); i++) {
+                String agentId = targetAgentIds.get(i);
+                String dirPath = i < targetDirs.size() ? targetDirs.get(i) : "";
+
+                TaskNodeStatusVO status = new TaskNodeStatusVO();
+                status.setAgentId(agentId);
+                status.setDirPath(dirPath);
+
+                AgentRegistry agent = agentRegistryMapper.selectAgentRegistryById(agentId);
+                if (agent != null) {
+                    status.setAgentName(agent.getNodeName());
+                    status.setNodeStatus(agent.getNodeStatus());
+
+                    if (agent.getNodeStatus() != null && agent.getNodeStatus() == 1) {
+                        Boolean dirExists = directoryChecker.checkDirectoryExists(agentId, dirPath);
+                        status.setDirExists(dirExists != null ? dirExists : Boolean.TRUE);
+                    } else {
+                        status.setDirExists(Boolean.FALSE);
+                    }
+                } else {
+                    status.setAgentName(targetAgentNames.size() > i ? targetAgentNames.get(i) : null);
+                    status.setNodeStatus(0);
+                    status.setDirExists(Boolean.FALSE);
+                }
+
+                statusList.add(status);
+            }
+        } catch (Exception e) {
+            log.warn("解析目标节点信息失败: taskId={}", task.getId(), e);
+        }
+
+        return statusList;
+    }
+
+    /**
+     * 解析分号分隔的目标目录
+     */
+    private List<String> parseTargetDirs(String targetDirs) {
+        if (targetDirs == null || targetDirs.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(targetDirs.split(";"));
     }
 
     @Override

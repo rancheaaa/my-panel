@@ -127,4 +127,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectAgentRegistryVo"/>
         where node_status = 1
     </select>
+
+    <select id="selectAgentRegistryByIds" resultMap="AgentRegistryResult">
+        <include refid="selectAgentRegistryVo"/>
+        where id in
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
 </mapper>

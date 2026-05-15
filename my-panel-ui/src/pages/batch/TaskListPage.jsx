@@ -1,28 +1,147 @@
-import React, { useState } from 'react';
-import { Button, Modal, Typography } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Button, Modal, Typography, message } from 'antd';
 import { PlusCircleOutlined } from '@ant-design/icons';
 import TaskListTab from './components/TaskListTab';
 import TaskForm from './components/TaskForm';
 import { useBatchTasks } from './hooks/useBatchTasks';
+import { batchApi } from '../../api/batch';
+import { listAgentRegistry } from '../../api/agent';
 
 const { Title } = Typography;
 
 const TaskListPage = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const { tasks, loading, pagination, fetchTasks, createTask, startTask, pauseTask, resumeTask, stopTask, deleteTask } = useBatchTasks();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [detailTask, setDetailTask] = useState(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [agentList, setAgentList] = useState([]);
+
+  const { tasks, loading, pagination, fetchTasks, createTask, updateTask, startTask, pauseTask, resumeTask, stopTask, deleteTask } = useBatchTasks();
+
+  useEffect(() => {
+    loadAgentList();
+  }, []);
+
+  const loadAgentList = async () => {
+    try {
+      const res = await listAgentRegistry({ pageNum: 1, pageSize: 1000 });
+      if (res.data?.rows) {
+        setAgentList(res.data.rows);
+      }
+    } catch (error) {
+      console.error('加载Agent列表失败:', error);
+    }
+  };
 
   const handleCreateSubmit = async (values) => {
-    const result = await createTask(values);
-    if (result) {
-      setCreateModalOpen(false);
+    setFormLoading(true);
+    try {
+      const result = await createTask(values);
+      if (result) {
+        message.success('创建任务成功');
+        setCreateModalOpen(false);
+      }
+    } finally {
+      setFormLoading(false);
     }
+  };
+
+  const handleEditClick = async (record) => {
+    setFormLoading(true);
+    try {
+      const res = await batchApi.getTaskById(record.id);
+      if (res.code === 200 && res.data) {
+        setEditingTask(res.data);
+        setEditModalOpen(true);
+      }
+    } catch (error) {
+      message.error('获取任务详情失败');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleEditSubmit = async (values) => {
+    setFormLoading(true);
+    try {
+      const result = await updateTask(editingTask.id, values);
+      if (result.code === 200) {
+        message.success('修改任务成功');
+        setEditModalOpen(false);
+        setEditingTask(null);
+      }
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleViewClick = async (record) => {
+    setFormLoading(true);
+    try {
+      const res = await batchApi.getTaskById(record.id);
+      if (res.code === 200 && res.data) {
+        setDetailTask(res.data);
+        setDetailModalOpen(true);
+      }
+    } catch (error) {
+      message.error('获取任务详情失败');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const getTaskInitialValues = (task) => {
+    if (!task) return {};
+    const targetAgentIds = Array.isArray(task.targetAgentIds)
+      ? task.targetAgentIds
+      : (() => { try { return JSON.parse(task.targetAgentIds || '[]'); } catch (e) { return []; } })();
+    const targetAgentNames = Array.isArray(task.targetAgentNames)
+      ? task.targetAgentNames
+      : (() => { try { return JSON.parse(task.targetAgentNames || '[]'); } catch (e) { return []; } })();
+    const targetDirs = (task.targetDirs || '').split(';').filter(Boolean);
+
+    return {
+      id: task.id,
+      taskName: task.taskName,
+      taskDescription: task.taskDescription,
+      sourceAgentId: task.sourceAgentId,
+      sourceDir: task.sourceDir,
+      targets: targetAgentIds.map((id, idx) => ({
+        agentId: id,
+        dir: targetDirs[idx] || ''
+      })),
+      transferMode: task.transferMode || 'ONE_TO_ONE',
+      routingStrategy: task.routingStrategy || 'ROUND_ROBIN',
+      preserveDirStructure: task.preserveDirStructure === 1,
+      retryEnabled: task.retryEnabled === 1,
+      retryMaxDays: task.retryMaxDays || 7,
+      retryIntervalMin: task.retryIntervalMin || 5,
+      maxRetryCount: task.maxRetryCount || 3,
+      retryBackoffType: task.retryBackoffType || 'EXPONENTIAL',
+      includePatterns: (() => {
+        if (Array.isArray(task.includePatterns)) return task.includePatterns;
+        try { return JSON.parse(task.includePatterns || '[]'); } catch (e) { return []; }
+      })(),
+      excludePatterns: (() => {
+        if (Array.isArray(task.excludePatterns)) return task.excludePatterns;
+        try { return JSON.parse(task.excludePatterns || '[]'); } catch (e) { return []; }
+      })(),
+      maxScanFiles: task.maxScanFiles || 1000,
+      scanCronExpression: task.scanCronExpression,
+      postTransferAction: task.postTransferAction || 'NONE',
+      backupDir: task.backupDir,
+      backupMode: task.backupMode || 'COPY',
+      remark: task.remark
+    };
   };
 
   return (
     <div>
-      <TaskListTab 
-        tasks={tasks} 
-        loading={loading} 
+      <TaskListTab
+        tasks={tasks}
+        loading={loading}
         pagination={pagination}
         fetchTasks={fetchTasks}
         startTask={startTask}
@@ -30,7 +149,9 @@ const TaskListPage = () => {
         resumeTask={resumeTask}
         stopTask={stopTask}
         deleteTask={deleteTask}
-        onCreateClick={() => setCreateModalOpen(true)} 
+        onCreateClick={() => setCreateModalOpen(true)}
+        onEditClick={handleEditClick}
+        onViewClick={handleViewClick}
       />
       <Modal
         title="创建传输任务"
@@ -41,7 +162,37 @@ const TaskListPage = () => {
         footer={null}
         styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
       >
-        <TaskForm onSubmit={handleCreateSubmit} />
+        <TaskForm onSubmit={handleCreateSubmit} mode="create" loading={formLoading} />
+      </Modal>
+      <Modal
+        title="修改传输任务"
+        open={editModalOpen}
+        onCancel={() => { setEditModalOpen(false); setEditingTask(null); }}
+        width={960}
+        destroyOnClose
+        footer={null}
+        styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
+      >
+        <TaskForm
+          onSubmit={handleEditSubmit}
+          mode="edit"
+          initialValues={getTaskInitialValues(editingTask)}
+          loading={formLoading}
+        />
+      </Modal>
+      <Modal
+        title="传输任务详情"
+        open={detailModalOpen}
+        onCancel={() => { setDetailModalOpen(false); setDetailTask(null); }}
+        width={960}
+        destroyOnClose
+        footer={null}
+        styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
+      >
+        <TaskForm
+          mode="detail"
+          initialValues={getTaskInitialValues(detailTask)}
+        />
       </Modal>
     </div>
   );

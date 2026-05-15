@@ -737,7 +737,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
 
 -- 批量传输子任务实例表(文件×目标Agent的笛卡尔积)
 CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
-    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `id` bigint NOT NULL COMMENT '主键ID',
     `task_id` bigint NOT NULL COMMENT '关联的批量任务ID',
     `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID',
     `source_agent_name` varchar(100) DEFAULT NULL COMMENT '源节点名称，格式：user@ip:port',

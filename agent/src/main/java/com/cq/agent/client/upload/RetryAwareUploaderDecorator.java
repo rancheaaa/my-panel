@@ -285,6 +285,23 @@ public class RetryAwareUploaderDecorator implements UploadService {
         RetryConfig retryConfig = config.getRetryConfig();
         int currentRetries = task.getRetryCount();
         int intervalMin = retryConfig.getIntervalMin() != null ? retryConfig.getIntervalMin() : 1;
+        int maxDays = retryConfig.getMaxDays() != null ? retryConfig.getMaxDays() : 7;
+
+        // 检查是否超过最大重试天数
+        String createTimeStr = task.getCreateTime();
+        if (createTimeStr != null) {
+            try {
+                long createTimeMs = parseUpdateTimeToMs(createTimeStr);
+                long maxRetryDurationMs = maxDays * 24L * 60 * 60 * 1000L;
+                if (currentTimeMs - createTimeMs > maxRetryDurationMs) {
+                    logger.info("⏰ 重试已过期(超过{}天): transferId={}, createTime={}",
+                            maxDays, task.getTransferId(), createTimeStr);
+                    return false;
+                }
+            } catch (Exception e) {
+                logger.warn("⚠️ 解析任务创建时间失败，跳过maxDays检查: transferId={}", task.getTransferId());
+            }
+        }
 
         long nextRetryTimeMs;
         String backoffType = retryConfig.getBackoffType();
@@ -304,9 +321,9 @@ public class RetryAwareUploaderDecorator implements UploadService {
         boolean isReached = currentTimeMs >= nextRetryTimeMs;
 
         logger.debug("重试时间检查: transferId={}, currentRetries={}, backoffType={}, " +
-                "intervalMin={}min, nextRetryTime={}, currentTime={}, isReached={}",
+                "intervalMin={}min, maxDays={}d, nextRetryTime={}, currentTime={}, isReached={}",
                 task.getTransferId(), currentRetries, backoffType,
-                intervalMin, LocalDateTime.ofInstant(
+                intervalMin, maxDays, LocalDateTime.ofInstant(
                         java.time.Instant.ofEpochMilli(nextRetryTimeMs),
                         java.time.ZoneId.systemDefault()).format(FORMATTER),
                 LocalDateTime.now().format(FORMATTER), isReached);

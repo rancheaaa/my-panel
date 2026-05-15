@@ -9,7 +9,7 @@ export function useBatchTasks() {
   const fetchTasks = useCallback(async (params = {}) => {
     setLoading(true);
     try {
-      const res = await batchApi.getTaskList(params);
+      const res = await batchApi.getTaskListWithStatus(params);
       if (res.code === 200) {
         setTasks(res.data || []);
         setPagination(prev => ({ ...prev, total: res.total || 0 }));

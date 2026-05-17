@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button } from 'antd';
+import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button, Pagination, Dropdown } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -17,9 +17,11 @@ import {
   DashboardOutlined,
   CodeOutlined,
   BugOutlined,
-  UserOutlined
+  UserOutlined,
+  ColumnHeightOutlined
 } from '@ant-design/icons';
 import { useSubtasks } from './hooks/useSubtasks';
+import './index.scss';
 
 const { Search } = Input;
 const { Text } = Typography;
@@ -80,9 +82,15 @@ function calculateDuration(record, now) {
 const SubtaskListPage = () => {
   const [taskIdFilter, setTaskIdFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
-  const [filePathSearch, setFilePathSearch] = useState('');
-  const [agentIdSearch, setAgentIdSearch] = useState('');
+  const [sourceFilePath, setSourceFilePath] = useState('');
+  const [targetFilePath, setTargetFilePath] = useState('');
+  const [targetAgentId, setTargetAgentId] = useState('');
+  const [sourceAgentId, setSourceAgentId] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [scanBatchId, setScanBatchId] = useState(null);
+  const [fileBatchId, setFileBatchId] = useState(null);
   const [now, setNow] = useState(() => Date.now());
+  const [tableSize, setTableSize] = useState('small');
 
   const { subtasks, loading, pagination, fetchSubtasks } = useSubtasks();
 
@@ -97,16 +105,26 @@ const SubtaskListPage = () => {
     fetchSubtasks({
       taskId: taskIdFilter || undefined,
       status: statusFilter || undefined,
-      sourcePath: filePathSearch || undefined,
-      targetAgentId: agentIdSearch || undefined
+      sourceFilePath: sourceFilePath || undefined,
+      targetFilePath: targetFilePath || undefined,
+      targetAgentId: targetAgentId || undefined,
+      sourceAgentId: sourceAgentId || undefined,
+      fileName: fileName || undefined,
+      scanBatchId: scanBatchId || undefined,
+      fileBatchId: fileBatchId || undefined
     });
   };
 
   const handleReset = () => {
     setTaskIdFilter(null);
     setStatusFilter(null);
-    setFilePathSearch('');
-    setAgentIdSearch('');
+    setSourceFilePath('');
+    setTargetFilePath('');
+    setTargetAgentId('');
+    setSourceAgentId('');
+    setFileName('');
+    setScanBatchId(null);
+    setFileBatchId(null);
     fetchSubtasks();
   };
 
@@ -128,6 +146,32 @@ const SubtaskListPage = () => {
       render: (id) => (
         <Tag color="blue" style={{ borderRadius: 4, fontSize: 11 }}>{id}</Tag>
       )
+    },
+    {
+      title: '扫描批次ID',
+      dataIndex: 'scanBatchId',
+      key: 'scanBatchId',
+      width: 160,
+      align: 'center',
+      ellipsis: true,
+      render: (id) => id ? (
+        <Tooltip title={id}>
+          <Text code style={{ fontSize: 11 }}>{id}</Text>
+        </Tooltip>
+      ) : '-'
+    },
+    {
+      title: '文件批次ID',
+      dataIndex: 'fileBatchId',
+      key: 'fileBatchId',
+      width: 160,
+      align: 'center',
+      ellipsis: true,
+      render: (id) => id ? (
+        <Tooltip title={id}>
+          <Text code style={{ fontSize: 11 }}>{id}</Text>
+        </Tooltip>
+      ) : '-'
     },
     {
       title: '文件名',
@@ -366,133 +410,196 @@ const SubtaskListPage = () => {
   ];
 
   return (
-    <div style={{ padding: '24px', background: '#f5f7fa', minHeight: 'calc(100vh - 84px)' }}>
-      {/* 搜索栏区域 - 独立卡片 */}
-      <Card 
-        size="small" 
-        style={{ 
-          borderRadius: 12, 
-          marginBottom: 16, 
-          border: '1px solid #e8ecf0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-        }} 
-        styles={{ body: { padding: '16px 20px' } }}
-      >
-        <Row gutter={[16, 12]} align="middle">
-          <Col xs={24} sm={12} md={6} lg={5} xl={4}>
-            <Input
-              placeholder="搜索任务ID"
-              allowClear
-              size="middle"
-              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-              value={taskIdFilter}
-              onChange={(e) => setTaskIdFilter(e.target.value)}
-              onPressEnter={handleSearch}
-              style={{ borderRadius: 8 }}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={5} xl={4}>
-            <Select
-              placeholder="选择状态"
-              allowClear
-              size="middle"
-              value={statusFilter}
-              onChange={(val) => setStatusFilter(val)}
-              style={{ width: '100%', borderRadius: 8 }}
-              options={[
-                { value: 'QUEUED', label: '排队中' },
-                { value: 'SENDING', label: '传输中' },
-                { value: 'COMPLETED', label: '已完成' },
-                { value: 'FAILED', label: '失败' },
-                { value: 'RETRYING', label: '重试中' }
-              ]}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={5} xl={5}>
-            <Search
-              placeholder="源文件路径"
-              allowClear
-              size="middle"
-              value={filePathSearch}
-              onChange={(e) => setFilePathSearch(e.target.value)}
-              onSearch={handleSearch}
-              style={{ borderRadius: 8 }}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={5} xl={4}>
-            <Search
-              placeholder="目标Agent ID"
-              allowClear
-              size="middle"
-              value={agentIdSearch}
-              onChange={(e) => setAgentIdSearch(e.target.value)}
-              onSearch={handleSearch}
-              style={{ borderRadius: 8 }}
-            />
-          </Col>
-          <Col xs={24} sm={24} md={24} lg={4} xl={3}>
-            <Space size={8}>
-              <Button 
-                type="primary" 
-                icon={<SearchOutlined />} 
-                onClick={handleSearch}
+    <div className="batch-subtask-page">
+      <div className="batch-subtask-container">
+        <Card size="small" className="search-card" bordered={false}>
+          <Row gutter={[16, 12]} align="middle">
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Input
+                placeholder="任务ID"
+                allowClear
+                size="middle"
+                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                value={taskIdFilter}
+                onChange={(e) => setTaskIdFilter(e.target.value)}
+                onPressEnter={handleSearch}
                 style={{ borderRadius: 8 }}
-              >
-                搜索
-              </Button>
-              <Button 
-                icon={<ReloadOutlined />} 
-                onClick={handleReset}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Select
+                placeholder="状态"
+                allowClear
+                size="middle"
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val)}
+                style={{ width: '100%', borderRadius: 8 }}
+                options={[
+                  { value: 'QUEUED', label: '排队中' },
+                  { value: 'SENDING', label: '传输中' },
+                  { value: 'COMPLETED', label: '已完成' },
+                  { value: 'FAILED', label: '失败' },
+                  { value: 'RETRYING', label: '重试中' }
+                ]}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Input
+                placeholder="扫描批次ID"
+                allowClear
+                size="middle"
+                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                value={scanBatchId}
+                onChange={(e) => setScanBatchId(e.target.value)}
+                onPressEnter={handleSearch}
                 style={{ borderRadius: 8 }}
-              >
-                重置
-              </Button>
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Input
+                placeholder="文件批次ID"
+                allowClear
+                size="middle"
+                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                value={fileBatchId}
+                onChange={(e) => setFileBatchId(e.target.value)}
+                onPressEnter={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="文件名"
+                allowClear
+                size="middle"
+                value={fileName}
+                onChange={(e) => setFileName(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="源文件路径"
+                allowClear
+                size="middle"
+                value={sourceFilePath}
+                onChange={(e) => setSourceFilePath(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="目标文件路径"
+                allowClear
+                size="middle"
+                value={targetFilePath}
+                onChange={(e) => setTargetFilePath(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="源Agent ID"
+                allowClear
+                size="middle"
+                value={sourceAgentId}
+                onChange={(e) => setSourceAgentId(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="目标Agent ID"
+                allowClear
+                size="middle"
+                value={targetAgentId}
+                onChange={(e) => setTargetAgentId(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={24} md={24} lg={4} xl={3}>
+              <Space size={8}>
+                <Button
+                  type="primary"
+                  icon={<SearchOutlined />}
+                  onClick={handleSearch}
+                  style={{ borderRadius: 8 }}
+                >
+                  搜索
+                </Button>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={handleReset}
+                  style={{ borderRadius: 8 }}
+                >
+                  重置
+                </Button>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
+
+        <Card size="small" className="table-card" bordered={false}>
+          <div className="subtask-toolbar">
+            <Space size="large">
+              <Tooltip title="刷新">
+                <Button icon={<ReloadOutlined />} onClick={() => fetchSubtasks()} shape="circle" />
+              </Tooltip>
             </Space>
-          </Col>
-        </Row>
-      </Card>
+            <div style={{ flex: 1 }}></div>
+            <Space size="large">
+              <Tooltip title="密度">
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'large', label: '默认' },
+                      { key: 'middle', label: '中等' },
+                      { key: 'small', label: '紧凑' },
+                    ],
+                    onClick: ({ key }) => setTableSize(key),
+                    selectedKeys: [tableSize],
+                  }}
+                  trigger={['click']}
+                >
+                  <Button icon={<ColumnHeightOutlined />} shape="circle" />
+                </Dropdown>
+              </Tooltip>
+            </Space>
+          </div>
 
-      {/* 表格区域 - 独立卡片 */}
-      <Card 
-        size="small" 
-        style={{ 
-          borderRadius: 12, 
-          border: '1px solid #e8ecf0',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-        }} 
-        styles={{ body: { padding: 0 } }}
-      >
-        <Table
-          columns={columns}
-          dataSource={subtasks}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条记录`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            onChange: (page, pageSize) => fetchSubtasks({ page, size: pageSize })
-          }}
-          scroll={{ x: 2100 }}
-          size="small"
-          rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
-          style={{ borderRadius: 12 }}
-        />
-      </Card>
+          <div className="subtask-table-container">
+            <Table
+              columns={columns}
+              dataSource={subtasks}
+              rowKey="id"
+              loading={loading}
+              size={tableSize}
+              scroll={{ x: 2100, y: 'calc(100vh - 500px)' }}
+              pagination={false}
+              rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
+            />
+          </div>
 
-      <style>{`
-        .row-error {
-          background-color: #fff1f0 !important;
-        }
-        .ant-table-thead > tr > th {
-          background-color: #fafbfc !important;
-          font-weight: 600 !important;
-          font-size: 12px !important;
-          color: #595959 !important;
-        }
-      `}</style>
+          <div className="fixed-pagination-bar">
+            <Pagination
+              current={pagination.current}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              showTotal={(t) => `共 ${t} 条`}
+              onChange={(page, pageSize) => fetchSubtasks({ page, size: pageSize })}
+              showSizeChanger
+              pageSizeOptions={['10', '20', '50', '100']}
+              showQuickJumper
+              size="default"
+            />
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -6,6 +6,7 @@ import TaskForm from './components/TaskForm';
 import { useBatchTasks } from './hooks/useBatchTasks';
 import { batchApi } from '../../api/batch';
 import { listAgentRegistry } from '../../api/agent';
+import './index.scss';
 
 const { Title } = Typography;
 
@@ -138,7 +139,8 @@ const TaskListPage = () => {
   };
 
   return (
-    <div>
+    <div className="batch-subtask-page">
+      <div className="batch-subtask-container">
       <TaskListTab
         tasks={tasks}
         loading={loading}
@@ -153,6 +155,7 @@ const TaskListPage = () => {
         onEditClick={handleEditClick}
         onViewClick={handleViewClick}
       />
+      </div>
       <Modal
         title="创建传输任务"
         open={createModalOpen}

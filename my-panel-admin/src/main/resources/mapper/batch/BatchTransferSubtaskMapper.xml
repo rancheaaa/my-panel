@@ -45,9 +45,20 @@
             <if test="sourcePath != null and sourcePath != ''">
                 AND source_path LIKE CONCAT('%', #{sourcePath}, '%')
             </if>
+            <if test="targetPath != null and targetPath != ''">
+                AND target_path LIKE CONCAT('%', #{targetPath}, '%')
+            </if>
             <if test="targetAgentId != null and targetAgentId != ''">
                 AND target_agent_id LIKE CONCAT('%', #{targetAgentId}, '%')
             </if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">
+                AND source_agent_id LIKE CONCAT('%', #{sourceAgentId}, '%')
+            </if>
+            <if test="fileName != null and fileName != ''">
+                AND file_name LIKE CONCAT('%', #{fileName}, '%')
+            </if>
+            <if test="scanBatchId != null">AND scan_batch_id = #{scanBatchId}</if>
+            <if test="fileBatchId != null">AND file_batch_id = #{fileBatchId}</if>
         </where>
     </sql>
 

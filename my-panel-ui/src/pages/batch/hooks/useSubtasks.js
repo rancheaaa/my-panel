@@ -12,7 +12,12 @@ const subtaskApi = {
         taskId: params?.taskId || undefined,
         status: params?.status || undefined,
         sourceFilePath: params?.sourceFilePath || undefined,
-        targetAgentId: params?.targetAgentId || undefined
+        targetFilePath: params?.targetFilePath || undefined,
+        targetAgentId: params?.targetAgentId || undefined,
+        sourceAgentId: params?.sourceAgentId || undefined,
+        fileName: params?.fileName || undefined,
+        scanBatchId: params?.scanBatchId || undefined,
+        fileBatchId: params?.fileBatchId || undefined
       }
     });
   }
@@ -29,10 +34,10 @@ export function useSubtasks() {
       const res = await subtaskApi.getList(params);
       if (res.code === 200) {
         setSubtasks(res.data?.data || []);
-        setPagination(prev => ({ 
-          ...prev, 
+        setPagination(prev => ({
+          ...prev,
           total: res.data?.total || 0,
-          current: res.data?.pageNum || 1 
+          current: res.data?.pageNum || 1
         }));
       }
     } catch (error) {

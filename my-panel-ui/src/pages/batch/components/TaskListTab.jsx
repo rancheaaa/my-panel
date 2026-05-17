@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input } from 'antd';
+import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input, Pagination, Dropdown } from 'antd';
 const { Search } = Input;
 import {
   PlayCircleOutlined,
@@ -16,8 +16,10 @@ import {
   FilterOutlined,
   ClockCircleOutlined,
   SyncOutlined,
-  SwapOutlined
+  SwapOutlined,
+  ColumnHeightOutlined
 } from '@ant-design/icons';
+import '../index.scss';
 
 const statusMap = {
   READY: { color: '#d9d9d9', bg: '#f5f5f5', text: '就绪' },
@@ -94,6 +96,7 @@ const TaskListTab = ({
 }) => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState(null);
+  const [tableSize, setTableSize] = useState('middle');
 
   const filteredData = (tasks || []).filter(item => {
     const t = item.task || item;
@@ -537,9 +540,8 @@ const TaskListTab = ({
   };
 
   return (
-    <div>
-      {/* 搜索卡片 */}
-      <Card bordered={false} className="search-card" style={{ marginBottom: 16 }}>
+    <>
+      <Card size="small" className="search-card" bordered={false}>
         <Search
           placeholder="搜索任务名、Agent ID、目录..."
           allowClear
@@ -551,48 +553,66 @@ const TaskListTab = ({
         />
       </Card>
 
-      {/* 任务卡片 */}
-      <Card bordered={false}>
-        {/* 工具栏 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <Card size="small" className="table-card" bordered={false}>
+        <div className="subtask-toolbar">
           <Space size="large">
             <Button type="primary" icon={<PlusCircleOutlined />} onClick={onCreateClick}>新建任务</Button>
           </Space>
+          <div style={{ flex: 1 }}></div>
           <Space size="large">
             <Tooltip title="刷新">
               <Button icon={<ReloadOutlined />} onClick={() => fetchTasks()} shape="circle" />
             </Tooltip>
+            <Tooltip title="密度">
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'large', label: '默认' },
+                    { key: 'middle', label: '中等' },
+                    { key: 'small', label: '紧凑' },
+                  ],
+                  onClick: ({ key }) => setTableSize(key),
+                  selectedKeys: [tableSize],
+                }}
+                trigger={['click']}
+              >
+                <Button icon={<ColumnHeightOutlined />} shape="circle" />
+              </Dropdown>
+            </Tooltip>
           </Space>
         </div>
 
-        {/* 表格 */}
-        <Table
-          columns={columns}
-          dataSource={filteredData}
-          rowKey={(record) => { const t = record.task || record; return t.id; }}
-          loading={loading}
-          expandable={{
-            expandedRowRender,
-            rowExpandable: () => true
-          }}
-          pagination={{
-            ...pagination,
-            current: pagination.current,
-            total: filteredData.length,
-            pageSize: pagination.pageSize || 10,
-            showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} 条`,
-            pageSizeOptions: ['10', '20', '50'],
-            size: "small",
-            style: { marginTop: 16 },
-            onChange: (page, size) => fetchTasks({ page, size, status: statusFilter, keyword: searchText }),
-            onShowSizeChange: (_, size) => fetchTasks({ page: 1, size, status: statusFilter, keyword: searchText })
-          }}
-          scroll={{ x: 1920, y: 'calc(100vh - 380px)' }}
-          size="middle"
-        />
+        <div className="subtask-table-container">
+          <Table
+            columns={columns}
+            dataSource={filteredData}
+            rowKey={(record) => { const t = record.task || record; return t.id; }}
+            loading={loading}
+            expandable={{
+              expandedRowRender,
+              rowExpandable: () => true
+            }}
+            scroll={{ x: 1920, y: 'calc(100vh - 400px)' }}
+            pagination={false}
+            size={tableSize}
+          />
+        </div>
+
+        <div className="fixed-pagination-bar">
+          <Pagination
+            current={pagination.current}
+            pageSize={pagination.pageSize || 10}
+            total={pagination.total}
+            showTotal={(t) => `共 ${t} 条`}
+            onChange={(page, size) => fetchTasks({ page, size, status: statusFilter, keyword: searchText })}
+            showSizeChanger
+            pageSizeOptions={['10', '20', '50']}
+            showQuickJumper
+            size="default"
+          />
+        </div>
       </Card>
-    </div>
+    </>
   );
 };
 

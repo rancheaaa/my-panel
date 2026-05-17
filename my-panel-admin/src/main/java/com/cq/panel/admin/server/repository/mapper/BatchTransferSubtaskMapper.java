@@ -37,7 +37,12 @@ public interface BatchTransferSubtaskMapper {
         @Param("taskId") Long taskId,
         @Param("status") String status,
         @Param("sourcePath") String sourcePath,
+        @Param("targetPath") String targetPath,
         @Param("targetAgentId") String targetAgentId,
+        @Param("sourceAgentId") String sourceAgentId,
+        @Param("fileName") String fileName,
+        @Param("scanBatchId") Long scanBatchId,
+        @Param("fileBatchId") Long fileBatchId,
         @Param("offset") Integer offset,
         @Param("limit") Integer limit
     );
@@ -49,7 +54,12 @@ public interface BatchTransferSubtaskMapper {
         @Param("taskId") Long taskId,
         @Param("status") String status,
         @Param("sourcePath") String sourcePath,
-        @Param("targetAgentId") String targetAgentId
+        @Param("targetPath") String targetPath,
+        @Param("targetAgentId") String targetAgentId,
+        @Param("sourceAgentId") String sourceAgentId,
+        @Param("fileName") String fileName,
+        @Param("scanBatchId") Long scanBatchId,
+        @Param("fileBatchId") Long fileBatchId
     );
 
     /**

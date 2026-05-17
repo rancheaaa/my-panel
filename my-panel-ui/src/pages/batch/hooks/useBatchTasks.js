@@ -12,7 +12,12 @@ export function useBatchTasks() {
       const res = await batchApi.getTaskListWithStatus(params);
       if (res.code === 200) {
         setTasks(res.data || []);
-        setPagination(prev => ({ ...prev, total: res.total || 0 }));
+        setPagination(prev => ({
+          ...prev,
+          current: params.page || prev.current,
+          pageSize: params.size || prev.pageSize,
+          total: res.total || 0
+        }));
       }
     } catch (error) {
       console.error('加载任务列表失败:', error);

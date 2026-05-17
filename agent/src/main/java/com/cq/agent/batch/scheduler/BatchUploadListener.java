@@ -393,13 +393,17 @@ public class BatchUploadListener implements UploadListener {
         event.setTotalChunks(finalChunks);
         event.setTransferredBytes(scannedFile.getFileSize());
         event.setTotalBytes(scannedFile.getFileSize());
-        event.setSpeedBytesPerSec(null);
 
         long startTime = transferStartTime != null ? transferStartTime : System.currentTimeMillis();
         long completedTime = System.currentTimeMillis();
+        long durationMs = completedTime - startTime;
         event.setStartedAt(new Date(startTime));
         event.setCompletedAt(new Date(completedTime));
-        event.setDurationMs(completedTime - startTime);
+        event.setDurationMs(durationMs);
+
+        // 计算平均传输速度：即使传输很快（durationMs很小），也能正确计算
+        long speed = durationMs > 0 ? scannedFile.getFileSize() * 1000L / durationMs : null;
+        event.setSpeedBytesPerSec(speed);
 
         return event;
     }

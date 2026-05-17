@@ -136,7 +136,12 @@ public class ProgressReceiverController {
             subtask.setTransferredChunks(dto.getTransferredChunks());
             subtask.setTotalChunks(dto.getTotalChunks());
             subtask.setTransferredBytes(dto.getTransferredBytes());
-            subtask.setSpeedBytesPerSec(dto.getSpeedBytesPerSec());
+            Long speed = dto.getSpeedBytesPerSec();
+            // 如果Agent未发送速度，则根据transferredBytes和durationMs计算
+            if (speed == null && dto.getTransferredBytes() != null && dto.getDurationMs() != null && dto.getDurationMs() > 0) {
+                speed = dto.getTransferredBytes() * 1000L / dto.getDurationMs();
+            }
+            subtask.setSpeedBytesPerSec(speed);
             subtask.setStartedAt(dto.getStartedAt() != null ? parseDateTime(dto.getStartedAt()) : null);
             subtask.setCompletedAt(dto.getCompletedAt() != null ? parseDateTime(dto.getCompletedAt()) : new Date());
             subtask.setDurationMs(dto.getDurationMs());

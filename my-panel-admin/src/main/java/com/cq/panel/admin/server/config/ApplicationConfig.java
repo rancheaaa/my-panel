@@ -10,11 +10,9 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 @Configuration
 @EnableAspectJAutoProxy(exposeProxy = true)
-public class ApplicationConfig
-{
+public class ApplicationConfig {
     @Bean
-    public ObjectMapper objectMapper()
-    {
+    public ObjectMapper objectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.setTimeZone(TimeZone.getDefault());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

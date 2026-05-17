@@ -83,6 +83,9 @@ public class BatchUploadListener implements UploadListener {
     /** 传输开始时间戳（毫秒） */
     private Long transferStartTime = null;
 
+    /** 子任务创建时间戳（毫秒，QUEUED阶段） */
+    private Long subtaskCreateTime = null;
+
     /** 传输ID（从UploadTask获取） */
     private String currentTransferId = null;
 
@@ -196,6 +199,11 @@ public class BatchUploadListener implements UploadListener {
             event.setFileSizeBytes(scannedFile.getFileSize());
             event.setFileLastModified(new Date(scannedFile.getLastModified()));
 
+            // 记录子任务创建时间，作为startedAt的兜底
+            long now = System.currentTimeMillis();
+            this.subtaskCreateTime = now;
+            event.setStartedAt(new Date(now));
+
             boolean success = progressReporter.createSubTask(event);
             if (success) {
                 log.info("📝 子任务已创建: subtaskId={}, file={}, size={}bytes",
@@ -248,7 +256,8 @@ public class BatchUploadListener implements UploadListener {
             }
         }
 
-        log.debug("📝 onBeforeSend已设置任务信息: transferId={}, taskId={}, subtaskId={}, scanBatch={}, fileBatch={}, fileName={}",
+        log.debug(
+                "📝 onBeforeSend已设置任务信息: transferId={}, taskId={}, subtaskId={}, scanBatch={}, fileBatch={}, fileName={}",
                 task.getTransferId(), taskId, subtaskId, scanBatchId, fileBatchId,
                 scannedFile != null ? scannedFile.getFileName() : "null");
     }
@@ -403,10 +412,18 @@ public class BatchUploadListener implements UploadListener {
         event.setErrorCode("UPLOAD_ERROR");
         event.setErrorMessage(errorMessage);
 
+        // 优先使用transferStartTime（传输开始时间），如果未开始传输则使用subtaskCreateTime（创建时间）
+        long startTime;
         if (transferStartTime != null) {
-            event.setStartedAt(new Date(transferStartTime));
-            event.setDurationMs(System.currentTimeMillis() - transferStartTime);
+            startTime = transferStartTime;
+        } else if (subtaskCreateTime != null) {
+            startTime = subtaskCreateTime;
+        } else {
+            startTime = System.currentTimeMillis();
         }
+
+        event.setStartedAt(new Date(startTime));
+        event.setDurationMs(System.currentTimeMillis() - startTime);
 
         return event;
     }
@@ -507,7 +524,8 @@ public class BatchUploadListener implements UploadListener {
                     }
                     relativePath = relativePath.replace("\\", "/");
                 } else {
-                    log.warn("⚠️ preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}", sourceDir, scannedFile.getAbsolutePath());
+                    log.warn("⚠️ preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}", sourceDir,
+                            scannedFile.getAbsolutePath());
                     relativePath = scannedFile.getFileName();
                 }
             } else {
@@ -527,7 +545,8 @@ public class BatchUploadListener implements UploadListener {
     }
 
     private String normalizePathSeparator(String path) {
-        if (path == null) return null;
+        if (path == null)
+            return null;
         return path.replace("/", "\\").trim();
     }
 

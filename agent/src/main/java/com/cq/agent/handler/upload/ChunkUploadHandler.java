@@ -41,7 +41,8 @@ public class ChunkUploadHandler extends BaseHandler {
             }
 
             // Log received metadata with traceid
-            logger.debug("[traceId={}] Received chunk upload request {}", traceId, body);
+            logger.debug("[traceId={}] Received chunk upload request: transferId={}, chunkIndex={}, chunkSize={}, encoding={}",
+                    traceId, body.getTransferId(), body.getChunkIndex(), body.getChunkSize(), body.getEncoding());
 
             if (body.getContent() == null) {
                 sendResponse(ctx,request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'content' field is required"));

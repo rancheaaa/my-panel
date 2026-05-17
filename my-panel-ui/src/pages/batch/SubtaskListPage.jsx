@@ -115,7 +115,7 @@ const SubtaskListPage = () => {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
-      width: 60,
+      width: 160,
       align: 'center',
       render: (id) => <Text type="secondary" style={{ fontSize: 11 }}>{id}</Text>
     },
@@ -123,7 +123,7 @@ const SubtaskListPage = () => {
       title: '任务ID',
       dataIndex: 'taskId',
       key: 'taskId',
-      width: 70,
+      width: 160,
       align: 'center',
       render: (id) => (
         <Tag color="blue" style={{ borderRadius: 4, fontSize: 11 }}>{id}</Tag>
@@ -175,10 +175,10 @@ const SubtaskListPage = () => {
       title: '源节点',
       dataIndex: 'sourceAgentName',
       key: 'sourceAgentName',
-      width: 140,
+      width: 200,
       ellipsis: true,
       render: (name, record) => (
-        <Tooltip title={`${record.sourceAgentId} | ${name}`}>
+        <Tooltip title={`${record.sourceAgentId}`}>
           <Space size={3} wrap>
             <UserOutlined style={{ color: '#1890ff', fontSize: 11 }} />
             <Text style={{ fontSize: 11.5 }}>{name || record.sourceAgentId}</Text>
@@ -190,10 +190,10 @@ const SubtaskListPage = () => {
       title: '目标节点',
       dataIndex: 'targetAgentName',
       key: 'targetAgentName',
-      width: 140,
+      width: 200,
       ellipsis: true,
       render: (name, record) => (
-        <Tooltip title={`${record.targetAgentId} | ${name}`}>
+        <Tooltip title={`${record.targetAgentId}`}>
           <Space size={3} wrap>
             <CloudServerOutlined style={{ color: '#52c41a', fontSize: 11 }} />
             <Text style={{ fontSize: 11.5 }}>{name || record.targetAgentId}</Text>
@@ -266,19 +266,19 @@ const SubtaskListPage = () => {
     {
       title: '时间信息',
       key: 'timeInfo',
-      width: 170,
+      width: 190,
       render: (_, record) => {
         const duration = calculateDuration(record, now);
         return (
           <div style={{ lineHeight: '16px' }}>
-            <div><Text type="secondary" style={{ fontSize: 10 }}>开始:</Text> {record.startedAt?.substring(11, 19) || '-'}</div>
-            <div><Text type="secondary" style={{ fontSize: 10 }}>完成:</Text> {record.completedAt?.substring(11, 19) || '-'}</div>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>开始:</Text> {record.startedAt?.substring(0, 19) || '-'}</div>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>完成:</Text> {record.completedAt?.substring(0, 19) || '-'}</div>
             <div><Text type="secondary" style={{ fontSize: 10 }}>耗时:</Text> 
               <Text style={{ fontSize: 10, color: duration > 300000 ? '#ff4d4f' : undefined }}>
                 {formatDuration(duration)}
               </Text>
             </div>
-            <div><Text type="secondary" style={{ fontSize: 10 }}>修改:</Text> {record.fileLastModified?.substring(0, 10) || '-'}</div>
+            <div><Text type="secondary" style={{ fontSize: 10 }}>修改:</Text> {record.fileLastModified?.substring(0, 19) || '-'}</div>
           </div>
         );
       }

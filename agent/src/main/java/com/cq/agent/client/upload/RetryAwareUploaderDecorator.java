@@ -8,6 +8,7 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.config.AgentConfig;
+import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
@@ -576,7 +577,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
     }
 
-    private com.cq.panel.common.dto.batch.TargetAgentInfo findTargetAgentForTask(
+    private TargetAgentInfo findTargetAgentForTask(
             AgentTaskConfig config, UploadTask task) {
         if (config == null || config.getTargetAgents() == null || config.getTargetAgents().isEmpty()) {
             return null;

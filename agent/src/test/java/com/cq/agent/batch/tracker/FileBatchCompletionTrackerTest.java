@@ -90,7 +90,7 @@ class FileBatchCompletionTrackerTest {
         AgentTaskConfig config = createTaskConfig();
         List<TargetAgentInfo> targets = createTargets(3);
 
-        tracker.initFileBatch(fileBatchId, scannedFile, config, targets);
+        tracker.initFileBatch(fileBatchId, 999L, scannedFile, config, targets);
 
         Path jsonPath = tempDir.resolve("fb-" + fileBatchId + ".json");
         assertTrue(Files.exists(jsonPath), "JSON文件应该存在");
@@ -124,7 +124,7 @@ class FileBatchCompletionTrackerTest {
     @DisplayName("markCompleted 单个完成 - 更新对应target为COMPLETED, completedCount+1, 返回false")
     void shouldMarkSingleTargetCompleted() throws Exception {
         Long fileBatchId = 1002L;
-        tracker.initFileBatch(fileBatchId, createScannedFile("test.log"), createTaskConfig(), createTargets(3));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("test.log"), createTaskConfig(), createTargets(3));
 
         boolean allCompleted = tracker.markCompleted(fileBatchId, "target-001");
 
@@ -147,7 +147,7 @@ class FileBatchCompletionTrackerTest {
     @DisplayName("markCompleted 全部完成 - 最后一个target完成后返回true, 整体status=COMPLETED")
     void shouldReturnTrueWhenAllCompleted() throws Exception {
         Long fileBatchId = 1003L;
-        tracker.initFileBatch(fileBatchId, createScannedFile("full.log"), createTaskConfig(), createTargets(2));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("full.log"), createTaskConfig(), createTargets(2));
 
         tracker.markCompleted(fileBatchId, "target-001");
         boolean allDone = tracker.markCompleted(fileBatchId, "target-002");
@@ -168,7 +168,7 @@ class FileBatchCompletionTrackerTest {
     @DisplayName("markFailed 终态失败(isFinalFailure=true) - 整体status变为FAILED, target状态为FINAL_FAILURE")
     void shouldMarkFinalFailure() throws Exception {
         Long fileBatchId = 1004L;
-        tracker.initFileBatch(fileBatchId, createScannedFile("fail.log"), createTaskConfig(), createTargets(3));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("fail.log"), createTaskConfig(), createTargets(3));
 
         tracker.markFailed(fileBatchId, "target-002", true);
 
@@ -188,7 +188,7 @@ class FileBatchCompletionTrackerTest {
     @DisplayName("markFailed 非终态失败(isFinalFailure=false) - 整体status保持PENDING, target状态为FAILED")
     void shouldMarkNonFinalFailure() throws Exception {
         Long fileBatchId = 1005L;
-        tracker.initFileBatch(fileBatchId, createScannedFile("retry.log"), createTaskConfig(), createTargets(3));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("retry.log"), createTaskConfig(), createTargets(3));
 
         tracker.markFailed(fileBatchId, "target-001", false);
 
@@ -208,7 +208,7 @@ class FileBatchCompletionTrackerTest {
     @DisplayName("重试回退 - FAILED → markCompleted后回滚为COMPLETED, summary正确更新")
     void shouldRetryFromFailedToCompleted() throws Exception {
         Long fileBatchId = 1006L;
-        tracker.initFileBatch(fileBatchId, createScannedFile("retry.log"), createTaskConfig(), createTargets(2));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("retry.log"), createTaskConfig(), createTargets(2));
 
         tracker.markFailed(fileBatchId, "target-001", false);
         FileBatchState afterFail = tracker.loadFileBatch(fileBatchId);
@@ -232,7 +232,7 @@ class FileBatchCompletionTrackerTest {
     @DisplayName("deleteFileBatch - JSON文件应该被删除")
     void shouldDeleteJsonFile() throws Exception {
         Long fileBatchId = 1007L;
-        tracker.initFileBatch(fileBatchId, createScannedFile("delete.log"), createTaskConfig(), createTargets(2));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("delete.log"), createTaskConfig(), createTargets(2));
 
         Path jsonPath = tempDir.resolve("fb-" + fileBatchId + ".json");
         assertTrue(Files.exists(jsonPath), "删除前文件应存在");
@@ -247,9 +247,9 @@ class FileBatchCompletionTrackerTest {
     @Test
     @DisplayName("recoverPendingBatches - 应扫描到PENDING和FAILED状态的残留文件（不含COMPLETED）")
     void shouldRecoverPendingAndFailedBatches() throws Exception {
-        tracker.initFileBatch(2001L, createScannedFile("pending.log"), createTaskConfig(), createTargets(2));
-        tracker.initFileBatch(2002L, createScannedFile("failed.log"), createTaskConfig(), createTargets(2));
-        tracker.initFileBatch(2003L, createScannedFile("completed.log"), createTaskConfig(), createTargets(1));
+        tracker.initFileBatch(2001L, 999L, createScannedFile("pending.log"), createTaskConfig(), createTargets(2));
+        tracker.initFileBatch(2002L, 999L, createScannedFile("failed.log"), createTaskConfig(), createTargets(2));
+        tracker.initFileBatch(2003L, 999L, createScannedFile("completed.log"), createTaskConfig(), createTargets(1));
 
         tracker.markFailed(2002L, "target-001", true);
         tracker.markCompleted(2003L, "target-001");
@@ -270,7 +270,7 @@ class FileBatchCompletionTrackerTest {
     void shouldBeThreadSafeForConcurrentMarkCompleted() throws Exception {
         Long fileBatchId = 3001L;
         int targetCount = 5;
-        tracker.initFileBatch(fileBatchId, createScannedFile("concurrent.log"), createTaskConfig(), createTargets(targetCount));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("concurrent.log"), createTaskConfig(), createTargets(targetCount));
 
         ExecutorService executor = Executors.newFixedThreadPool(targetCount);
         CountDownLatch latch = new CountDownLatch(1);

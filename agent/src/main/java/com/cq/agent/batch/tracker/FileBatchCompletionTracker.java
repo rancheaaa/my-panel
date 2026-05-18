@@ -44,11 +44,11 @@ public class FileBatchCompletionTracker {
         ensureDirectoryExists();
     }
 
-    public void initFileBatch(Long fileBatchId, ScannedFile scannedFile, AgentTaskConfig config,
+    public void initFileBatch(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile, AgentTaskConfig config,
                               List<TargetAgentInfo> routedTargets) throws IOException {
-        logger.info("初始化文件批次: fileBatchId={}", fileBatchId);
+        logger.info("初始化文件批次: fileBatchId={}, scanBatchId={}", fileBatchId, scanBatchId);
 
-        FileBatchState state = buildInitialState(fileBatchId, scannedFile, config, routedTargets);
+        FileBatchState state = buildInitialState(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
         writeState(state);
 
         logger.info("文件批次初始化完成: fileBatchId={}, totalTargets={}",
@@ -139,10 +139,11 @@ public class FileBatchCompletionTracker {
         return result;
     }
 
-    private FileBatchState buildInitialState(Long fileBatchId, ScannedFile scannedFile, AgentTaskConfig config,
+    private FileBatchState buildInitialState(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile, AgentTaskConfig config,
                                              List<TargetAgentInfo> routedTargets) {
         FileBatchState state = new FileBatchState();
         state.setFileBatchId(fileBatchId);
+        state.setScanBatchId(scanBatchId);
         state.setTaskId(config.getTaskId());
         state.setTaskName(config.getTaskName());
         state.setStatus("PENDING");

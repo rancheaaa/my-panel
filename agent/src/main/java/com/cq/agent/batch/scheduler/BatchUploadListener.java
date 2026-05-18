@@ -6,6 +6,7 @@ import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.TransferConfig;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.report.SubTaskEvent;
+import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
 import lombok.Getter;
@@ -50,6 +51,7 @@ public class BatchUploadListener implements UploadListener {
     private final ProgressReporter progressReporter;
     private final String successQueueDir;
     private final String sendingQueueDir;
+    private final FileBatchCompletionTracker fileBatchTracker;
 
     /**
      * 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
@@ -105,7 +107,8 @@ public class BatchUploadListener implements UploadListener {
     public BatchUploadListener(Long taskId, ScannedFile scannedFile,
             AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
             String successQueueDir, String sendingQueueDir,
-            Long scanBatchId, Long fileBatchId) {
+            Long scanBatchId, Long fileBatchId,
+            FileBatchCompletionTracker fileBatchTracker) {
         this.taskId = taskId;
         this.scanBatchId = scanBatchId;
         this.fileBatchId = fileBatchId;
@@ -115,6 +118,7 @@ public class BatchUploadListener implements UploadListener {
         this.progressReporter = progressReporter;
         this.successQueueDir = successQueueDir;
         this.sendingQueueDir = sendingQueueDir;
+        this.fileBatchTracker = fileBatchTracker;
 
         // 生成全局唯一的subtaskId（避免重启后冲突）
         this.subtaskId = generateUniqueSubtaskId(taskId, scannedFile.getFileName(),
@@ -142,6 +146,7 @@ public class BatchUploadListener implements UploadListener {
         this.progressReporter = null;
         this.successQueueDir = null;
         this.sendingQueueDir = null;
+        this.fileBatchTracker = null;
         this.subtaskId = null;
     }
 
@@ -317,7 +322,25 @@ public class BatchUploadListener implements UploadListener {
             progressReporter.reportComplete(event);
         }
 
-        executePostTransferAction();
+        if (fileBatchTracker != null && fileBatchId != null) {
+            try {
+                boolean allDone = fileBatchTracker.markCompleted(fileBatchId,
+                        targetAgent != null ? targetAgent.getAgentId() : null);
+                if (allDone) {
+                    executePostTransferAction();
+                    try {
+                        fileBatchTracker.deleteFileBatch(fileBatchId);
+                    } catch (Exception e) {
+                        log.warn("⚠️ 删除文件批次追踪文件失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ 标记文件批次完成状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                executePostTransferAction();
+            }
+        } else {
+            executePostTransferAction();
+        }
         moveControlFileToSuccessQueue();
     }
 
@@ -337,6 +360,15 @@ public class BatchUploadListener implements UploadListener {
 
             // 使用POST /api/batch/subtask/failed接口
             progressReporter.reportFailed(event);
+        }
+        if (fileBatchTracker != null && fileBatchId != null) {
+            try {
+                fileBatchTracker.markFailed(fileBatchId,
+                        targetAgent != null ? targetAgent.getAgentId() : null,
+                        false);
+            } catch (Exception e) {
+                log.warn("⚠️ 标记文件批次失败状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+            }
         }
     }
 

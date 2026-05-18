@@ -10,6 +10,7 @@ import com.cq.agent.client.upload.UploadService;
 import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.config.AgentConfig;
+import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.TransferConfig;
 import lombok.Getter;
@@ -43,6 +44,7 @@ public class BatchTaskSchedulerManager {
     @Getter
     private ProgressReporter progressReporter;
     private AgentConfig agentConfig;
+    private FileBatchCompletionTracker fileBatchTracker;
 
     public BatchTaskSchedulerManager(ConfigFileManager configFileManager) throws SchedulerException {
         this.configFileManager = configFileManager;
@@ -89,6 +91,11 @@ public class BatchTaskSchedulerManager {
     public void setAgentConfig(AgentConfig agentConfig) {
         this.agentConfig = agentConfig;
         log.info("⚙️ 已设置AgentConfig");
+    }
+
+    public void setFileBatchTracker(FileBatchCompletionTracker fileBatchTracker) {
+        this.fileBatchTracker = fileBatchTracker;
+        log.info("📊 已设置FileBatchCompletionTracker");
     }
 
     // ==================== 任务生命周期管理 ====================
@@ -326,6 +333,14 @@ public class BatchTaskSchedulerManager {
             List<TargetAgentInfo> routedTargets = router.route(allTargets, transferConfig);
             totalSubtasks += routedTargets.size();
 
+            if (routedTargets.size() > 1 && fileBatchTracker != null) {
+                try {
+                    fileBatchTracker.initFileBatch(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
+                } catch (Exception e) {
+                    log.warn("⚠️ 初始化文件批次追踪失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                }
+            }
+
             for (TargetAgentInfo targetAgent : routedTargets) {
                 try {
                     log.debug("📤 准备传输文件: fileName={}, size={}bytes, target={}, strategy={}",
@@ -348,7 +363,8 @@ public class BatchTaskSchedulerManager {
                             taskId, scannedFile, config, targetAgent, progressReporter,
                             agentConfig != null ? agentConfig.getUploadSuccessQueueDir() : null,
                             agentConfig != null ? agentConfig.getUploadSendingQueueDir() : null,
-                            scanBatchId, fileBatchId);
+                            scanBatchId, fileBatchId,
+                            fileBatchTracker);
 
                     boolean uploadSubmitted = agentUploader.uploadFile(localFilePath, remoteTargetInfo, listener);
 
@@ -376,12 +392,8 @@ public class BatchTaskSchedulerManager {
             log.warn("⚠️ 部分子任务提交发送队列失败 ({}/{}): {}",
                     failedFiles.size(), totalSubtasks,
                     String.join(", ", failedFiles));
+            // todo 入队列失败的如何处理
             log.info("ℹ️ 失败的文件将进入失败队列，等待 RetryManager 定时扫描和重试");
-            if (agentUploader != null) {
-                if (agentUploader instanceof AgentUploader uploader) {
-                    log.info("ℹ️ 上传失败队列路径: {}", uploader.getFailedQueueDir());
-                }
-            }
         }
     }
 

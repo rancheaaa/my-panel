@@ -11,6 +11,7 @@ import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.client.upload.AgentUploader;
 import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.agent.client.download.AgentDownloader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
@@ -161,6 +162,11 @@ public class AgentApplication {
         ProgressReporter progressReporter = new ProgressReporter(config);
         taskSchedulerManager.setProgressReporter(progressReporter);
         retryAwareUploader.setGlobalProgressReporter(progressReporter);
+
+        FileBatchCompletionTracker fileBatchTracker = new FileBatchCompletionTracker(
+                config.getFilebatchPendingDir());
+        taskSchedulerManager.setFileBatchTracker(fileBatchTracker);
+        logger.info("✅ FileBatchCompletionTracker initialized: dir={}", config.getFilebatchPendingDir());
 
         FallbackPersistenceService fallbackPersistenceService = new FallbackPersistenceService(
                 config.getProgressFallbackDir());

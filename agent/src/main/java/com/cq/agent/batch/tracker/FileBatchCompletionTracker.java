@@ -9,7 +9,6 @@ import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.TransferConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,12 +33,10 @@ public class FileBatchCompletionTracker {
             .serializeNulls()
             .create();
 
-    private final String pendingDir;
     private final Path pendingDirPath;
     private final ConcurrentHashMap<String, ReentrantLock> locks = new ConcurrentHashMap<>();
 
     public FileBatchCompletionTracker(String pendingDir) {
-        this.pendingDir = pendingDir;
         this.pendingDirPath = Path.of(pendingDir);
         ensureDirectoryExists();
     }

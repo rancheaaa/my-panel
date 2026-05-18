@@ -39,12 +39,15 @@ public class AgentApplication {
             ConfigFileManager configFileManager = initializeBatchConfigManagement(config);
             BatchTaskSchedulerManager taskSchedulerManager = initializeTaskScheduler(configFileManager);
 
+            FileBatchCompletionTracker fileBatchTracker = new FileBatchCompletionTracker(config.getFilebatchPendingDir());
+
             RetryAwareUploaderDecorator retryAwareUploader = initializeUploadDownloadServices(config);
+            retryAwareUploader.setFileBatchTracker(fileBatchTracker);
             ConfigChangeListener configChangeListener = setupConfigChangeListener(configFileManager,
                     taskSchedulerManager, retryAwareUploader);
 
             connectComponentsToScheduler(config, taskSchedulerManager, retryAwareUploader, configFileManager,
-                    configChangeListener);
+                    configChangeListener, fileBatchTracker);
             taskSchedulerManager.startAllRunningTasks();
 
             // Initialize file-level retry scheduler with independent Quartz instance
@@ -108,7 +111,6 @@ public class AgentApplication {
 
         RetryAwareUploaderDecorator retryAwareUploader = new RetryAwareUploaderDecorator(coreUploader);
         retryAwareUploader.initWithConfig(config);
-
         logger.info("Upload/Download services initialized with decorator chain: Core → ListenerAware → RetryAware");
 
         return retryAwareUploader;
@@ -151,7 +153,8 @@ public class AgentApplication {
             BatchTaskSchedulerManager taskSchedulerManager,
             RetryAwareUploaderDecorator retryAwareUploader,
             ConfigFileManager configFileManager,
-            ConfigChangeListener configChangeListener) {
+            ConfigChangeListener configChangeListener,
+            FileBatchCompletionTracker fileBatchTracker) {
         taskSchedulerManager.setRetryAwareUploader(retryAwareUploader);
         taskSchedulerManager.setAgentUploader(retryAwareUploader);
         taskSchedulerManager.setAgentConfig(config);
@@ -163,8 +166,6 @@ public class AgentApplication {
         taskSchedulerManager.setProgressReporter(progressReporter);
         retryAwareUploader.setGlobalProgressReporter(progressReporter);
 
-        FileBatchCompletionTracker fileBatchTracker = new FileBatchCompletionTracker(
-                config.getFilebatchPendingDir());
         taskSchedulerManager.setFileBatchTracker(fileBatchTracker);
         logger.info("✅ FileBatchCompletionTracker initialized: dir={}", config.getFilebatchPendingDir());
 

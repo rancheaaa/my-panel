@@ -2,6 +2,7 @@ package com.cq.agent.client.upload;
 
 import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.agent.batch.scheduler.BatchUploadListener;
+import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.RetryConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
@@ -75,6 +76,9 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
     // ===== 状态跟踪 =====
     private final Map<Long, AgentTaskConfig> taskConfigMap = new ConcurrentHashMap<>();
+
+    @Setter
+    private volatile FileBatchCompletionTracker fileBatchTracker;
 
     // ===== 重试执行器（可选）=====
     @Getter
@@ -566,7 +570,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     getGlobalProgressReporter(),
                     getAgentConfig() != null ? getAgentConfig().getUploadSuccessQueueDir() : null,
                     getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null,
-                    scanBatchId, fileBatchId);
+                    scanBatchId, fileBatchId,
+                    fileBatchTracker);
             logger.info("✅ 创建重试监听器(恢复模式): transferId={}, file={}, scanBatch={}, fileBatch={}",
                     task.getTransferId(), fileName, scanBatchId, fileBatchId);
             return retryListener;

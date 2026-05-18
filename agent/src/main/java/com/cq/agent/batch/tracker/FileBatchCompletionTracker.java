@@ -41,10 +41,225 @@ public class FileBatchCompletionTracker {
         ensureDirectoryExists();
     }
 
-    public void initFileBatch(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile, AgentTaskConfig config,
-                              List<TargetAgentInfo> routedTargets) throws IOException {
-        logger.info("初始化文件批次: fileBatchId={}, scanBatchId={}", fileBatchId, scanBatchId);
+    public boolean initFileBatchIfAbsent(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile,
+            AgentTaskConfig config, List<TargetAgentInfo> routedTargets) throws IOException {
+        if (existsActiveBatchForFile(scannedFile.getAbsolutePath(), config.getTaskId())) {
+            logger.info("文件已存在活跃批次，跳过重复初始化: filePath={}, taskId={}",
+                    scannedFile.getAbsolutePath(), config.getTaskId());
+            return false;
+        }
 
+        initFileBatch(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
+        return true;
+    }
+
+    public boolean existsActiveBatchForFile(String localFilePath, Long taskId) {
+        if (localFilePath == null || !Files.exists(pendingDirPath)) {
+            return false;
+        }
+
+        try (Stream<Path> stream = Files.list(pendingDirPath)) {
+            return stream
+                    .filter(p -> p.toString().endsWith(".json") && p.getFileName().toString().startsWith("fb-"))
+                    .anyMatch(p -> {
+                        try {
+                            FileBatchState state = GSON.fromJson(Files.readString(p), FileBatchState.class);
+                            if (state == null || state.getSource() == null) {
+                                return false;
+                            }
+                            if ("COMPLETED".equals(state.getStatus())) {
+                                return false;
+                            }
+                            if (!localFilePath.equals(state.getSource().getFilePath())) {
+                                return false;
+                            }
+                            if (taskId != null && state.getTaskId() != null
+                                    && !taskId.equals(state.getTaskId())) {
+                                return false;
+                            }
+                            return true;
+                        } catch (Exception e) {
+                            logger.warn("检查活跃批次文件失败: {}", p, e);
+                            return false;
+                        }
+                    });
+        } catch (IOException e) {
+            logger.warn("扫描pending目录失败: {}", pendingDirPath, e);
+            return false;
+        }
+    }
+
+    public Long findActiveBatchIdForFile(String localFilePath, Long taskId) {
+        if (localFilePath == null || !Files.exists(pendingDirPath)) {
+            return null;
+        }
+
+        try (Stream<Path> stream = Files.list(pendingDirPath)) {
+            return stream
+                    .filter(p -> p.toString().endsWith(".json") && p.getFileName().toString().startsWith("fb-"))
+                    .map(p -> {
+                        try {
+                            FileBatchState state = GSON.fromJson(Files.readString(p), FileBatchState.class);
+                            if (state == null || state.getSource() == null) {
+                                return null;
+                            }
+                            if ("COMPLETED".equals(state.getStatus())) {
+                                return null;
+                            }
+                            if (!localFilePath.equals(state.getSource().getFilePath())) {
+                                return null;
+                            }
+                            if (taskId != null && state.getTaskId() != null
+                                    && !taskId.equals(state.getTaskId())) {
+                                return null;
+                            }
+                            return state.getFileBatchId();
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .filter(id -> id != null)
+                    .findFirst()
+                    .orElse(null);
+        } catch (IOException e) {
+            logger.warn("扫描pending目录失败: {}", pendingDirPath, e);
+            return null;
+        }
+    }
+
+    public boolean isTargetCompletedInBatch(String localFilePath, Long taskId, String targetAgentKey) {
+        if (localFilePath == null || targetAgentKey == null || !Files.exists(pendingDirPath)) {
+            return false;
+        }
+
+        try (Stream<Path> stream = Files.list(pendingDirPath)) {
+            return stream
+                    .filter(p -> p.toString().endsWith(".json") && p.getFileName().toString().startsWith("fb-"))
+                    .anyMatch(p -> {
+                        try {
+                            FileBatchState state = GSON.fromJson(Files.readString(p), FileBatchState.class);
+                            if (state == null || state.getSource() == null) {
+                                return false;
+                            }
+                            if ("COMPLETED".equals(state.getStatus())) {
+                                return false;
+                            }
+                            if (!localFilePath.equals(state.getSource().getFilePath())) {
+                                return false;
+                            }
+                            if (taskId != null && state.getTaskId() != null
+                                    && !taskId.equals(state.getTaskId())) {
+                                return false;
+                            }
+                            if (state.getTargets() == null) {
+                                return false;
+                            }
+                            return state.getTargets().stream()
+                                    .anyMatch(t -> "COMPLETED".equals(t.getStatus())
+                                            && matchesTargetAgentKey(t.getAgentName(), t.getAgentId(), targetAgentKey));
+                        } catch (Exception e) {
+                            return false;
+                        }
+                    });
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    public boolean existsFileInPendingBatch(String localFilePath, String targetAgentKey) {
+        return existsFileInPendingBatch(localFilePath, targetAgentKey, 30);
+    }
+
+    public boolean existsFileInPendingBatch(String localFilePath, String targetAgentKey, int pendingTimeoutMinutes) {
+        if (localFilePath == null || targetAgentKey == null) {
+            return false;
+        }
+
+        if (!Files.exists(pendingDirPath)) {
+            return false;
+        }
+
+        try (Stream<Path> stream = Files.list(pendingDirPath)) {
+            return stream
+                    .filter(p -> p.toString().endsWith(".json") && p.getFileName().toString().startsWith("fb-"))
+                    .anyMatch(p -> {
+                        try {
+                            FileBatchState state = GSON.fromJson(Files.readString(p), FileBatchState.class);
+                            if (state == null || state.getSource() == null) {
+                                return false;
+                            }
+
+                            if ("COMPLETED".equals(state.getStatus())) {
+                                return false;
+                            }
+
+                            if (!localFilePath.equals(state.getSource().getFilePath())) {
+                                return false;
+                            }
+
+                            if (state.getTargets() == null || state.getTargets().isEmpty()) {
+                                return false;
+                            }
+
+                            if (isBatchExpired(state, pendingTimeoutMinutes)) {
+                                logger.info("批次已超时，视为失效: filePath={}, updateTime={}",
+                                        localFilePath, state.getUpdateTime());
+                                return false;
+                            }
+
+                            return state.getTargets().stream()
+                                    .anyMatch(t -> "PENDING".equals(t.getStatus())
+                                            && matchesTargetAgentKey(t.getAgentName(), t.getAgentId(), targetAgentKey));
+
+                        } catch (Exception e) {
+                            logger.warn("检查pending批次文件失败: {}", p, e);
+                            return false;
+                        }
+                    });
+        } catch (IOException e) {
+            logger.warn("扫描pending目录失败: {}", pendingDirPath, e);
+            return false;
+        }
+    }
+
+    private boolean isBatchExpired(FileBatchState state, int timeoutMinutes) {
+        if (timeoutMinutes <= 0) {
+            return false;
+        }
+        String updateTimeStr = state.getUpdateTime();
+        if (updateTimeStr == null || updateTimeStr.isEmpty()) {
+            return false;
+        }
+        try {
+            LocalDateTime updateTime = LocalDateTime.parse(updateTimeStr, FORMATTER);
+            long updateEpoch = updateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+            long now = System.currentTimeMillis();
+            long timeoutMs = (long) timeoutMinutes * 60 * 1000;
+            return (now - updateEpoch) > timeoutMs;
+        } catch (Exception e) {
+            logger.warn("解析批次更新时间失败: {}", updateTimeStr, e);
+            return false;
+        }
+    }
+
+    private boolean matchesTargetAgentKey(String agentName, String agentId, String targetAgentKey) {
+        if (targetAgentKey == null) {
+            return false;
+        }
+        if (agentName != null && (agentName.equals(targetAgentKey)
+                || agentName.endsWith("@" + targetAgentKey))) {
+            return true;
+        }
+        if (agentId != null && (agentId.equals(targetAgentKey)
+                || agentId.endsWith("@" + targetAgentKey))) {
+            return true;
+        }
+        return false;
+    }
+
+    public void initFileBatch(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile, AgentTaskConfig config,
+            List<TargetAgentInfo> routedTargets) throws IOException {
+        logger.info("初始化文件批次: fileBatchId={}, scanBatchId={}", fileBatchId, scanBatchId);
         FileBatchState state = buildInitialState(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
         writeState(state);
 
@@ -106,6 +321,10 @@ public class FileBatchCompletionTracker {
         logger.info("删除文件批次: fileBatchId={}", fileBatchId);
     }
 
+    public Path getPendingDirPath() {
+        return pendingDirPath;
+    }
+
     public FileBatchState loadFileBatch(Long fileBatchId) throws IOException {
         Path jsonPath = resolveJsonPath(fileBatchId);
         if (!Files.exists(jsonPath)) {
@@ -136,8 +355,9 @@ public class FileBatchCompletionTracker {
         return result;
     }
 
-    private FileBatchState buildInitialState(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile, AgentTaskConfig config,
-                                             List<TargetAgentInfo> routedTargets) {
+    private FileBatchState buildInitialState(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile,
+            AgentTaskConfig config,
+            List<TargetAgentInfo> routedTargets) {
         FileBatchState state = new FileBatchState();
         state.setFileBatchId(fileBatchId);
         state.setScanBatchId(scanBatchId);
@@ -156,7 +376,8 @@ public class FileBatchCompletionTracker {
         sourceInfo.setFileName(scannedFile.getFileName());
         sourceInfo.setFileSizeBytes(scannedFile.getFileSize());
         long ts = scannedFile.getLastModified();
-        sourceInfo.setLastModified(LocalDateTime.ofInstant(Instant.ofEpochMilli(ts), ZoneId.systemDefault()).format(FORMATTER));
+        sourceInfo.setLastModified(
+                LocalDateTime.ofInstant(Instant.ofEpochMilli(ts), ZoneId.systemDefault()).format(FORMATTER));
         state.setSource(sourceInfo);
 
         TransferConfig tc = config.getTransferConfig();

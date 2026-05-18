@@ -735,7 +735,16 @@ public class RetryAwareUploaderDecorator implements UploadService {
     }
 
     private boolean existsInFailedQueue(String localFilePath, String targetAgentKey) {
-        final String uploadFailRetryQueueDir = getAgentConfig().getUploadFailRetryQueueDir();
+        AgentConfig config = getAgentConfig();
+        if (config == null) {
+            return false;
+        }
+
+        final String uploadFailRetryQueueDir = config.getUploadFailRetryQueueDir();
+        if (uploadFailRetryQueueDir == null || uploadFailRetryQueueDir.isEmpty()) {
+            return false;
+        }
+
         final Path uploadFailRetryQueuePath = Paths.get(uploadFailRetryQueueDir);
         if (!Files.exists(uploadFailRetryQueuePath)) {
             return false;

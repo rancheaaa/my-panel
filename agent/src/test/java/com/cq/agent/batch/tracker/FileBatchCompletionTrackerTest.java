@@ -1,6 +1,7 @@
 package com.cq.agent.batch.tracker;
 
 import com.cq.agent.batch.scanner.ScannedFile;
+import com.cq.agent.util.AtomicFileWriter;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.TransferConfig;
@@ -9,10 +10,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +20,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("FileBatchCompletionTracker - 文件批次完成追踪器")
@@ -266,11 +264,145 @@ class FileBatchCompletionTrackerTest {
     }
 
     @Test
+    @DisplayName("initFileBatchIfAbsent - 首次初始化时返回true并创建文件")
+    void shouldReturnTrueOnFirstInit() throws Exception {
+        Long fileBatchId = 5001L;
+        ScannedFile scannedFile = createScannedFile("first-init.log");
+        boolean result = tracker.initFileBatchIfAbsent(fileBatchId, 999L, scannedFile, createTaskConfig(),
+                createTargets(2));
+
+        assertTrue(result, "首次初始化应返回true");
+        FileBatchState state = tracker.loadFileBatch(fileBatchId);
+        assertNotNull(state);
+        assertEquals("PENDING", state.getStatus());
+    }
+
+    @Test
+    @DisplayName("initFileBatchIfAbsent - 同一文件不同fileBatchId时跳过初始化（第二扫描周期场景）")
+    void shouldSkipInitWhenSameFileDifferentBatchId() throws Exception {
+        Long firstBatchId = 5002L;
+        Long secondBatchId = 5999L;
+        ScannedFile scannedFile = createScannedFile("same-file-diff-id.log");
+        AgentTaskConfig config = createTaskConfig();
+
+        tracker.initFileBatch(firstBatchId, 999L, scannedFile, config, createTargets(3));
+        tracker.markCompleted(firstBatchId, "target-001");
+
+        boolean result = tracker.initFileBatchIfAbsent(secondBatchId, 1000L, scannedFile, config, createTargets(3));
+
+        assertFalse(result, "同一文件已有活跃批次时应返回false，即使fileBatchId不同");
+        assertFalse(Files.exists(tracker.getPendingDirPath().resolve("fb-" + secondBatchId + ".json")),
+                "不应创建新的JSON文件");
+        FileBatchState original = tracker.loadFileBatch(firstBatchId);
+        assertEquals(1, original.getSummary().getCompletedCount(), "原批次的进度应保留");
+    }
+
+    @Test
+    @DisplayName("initFileBatchIfAbsent - 批次已COMPLETED时允许重新初始化")
+    void shouldAllowReinitWhenBatchCompleted() throws Exception {
+        Long fileBatchId = 5003L;
+        ScannedFile scannedFile = createScannedFile("completed-reinit.log");
+        AgentTaskConfig config = createTaskConfig();
+        tracker.initFileBatch(fileBatchId, 999L, scannedFile, config, createTargets(1));
+        tracker.markCompleted(fileBatchId, "target-001");
+
+        boolean result = tracker.initFileBatchIfAbsent(fileBatchId + 1, 1000L, scannedFile, config, createTargets(1));
+
+        assertTrue(result, "COMPLETED的批次不应阻止新批次创建");
+    }
+
+    @Test
+    @DisplayName("initFileBatchIfAbsent - 不同taskId的同一文件路径允许初始化")
+    void shouldAllowInitWhenSameFileDifferentTask() throws Exception {
+        Long fileBatchId = 5004L;
+        ScannedFile scannedFile = createScannedFile("diff-task.log");
+        AgentTaskConfig config1 = createTaskConfig();
+        config1.setTaskId(100L);
+        tracker.initFileBatch(fileBatchId, 999L, scannedFile, config1, createTargets(2));
+
+        AgentTaskConfig config2 = createTaskConfig();
+        config2.setTaskId(200L);
+        boolean result = tracker.initFileBatchIfAbsent(fileBatchId + 1, 1000L, scannedFile, config2, createTargets(2));
+
+        assertTrue(result, "不同taskId的同一文件应允许创建新批次");
+    }
+
+    @Test
+    @DisplayName("initFileBatchIfAbsent - 模拟第二扫描周期，已完成的target不被覆盖")
+    void shouldNotOverwriteProgressOnSecondScanCycle() throws Exception {
+        Long firstBatchId = 5005L;
+        Long secondBatchId = 5888L;
+        ScannedFile scannedFile = createScannedFile("second-cycle.log");
+        AgentTaskConfig config = createTaskConfig();
+        List<TargetAgentInfo> targets = createTargets(3);
+        tracker.initFileBatch(firstBatchId, 999L, scannedFile, config, targets);
+
+        tracker.markCompleted(firstBatchId, "target-001");
+        tracker.markFailed(firstBatchId, "target-002", false);
+
+        boolean result = tracker.initFileBatchIfAbsent(secondBatchId, 1000L, scannedFile, config, targets);
+
+        assertFalse(result, "第二扫描周期不应重新初始化");
+        FileBatchState state = tracker.loadFileBatch(firstBatchId);
+        assertEquals(1, state.getSummary().getCompletedCount(), "已完成的target应保留");
+        assertEquals(1, state.getSummary().getFailedCount(), "已失败的target应保留");
+        assertEquals(1, state.getSummary().getPendingCount(), "未处理的target应保留");
+    }
+
+    @Test
+    @DisplayName("existsActiveBatchForFile - PENDING状态返回true")
+    void shouldFindActiveBatchWhenPending() throws Exception {
+        Long fileBatchId = 5006L;
+        ScannedFile scannedFile = createScannedFile("active-pending.log");
+        AgentTaskConfig config = createTaskConfig();
+        config.setTaskId(500L);
+        tracker.initFileBatch(fileBatchId, 999L, scannedFile, config, createTargets(2));
+
+        assertTrue(tracker.existsActiveBatchForFile(scannedFile.getAbsolutePath(), 500L));
+    }
+
+    @Test
+    @DisplayName("existsActiveBatchForFile - COMPLETED状态返回false")
+    void shouldNotFindActiveBatchWhenCompleted() throws Exception {
+        Long fileBatchId = 5007L;
+        ScannedFile scannedFile = createScannedFile("active-completed.log");
+        AgentTaskConfig config = createTaskConfig();
+        config.setTaskId(501L);
+        tracker.initFileBatch(fileBatchId, 999L, scannedFile, config, createTargets(1));
+        tracker.markCompleted(fileBatchId, "target-001");
+
+        assertFalse(tracker.existsActiveBatchForFile(scannedFile.getAbsolutePath(), 501L));
+    }
+
+    @Test
+    @DisplayName("existsActiveBatchForFile - 不同taskId返回false")
+    void shouldNotFindActiveBatchWhenDifferentTaskId() throws Exception {
+        Long fileBatchId = 5008L;
+        ScannedFile scannedFile = createScannedFile("active-diff-task.log");
+        AgentTaskConfig config = createTaskConfig();
+        config.setTaskId(600L);
+        tracker.initFileBatch(fileBatchId, 999L, scannedFile, config, createTargets(2));
+
+        assertFalse(tracker.existsActiveBatchForFile(scannedFile.getAbsolutePath(), 999L),
+                "不同taskId不应匹配");
+        assertTrue(tracker.existsActiveBatchForFile(scannedFile.getAbsolutePath(), 600L),
+                "相同taskId应匹配");
+    }
+
+    @Test
+    @DisplayName("existsActiveBatchForFile - null参数返回false")
+    void shouldReturnFalseForNullParams() {
+        assertFalse(tracker.existsActiveBatchForFile(null, 1L));
+        assertFalse(tracker.existsActiveBatchForFile("/some/path", null));
+    }
+
+    @Test
     @DisplayName("并发安全 - 多线程同时markCompleted，最终结果一致")
     void shouldBeThreadSafeForConcurrentMarkCompleted() throws Exception {
         Long fileBatchId = 3001L;
         int targetCount = 5;
-        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("concurrent.log"), createTaskConfig(), createTargets(targetCount));
+        tracker.initFileBatch(fileBatchId, 999L, createScannedFile("concurrent.log"), createTaskConfig(),
+                createTargets(targetCount));
 
         ExecutorService executor = Executors.newFixedThreadPool(targetCount);
         CountDownLatch latch = new CountDownLatch(1);

@@ -335,7 +335,14 @@ public class BatchTaskSchedulerManager {
 
             if (routedTargets.size() > 1 && fileBatchTracker != null) {
                 try {
-                    fileBatchTracker.initFileBatch(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
+                    boolean created = fileBatchTracker.initFileBatchIfAbsent(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
+                    if (!created) {
+                        Long existingBatchId = fileBatchTracker.findActiveBatchIdForFile(scannedFile.getAbsolutePath(), taskId);
+                        if (existingBatchId != null) {
+                            fileBatchId = existingBatchId;
+                            log.debug("使用已有批次ID: fileBatchId={}, file={}", fileBatchId, scannedFile.getFileName());
+                        }
+                    }
                 } catch (Exception e) {
                     log.warn("⚠️ 初始化文件批次追踪失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
                 }
@@ -359,6 +366,15 @@ public class BatchTaskSchedulerManager {
                         }
                     }
 
+                    if (fileBatchTracker != null && routedTargets.size() > 1) {
+                        String targetAgentKey = extractTargetAgentKeyFromInfo(targetAgent);
+                        if (targetAgentKey != null && fileBatchTracker.isTargetCompletedInBatch(localFilePath, taskId, targetAgentKey)) {
+                            log.info("⏭️ 文件目标已完成，跳过: fileName={}, target={}",
+                                    scannedFile.getFileName(), targetAgent.getAgentId());
+                            continue;
+                        }
+                    }
+
                     UploadListener listener = new BatchUploadListener(
                             taskId, scannedFile, config, targetAgent, progressReporter,
                             agentConfig != null ? agentConfig.getUploadSuccessQueueDir() : null,
@@ -372,6 +388,14 @@ public class BatchTaskSchedulerManager {
                         log.warn("⚠️  文件上传提交失败: fileName={}, target={}",
                                 scannedFile.getFileName(), targetAgent.getAgentId());
                         failedFiles.add(scannedFile.getFileName() + "->" + targetAgent.getAgentId());
+                        if (fileBatchTracker != null && fileBatchId != null) {
+                            try {
+                                fileBatchTracker.markFailed(fileBatchId, targetAgent.getAgentId(), true);
+                                log.info("标记目标为终态失败: fileBatchId={}, target={}", fileBatchId, targetAgent.getAgentId());
+                            } catch (Exception e) {
+                                log.warn("⚠️ 标记批次失败状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                            }
+                        }
                     } else {
                         log.debug("✅ 文件上传已提交到队列: fileName={}, target={}",
                                 scannedFile.getFileName(), targetAgent.getAgentId());
@@ -402,6 +426,17 @@ public class BatchTaskSchedulerManager {
      */
     private boolean hasTargetAgents(AgentTaskConfig config) {
         return config.getTargetAgents() != null && !config.getTargetAgents().isEmpty();
+    }
+
+    private String extractTargetAgentKeyFromInfo(TargetAgentInfo targetAgent) {
+        if (targetAgent == null) {
+            return null;
+        }
+        String agentName = targetAgent.getAgentName();
+        if (agentName != null && agentName.contains("@")) {
+            return agentName.substring(agentName.lastIndexOf("@") + 1);
+        }
+        return agentName;
     }
 
     private String buildRemoteTargetInfo(AgentTaskConfig config, TargetAgentInfo targetAgent, ScannedFile scannedFile) {

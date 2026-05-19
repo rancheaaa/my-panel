@@ -703,24 +703,30 @@ public class RetryAwareUploaderDecorator implements UploadService {
         return 50; // 默认值
     }
 
+    /**
+     * 判断文件是否已在传输中。
+     * 通过检查文件的隐藏版本（.{fileName}.transferring）是否存在来判断，
+     * 替代原有的发送队列+失败队列扫描逻辑。
+     *
+     * @param localFilePath    本地文件路径
+     * @param remoteTargetInfo 远程目标信息（保留参数兼容性，当前未使用）
+     * @return true 如果文件正在传输中
+     */
     public boolean isFileAlreadyQueued(String localFilePath, String remoteTargetInfo) {
-        if (localFilePath == null || remoteTargetInfo == null) {
+        if (localFilePath == null) {
             return false;
         }
 
-        String targetAgentKey = extractTargetAgentKey(remoteTargetInfo);
-
-        if (metaStore != null) {
-            boolean inSendingQueue = metaStore.existsTaskWithLocalPath(localFilePath, targetAgentKey);
-            if (inSendingQueue) {
-                logger.debug("📋 文件已在发送队列中: file={}, target={}", localFilePath, targetAgentKey);
-                return true;
-            }
+        // 如果传入的路径本身就是隐藏文件，说明已在传输中
+        Path path = Paths.get(localFilePath);
+        if (TransferFileStateManager.isTransferringFile(path)) {
+            logger.debug("文件已是传输中状态: file={}", localFilePath);
+            return true;
         }
 
-        boolean inFailedQueue = existsInFailedQueue(localFilePath, targetAgentKey);
-        if (inFailedQueue) {
-            logger.debug("📋 文件已在失败重试队列中: file={}, target={}", localFilePath, targetAgentKey);
+        // 检查原始文件对应的隐藏文件是否存在
+        if (TransferFileStateManager.isTransferring(path)) {
+            logger.debug("文件已在传输中（隐藏文件存在）: file={}", localFilePath);
             return true;
         }
 
@@ -740,64 +746,5 @@ public class RetryAwareUploaderDecorator implements UploadService {
             logger.warn("提取目标Agent标识失败: remoteTargetInfo={}", remoteTargetInfo, e);
             return remoteTargetInfo;
         }
-    }
-
-    private boolean existsInFailedQueue(String localFilePath, String targetAgentKey) {
-        AgentConfig config = getAgentConfig();
-        if (config == null) {
-            return false;
-        }
-
-        final String uploadFailRetryQueueDir = config.getUploadFailRetryQueueDir();
-        if (uploadFailRetryQueueDir == null || uploadFailRetryQueueDir.isEmpty()) {
-            return false;
-        }
-
-        final Path uploadFailRetryQueuePath = Paths.get(uploadFailRetryQueueDir);
-        if (!Files.exists(uploadFailRetryQueuePath)) {
-            return false;
-        }
-
-        try (Stream<Path> paths = Files.list(uploadFailRetryQueuePath)) {
-            return paths.filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(".json"))
-                    .anyMatch(path -> {
-                        try {
-                            String json = Files.readString(path);
-                            UploadTask task = gson.fromJson(json, UploadTask.class);
-
-                            if (task == null) {
-                                return false;
-                            }
-
-                            if (!localFilePath.equals(task.getLocalFilePath())) {
-                                return false;
-                            }
-
-                            String taskTargetAgent = extractTargetAgentFromTask(task);
-                            return targetAgentKey.equals(taskTargetAgent);
-
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    });
-        } catch (IOException e) {
-            return false;
-        }
-    }
-
-    private String extractTargetAgentFromTask(UploadTask task) {
-        String remotePath = task.getRemoteAgentApiUrl();
-
-        if (remotePath != null && remotePath.startsWith("http://")) {
-            try {
-                URI uri = new URI(remotePath);
-                return uri.getHost() + ":" + uri.getPort();
-            } catch (Exception e) {
-                return remotePath;
-            }
-        }
-
-        return remotePath;
     }
 }

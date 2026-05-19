@@ -8,6 +8,7 @@ import com.cq.agent.batch.scheduler.BatchUploadListener;
 import com.cq.agent.batch.scheduler.QuartzTaskScheduler;
 import com.cq.agent.batch.scheduler.TargetRouter;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
+import com.cq.agent.client.upload.TransferFileStateManager;
 import com.cq.agent.config.AgentConfig;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
@@ -20,6 +21,11 @@ import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -281,7 +287,10 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                     String localFilePath = scannedFile.getAbsolutePath();
                     String remoteTargetInfo = buildRemoteTargetInfo(config, targetAgent, scannedFile);
 
-                    if (shouldSkipAlreadyQueued(localFilePath, remoteTargetInfo, scannedFile, targetAgent)) {
+                    // 通过检查隐藏文件判断是否已在传输中（替代原有的队列检查逻辑）
+                    if (TransferFileStateManager.isTransferring(Paths.get(localFilePath))) {
+                        log.info("文件已在传输中（隐藏文件存在），跳过: fileName={}, target={}",
+                                scannedFile.getFileName(), targetAgent.getAgentId());
                         continue;
                     }
 
@@ -289,11 +298,14 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                         continue;
                     }
 
+                    // 提交前将原始文件标记为传输中（重命名为隐藏文件）
+                    Path hiddenPath = hideFileBeforeUpload(scannedFile);
+
                     UploadListener listener = createBatchUploadListener(
                             taskId, scannedFile, config, targetAgent,
                             scanBatchId, fileBatchId);
 
-                    boolean submitted = delegate.uploadFile(localFilePath, remoteTargetInfo, listener);
+                    boolean submitted = delegate.uploadFile(hiddenPath.toString(), remoteTargetInfo, listener);
                     result.incrementSubmitted();
 
                     if (!submitted) {
@@ -329,16 +341,39 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
         }
     }
 
-    private boolean shouldSkipAlreadyQueued(String localFilePath, String remoteTargetInfo,
-            ScannedFile scannedFile, TargetAgentInfo targetAgent) {
-        if (delegate instanceof RetryAwareUploaderDecorator uploader) {
-            if (uploader.isFileAlreadyQueued(localFilePath, remoteTargetInfo)) {
-                log.info("文件已在传输队列中，跳过: fileName={}, target={}",
-                        scannedFile.getFileName(), targetAgent.getAgentId());
-                return true;
-            }
+    /**
+     * 将文件标记为传输中（重命名为隐藏文件）。
+     * 如果文件已经被隐藏（一对多场景中第一个目标已隐藏），直接返回已有的隐藏路径。
+     *
+     * @param scannedFile 扫描到的文件
+     * @return 隐藏后的文件路径
+     * @throws IOException 如果文件不存在或隐藏失败
+     */
+    private Path hideFileBeforeUpload(ScannedFile scannedFile) throws IOException {
+        Path originalPath = Paths.get(scannedFile.getAbsolutePath());
+
+        // 如果已经是隐藏文件路径（一对多场景中第一个目标已隐藏），直接返回
+        if (TransferFileStateManager.isTransferringFile(originalPath)) {
+            log.debug("文件已是隐藏状态，直接使用: {}", originalPath);
+            return originalPath;
         }
-        return false;
+
+        // 如果隐藏文件已存在（文件已被隐藏），直接返回隐藏路径
+        if (TransferFileStateManager.isTransferring(originalPath)) {
+            Path hiddenPath = TransferFileStateManager.getTransferringPath(originalPath);
+            log.debug("文件已在传输中，使用已有隐藏路径: {}", hiddenPath);
+            // 更新scannedFile的路径为隐藏路径
+            scannedFile.setOriginalAbsolutePath(scannedFile.getAbsolutePath());
+            scannedFile.setAbsolutePath(hiddenPath.toString());
+            return hiddenPath;
+        }
+
+        // 首次隐藏：将原始文件重命名为隐藏文件
+        Path hiddenPath = TransferFileStateManager.hideFile(originalPath);
+        // 保存原始路径，更新为隐藏路径
+        scannedFile.setOriginalAbsolutePath(originalPath.toString());
+        scannedFile.setAbsolutePath(hiddenPath.toString());
+        return hiddenPath;
     }
 
     private boolean shouldSkipTargetCompleted(String localFilePath, Long taskId,

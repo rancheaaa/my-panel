@@ -7,6 +7,7 @@ import com.cq.panel.common.dto.batch.TransferConfig;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.report.SubTaskEvent;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
+import com.cq.agent.client.upload.TransferFileStateManager;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
 import lombok.Getter;
@@ -135,17 +136,17 @@ public class BatchUploadListener implements UploadListener {
     /**
      * 恢复模式构造函数 - 用于重试场景，复用已有 subtaskId，不创建新子任务记录
      *
-     * @param taskId           任务ID
+     * @param taskId            任务ID
      * @param existingSubtaskId 已有的子任务ID（来自原始失败的 UploadTask）
-     * @param scannedFile      扫描到的文件
-     * @param config           任务配置
-     * @param targetAgent      目标Agent信息
-     * @param progressReporter 进度上报器
-     * @param successQueueDir  上传成功队列目录
-     * @param sendingQueueDir  发送中队列目录
-     * @param scanBatchId      扫描批次ID
-     * @param fileBatchId      文件批次ID
-     * @param fileBatchTracker 文件批次完成追踪器
+     * @param scannedFile       扫描到的文件
+     * @param config            任务配置
+     * @param targetAgent       目标Agent信息
+     * @param progressReporter  进度上报器
+     * @param successQueueDir   上传成功队列目录
+     * @param sendingQueueDir   发送中队列目录
+     * @param scanBatchId       扫描批次ID
+     * @param fileBatchId       文件批次ID
+     * @param fileBatchTracker  文件批次完成追踪器
      */
     public BatchUploadListener(Long taskId, Long existingSubtaskId, ScannedFile scannedFile,
             AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
@@ -347,11 +348,11 @@ public class BatchUploadListener implements UploadListener {
     @Override
     public void onComplete(UploadTask task) {
         if (scannedFile == null || subtaskId == null) {
-            log.warn("⚠️ 状态不完整，跳过完成通知: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
+            log.warn("状态不完整，跳过完成通知: subtaskId={}, scannedFile={}", subtaskId, scannedFile);
             return;
         }
 
-        log.info("✅ 文件上传完成: subtask={}, file={}, transferId={}",
+        log.info("文件上传完成: subtask={}, file={}, transferId={}",
                 subtaskId, scannedFile.getFileName(), task.getTransferId());
 
         if (progressReporter != null) {
@@ -370,14 +371,15 @@ public class BatchUploadListener implements UploadListener {
                     try {
                         fileBatchTracker.deleteFileBatch(fileBatchId);
                     } catch (Exception e) {
-                        log.warn("⚠️ 删除文件批次追踪文件失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                        log.warn("删除文件批次追踪文件失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
                     }
                 }
             } catch (Exception e) {
-                log.warn("⚠️ 标记文件批次完成状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                log.warn("标记文件批次完成状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
                 executePostTransferAction();
             }
         } else {
+            // 非批量场景（单目标），直接执行传输后操作
             executePostTransferAction();
         }
         moveControlFileToSuccessQueue();
@@ -666,10 +668,15 @@ public class BatchUploadListener implements UploadListener {
 
     /**
      * 执行传输后操作（spec.md 4.6 - postTransferAction）
+     * 适配隐藏文件机制：文件在传输前被重命名为隐藏文件（.{name}.transferring），
+     * 传输完成后根据配置执行不同操作：
+     * - NONE: 将隐藏文件恢复为原始文件名（unhide）
+     * - DELETE: 删除隐藏文件
+     * - BACKUP: 将隐藏文件备份（使用原始文件名），然后删除隐藏文件
      */
     private void executePostTransferAction() {
         if (scannedFile == null) {
-            log.warn("⚠️ scannedFile为null，跳过传输后操作");
+            log.warn("scannedFile为null，跳过传输后操作");
             return;
         }
 
@@ -680,64 +687,85 @@ public class BatchUploadListener implements UploadListener {
         }
 
         if ("NONE".equalsIgnoreCase(postTransferAction)) {
-            log.debug("ℹ️ postTransferAction=NONE，跳过后续操作: subtask={}, fileName={}",
+            log.debug("postTransferAction=NONE，恢复原始文件: subtask={}, fileName={}",
                     subtaskId, scannedFile.getFileName());
+            unhideTransferringFile();
             return;
         }
 
-        log.info("🔧 执行传输后操作: subtask={}, fileName={}, action={}",
+        log.info("执行传输后操作: subtask={}, fileName={}, action={}",
                 subtaskId, scannedFile.getFileName(), postTransferAction);
 
         try {
-            String filePath = scannedFile.getAbsolutePath();
-            Path sourcePath = Paths.get(filePath);
+            // 获取当前文件路径（可能是隐藏路径）
+            Path currentPath = Paths.get(scannedFile.getAbsolutePath());
+            // 获取原始文件路径
+            Path originalPath = Paths.get(scannedFile.getOriginalAbsolutePath());
 
             switch (postTransferAction.toUpperCase()) {
                 case "DELETE":
-                    deleteSourceFile(sourcePath);
+                    deleteSourceFile(currentPath);
                     break;
 
                 case "BACKUP":
-                    backupSourceFile(sourcePath);
+                    backupSourceFile(currentPath, originalPath);
                     break;
 
                 default:
-                    log.warn("⚠️ 未知的postTransferAction: {}, 跳过", postTransferAction);
+                    log.warn("未知的postTransferAction: {}, 恢复原始文件", postTransferAction);
+                    unhideTransferringFile();
                     break;
             }
 
-            log.info("✅ 传输后操作成功: subtask={}, fileName={}, action={}",
+            log.info("传输后操作成功: subtask={}, fileName={}, action={}",
                     subtaskId, scannedFile.getFileName(), postTransferAction);
 
         } catch (Exception e) {
-            log.error("❌ 执行postTransferAction失败: subtask={}, fileName={}, error={}",
+            log.error("执行postTransferAction失败: subtask={}, fileName={}, error={}",
                     subtaskId, scannedFile.getFileName(), e.getMessage());
         }
     }
 
     /**
-     * 删除源文件
+     * 将隐藏文件恢复为原始文件名（取消传输中标记）
+     */
+    private void unhideTransferringFile() {
+        Path currentPath = Paths.get(scannedFile.getAbsolutePath());
+        if (TransferFileStateManager.isTransferringFile(currentPath)) {
+            Path restoredPath = TransferFileStateManager.unhideFileSafely(currentPath);
+            if (restoredPath != null) {
+                log.info("隐藏文件已恢复: subtask={}, {} -> {}",
+                        subtaskId, currentPath.getFileName(), restoredPath.getFileName());
+            }
+        }
+    }
+
+    /**
+     * 删除源文件（支持隐藏文件路径）
      */
     private void deleteSourceFile(Path sourcePath) {
         try {
             if (!Files.exists(sourcePath)) {
-                log.warn("⚠️ 源文件不存在，跳过删除: fileName={}", scannedFile.getFileName());
+                log.warn("源文件不存在，跳过删除: fileName={}", scannedFile.getFileName());
                 return;
             }
 
             Files.delete(sourcePath);
-            log.info("🗑️ 源文件已删除: subtask={}, fileName={}", subtaskId, scannedFile.getFileName());
+            log.info("源文件已删除: subtask={}, fileName={}, path={}", subtaskId, scannedFile.getFileName(), sourcePath);
 
         } catch (Exception e) {
-            log.error("❌ 删除源文件失败: fileName={}, error={}", scannedFile.getFileName(), e.getMessage());
+            log.error("删除源文件失败: fileName={}, error={}", scannedFile.getFileName(), e.getMessage());
             throw new RuntimeException("删除源文件失败: " + e.getMessage(), e);
         }
     }
 
     /**
-     * 备份源文件
+     * 备份源文件（支持隐藏文件路径，使用原始文件名备份）
+     *
+     * @param currentPath  当前文件路径（可能是隐藏文件路径）
+     * @param originalPath 原始文件路径（用于确定备份文件名）
      */
-    private void backupSourceFile(Path sourcePath) {
+    private void backupSourceFile(Path currentPath, Path originalPath) {
         TransferConfig transferConfig = config != null ? config.getTransferConfig() : null;
         String backupDir = transferConfig != null ? transferConfig.getBackupDir() : null;
         String backupMode = transferConfig != null ? transferConfig.getBackupMode() : null;
@@ -752,30 +780,35 @@ public class BatchUploadListener implements UploadListener {
 
             if (!Files.exists(backupPath)) {
                 Files.createDirectories(backupPath);
-                log.info("📁 创建备份目录: {}", backupDir);
+                log.info("创建备份目录: {}", backupDir);
             }
 
-            Path targetPath = backupPath.resolve(scannedFile.getFileName());
+            // 使用原始文件名作为备份文件名
+            String originalFileName = originalPath.getFileName().toString();
+            Path targetPath = backupPath.resolve(originalFileName);
 
             if (Files.exists(targetPath)) {
                 String timestamp = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
-                String newName = scannedFile.getFileName() + "." + timestamp;
+                String newName = originalFileName + "." + timestamp;
                 targetPath = backupPath.resolve(newName);
-                log.info("ℹ️ 备份文件已存在，使用新名称: {}", newName);
+                log.info("备份文件已存在，使用新名称: {}", newName);
             }
 
             if ("MOVE".equalsIgnoreCase(backupMode)) {
-                Files.move(sourcePath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                log.info("✅ 源文件已移动到备份目录: subtask={}, src={}, dst={}",
-                        subtaskId, sourcePath, targetPath);
+                Files.move(currentPath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                log.info("源文件已移动到备份目录: subtask={}, src={}, dst={}",
+                        subtaskId, currentPath, targetPath);
             } else {
-                Files.copy(sourcePath, targetPath, java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
-                log.info("✅ 源文件已复制到备份目录: subtask={}, src={}, dst={}",
-                        subtaskId, sourcePath, targetPath);
+                Files.copy(currentPath, targetPath, java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
+                log.info("源文件已复制到备份目录: subtask={}, src={}, dst={}",
+                        subtaskId, currentPath, targetPath);
+                // COPY模式下，复制完成后删除隐藏文件
+                Files.deleteIfExists(currentPath);
+                log.info("已删除隐藏源文件: subtask={}, path={}", subtaskId, currentPath);
             }
 
         } catch (Exception e) {
-            log.error("❌ 备份源文件失败: fileName={}, backupDir={}, error={}",
+            log.error("备份源文件失败: fileName={}, backupDir={}, error={}",
                     scannedFile.getFileName(), backupDir, e.getMessage());
             throw new RuntimeException("备份源文件失败: " + e.getMessage(), e);
         }

@@ -115,6 +115,7 @@ const TaskListPage = () => {
       })),
       transferMode: task.transferMode || 'ONE_TO_ONE',
       routingStrategy: task.routingStrategy || 'ROUND_ROBIN',
+      routingConfig: task.routingConfig || '',
       preserveDirStructure: task.preserveDirStructure === 1,
       retryEnabled: task.retryEnabled === 1,
       retryMaxDays: task.retryMaxDays || 7,
@@ -160,7 +161,7 @@ const TaskListPage = () => {
         title="创建传输任务"
         open={createModalOpen}
         onCancel={() => setCreateModalOpen(false)}
-        width={960}
+        width={1160}
         destroyOnClose
         footer={null}
         styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
@@ -171,7 +172,7 @@ const TaskListPage = () => {
         title="修改传输任务"
         open={editModalOpen}
         onCancel={() => { setEditModalOpen(false); setEditingTask(null); }}
-        width={960}
+        width={1160}
         destroyOnClose
         footer={null}
         styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
@@ -187,7 +188,7 @@ const TaskListPage = () => {
         title="传输任务详情"
         open={detailModalOpen}
         onCancel={() => { setDetailModalOpen(false); setDetailTask(null); }}
-        width={960}
+        width={1160}
         destroyOnClose
         footer={null}
         styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}

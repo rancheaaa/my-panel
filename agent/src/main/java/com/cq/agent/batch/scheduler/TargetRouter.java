@@ -68,34 +68,48 @@ public class TargetRouter {
         }
 
         try {
-            Map<String, Object> configMap = parseSimpleJson(routingConfigJson);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> regionMapping = (Map<String, Object>) configMap.get("regionMapping");
-            String defaultRegion = (String) configMap.get("defaultRegion");
-
-            if (regionMapping == null || regionMapping.isEmpty()) {
-                log.warn("⚠️ REGION_BASED策略但regionMapping为空，降级为BROADCAST");
+            RegionRoutingConfig regionConfig = RegionRoutingConfig.fromJson(routingConfigJson);
+            if (regionConfig == null || regionConfig.getRegionMapping() == null || regionConfig.getRegionMapping().isEmpty()) {
+                log.warn("⚠️ REGION_BASED策略解析后regionMapping为空，降级为BROADCAST");
                 return allTargets;
             }
 
-            String sourceRegion = findSourceRegion(regionMapping);
-            if (sourceRegion == null) {
-                sourceRegion = defaultRegion;
+            String targetRegion = regionConfig.resolveTargetRegion();
+            if (targetRegion == null || !regionConfig.hasRegion(targetRegion)) {
+                log.warn("⚠️ REGION_BASED策略目标区域不存在: targetRegion={}, availableRegions={}, 降级为BROADCAST",
+                        targetRegion, regionConfig.getRegionMapping().keySet());
+                return allTargets;
             }
 
-            if (sourceRegion != null && regionMapping.containsKey(sourceRegion)) {
-                @SuppressWarnings("unchecked")
-                List<String> regionAgentIds = (List<String>) regionMapping.get(sourceRegion);
-                List<TargetAgentInfo> matched = new ArrayList<>();
-                for (TargetAgentInfo target : allTargets) {
-                    if (regionAgentIds.contains(target.getAgentId())) {
-                        matched.add(target);
-                    }
+            List<String> targetAgentIds = regionConfig.getAgentIdsForRegion(targetRegion);
+            if (targetAgentIds == null || targetAgentIds.isEmpty()) {
+                log.warn("⚠️ REGION_BASED策略区域无目标Agent: region={}, 降级为BROADCAST", targetRegion);
+                return allTargets;
+            }
+
+            Set<String> targetIdSet = new HashSet<>(targetAgentIds);
+            List<TargetAgentInfo> matched = new ArrayList<>();
+            for (TargetAgentInfo target : allTargets) {
+                if (targetIdSet.contains(target.getAgentId())) {
+                    matched.add(target);
                 }
-                if (!matched.isEmpty()) {
-                    log.debug("🌍 REGION_BASED选择: region={}, agents={}", sourceRegion,
-                            matched.stream().map(TargetAgentInfo::getAgentId).toList());
-                    return matched;
+            }
+
+            if (!matched.isEmpty()) {
+                log.debug("🌍 REGION_BASED选择: region={}, matchedAgents={}/{}, agentIds={}",
+                        targetRegion, matched.size(), allTargets.size(),
+                        matched.stream().map(TargetAgentInfo::getAgentId).toList());
+                return matched;
+            }
+
+            if (!regionConfig.isFallbackToBroadcast()) {
+                String fallback = regionConfig.getFallbackStrategy();
+                log.warn("⚠️ REGION_BASED未匹配到区域Agent，使用fallback策略: {}", fallback);
+                if ("ROUND_ROBIN".equalsIgnoreCase(fallback)) {
+                    return routeRoundRobin(allTargets);
+                }
+                if ("RANDOM".equalsIgnoreCase(fallback)) {
+                    return routeRandom(allTargets);
                 }
             }
 
@@ -106,67 +120,5 @@ public class TargetRouter {
             log.warn("⚠️ REGION_BASED解析失败: {}, 降级为BROADCAST", e.getMessage());
             return allTargets;
         }
-    }
-
-    private String findSourceRegion(Map<String, Object> regionMapping) {
-        return null;
-    }
-
-    private Map<String, Object> parseSimpleJson(String json) {
-        Map<String, Object> result = new HashMap<>();
-        if (json == null || json.isBlank()) {
-            return result;
-        }
-
-        String trimmed = json.trim();
-        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
-            trimmed = trimmed.substring(1, trimmed.length() - 1);
-        }
-
-        int depth = 0;
-        StringBuilder current = new StringBuilder();
-        List<String> pairs = new ArrayList<>();
-
-        for (char c : trimmed.toCharArray()) {
-            if (c == '{' || c == '[') depth++;
-            else if (c == '}' || c == ']') depth--;
-            else if (c == ',' && depth == 0) {
-                pairs.add(current.toString().trim());
-                current = new StringBuilder();
-                continue;
-            }
-            current.append(c);
-        }
-        if (!current.isEmpty()) {
-            pairs.add(current.toString().trim());
-        }
-
-        for (String pair : pairs) {
-            int colonIdx = pair.indexOf(':');
-            if (colonIdx < 0) continue;
-
-            String key = pair.substring(0, colonIdx).trim().replace("\"", "");
-            String value = pair.substring(colonIdx + 1).trim();
-
-            if (value.startsWith("{") || value.startsWith("[")) {
-                result.put(key, value);
-            } else if (value.startsWith("\"")) {
-                result.put(key, value.replace("\"", ""));
-            } else if ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
-                result.put(key, Boolean.parseBoolean(value));
-            } else {
-                try {
-                    if (value.contains(".")) {
-                        result.put(key, Double.parseDouble(value));
-                    } else {
-                        result.put(key, Long.parseLong(value));
-                    }
-                } catch (NumberFormatException e) {
-                    result.put(key, value);
-                }
-            }
-        }
-
-        return result;
     }
 }

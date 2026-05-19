@@ -257,6 +257,17 @@ const TaskListTab = ({
             <Tag color={routingMap[t.routingStrategy]?.color || 'default'} style={{ margin: 0, fontSize: 11, width: 'fit-content' }}>
               {routingMap[t.routingStrategy]?.text || t.routingStrategy}
             </Tag>
+            {t.routingStrategy === 'REGION_BASED' && t.routingConfig && (
+              <Tooltip color="#fff" overlayInnerStyle={{ color: '#333', maxWidth: 400 }} title={
+                <div style={{ maxWidth: 380 }}>
+                  <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{t.routingConfig}</pre>
+                </div>
+              }>
+                <Tag color="purple" style={{ margin: 0, fontSize: 10, width: 'fit-content', cursor: 'pointer' }}>
+                  区域配置 ✓
+                </Tag>
+              </Tooltip>
+            )}
             <Tag color={t.preserveDirStructure === 1 ? 'blue' : 'default'} style={{ margin: 0, fontSize: 10.5, width: 'fit-content' }}>
               {t.preserveDirStructure === 1 ? '保持目录' : '扁平化'}
             </Tag>
@@ -535,6 +546,28 @@ const TaskListTab = ({
             </Tag>
           </Col>
         </Row>
+        {t.routingStrategy === 'REGION_BASED' && t.routingConfig && (
+          <Row gutter={[32, 12]} style={{ marginTop: 8 }}>
+            <Col span={24}>
+              <div style={{ fontSize: 11.5, color: '#722ed1', marginBottom: 4, fontWeight: 500 }}>区域路由配置</div>
+              <div style={{
+                background: '#f9f0ff',
+                border: '1px solid #d3adf7',
+                borderRadius: 6,
+                padding: '10px 14px'
+              }}>
+                <pre style={{
+                  margin: 0,
+                  fontSize: 12,
+                  fontFamily: 'Monaco, Consolas, monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  color: '#333'
+                }}>{t.routingConfig}</pre>
+              </div>
+            </Col>
+          </Row>
+        )}
       </div>
     );
   };

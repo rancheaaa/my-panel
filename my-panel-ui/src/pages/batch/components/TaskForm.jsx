@@ -204,6 +204,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
       targetAgentIds,
       targetAgentNames,
       targetDirs,
+      routingConfig: values.routingStrategy === 'REGION_BASED' ? (values.routingConfig || null) : null,
       retryEnabled: values.retryEnabled ? 1 : 0,
       preserveDirStructure: values.preserveDirStructure ? 1 : 0
     };
@@ -417,6 +418,43 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                   </Select>
                 </Form.Item></Col>
               </Row>
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.routingStrategy !== cur.routingStrategy}>
+                {({ getFieldValue }) => {
+                  const strategy = getFieldValue('routingStrategy');
+                  if (strategy === 'REGION_BASED') {
+                    return (
+                      <div style={{
+                        background: '#f9f0ff',
+                        border: '1px solid #d3adf7',
+                        borderRadius: 6,
+                        padding: '12px 14px',
+                        marginBottom: 10
+                      }}>
+                        <Form.Item
+                          label={<span>区域路由配置 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                          name="routingConfig"
+                          rules={[{ required: true, message: '区域路由策略必填' }]}
+                          style={{ marginBottom: 4 }}
+                        >
+                          <TextArea
+                            rows={4}
+                            placeholder='{"regionMapping": {"region-a": ["agent-001", "agent-002"], "region-b": ["agent-003", "agent-004"], "region-c": ["agent-005"]}, "sourceRegion": "region-a", "defaultRegion": "region-a", "fallbackStrategy": "BROADCAST"}'
+                            maxLength={2000}
+                            showCount
+                            disabled={isDisabled}
+                            style={{ borderRadius: 6, fontFamily: 'Monaco, Consolas, monospace', fontSize: 12 }}
+                          />
+                        </Form.Item>
+                        <div style={{ fontSize: 11.5, color: '#8c8c8c', display: 'flex', alignItems: 'center' }}>
+                          <InfoCircleOutlined style={{ marginRight: 4, flexShrink: 0 }} />
+                          <span>JSON格式，定义区域与目标节点的映射关系</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              </Form.Item>
               <Form.Item label="保持目录结构" name="preserveDirStructure" valuePropName="checked" initialValue={true} style={{ ...formItemStyle, marginBottom: 0 }}>
                 <Switch checkedChildren="保持" unCheckedChildren="扁平" size="small" disabled={isDisabled} />
               </Form.Item>

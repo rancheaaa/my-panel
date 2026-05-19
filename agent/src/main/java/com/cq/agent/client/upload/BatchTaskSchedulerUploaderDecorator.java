@@ -59,7 +59,8 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
 
     private final QuartzTaskScheduler quartzTaskScheduler;
 
-    public BatchTaskSchedulerUploaderDecorator(UploadService delegate, ConfigFileManager configFileManager) throws SchedulerException {
+    public BatchTaskSchedulerUploaderDecorator(UploadService delegate, ConfigFileManager configFileManager)
+            throws SchedulerException {
         this.delegate = delegate;
         this.agentConfig = delegate != null ? delegate.getAgentConfig() : null;
         this.configFileManager = configFileManager;
@@ -90,7 +91,8 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
         return delegate.getAgentConfig();
     }
 
-    // ==================== 任务生命周期管理（原BatchTaskSchedulerManager职能）====================
+    // ====================
+    // 任务生命周期管理（原BatchTaskSchedulerManager职能）====================
 
     public void startAllRunningTasks() {
         log.info("启动所有RUNNING状态的任务...");
@@ -267,7 +269,8 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
         List<TargetAgentInfo> allTargets = config.getTargetAgents();
         TransferConfig transferConfig = config.getTransferConfig();
         String routingStrategy = transferConfig != null && transferConfig.getRoutingStrategy() != null
-                ? transferConfig.getRoutingStrategy() : "BROADCAST";
+                ? transferConfig.getRoutingStrategy()
+                : "BROADCAST";
 
         TargetRouter router = new TargetRouter();
 
@@ -457,11 +460,14 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
             TransferConfig transferConfig = config.getTransferConfig();
             boolean preserveDir = transferConfig != null && transferConfig.isPreserveDirStructure();
 
+            // 使用原始路径计算远程目标路径（不使用隐藏文件路径）
+            String originalPath = scannedFile.getOriginalAbsolutePath();
+
             String relativePath;
             if (preserveDir) {
                 String sourceDir = config.getSourceDir();
                 if (sourceDir != null && !sourceDir.trim().isEmpty()) {
-                    String absPath = normalizePath(scannedFile.getAbsolutePath());
+                    String absPath = normalizePath(originalPath);
                     String normSourceDir = normalizePath(sourceDir);
 
                     if (absPath.startsWith(normSourceDir)) {
@@ -472,7 +478,7 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                         relativePath = relativePath.replace("\\", "/");
                     } else {
                         log.warn("preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}",
-                                sourceDir, scannedFile.getAbsolutePath());
+                                sourceDir, originalPath);
                         relativePath = scannedFile.getFileName();
                     }
                 } else {
@@ -494,7 +500,8 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     }
 
     private String normalizePath(String path) {
-        if (path == null) return null;
+        if (path == null)
+            return null;
         return path.replace("/", "\\").trim();
     }
 
@@ -527,7 +534,12 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
             submittedCount++;
         }
 
-        public boolean hasFailures() { return !failedFiles.isEmpty(); }
-        public int getFailedCount() { return failedFiles.size(); }
+        public boolean hasFailures() {
+            return !failedFiles.isEmpty();
+        }
+
+        public int getFailedCount() {
+            return failedFiles.size();
+        }
     }
 }

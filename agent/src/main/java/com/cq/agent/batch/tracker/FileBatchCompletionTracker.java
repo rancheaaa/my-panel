@@ -372,7 +372,7 @@ public class FileBatchCompletionTracker {
         sourceInfo.setAgentId(config.getSourceAgentId());
         sourceInfo.setAgentName(config.getSourceAgentName());
         sourceInfo.setSourceDir(config.getSourceDir());
-        sourceInfo.setFilePath(scannedFile.getAbsolutePath());
+        sourceInfo.setFilePath(scannedFile.getOriginalAbsolutePath());
         sourceInfo.setFileName(scannedFile.getFileName());
         sourceInfo.setFileSizeBytes(scannedFile.getFileSize());
         long ts = scannedFile.getLastModified();

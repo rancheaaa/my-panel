@@ -289,6 +289,13 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
     private boolean isRetryTimeReached(UploadTask task, long currentTimeMs) {
         AgentTaskConfig config = taskConfigMap.get(task.getTaskId());
+        if (config == null) {
+            config = loadRetryConfigFromPersistenceByTaskId(task.getTaskId());
+            if (config != null) {
+                taskConfigMap.put(task.getTaskId(), config);
+            }
+        }
+
         if (config == null || config.getRetryConfig() == null || !config.getRetryConfig().isEnabled()) {
             logger.debug("任务未启用重试或配置不存在: taskId={}, transferId={}",
                     task.getTaskId(), task.getTransferId());
@@ -319,16 +326,25 @@ public class RetryAwareUploaderDecorator implements UploadService {
         long nextRetryTimeMs;
         String backoffType = retryConfig.getBackoffType();
 
+        // 判断基准时间：如果任务的 update 时间距现在太久（> 2倍间隔或 > 1小时），
+        // 说明是 Agent 重启后的遗留任务，应以当前时间为基准计算首次重试延迟，
+        // 避免 EXPONENTIAL 退避下 retryCount 已累积导致计算出天文数字的重试时间
+        long updateTimeMs = parseUpdateTimeToMs(task.getUpdateTime());
+        long staleThresholdMs = Math.max(intervalMin * 2L * 60_000L, 60 * 60 * 1000L);
+        long baseTimeMs = (currentTimeMs - updateTimeMs > staleThresholdMs) ? currentTimeMs : updateTimeMs;
+
         if ("EXPONENTIAL".equalsIgnoreCase(backoffType)) {
             long baseIntervalMs = intervalMin * 60_000L;
-            long exponentialDelay = baseIntervalMs * (long) Math.pow(2, currentRetries);
-            nextRetryTimeMs = parseUpdateTimeToMs(task.getUpdateTime()) + exponentialDelay;
+            // 遗留任务从 retryCount=0 开始重新计算，避免指数爆炸
+            int effectiveRetries = (baseTimeMs == currentTimeMs) ? 0 : currentRetries;
+            long exponentialDelay = baseIntervalMs * (long) Math.pow(2, effectiveRetries);
+            nextRetryTimeMs = baseTimeMs + exponentialDelay;
         } else if ("LINEAR".equalsIgnoreCase(backoffType)) {
             long linearDelay = intervalMin * 60_000L * (currentRetries + 1);
-            nextRetryTimeMs = parseUpdateTimeToMs(task.getUpdateTime()) + linearDelay;
+            nextRetryTimeMs = baseTimeMs + linearDelay;
         } else {
             long fixedDelay = intervalMin * 60_000L;
-            nextRetryTimeMs = parseUpdateTimeToMs(task.getUpdateTime()) + fixedDelay;
+            nextRetryTimeMs = baseTimeMs + fixedDelay;
         }
 
         boolean isReached = currentTimeMs >= nextRetryTimeMs;
@@ -564,6 +580,13 @@ public class RetryAwareUploaderDecorator implements UploadService {
             restoredFile.setLastModified(System.currentTimeMillis());
             restoredFile.setAbsolutePath(filePath);
 
+            // 如果路径是隐藏文件路径，推算并设置原始路径，确保上报明细使用原始文件名
+            Path filePathObj = Path.of(filePath);
+            if (TransferFileStateManager.isTransferringFile(filePathObj)) {
+                Path originalPath = TransferFileStateManager.getOriginalPath(filePathObj);
+                restoredFile.setOriginalAbsolutePath(originalPath.toString());
+            }
+
             AgentTaskConfig agentTaskConfig = findTaskConfigForUpload(taskId);
             if (agentTaskConfig == null) {
                 agentTaskConfig = loadRetryConfigFromPersistenceByTaskId(taskId);
@@ -692,7 +715,14 @@ public class RetryAwareUploaderDecorator implements UploadService {
     }
 
     private AgentTaskConfig findTaskConfigForUpload(long taskId) {
-        return this.taskConfigMap.get(taskId);
+        AgentTaskConfig config = this.taskConfigMap.get(taskId);
+        if (config == null) {
+            config = loadRetryConfigFromPersistenceByTaskId(taskId);
+            if (config != null) {
+                taskConfigMap.put(taskId, config);
+            }
+        }
+        return config;
     }
 
     private int getMaxRetriesForTask(UploadTask task) {

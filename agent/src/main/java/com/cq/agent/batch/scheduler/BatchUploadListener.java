@@ -237,8 +237,8 @@ public class BatchUploadListener implements UploadListener {
                 event.setTargetAgentName(targetAgent.getAgentName());
             }
 
-            // 文件信息
-            event.setSourcePath(scannedFile.getAbsolutePath());
+            // 文件信息（使用原始路径上报，不使用隐藏文件路径）
+            event.setSourcePath(scannedFile.getOriginalAbsolutePath());
             event.setTargetPath(computeTargetPath());
             event.setFileName(scannedFile.getFileName());
             event.setFileSizeBytes(scannedFile.getFileSize());
@@ -432,9 +432,9 @@ public class BatchUploadListener implements UploadListener {
             event.setTargetAgentName(targetAgent.getAgentName());
         }
 
-        // 文件信息
+        // 文件信息（使用原始路径上报，不使用隐藏文件路径）
         if (scannedFile != null) {
-            event.setSourcePath(scannedFile.getAbsolutePath());
+            event.setSourcePath(scannedFile.getOriginalAbsolutePath());
             event.setTargetPath(computeTargetPath());
             event.setFileName(scannedFile.getFileName());
             event.setFileSizeBytes(scannedFile.getFileSize());
@@ -587,11 +587,14 @@ public class BatchUploadListener implements UploadListener {
         TransferConfig transferConfig = config != null ? config.getTransferConfig() : null;
         boolean preserveDir = transferConfig != null && transferConfig.isPreserveDirStructure();
 
+        // 使用原始路径计算目标路径（不使用隐藏文件路径）
+        String originalPath = scannedFile.getOriginalAbsolutePath();
+
         String relativePath;
         if (preserveDir) {
             String sourceDir = config.getSourceDir();
             if (sourceDir != null && !sourceDir.trim().isEmpty()) {
-                String absPath = normalizePathSeparator(scannedFile.getAbsolutePath());
+                String absPath = normalizePathSeparator(originalPath);
                 String normSourceDir = normalizePathSeparator(sourceDir);
 
                 if (absPath.startsWith(normSourceDir)) {
@@ -601,12 +604,12 @@ public class BatchUploadListener implements UploadListener {
                     }
                     relativePath = relativePath.replace("\\", "/");
                 } else {
-                    log.warn("⚠️ preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}", sourceDir,
-                            scannedFile.getAbsolutePath());
+                    log.warn("preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}", sourceDir,
+                            originalPath);
                     relativePath = scannedFile.getFileName();
                 }
             } else {
-                log.warn("⚠️ preserveDirStructure=true但sourceDir为空，使用文件名");
+                log.warn("preserveDirStructure=true但sourceDir为空，使用文件名");
                 relativePath = scannedFile.getFileName();
             }
         } else {
@@ -615,9 +618,9 @@ public class BatchUploadListener implements UploadListener {
 
         String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
         String result = targetDir + separator + relativePath;
-        log.debug("📁 computeTargetPath: preserveDir={}, sourceDir={}, sourceFile={}, relativePath={}, targetPath={}",
+        log.debug("computeTargetPath: preserveDir={}, sourceDir={}, sourceFile={}, relativePath={}, targetPath={}",
                 preserveDir, config != null ? config.getSourceDir() : "null",
-                scannedFile.getAbsolutePath(), relativePath, result);
+                originalPath, relativePath, result);
         return result;
     }
 

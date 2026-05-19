@@ -28,7 +28,6 @@
       margin-bottom: 0 !important;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
       border-radius: 12px;
       border: 1px solid #e8ecf0;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -39,9 +38,9 @@
         flex-direction: column !important;
         flex: 1 !important;
         min-height: 0 !important;
-        overflow: hidden !important;
         margin: 0 !important;
         gap: 0 !important;
+        // 不设 overflow:hidden，让子元素（table）的滚动条可见
       }
     }
   }
@@ -59,26 +58,8 @@
 .subtask-table-container {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-
-  .ant-table-wrapper {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .ant-spin-nested-loading,
-  .ant-spin-container {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .ant-table {
-    flex: 1;
-    min-height: 0;
-  }
+  // 关键：不设 overflow:hidden，让Ant Design Table内部的横向滚动条可见
+  // 表格高度由 scroll.y + flex布局共同约束，不需要容器裁剪
 }
 
 .fixed-pagination-bar {

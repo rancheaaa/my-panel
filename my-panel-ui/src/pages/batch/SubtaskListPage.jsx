@@ -314,7 +314,7 @@ const SubtaskListPage = () => {
       render: (_, record) => {
         const duration = calculateDuration(record, now);
         return (
-          <div style={{ lineHeight: '16px' }}>
+          <div style={{ lineHeight: '18px' }}>
             <div><Text type="secondary" style={{ fontSize: 10 }}>开始:</Text> {record.startedAt?.substring(0, 19) || '-'}</div>
             <div><Text type="secondary" style={{ fontSize: 10 }}>完成:</Text> {record.completedAt?.substring(0, 19) || '-'}</div>
             <div><Text type="secondary" style={{ fontSize: 10 }}>耗时:</Text> 
@@ -330,31 +330,35 @@ const SubtaskListPage = () => {
     {
       title: '重试信息',
       key: 'retryInfo',
-      width: 120,
+      width: 150,
       render: (_, record) => (
-        <div style={{ lineHeight: '16px' }}>
+        <div style={{ lineHeight: '20px' }}>
           <div>
             <Text type="secondary" style={{ fontSize: 10 }}>次数: </Text>
             {record.retryCount > 0 ? (
               <Badge count={record.retryCount} style={{ backgroundColor: '#faad14', fontSize: 9 }} />
             ) : <Text type="secondary" style={{ fontSize: 10 }}>0</Text>}
           </div>
-          {record.lastRetryAt && (
-            <Tooltip title={`最后重试: ${record.lastRetryAt}`}>
-              <Text type="warning" style={{ fontSize: 10 }}>
-                <FieldTimeOutlined style={{ marginRight: 2, fontSize: 9 }} />
-                最后: {record.lastRetryAt?.substring(11, 19)}
-              </Text>
-            </Tooltip>
-          )}
-          {record.nextRetryAfter && (
-            <Tooltip title={`下次可重试: ${record.nextRetryAfter}`}>
-              <Text type="success" style={{ fontSize: 10 }}>
-                <FieldTimeOutlined style={{ marginRight: 2, fontSize: 9 }} />
-                下次: {record.nextRetryAfter?.substring(11, 19)}
-              </Text>
-            </Tooltip>
-          )}
+          <div>
+            {record.lastRetryAt ? (
+              <Tooltip title={`最后重试: ${record.lastRetryAt}`}>
+                <Text type="warning" style={{ fontSize: 10 }}>
+                  <FieldTimeOutlined style={{ marginRight: 2, fontSize: 9 }} />
+                  最后: {record.lastRetryAt?.substring(11, 19)}
+                </Text>
+              </Tooltip>
+            ) : <span style={{ color: '#bfbfbf', fontSize: 10 }}>最后: -</span>}
+          </div>
+          <div>
+            {record.nextRetryAfter ? (
+              <Tooltip title={`下次可重试: ${record.nextRetryAfter}`}>
+                <Text type="success" style={{ fontSize: 10 }}>
+                  <FieldTimeOutlined style={{ marginRight: 2, fontSize: 9 }} />
+                  下次: {record.nextRetryAfter?.substring(11, 19)}
+                </Text>
+              </Tooltip>
+            ) : <span style={{ color: '#bfbfbf', fontSize: 10 }}>下次: -</span>}
+          </div>
         </div>
       )
     },
@@ -579,7 +583,7 @@ const SubtaskListPage = () => {
               rowKey="id"
               loading={loading}
               size={tableSize}
-              scroll={{ x: 2100, y: 'calc(100vh - 500px)' }}
+              scroll={{ x: 2130, y: 'calc(100vh - 530px)' }}
               pagination={false}
               rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
             />

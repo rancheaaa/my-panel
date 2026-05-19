@@ -2,7 +2,7 @@
 
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.handler.FileHandler;
@@ -54,10 +54,10 @@ public class HttpServer {
 
     public HttpServer(AgentConfig config, CommandExecutor commandExecutor, FileService fileService,
                       ChunkedTransferService chunkedTransferService, ConfigFileManager configFileManager,
-                      ConfigChangeListener configChangeListener, BatchTaskSchedulerManager taskSchedulerManager) {
+                      ConfigChangeListener configChangeListener, BatchTaskSchedulerUploaderDecorator batchTaskUploader) {
         this.config = config;
         this.commandExecutor = commandExecutor;
-        this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService, configFileManager, configChangeListener, taskSchedulerManager);
+        this.handlerFactory = new HandlerFactory(fileService, chunkedTransferService, configFileManager, configChangeListener, batchTaskUploader);
     }
 
     /**

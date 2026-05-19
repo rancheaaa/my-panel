@@ -61,6 +61,14 @@ public class FallbackPersistenceService {
         log.info("✅ 本地持久化服务初始化: dir={}", storageDir);
     }
 
+    public FallbackPersistenceService(String storageDir, ProgressReporter progressReporter,
+            long scanIntervalSeconds, int batchSize) {
+        this(storageDir);
+        this.progressReporter = progressReporter;
+        this.scanIntervalSeconds = scanIntervalSeconds;
+        this.batchSize = batchSize;
+    }
+
     /**
      * 配置自动补报参数
      * @param scanIntervalSeconds 扫描间隔（秒）

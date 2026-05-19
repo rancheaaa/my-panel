@@ -28,6 +28,7 @@ class FallbackPersistenceServiceTest {
         
         // 创建mock ProgressReporter（使用String构造函数用于测试）
         mockProgressReporter = new ProgressReporter(new AgentConfig());
+        mockProgressReporter.setFallbackPersistenceService(persistenceService);
         persistenceService.setProgressReporter(mockProgressReporter);
         
         // 配置较短的间隔用于测试（1秒）

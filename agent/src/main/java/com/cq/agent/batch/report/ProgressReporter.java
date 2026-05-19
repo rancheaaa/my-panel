@@ -17,7 +17,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 
 /**
  * 进度上报器
@@ -36,7 +35,7 @@ public class ProgressReporter {
     @Setter
     private BiFunction<String, String, Boolean> httpClient;
     @Setter
-    private Consumer<SubTaskEvent> fallbackHandler;
+    private FallbackPersistenceService fallbackPersistenceService;
 
     /**
      * 构造函数（推荐）- 自动创建带负载均衡的HTTP客户端
@@ -292,9 +291,9 @@ public class ProgressReporter {
     }
 
     private void fallbackToLocal(SubTaskEvent event) {
-        if (fallbackHandler != null) {
+        if (fallbackPersistenceService != null) {
             try {
-                fallbackHandler.accept(event);
+                fallbackPersistenceService.persist(event);
                 log.info("🔄 回退到本地: subtaskId={}", event.getSubtaskId());
             } catch (Exception e) {
                 log.error("❌ 本地回退失败: {}", e.getMessage());

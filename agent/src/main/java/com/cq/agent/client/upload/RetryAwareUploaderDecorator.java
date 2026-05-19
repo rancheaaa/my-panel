@@ -96,6 +96,14 @@ public class RetryAwareUploaderDecorator implements UploadService {
         this.delegate = delegate;
     }
 
+    public RetryAwareUploaderDecorator(UploadService delegate, AgentConfig config,
+            FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter) {
+        this.delegate = delegate;
+        initWithConfig(config);
+        this.fileBatchTracker = fileBatchTracker;
+        this.globalProgressReporter = progressReporter;
+    }
+
     // ==================== UploadService 接口实现 ====================
 
     @Override
@@ -565,15 +573,15 @@ public class RetryAwareUploaderDecorator implements UploadService {
             }
 
             BatchUploadListener retryListener = new BatchUploadListener(
-                    taskId, restoredFile, agentTaskConfig,
+                    taskId, task.getSubtaskId(), restoredFile, agentTaskConfig,
                     findTargetAgentForTask(agentTaskConfig, task),
                     getGlobalProgressReporter(),
                     getAgentConfig() != null ? getAgentConfig().getUploadSuccessQueueDir() : null,
                     getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null,
                     scanBatchId, fileBatchId,
                     fileBatchTracker);
-            logger.info("✅ 创建重试监听器(恢复模式): transferId={}, file={}, scanBatch={}, fileBatch={}",
-                    task.getTransferId(), fileName, scanBatchId, fileBatchId);
+            logger.info("✅ 创建重试监听器(恢复模式): transferId={}, subtaskId={}, file={}, scanBatch={}, fileBatch={}",
+                    task.getTransferId(), task.getSubtaskId(), fileName, scanBatchId, fileBatchId);
             return retryListener;
 
         } catch (Exception e) {

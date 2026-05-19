@@ -306,53 +306,94 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             return;
         }
 
+        int totalToUpload = missingChunks.size();
         int initialUploadedCount = task.getTotalChunks() - missingChunks.size();
         UploadListener listener = listenerCache.get(transferId);
         task.setUploadChunksCount(new AtomicInteger(initialUploadedCount));
+        AtomicInteger failedCount = new AtomicInteger(0);
+        CountDownLatch completionLatch = new CountDownLatch(totalToUpload);
+
+        List<CompletableFuture<Void>> uploadFutures = new ArrayList<>();
 
         try (FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
-            CompletableFuture<?>[] uploadFutures = missingChunks.stream()
-                    .map(chunkIndex -> CompletableFuture.runAsync(() -> {
-                        try {
-                            byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
-                            applyRateLimit(chunkData.length, traceId);
-                            if (listener != null) {
-                                handleListenerBeforeSend(transferId, task);
-                            }
-                            ApiResponse<ChunkUploadResponse> uploadResponse =
-                                    uploadChunk(task, chunkIndex, chunkData);
-                            if (!uploadResponse.isSuccess()) {
-                                throw new IOException("Chunk upload failed: " + uploadResponse.getMsg());
-                            }
-                            task.incrementUploadChunksCount();
-                            int currentUploaded = task.getUploadChunksCount().get();
-                            task.updateTimestamp();
-                            this.inflightTasks.put(task.getTransferId(), task);
-                            if (listener != null) {
-                                double progress = (double) currentUploaded / task.getTotalChunks() * 100.0;
-                                handleListenerProgress(transferId, task.getTotalChunks(), currentUploaded, progress);
-                            }
-                        } catch (Exception e) {
-                            throw new CompletionException("Failed to upload chunk " + chunkIndex, e);
+            for (int i = 0; i < totalToUpload; i++) {
+                final int chunkIndex = missingChunks.get(i);
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
+                        applyRateLimit(chunkData.length, traceId);
+                        if (listener != null) {
+                            handleListenerBeforeSend(transferId, task);
                         }
-                    }, chunkExecutor))
-                    .toArray(CompletableFuture[]::new);
-
-            CompletableFuture<Void> allUploads = CompletableFuture.allOf(uploadFutures);
-
-            // Calculate a reasonable timeout
-            int chunksToUpload = missingChunks.size();
-            long waves = (long) Math.ceil((double) chunksToUpload / this.concurrentThreads);
-            long timeoutSeconds = (waves + 2) * this.requestTimeoutSeconds; // Add a 2-request buffer
-            timeoutSeconds = Math.max(60, timeoutSeconds); // Minimum 60 seconds
-
-            try {
-                allUploads.get(timeoutSeconds, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                throw new IOException("Chunk uploads timed out after " + timeoutSeconds + " seconds", e);
+                        ApiResponse<ChunkUploadResponse> uploadResponse =
+                                uploadChunk(task, chunkIndex, chunkData);
+                        if (!uploadResponse.isSuccess()) {
+                            throw new IOException("Chunk upload failed: " + uploadResponse.getMsg());
+                        }
+                        task.incrementUploadChunksCount();
+                        int currentUploaded = task.getUploadChunksCount().get();
+                        task.updateTimestamp();
+                        this.inflightTasks.put(task.getTransferId(), task);
+                        if (listener != null) {
+                            double progress = (double) currentUploaded / task.getTotalChunks() * 100.0;
+                            handleListenerProgress(transferId, task.getTotalChunks(), currentUploaded, progress);
+                        }
+                    } catch (Exception e) {
+                        failedCount.incrementAndGet();
+                        logger.error("[traceId={}] Chunk {} upload failed: {}", traceId, chunkIndex, e.getMessage());
+                        throw new CompletionException("Failed to upload chunk " + chunkIndex, e);
+                    } finally {
+                        completionLatch.countDown();
+                    }
+                }, chunkExecutor);
+                uploadFutures.add(future);
             }
+
+            long waves = (long) Math.ceil((double) totalToUpload / this.concurrentThreads);
+            long estimatedRateLimitMsPerChunk = estimateRateLimitTimeMsPerChunk(task.getChunkSize());
+            long perChunkTimeMs = Math.max(this.requestTimeoutSeconds * 1000L, estimatedRateLimitMsPerChunk);
+            long timeoutMs = Math.max(60_000L, (waves + 2) * perChunkTimeMs);
+
+            boolean completedInTime;
+            try {
+                completedInTime = completionLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                cancelAllFutures(uploadFutures);
+                throw new IOException("Chunk upload interrupted", e);
+            }
+
+            if (!completedInTime) {
+                cancelAllFutures(uploadFutures);
+                int succeeded = totalToUpload - failedCount.get();
+                throw new IOException(String.format(
+                        "Chunk uploads timed out after %d seconds: %d/%d chunks completed (%d failed), %d still pending",
+                        timeoutMs / 1000, succeeded, totalToUpload, failedCount.get(), completionLatch.getCount()));
+            }
+
+            int failed = failedCount.get();
+            if (failed > 0) {
+                int succeeded = totalToUpload - failed;
+                throw new IOException(String.format(
+                        "%d/%d chunks failed to upload (%d succeeded)", failed, totalToUpload, succeeded));
+            }
+        } catch (IOException e) {
+            throw e;
         } catch (Exception e) {
             throw new IOException("Failed to upload chunks", e);
+        }
+    }
+
+    private long estimateRateLimitTimeMsPerChunk(int chunkSize) {
+        if (rateLimiter == null || maxRateKBPerSecond <= 0 || chunkSize <= 0) {
+            return 0;
+        }
+        return (long) ((double) chunkSize / (maxRateKBPerSecond * 1024L)) * 1000;
+    }
+
+    private void cancelAllFutures(List<CompletableFuture<Void>> futures) {
+        for (CompletableFuture<Void> future : futures) {
+            future.cancel(true);
         }
     }
 
@@ -370,7 +411,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         return getApi(task.getRemoteAgentApiUrl() ,"api/file/chunk/status?transferId=" + task.getTransferId(), API_RESPONSE_CHUNK_STATUS, task.getTraceId());
     }
 
-    private byte[] readChunk(FileChannel channel, int chunkIndex, int chunkSize, long totalSize) throws IOException {
+    protected byte[] readChunk(FileChannel channel, int chunkIndex, int chunkSize, long totalSize) throws IOException {
         long start = (long) chunkIndex * chunkSize;
         long length = Math.min(chunkSize, totalSize - start);
 
@@ -417,7 +458,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         return postApi(task.getRemoteAgentApiUrl(),"api/file/chunk/init", req, API_RESPONSE_CHUNK_INIT, task.getTraceId());
     }
 
-    private ApiResponse<ChunkUploadResponse> uploadChunk(UploadTask task, int chunkIndex, byte[] data) throws IOException, InterruptedException {
+    protected ApiResponse<ChunkUploadResponse> uploadChunk(UploadTask task, int chunkIndex, byte[] data) throws IOException, InterruptedException {
         logger.debug("[traceId={}] Uploading chunk {} for transferId: {}", task.getTraceId(), chunkIndex, task.getTransferId());
         ChunkUploadRequest req = new ChunkUploadRequest();
         req.setTransferId(task.getTransferId());

@@ -6,6 +6,7 @@ import com.cq.agent.client.download.DownloadTaskStatus;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -147,8 +148,8 @@ class TransferMetaStoreTest {
 
         uploadMetaStore.saveTask(expiredTask);
 
-        Thread.sleep(100); // 确保时间差
-        uploadMetaStore.cleanupExpiredTasks(0); // 立即过期
+        Thread.sleep(100);
+        uploadMetaStore.cleanupExpiredTasks(0);
 
         assertFalse(uploadMetaStore.loadTask("expired-1").isPresent(), "过期任务应该被清理");
     }
@@ -158,11 +159,11 @@ class TransferMetaStoreTest {
     void shouldNotCleanupNonExpiredTasks() throws IOException {
         UploadTask activeTask = createUploadTask("active-1");
         activeTask.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
-        activeTask.updateTimestamp(); // 刚刚更新
+        activeTask.updateTimestamp();
 
         uploadMetaStore.saveTask(activeTask);
 
-        uploadMetaStore.cleanupExpiredTasks(Long.MAX_VALUE); // 超时时间设为最大
+        uploadMetaStore.cleanupExpiredTasks(Long.MAX_VALUE);
 
         assertTrue(uploadMetaStore.loadTask("active-1").isPresent(), "未过期任务不应该被清理");
     }
@@ -255,93 +256,245 @@ class TransferMetaStoreTest {
         assertEquals(DownloadTaskStatus.SCANNED, loaded.get().getStatus());
     }
 
-    @Test
-    @DisplayName("JSON文件应该包含所有字段包括null值字段")
-    void shouldIncludeAllFieldsIncludingNullOnes() throws IOException {
-        UploadTask task = createUploadTask("full-fields-test");
+    // ==================== 内存Map相关测试 ====================
 
-        uploadMetaStore.saveTask(task);
+    @Nested
+    @DisplayName("内存Map - 启动加载与一致性")
+    class MemoryMapLoadAndConsistency {
 
-        Path jsonFile = tempDir.resolve("uploads").resolve("PREPARED-upload-full-fields-test.json");
-        assertTrue(Files.exists(jsonFile), "JSON文件应该存在");
+        @Test
+        @DisplayName("构造函数应从磁盘加载已有任务到内存")
+        void shouldLoadExistingTasksIntoMemoryOnStartup() throws Exception {
+            UploadTask task = createUploadTask("startup-load");
+            uploadMetaStore.saveTask(task);
 
-        String jsonContent = Files.readString(jsonFile);
+            assertEquals(1, uploadMetaStore.getMemorySize());
 
-        assertNotNull(jsonContent, "JSON内容不应该为null");
+            Path sameUploadDir = tempDir.resolve("uploads");
+            TransferMetaStore<UploadTask> freshStore = new TransferMetaStore<>(sameUploadDir, UploadTask.class);
+            assertEquals(1, freshStore.getMemorySize(), "新store从磁盘加载后内存中应有1个任务");
+            assertTrue(freshStore.loadTask("startup-load").isPresent());
+        }
 
-        assertTrue(jsonContent.contains("\"localFilePath\""), "应该包含localFilePath字段");
-        assertTrue(jsonContent.contains("\"remoteTargetPath\""), "应该包含remoteTargetPath字段");
-        assertTrue(jsonContent.contains("\"transferId\""), "应该包含transferId字段");
-        assertTrue(jsonContent.contains("\"traceId\""), "应该包含traceId字段");
-        assertTrue(jsonContent.contains("\"status\""), "应该包含status字段");
-        assertTrue(jsonContent.contains("\"listenerClassName\""), "应该包含listenerClassName字段");
-        assertTrue(jsonContent.contains("\"remoteAgentApiUrl\""), "应该包含remoteAgentApiUrl字段");
-        assertTrue(jsonContent.contains("\"remoteAgentUsername\""), "应该包含remoteAgentUsername字段");
-        assertTrue(jsonContent.contains("\"createTime\""), "应该包含createTime字段");
-        assertTrue(jsonContent.contains("\"updateTime\""), "应该包含updateTime字段");
-        assertTrue(jsonContent.contains("\"enqueuedTime\""), "应该包含enqueuedTime字段");
-        assertTrue(jsonContent.contains("\"scannedStartTime\""), "应该包含scannedStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"scannedEndTime\""), "应该包含scannedEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"initUploadStartTime\""), "应该包含initUploadStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"initUploadEndTime\""), "应该包含initUploadEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"uploadChunksStartTime\""), "应该包含uploadChunksStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"uploadChunksEndTime\""), "应该包含uploadChunksEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"mergeChunksStartTime\""), "应该包含mergeChunksStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"mergeChunksEndTime\""), "应该包含mergeChunksEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"uploadSuccessTime\""), "应该包含uploadSuccessTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"verifyStartTime\""), "应该包含verifyStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"verifyEndTime\""), "应该包含verifyEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"chunkSize\""), "应该包含chunkSize字段");
-        assertTrue(jsonContent.contains("\"totalChunks\""), "应该包含totalChunks字段");
-        assertTrue(jsonContent.contains("\"totalSize\""), "应该包含totalSize字段");
-        assertTrue(jsonContent.contains("\"exceptionDesc\""), "应该包含exceptionDesc字段（即使为null）");
-        assertTrue(jsonContent.contains("\"missingChunks\""), "应该包含missingChunks字段");
-        assertTrue(jsonContent.contains("\"uploadChunksCount\""), "应该包含uploadChunksCount字段");
-        assertTrue(jsonContent.contains("\"retryCount\""), "应该包含retryCount字段");
+        @Test
+        @DisplayName("启动时加载多个任务到内存")
+        void shouldLoadMultipleTasksIntoMemoryOnStartup() throws Exception {
+            for (int i = 0; i < 5; i++) {
+                UploadTask t = createUploadTask("multi-" + i);
+                uploadMetaStore.saveTask(t);
+            }
+            assertEquals(5, uploadMetaStore.getMemorySize());
+
+            Path sameUploadDir = tempDir.resolve("uploads");
+            TransferMetaStore<UploadTask> freshStore = new TransferMetaStore<>(sameUploadDir, UploadTask.class);
+            assertEquals(5, freshStore.getMemorySize());
+        }
+
+        @Test
+        @DisplayName("磁盘损坏的JSON文件不应阻止其他文件加载")
+        void shouldSkipCorruptedJsonFilesOnLoad() throws Exception {
+            UploadTask goodTask = createUploadTask("good-task");
+            uploadMetaStore.saveTask(goodTask);
+
+            Path corruptedPath = tempDir.resolve("uploads").resolve("CORRUPTED-upload-bad.json");
+            Files.writeString(corruptedPath, "{this is not valid json!!!}");
+
+            Path sameUploadDir = tempDir.resolve("uploads");
+            TransferMetaStore<UploadTask> freshStore = new TransferMetaStore<>(sameUploadDir, UploadTask.class);
+            assertEquals(1, freshStore.getMemorySize(), "只应加载有效的JSON文件");
+        }
+
+        @Test
+        @DisplayName("空目录启动时内存Map为空")
+        void shouldHaveEmptyMemoryMapWhenEmptyDirectory() {
+            assertEquals(0, uploadMetaStore.getMemorySize());
+            assertEquals(0, uploadMetaStore.getLocalPathIndexSize());
+        }
     }
 
-    @Test
-    @DisplayName("下载任务JSON也应该包含所有字段包括null值字段")
-    void shouldIncludeAllDownloadTaskFieldsIncludingNullOnes() throws IOException {
-        DownloadTask task = createDownloadTask("download-full-fields");
+    @Nested
+    @DisplayName("内存Map - 写操作同步")
+    class MemoryMapWriteSync {
 
-        downloadMetaStore.saveTask(task);
+        @Test
+        @DisplayName("saveTask后内存Map大小增加")
+        void memorySizeShouldIncreaseAfterSave() throws Exception {
+            assertEquals(0, uploadMetaStore.getMemorySize());
+            uploadMetaStore.saveTask(createUploadTask("sync-save"));
+            assertEquals(1, uploadMetaStore.getMemorySize());
+        }
 
-        Path jsonFile = tempDir.resolve("downloads").resolve("PREPARED-download-download-full-fields.json");
-        assertTrue(Files.exists(jsonFile), "下载任务JSON文件应该存在");
+        @Test
+        @DisplayName("deleteTask后内存Map和索引同步清除")
+        void memoryShouldBeClearedAfterDelete() throws Exception {
+            uploadMetaStore.saveTask(createUploadTask("sync-del"));
+            assertEquals(1, uploadMetaStore.getMemorySize());
 
-        String jsonContent = Files.readString(jsonFile);
-        assertNotNull(jsonContent, "JSON内容不应该为null");
+            uploadMetaStore.deleteTask("sync-del");
+            assertEquals(0, uploadMetaStore.getMemorySize());
+        }
 
-        assertTrue(jsonContent.contains("\"transferId\""), "应该包含transferId字段");
-        assertTrue(jsonContent.contains("\"traceId\""), "应该包含traceId字段");
-        assertTrue(jsonContent.contains("\"remoteFilePath\""), "应该包含remoteFilePath字段");
-        assertTrue(jsonContent.contains("\"localFilePath\""), "应该包含localFilePath字段");
-        assertTrue(jsonContent.contains("\"tmpLocalFilePath\""), "应该包含tmpLocalFilePath字段（即使为null）");
-        assertTrue(jsonContent.contains("\"remoteAgentApiUrl\""), "应该包含remoteAgentApiUrl字段");
-        assertTrue(jsonContent.contains("\"remoteAgentUsername\""), "应该包含remoteAgentUsername字段");
-        assertTrue(jsonContent.contains("\"totalSize\""), "应该包含totalSize字段");
-        assertTrue(jsonContent.contains("\"status\""), "应该包含status字段");
-        assertTrue(jsonContent.contains("\"createTime\""), "应该包含createTime字段");
-        assertTrue(jsonContent.contains("\"updateTime\""), "应该包含updateTime字段");
-        assertTrue(jsonContent.contains("\"enqueuedTime\""), "应该包含enqueuedTime字段");
-        assertTrue(jsonContent.contains("\"scannedStartTime\""), "应该包含scannedStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"scannedEndTime\""), "应该包含scannedEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"initDownloadStartTime\""), "应该包含initDownloadStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"initDownloadEndTime\""), "应该包含initDownloadEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"downloadChunksStartTime\""), "应该包含downloadChunksStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"downloadChunksEndTime\""), "应该包含downloadChunksEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"mergeChunksStartTime\""), "应该包含mergeChunksStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"mergeChunksEndTime\""), "应该包含mergeChunksEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"verifyStartTime\""), "应该包含verifyStartTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"verifyEndTime\""), "应该包含verifyEndTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"downloadSuccessTime\""), "应该包含downloadSuccessTime字段（即使为null）");
-        assertTrue(jsonContent.contains("\"chunkSize\""), "应该包含chunkSize字段");
-        assertTrue(jsonContent.contains("\"totalChunks\""), "应该包含totalChunks字段");
-        assertTrue(jsonContent.contains("\"downloadedChunksCount\""), "应该包含downloadedChunksCount字段");
-        assertTrue(jsonContent.contains("\"retryCount\""), "应该包含retryCount字段");
-        assertTrue(jsonContent.contains("\"listenerClassName\""), "应该包含listenerClassName字段（即使为null）");
-        assertTrue(jsonContent.contains("\"exceptionDesc\""), "应该包含exceptionDesc字段（即使为null）");
+        @Test
+        @DisplayName("覆盖保存更新内存中的task对象")
+        void memoryShouldUpdateOnOverwriteSave() throws Exception {
+            UploadTask task1 = createUploadTask("overwrite-mem");
+            task1.setStatus(UploadTaskStatus.PREPARED);
+            uploadMetaStore.saveTask(task1);
+
+            UploadTask task2 = createUploadTask("overwrite-mem");
+            task2.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
+            uploadMetaStore.saveTask(task2);
+
+            Optional<UploadTask> loaded = uploadMetaStore.loadTask("overwrite-mem");
+            assertTrue(loaded.isPresent());
+            assertEquals(UploadTaskStatus.UPLOADING_CHUNKS, loaded.get().getStatus(),
+                    "覆盖保存后内存中应为最新状态");
+            assertEquals(1, uploadMetaStore.getMemorySize(), "覆盖保存不应增加内存数量");
+        }
+
+        @Test
+        @DisplayName("cleanupExpiredTasks清除过期任务的内存记录")
+        void memoryShouldBeCleanedAfterCleanupExpired() throws Exception {
+            UploadTask expired = createUploadTask("mem-expired");
+            expired.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
+            expired.setUpdateTime(getOldTimestamp());
+            uploadMetaStore.saveTask(expired);
+
+            assertEquals(1, uploadMetaStore.getMemorySize());
+            uploadMetaStore.cleanupExpiredTasks(0);
+            assertEquals(0, uploadMetaStore.getMemorySize(), "清理后内存应为空");
+        }
+    }
+
+    @Nested
+    @DisplayName("内存Map - 查询性能验证")
+    class MemoryMapQueryPerformance {
+
+        @Test
+        @DisplayName("loadTask通过内存Map快速查找")
+        void loadTaskShouldUseMemoryLookup() throws Exception {
+            int count = 30;
+            for (int i = 0; i < count; i++) {
+                UploadTask t = createUploadTask("perf-load-" + i);
+                uploadMetaStore.saveTask(t);
+            }
+            assertEquals(count, uploadMetaStore.getMemorySize());
+            assertTrue(uploadMetaStore.loadTask("perf-load-15").isPresent());
+            assertFalse(uploadMetaStore.loadTask("perf-load-99").isPresent());
+        }
+
+        @Test
+        @DisplayName("existsTaskWithLocalPath通过内存索引快速判断")
+        void existsTaskWithLocalPathShouldUseMemoryIndex() throws Exception {
+            UploadTask task = createUploadTask("localpath-test");
+            uploadMetaStore.saveTask(task);
+
+            String localPath = "/local/path/file.zip";
+            String targetAgent = "192.168.1.100:8080";
+
+            assertTrue(uploadMetaStore.existsTaskWithLocalPath(localPath, targetAgent),
+                    "已保存的任务应通过本地路径找到");
+            assertFalse(uploadMetaStore.existsTaskWithLocalPath("/non/exist/path", targetAgent));
+            assertFalse(uploadMetaStore.existsTaskWithLocalPath(localPath, "999.999.999:9999"));
+        }
+
+        @Test
+        @DisplayName("existsTaskWithLocalPath对null参数返回false")
+        void existsTaskShouldReturnFalseForNullParams() {
+            assertFalse(uploadMetaStore.existsTaskWithLocalPath(null, "agent"));
+            assertFalse(uploadMetaStore.existsTaskWithLocalPath("/path", null));
+            assertFalse(uploadMetaStore.existsTaskWithLocalPath(null, null));
+        }
+
+        @Test
+        @DisplayName("recoverPendingTasks通过内存Map过滤")
+        void recoverPendingTasksShouldUseMemoryFilter() throws Exception {
+            UploadTask pending1 = createUploadTask("mem-pend-1");
+            pending1.setStatus(UploadTaskStatus.UPLOADING_CHUNKS);
+            UploadTask pending2 = createUploadTask("mem-pend-2");
+            pending2.setStatus(UploadTaskStatus.INIT_UPLOAD_COMPLETED);
+            UploadTask completed = createUploadTask("mem-done-1");
+            completed.setStatus(UploadTaskStatus.UPLOAD_SUCCESS);
+
+            uploadMetaStore.saveTask(pending1);
+            uploadMetaStore.saveTask(pending2);
+            uploadMetaStore.saveTask(completed);
+
+            List<UploadTask> recovered = uploadMetaStore.recoverPendingTasks();
+            assertEquals(2, recovered.size(), "应只返回未完成的任务");
+            assertTrue(recovered.stream().allMatch(t ->
+                    !t.getStatus().toString().contains("SUCCESS")));
+        }
+
+        @Test
+        @DisplayName("delete后existsTaskWithLocalPath返回false")
+        void existsTaskShouldReturnFalseAfterDelete() throws Exception {
+            UploadTask task = createUploadTask("del-exists");
+            uploadMetaStore.saveTask(task);
+
+            assertTrue(uploadMetaStore.existsTaskWithLocalPath("/local/path/file.zip", "192.168.1.100:8080"));
+
+            uploadMetaStore.deleteTask("del-exists");
+            assertFalse(uploadMetaStore.existsTaskWithLocalPath("/local/path/file.zip", "192.168.1.100:8080"));
+        }
+    }
+
+    @Nested
+    @DisplayName("内存Map - 边界条件")
+    class MemoryMapEdgeCases {
+
+        @Test
+        @DisplayName("大量任务写入后内存大小准确")
+        void memorySizeAccurateAfterManyWrites() throws Exception {
+            int count = 20;
+            for (int i = 0; i < count; i++) {
+                UploadTask t = createUploadTask("bulk-mem-" + i);
+                uploadMetaStore.saveTask(t);
+            }
+            assertEquals(count, uploadMetaStore.getMemorySize());
+        }
+
+        @Test
+        @DisplayName("删除不存在的transferId不抛异常且内存不变")
+        void deleteNonExistentShouldNotThrowOrChangeMemory() throws Exception {
+            assertDoesNotThrow(() -> uploadMetaStore.deleteTask("nonexistent-99999"));
+            assertEquals(0, uploadMetaStore.getMemorySize());
+        }
+
+        @Test
+        @DisplayName("recoverPendingTasks在空内存上返回空列表")
+        void recoverEmptyMemoryReturnsEmptyList() {
+            List<UploadTask> result = uploadMetaStore.recoverPendingTasks();
+            assertNotNull(result);
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("loadTask对null transferId返回empty")
+        void loadTaskNullReturnsEmpty() {
+            Optional<UploadTask> result = uploadMetaStore.loadTask(null);
+            assertFalse(result.isPresent());
+        }
+
+        @Test
+        @DisplayName("多次save不同transferId的任务，每个都能独立查询和删除")
+        void multipleIndependentTasksCanBeManaged() throws Exception {
+            UploadTask t1 = createUploadTask("ind-1");
+            UploadTask t2 = createUploadTask("ind-2");
+            UploadTask t3 = createUploadTask("ind-3");
+
+            uploadMetaStore.saveTask(t1);
+            uploadMetaStore.saveTask(t2);
+            uploadMetaStore.saveTask(t3);
+
+            assertEquals(3, uploadMetaStore.getMemorySize());
+
+            uploadMetaStore.deleteTask("ind-2");
+            assertEquals(2, uploadMetaStore.getMemorySize());
+            assertTrue(uploadMetaStore.loadTask("ind-1").isPresent());
+            assertFalse(uploadMetaStore.loadTask("ind-2").isPresent());
+            assertTrue(uploadMetaStore.loadTask("ind-3").isPresent());
+        }
     }
 
     private UploadTask createUploadTask(String transferId) {

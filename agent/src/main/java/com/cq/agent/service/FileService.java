@@ -4,6 +4,7 @@ import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.model.FileInfo;
+import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.*;
@@ -32,6 +33,7 @@ public class FileService {
     private final boolean allowOutsideBase;
     private final long maxFileSize;
 
+    @Inject
     public FileService(AgentConfig config) {
         String baseDir = config.getFileBaseDirectory();
         this.baseDirectory = Path.of(baseDir).toAbsolutePath().normalize();

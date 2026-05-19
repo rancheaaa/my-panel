@@ -232,6 +232,70 @@ class FileScannerTddTest {
         System.out.println("✅ 容错性验证: 跳过不可读文件，返回" + files.size() + "个文件");
     }
 
+    @Test
+    @DisplayName("11. 应跳过以点号开头的隐藏文件")
+    void testScan_shouldSkipDotPrefixedHiddenFiles() throws IOException {
+        // Given: 创建普通文件和以点号开头的隐藏文件
+        createFile("app.log");
+        createFile(".hidden_log");
+        createFile(".DS_Store");
+        createFile(".gitignore");
+        createFile("error.log");
+
+        // When: 扫描目录
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+
+        // Then: 只应返回非隐藏文件
+        assertEquals(2, files.size(), "应只返回2个非隐藏文件");
+        assertTrue(files.stream().noneMatch(f -> f.getFileName().startsWith(".")),
+                "不应包含以点号开头的文件");
+
+        System.out.println("✅ 隐藏文件验证: 过滤后返回" + files.size() + "个文件（排除4个隐藏文件）");
+    }
+
+    @Test
+    @DisplayName("12. 子目录中的隐藏文件也应被跳过")
+    void testScan_shouldSkipHiddenFilesInSubdirectories() throws IOException {
+        // Given: 在子目录中创建隐藏文件和普通文件
+        createSubdirAndFile("subdir", ".hidden_in_subdir");
+        createSubdirAndFile("subdir", "normal_in_subdir.log");
+        createFile("root.log");
+
+        // When: 扫描目录
+        List<ScannedFile> files = fileScanner.scan(tempDir.toString(), null, null, null);
+
+        // Then: 子目录中的隐藏文件应被跳过
+        assertEquals(2, files.size(), "应返回2个文件（子目录隐藏文件被排除）");
+        assertTrue(files.stream().noneMatch(f -> f.getFileName().startsWith(".")),
+                "不应包含任何隐藏文件");
+
+        System.out.println("✅ 子目录隐藏文件验证: 返回" + files.size() + "个文件");
+    }
+
+    @Test
+    @DisplayName("13. 隐藏文件不应出现在include_patterns结果中")
+    void testScan_hiddenFilesExcludedEvenWithIncludePatterns() throws IOException {
+        // Given: 创建log文件和隐藏的log文件
+        createFile("app.log");
+        createFile(".hidden.log");
+        createFile("error.log");
+
+        // When: 扫描*.log文件
+        List<ScannedFile> files = fileScanner.scan(
+            tempDir.toString(),
+            List.of("*.log"),
+            null,
+            null
+        );
+
+        // Then: 隐藏的log文件也应被排除
+        assertEquals(2, files.size(), "应只返回2个可见的log文件");
+        assertTrue(files.stream().allMatch(f -> !f.getFileName().startsWith(".")),
+                "所有结果都不应以点号开头");
+
+        System.out.println("✅ 隐藏文件+include验证: 返回" + files.size() + "个文件");
+    }
+
     // ==================== 辅助方法 ====================
 
     private File createFile(String name) throws IOException {

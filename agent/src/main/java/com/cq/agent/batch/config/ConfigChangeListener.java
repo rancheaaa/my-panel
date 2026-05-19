@@ -37,6 +37,14 @@ public class ConfigChangeListener {
         this.versionManager = versionManager;
     }
 
+    public ConfigChangeListener(ConfigFileManager configFileManager, VersionManager versionManager,
+            Consumer<Long> cronChangeHandler, Consumer<AnyChangeContext> anyChangeHandler) {
+        this.configFileManager = configFileManager;
+        this.versionManager = versionManager;
+        this.cronChangeHandler = cronChangeHandler;
+        this.anyChangeHandler = anyChangeHandler;
+    }
+
     /**
      * 检测并应用配置变更
      * 

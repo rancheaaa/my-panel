@@ -8,8 +8,10 @@ import com.cq.panel.common.dto.batch.TransferConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
@@ -20,6 +22,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("FileBatchCompletionTracker - 文件批次完成追踪器")
@@ -227,10 +230,13 @@ class FileBatchCompletionTrackerTest {
     }
 
     @Test
-    @DisplayName("deleteFileBatch - JSON文件应该被删除")
-    void shouldDeleteJsonFile() throws Exception {
+    @DisplayName("deleteFileBatch - JSON文件应该被删除，内存Map也清除")
+    void shouldDeleteJsonFileAndMemory() throws Exception {
         Long fileBatchId = 1007L;
         tracker.initFileBatch(fileBatchId, 999L, createScannedFile("delete.log"), createTaskConfig(), createTargets(2));
+
+        assertEquals(1, tracker.getMemorySize(), "删除前内存应有1个批次");
+        assertTrue(tracker.getFileIndexSize() > 0, "删除前索引应有数据");
 
         Path jsonPath = tempDir.resolve("fb-" + fileBatchId + ".json");
         assertTrue(Files.exists(jsonPath), "删除前文件应存在");
@@ -238,12 +244,13 @@ class FileBatchCompletionTrackerTest {
         tracker.deleteFileBatch(fileBatchId);
 
         assertFalse(Files.exists(jsonPath), "删除后文件不应存在");
+        assertEquals(0, tracker.getMemorySize(), "删除后内存Map应为空");
         assertThrows(Exception.class, () -> tracker.loadFileBatch(fileBatchId),
                 "加载已删除的批次应抛出异常");
     }
 
     @Test
-    @DisplayName("recoverPendingBatches - 应扫描到PENDING和FAILED状态的残留文件（不含COMPLETED）")
+    @DisplayName("recoverPendingBatches - 应从内存中扫描到PENDING和FAILED状态的残留文件（不含COMPLETED）")
     void shouldRecoverPendingAndFailedBatches() throws Exception {
         tracker.initFileBatch(2001L, 999L, createScannedFile("pending.log"), createTaskConfig(), createTargets(2));
         tracker.initFileBatch(2002L, 999L, createScannedFile("failed.log"), createTaskConfig(), createTargets(2));
@@ -350,7 +357,7 @@ class FileBatchCompletionTrackerTest {
     }
 
     @Test
-    @DisplayName("existsActiveBatchForFile - PENDING状态返回true")
+    @DisplayName("existsActiveBatchForFile - PENDING状态返回true（内存查询）")
     void shouldFindActiveBatchWhenPending() throws Exception {
         Long fileBatchId = 5006L;
         ScannedFile scannedFile = createScannedFile("active-pending.log");
@@ -362,7 +369,7 @@ class FileBatchCompletionTrackerTest {
     }
 
     @Test
-    @DisplayName("existsActiveBatchForFile - COMPLETED状态返回false")
+    @DisplayName("existsActiveBatchForFile - COMPLETED状态返回false（内存查询）")
     void shouldNotFindActiveBatchWhenCompleted() throws Exception {
         Long fileBatchId = 5007L;
         ScannedFile scannedFile = createScannedFile("active-completed.log");
@@ -375,7 +382,7 @@ class FileBatchCompletionTrackerTest {
     }
 
     @Test
-    @DisplayName("existsActiveBatchForFile - 不同taskId返回false")
+    @DisplayName("existsActiveBatchForFile - 不同taskId返回false（内存查询）")
     void shouldNotFindActiveBatchWhenDifferentTaskId() throws Exception {
         Long fileBatchId = 5008L;
         ScannedFile scannedFile = createScannedFile("active-diff-task.log");
@@ -434,5 +441,248 @@ class FileBatchCompletionTrackerTest {
         assertEquals(targetCount, state.getSummary().getCompletedCount(),
                 "所有target都应被标记为COMPLETED");
         assertEquals(0, state.getSummary().getPendingCount(), "pendingCount应为0");
+    }
+
+    // ==================== 内存Map相关测试 ====================
+
+    @Nested
+    @DisplayName("内存Map - 启动加载与一致性")
+    class MemoryMapLoadAndConsistency {
+
+        @Test
+        @DisplayName("构造函数应从磁盘加载已有批次到内存")
+        void shouldLoadExistingBatchesIntoMemoryOnStartup() throws Exception {
+            Long batchId = 8001L;
+            tracker.initFileBatch(batchId, 999L, createScannedFile("startup-load.log"),
+                    createTaskConfig(), createTargets(2));
+
+            assertEquals(1, tracker.getMemorySize(), "内存中应有1个批次");
+            assertTrue(tracker.getFileIndexSize() > 0, "文件索引应有数据");
+
+            FileBatchCompletionTracker freshTracker = new FileBatchCompletionTracker(tempDir.toString());
+            assertEquals(1, freshTracker.getMemorySize(), "新tracker从磁盘加载后内存中应有1个批次");
+            assertTrue(freshTracker.getFileIndexSize() > 0, "新tracker的文件索引应有数据");
+        }
+
+        @Test
+        @DisplayName("启动时加载多个批次到内存")
+        void shouldLoadMultipleBatchesIntoMemoryOnStartup() throws Exception {
+            tracker.initFileBatch(8010L, 1L, createScannedFile("multi-a.log"), createTaskConfig(), createTargets(2));
+            tracker.initFileBatch(8011L, 2L, createScannedFile("multi-b.log"), createTaskConfig(), createTargets(3));
+            tracker.initFileBatch(8012L, 3L, createScannedFile("multi-c.log"), createTaskConfig(), createTargets(1));
+
+            assertEquals(3, tracker.getMemorySize());
+
+            FileBatchCompletionTracker freshTracker = new FileBatchCompletionTracker(tempDir.toString());
+            assertEquals(3, freshTracker.getMemorySize(), "新tracker应加载全部3个批次");
+        }
+
+        @Test
+        @DisplayName("磁盘损坏的JSON文件不应阻止其他文件加载")
+        void shouldSkipCorruptedJsonFilesOnLoad() throws Exception {
+            tracker.initFileBatch(8020L, 1L, createScannedFile("good.log"), createTaskConfig(), createTargets(2));
+
+            Path corruptedPath = tempDir.resolve("fb-corrupt.json");
+            Files.writeString(corruptedPath, "{this is not valid json!!!");
+
+            FileBatchCompletionTracker freshTracker = new FileBatchCompletionTracker(tempDir.toString());
+            assertEquals(1, freshTracker.getMemorySize(), "只应加载有效的JSON文件");
+        }
+
+        @Test
+        @DisplayName("空目录启动时内存Map为空")
+        void shouldHaveEmptyMemoryMapWhenEmptyDirectory() {
+            assertEquals(0, tracker.getMemorySize());
+            assertEquals(0, tracker.getFileIndexSize());
+        }
+    }
+
+    @Nested
+    @DisplayName("内存Map - 写操作同步")
+    class MemoryMapWriteSync {
+
+        @Test
+        @DisplayName("initFileBatch后内存Map大小增加")
+        void memorySizeShouldIncreaseAfterInit() throws Exception {
+            assertEquals(0, tracker.getMemorySize());
+            tracker.initFileBatch(8100L, 1L, createScannedFile("sync-init.log"),
+                    createTaskConfig(), createTargets(2));
+            assertEquals(1, tracker.getMemorySize());
+        }
+
+        @Test
+        @DisplayName("deleteFileBatch后内存Map和索引同步清除")
+        void memoryShouldBeClearedAfterDelete() throws Exception {
+            tracker.initFileBatch(8101L, 1L, createScannedFile("sync-del.log"),
+                    createTaskConfig(), createTargets(2));
+            assertEquals(1, tracker.getMemorySize());
+
+            tracker.deleteFileBatch(8101L);
+            assertEquals(0, tracker.getMemorySize(), "batchStateMap应清空");
+            assertEquals(0, tracker.getFileIndexSize(), "fileToBatchIndex应清空");
+        }
+
+        @Test
+        @DisplayName("markCompleted后内存中的state更新为最新值")
+        void memoryStateShouldUpdateAfterMarkCompleted() throws Exception {
+            Long batchId = 8102L;
+            tracker.initFileBatch(batchId, 1L, createScannedFile("sync-mark.log"),
+                    createTaskConfig(), createTargets(2));
+            tracker.markCompleted(batchId, "target-001");
+
+            assertEquals(1, tracker.getMemorySize());
+            assertTrue(tracker.existsActiveBatchForFile("/data/logs/sync-mark.log", 1001L),
+                    "部分完成时批次仍为活跃状态");
+            assertNotNull(tracker.findActiveBatchIdForFile("/data/logs/sync-mark.log", 1001L),
+                    "部分完成时findActiveBatchIdForFile应返回batchId");
+        }
+
+        @Test
+        @DisplayName("markFailed后内存中的state更新为最新值")
+        void memoryStateShouldUpdateAfterMarkFailed() throws Exception {
+            Long batchId = 8103L;
+            tracker.initFileBatch(batchId, 1L, createScannedFile("sync-fail.log"),
+                    createTaskConfig(), createTargets(2));
+            tracker.markFailed(batchId, "target-001", true);
+
+            assertTrue(tracker.existsActiveBatchForFile("/data/logs/sync-fail.log", 1001L),
+                    "FAILED状态仍算活跃批次");
+        }
+
+        @Test
+        @DisplayName("多次写操作后内存与磁盘数据一致")
+        void shouldBeConsistentAfterMultipleWrites() throws Exception {
+            Long batchId = 8104L;
+            ScannedFile file = createScannedFile("consistency.log");
+            AgentTaskConfig config = createTaskConfig();
+
+            tracker.initFileBatch(batchId, 1L, file, config, createTargets(3));
+            tracker.markCompleted(batchId, "target-001");
+            tracker.markFailed(batchId, "target-002", false);
+            tracker.markCompleted(batchId, "target-003");
+
+            FileBatchState fromDisk = tracker.loadFileBatch(batchId);
+            assertEquals("PENDING", fromDisk.getStatus(),
+                    "存在非终态FAILED目标时整体状态应为PENDING");
+            assertEquals(2, fromDisk.getSummary().getCompletedCount());
+            assertEquals(1, fromDisk.getSummary().getFailedCount());
+        }
+    }
+
+    @Nested
+    @DisplayName("内存Map - 查询性能验证")
+    class MemoryMapQueryPerformance {
+
+        @Test
+        @DisplayName("existsActiveBatchForFile通过内存Map快速查找")
+        void existsActiveBatchShouldUseMemoryLookup() throws Exception {
+            int count = 50;
+            for (int i = 0; i < count; i++) {
+                ScannedFile f = createScannedFile("perf-" + i + ".log");
+                AgentTaskConfig c = createTaskConfig();
+                c.setTaskId((long) (9000 + i));
+                tracker.initFileBatch(9000L + i, 1L, f, c, createTargets(2));
+            }
+
+            assertEquals(count, tracker.getMemorySize());
+            assertTrue(tracker.existsActiveBatchForFile("/data/logs/perf-25.log", 9025L));
+            assertFalse(tracker.existsActiveBatchForFile("/data/logs/perf-99.log", 9099L));
+        }
+
+        @Test
+        @DisplayName("findActiveBatchIdForFile通过内存Map快速定位")
+        void findActiveBatchIdShouldUseMemoryLookup() throws Exception {
+            ScannedFile f = createScannedFile("find-id-test.log");
+            AgentTaskConfig c = createTaskConfig();
+            c.setTaskId(777L);
+            tracker.initFileBatch(7777L, 1L, f, c, createTargets(2));
+
+            Long found = tracker.findActiveBatchIdForFile("/data/logs/find-id-test.log", 777L);
+            assertEquals(7777L, found);
+
+            Long notFound = tracker.findActiveBatchIdForFile("/data/logs/nonexist.log", 777L);
+            assertNull(notFound);
+        }
+
+        @Test
+        @DisplayName("isTargetCompletedInBatch通过内存Map快速判断")
+        void isTargetCompletedShouldUseMemoryLookup() throws Exception {
+            Long batchId = 8888L;
+            ScannedFile f = createScannedFile("is-complete-test.log");
+            AgentTaskConfig c = createTaskConfig();
+            c.setTaskId(888L);
+            tracker.initFileBatch(batchId, 1L, f, c, createTargets(3));
+
+            assertFalse(tracker.isTargetCompletedInBatch("/data/logs/is-complete-test.log", 888L, "target-001"));
+
+            tracker.markCompleted(batchId, "target-001");
+            assertTrue(tracker.isTargetCompletedInBatch("/data/logs/is-complete-test.log", 888L, "target-001"));
+            assertFalse(tracker.isTargetCompletedInBatch("/data/logs/is-complete-test.log", 888L, "target-002"));
+        }
+
+        @Test
+        @DisplayName("existsFileInPendingBatch通过内存Map快速过滤")
+        void existsFileInPendingBatchShouldUseMemoryLookup() throws Exception {
+            Long batchId = 8999L;
+            ScannedFile f = createScannedFile("pending-check.log");
+            AgentTaskConfig c = createTaskConfig();
+            c.setTaskId(899L);
+            List<TargetAgentInfo> targets = createTargets(3);
+            tracker.initFileBatch(batchId, 1L, f, c, targets);
+
+            assertTrue(tracker.existsFileInPendingBatch("/data/logs/pending-check.log",
+                    targets.get(0).getAgentName()));
+
+            tracker.markCompleted(batchId, "target-001");
+            assertFalse(tracker.existsFileInPendingBatch("/data/logs/pending-check.log",
+                    targets.get(0).getAgentName()));
+            assertTrue(tracker.existsFileInPendingBatch("/data/logs/pending-check.log",
+                    targets.get(1).getAgentName()));
+        }
+    }
+
+    @Nested
+    @DisplayName("内存Map - 边界条件")
+    class MemoryMapEdgeCases {
+
+        @Test
+        @DisplayName("重复putToMemory覆盖旧值但不产生异常")
+        void duplicatePutShouldOverwriteWithoutError() throws Exception {
+            Long batchId = 9100L;
+            tracker.initFileBatch(batchId, 1L, createScannedFile("dup-put.log"),
+                    createTaskConfig(), createTargets(2));
+
+            assertEquals(1, tracker.getMemorySize());
+            FileBatchState state = tracker.loadFileBatch(batchId);
+            state.setStatus("CUSTOM_STATUS");
+        }
+
+        @Test
+        @DisplayName("删除不存在的batchId不抛异常")
+        void deleteNonExistentBatchShouldNotThrow() throws Exception {
+            assertDoesNotThrow(() -> tracker.deleteFileBatch(99999L));
+            assertEquals(0, tracker.getMemorySize());
+        }
+
+        @Test
+        @DisplayName("recoverPendingBatches在空内存上返回空列表")
+        void recoverEmptyMemoryReturnsEmptyList() {
+            List<FileBatchState> result = tracker.recoverPendingBatches();
+            assertNotNull(result);
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("大量批次写入后内存大小准确")
+        void memorySizeAccurateAfterManyWrites() throws Exception {
+            int count = 20;
+            for (int i = 0; i < count; i++) {
+                ScannedFile f = createScannedFile("bulk-" + i + ".log");
+                AgentTaskConfig c = createTaskConfig();
+                c.setTaskId((long) (9500 + i));
+                tracker.initFileBatch(9500L + i, 1L, f, c, createTargets(2));
+            }
+            assertEquals(count, tracker.getMemorySize());
+        }
     }
 }

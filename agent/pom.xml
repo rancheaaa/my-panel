@@ -34,6 +34,13 @@
             <artifactId>commons-exec</artifactId>
         </dependency>
 
+        <!-- Guice DI -->
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>7.0.0</version>
+        </dependency>
+
         <!-- Guava -->
         <dependency>
             <groupId>com.google.guava</groupId>

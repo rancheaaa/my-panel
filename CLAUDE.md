@@ -181,7 +181,7 @@ Default accounts: admin/admin123, guest/guest123, cq/cq123456
 0、第一原则，不要过度设计，以TDD为原则，测试驱动开发，写新功能前先写测试案例（可以使用mockito或者真实连接到数据库），测试案例要全，边界条件要全，测试覆盖率、通过率要100%，surefire通过，只有测试案例都通过了，主程序运行正常（一定要做，确保主程序始终是正常运行的），编写git commit提交信息，才能开发下一个。前端代码如果只是页面或者简单逻辑，直接写代码即可，牢记。
 
 1、开发了新的java组件或者类，一定要集成进主程序，不要只在测试案例中使用了或者压根就没使用；重要牢记。
-2、进入cmd，使用bash可以进入wsl Debian系统，root跟默认用户的密码是!Cq199606，必要进入wsl的linux系统执行一些命令或者调试。开发是在windows上进行的，admin的日志文件在E:\tmp\my-panel\admin\logs\admin，proxy的日志在E:\tmp\my-panel\admin\logs\proxy，agent日志在E:\tmp\my-panel\admin\logs\agent
+2、进入cmd，使用bash可以进入wsl Debian系统，root跟默认用户的密码是!Cq199606，必要进入wsl的linux系统执行一些命令或者调试。开发是在windows上进行的，admin的日志文件在E:\tmp\my-panel\admin\logs\admin，proxy的日志在E:\tmp\my-panel\admin\logs\proxy，agent日志在E:\tmp\my-panel\admin\logs\agent。`mvn compile -pl agent ; mvn test -pl agent`多命令分隔符使用分号，不要使用&& ，请牢记。
 3、由于是在开发阶段，任何新建表都要放在schema.sql中，任何初始化sql插入都要放在data.sql中，不要使用alt加或者改表结构，直接重建，有新表时我会手动删除现有数据库。
 4、使用mvn clean install时，尽可能不要运行distribution的compile package install，因为打包这个模块很慢很耗时，除非我主动要求打包distribution。
 5、如果是新功能，不要直接写代码，先头脑风暴，先做需求调研和分析，将需求文档和设计写出来，等我确认过了，再开始写代码。

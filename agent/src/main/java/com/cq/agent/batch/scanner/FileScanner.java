@@ -55,6 +55,7 @@ public class FileScanner {
         try (Stream<Path> pathStream = Files.walk(rootPath)) {
             pathStream
                 .filter(Files::isRegularFile)
+                .filter(this::isVisibleFile)
                 .filter(fileFilter)
                 .limit(maxLimit)
                 .forEach(path -> {
@@ -71,6 +72,17 @@ public class FileScanner {
 
         log.info("📁 文件扫描完成: dir={}, found={} files", rootDir, result.size());
         return result;
+    }
+
+    private boolean isVisibleFile(Path path) {
+        try {
+            if (Files.isHidden(path)) {
+                return false;
+            }
+        } catch (IOException e) {
+            log.debug("无法检查文件隐藏属性: {}, 假设为可见", path);
+        }
+        return !path.getFileName().toString().startsWith(".");
     }
 
     /**

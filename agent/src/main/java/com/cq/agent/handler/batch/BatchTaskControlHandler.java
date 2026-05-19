@@ -1,6 +1,6 @@
 package com.cq.agent.handler.batch;
 
-import com.cq.agent.batch.scheduler.BatchTaskSchedulerManager;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
 import com.cq.agent.handler.IRequestHandler;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
@@ -30,10 +30,10 @@ public class BatchTaskControlHandler implements IRequestHandler {
     private static final Logger log = LoggerFactory.getLogger(BatchTaskControlHandler.class);
     private static final Gson GSON = new Gson();
 
-    private final BatchTaskSchedulerManager taskSchedulerManager;
+    private final BatchTaskSchedulerUploaderDecorator batchTaskUploader;
 
-    public BatchTaskControlHandler(BatchTaskSchedulerManager taskSchedulerManager) {
-        this.taskSchedulerManager = taskSchedulerManager;
+    public BatchTaskControlHandler(BatchTaskSchedulerUploaderDecorator batchTaskUploader) {
+        this.batchTaskUploader = batchTaskUploader;
     }
 
     @Override
@@ -67,22 +67,22 @@ public class BatchTaskControlHandler implements IRequestHandler {
 
             switch (action.toUpperCase()) {
                 case "PAUSE":
-                    taskSchedulerManager.pauseTask(taskId);
+                    batchTaskUploader.pauseTask(taskId);
                     success = true;
                     message = "任务已暂停";
                     break;
                 case "RESUME":
-                    taskSchedulerManager.resumeTask(taskId);
+                    batchTaskUploader.resumeTask(taskId);
                     success = true;
                     message = "任务已恢复";
                     break;
                 case "DELETE":
-                    taskSchedulerManager.deleteTask(taskId);
+                    batchTaskUploader.deleteTask(taskId);
                     success = true;
                     message = "任务已删除";
                     break;
                 case "STATUS":
-                    boolean isRunning = taskSchedulerManager.isTaskRunning(taskId);
+                    boolean isRunning = batchTaskUploader.isTaskRunning(taskId);
                     success = true;
                     message = isRunning ? "任务运行中" : "任务未运行";
                     break;

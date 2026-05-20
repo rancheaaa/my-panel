@@ -11,6 +11,7 @@ import com.cq.agent.client.upload.TransferFileStateManager;
 import com.cq.agent.client.upload.UploadListener;
 import com.cq.agent.client.upload.UploadTask;
 import lombok.Getter;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
@@ -77,7 +78,11 @@ public class BatchUploadListener implements UploadListener {
     }
 
     /** 用于计算传输速度的变量 */
+    @Getter
+    @Setter
     private long lastTransferredBytes = 0;
+    @Getter
+    @Setter
     private long lastUpdateTime = System.currentTimeMillis();
 
     /** 记录实际的分块数量 */
@@ -506,56 +511,6 @@ public class BatchUploadListener implements UploadListener {
     }
 
     /**
-     * 构建重试事件（用于/retrying接口）
-     * 从RetryAwareUploaderDecorator调用
-     */
-    public SubTaskEvent buildRetryingEvent(int retryCount) {
-        SubTaskEvent event = buildBaseEvent("RETRYING");
-        event.setRetryCount(retryCount);
-        event.setLastRetryAt(new Date());
-        event.setNextRetryAfter(new Date(calculateNextRetryAfter(retryCount)));
-        return event;
-    }
-
-    /**
-     * 上报重试事件
-     */
-    public void reportRetrying(int retryCount) {
-        if (progressReporter != null) {
-            SubTaskEvent event = buildRetryingEvent(retryCount);
-            // 使用POST /api/batch/subtask/retrying接口
-            progressReporter.reportRetrying(event);
-        }
-    }
-
-    /**
-     * 计算下次重试时间（毫秒时间戳）
-     */
-    private Long calculateNextRetryAfter(int retryCount) {
-        if (config == null || config.getRetryConfig() == null || !config.getRetryConfig().isEnabled()) {
-            return System.currentTimeMillis() + 30 * 60 * 1000L; // 默认30分钟
-        }
-
-        int intervalMin = config.getRetryConfig().getIntervalMin() != null
-                ? config.getRetryConfig().getIntervalMin()
-                : 30;
-        String backoffType = config.getRetryConfig().getBackoffType();
-
-        long baseIntervalMs = intervalMin * 60_000L;
-        long delay;
-
-        if ("EXPONENTIAL".equalsIgnoreCase(backoffType)) {
-            delay = baseIntervalMs * (long) Math.pow(2, retryCount);
-        } else if ("LINEAR".equalsIgnoreCase(backoffType)) {
-            delay = baseIntervalMs * (retryCount + 1);
-        } else {
-            delay = baseIntervalMs;
-        }
-
-        return System.currentTimeMillis() + delay;
-    }
-
-    /**
      * 计算传输速度（字节/秒）- 基于时间差的瞬时速度
      */
     private Long calculateSpeedBytesPerSec(double progress) {
@@ -816,4 +771,5 @@ public class BatchUploadListener implements UploadListener {
             throw new RuntimeException("备份源文件失败: " + e.getMessage(), e);
         }
     }
+
 }

@@ -85,6 +85,7 @@ public class AgentConfig {
     // Failed task retry queue directories
     private String uploadFailRetryQueueDir;
     private String downloadFailRetryQueueDir;
+    private String uploadFinalFailureQueueDir;
     private String filebatchPendingDir;
 
     // Failed queue scan interval (milliseconds)
@@ -245,11 +246,13 @@ public class AgentConfig {
                 "/tmp/my-panel/admin/data/transfers/uploadFailRetryQueue");
         this.downloadFailRetryQueueDir = getStringProperty("download.fail.retry.queue.dir",
                 "/tmp/my-panel/admin/data/transfers/downloadFailRetryQueue");
+        this.uploadFinalFailureQueueDir = getStringProperty("upload.final.failure.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadFinalFailureQueue");
         this.filebatchPendingDir = getStringProperty("filebatch.pending.dir",
                 "/tmp/my-panel/admin/data/transfers/filebatchPending");
 
-        // Failed queue scan interval (default: 5 seconds)
-        this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 5 * 1000L);
+        // Failed queue scan interval (default: 30 seconds)
+        this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 30 * 1000L);
 
         // Validate configuration
         validateConfiguration();

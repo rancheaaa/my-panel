@@ -30,4 +30,6 @@ public interface UploadService {
      * @return 配置对象
      */
     AgentConfig getAgentConfig();
+
+    boolean resubmitTask(UploadTask task, UploadListener listener);
 }

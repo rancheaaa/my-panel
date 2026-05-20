@@ -8,7 +8,6 @@ import com.cq.agent.batch.scheduler.BatchUploadListener;
 import com.cq.agent.batch.scheduler.QuartzTaskScheduler;
 import com.cq.agent.batch.scheduler.TargetRouter;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
-import com.cq.agent.client.upload.TransferFileStateManager;
 import com.cq.agent.config.AgentConfig;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
@@ -21,9 +20,7 @@ import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -89,6 +86,11 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     @Override
     public AgentConfig getAgentConfig() {
         return delegate.getAgentConfig();
+    }
+
+    @Override
+    public boolean resubmitTask(UploadTask task, UploadListener listener) {
+        return this.delegate.resubmitTask(task, listener);
     }
 
     // ====================

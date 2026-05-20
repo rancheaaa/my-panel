@@ -99,6 +99,10 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             ApiResponse<ChunkStatusResponse> resp = getUploadStatus(task);
             if (resp.getData() == null) {
                 ApiResponse<ChunkInitResponse> chunkInitResponse = initUpload(task);
+                if (!chunkInitResponse.isSuccess() || chunkInitResponse.getData() == null) {
+                    String errorMsg = chunkInitResponse.getMsg() != null ? chunkInitResponse.getMsg() : "initUpload returned null data";
+                    throw new IOException("Upload init failed: " + errorMsg);
+                }
                 logger.debug("[traceId={}] Upload initialized: transferId={}, totalChunks={}, chunkSize={}",
                         traceId, chunkInitResponse.getData().getTransferId(),
                         chunkInitResponse.getData().getTotalChunks(), chunkInitResponse.getData().getChunkSize());
@@ -312,6 +316,24 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         } catch (Exception e) {
             logger.error("upload file with error!", e);
             handleListenerError(listener, "upload file with error!");
+            return false;
+        }
+    }
+
+    @Override
+    public boolean resubmitTask(UploadTask task, UploadListener listener) {
+        String transferId = task.getTransferId();
+        try {
+            if (listener != null) {
+                listenerCache.put(transferId, listener);
+            }
+            inflightTasks.put(transferId, task);
+            boolean offered = taskQueue.offer(task);
+            logger.info("[transferId={}] 任务重新提交到处理队列: offered={}", transferId, offered);
+            return offered;
+        } catch (Exception e) {
+            logger.error("[transferId={}] 重新提交任务失败: {}", transferId, e.getMessage(), e);
+            handleListenerError(listener, "resubmit task failed: " + e.getMessage());
             return false;
         }
     }

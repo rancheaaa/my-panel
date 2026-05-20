@@ -187,66 +187,6 @@ public class FileBatchCompletionTracker {
                         && matchesTargetAgentKey(t.getAgentName(), t.getAgentId(), targetAgentKey));
     }
 
-    public boolean existsFileInPendingBatch(String localFilePath, String targetAgentKey) {
-        return existsFileInPendingBatch(localFilePath, targetAgentKey, 30);
-    }
-
-    public boolean existsFileInPendingBatch(String localFilePath, String targetAgentKey, int pendingTimeoutMinutes) {
-        if (localFilePath == null || targetAgentKey == null) {
-            return false;
-        }
-        for (var entry : fileToBatchIndex.entrySet()) {
-            String indexKey = entry.getKey();
-            if (!indexKey.startsWith(localFilePath)) {
-                continue;
-            }
-            String batchIdStr = entry.getValue();
-            FileBatchState state = batchStateMap.get(batchIdStr);
-            if (state == null || state.getSource() == null) {
-                continue;
-            }
-            if (!localFilePath.equals(state.getSource().getFilePath())) {
-                continue;
-            }
-            if ("COMPLETED".equals(state.getStatus())) {
-                continue;
-            }
-            if (state.getTargets() == null || state.getTargets().isEmpty()) {
-                continue;
-            }
-            if (isBatchExpired(state, pendingTimeoutMinutes)) {
-                continue;
-            }
-            boolean match = state.getTargets().stream()
-                    .anyMatch(t -> "PENDING".equals(t.getStatus())
-                            && matchesTargetAgentKey(t.getAgentName(), t.getAgentId(), targetAgentKey));
-            if (match) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isBatchExpired(FileBatchState state, int timeoutMinutes) {
-        if (timeoutMinutes <= 0) {
-            return false;
-        }
-        String updateTimeStr = state.getUpdateTime();
-        if (updateTimeStr == null || updateTimeStr.isEmpty()) {
-            return false;
-        }
-        try {
-            LocalDateTime updateTime = LocalDateTime.parse(updateTimeStr, FORMATTER);
-            long updateEpoch = updateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-            long now = System.currentTimeMillis();
-            long timeoutMs = (long) timeoutMinutes * 60 * 1000;
-            return (now - updateEpoch) > timeoutMs;
-        } catch (Exception e) {
-            logger.warn("解析批次更新时间失败: {}", updateTimeStr, e);
-            return false;
-        }
-    }
-
     private boolean matchesTargetAgentKey(String agentName, String agentId, String targetAgentKey) {
         if (targetAgentKey == null) {
             return false;

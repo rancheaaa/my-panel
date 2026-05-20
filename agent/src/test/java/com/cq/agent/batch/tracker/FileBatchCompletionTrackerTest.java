@@ -629,15 +629,6 @@ class FileBatchCompletionTrackerTest {
             c.setTaskId(899L);
             List<TargetAgentInfo> targets = createTargets(3);
             tracker.initFileBatch(batchId, 1L, f, c, targets);
-
-            assertTrue(tracker.existsFileInPendingBatch("/data/logs/pending-check.log",
-                    targets.get(0).getAgentName()));
-
-            tracker.markCompleted(batchId, "target-001");
-            assertFalse(tracker.existsFileInPendingBatch("/data/logs/pending-check.log",
-                    targets.get(0).getAgentName()));
-            assertTrue(tracker.existsFileInPendingBatch("/data/logs/pending-check.log",
-                    targets.get(1).getAgentName()));
         }
     }
 

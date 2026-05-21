@@ -5,7 +5,7 @@ import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.agent.batch.scheduler.BatchUploadListener;
-import com.cq.agent.batch.scheduler.QuartzTaskScheduler;
+import com.cq.agent.batch.scheduler.BatchTransferJob;
 import com.cq.agent.batch.scheduler.TargetRouter;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.agent.config.AgentConfig;
@@ -15,9 +15,9 @@ import com.cq.panel.common.dto.batch.TransferConfig;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
-import org.quartz.Scheduler;
-import org.quartz.SchedulerException;
+import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -54,16 +54,19 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     @Getter
     private RetryAwareUploaderDecorator retryAwareUploader;
 
-    private final QuartzTaskScheduler quartzTaskScheduler;
+    private static final String JOB_GROUP = "batch-transfer";
+    private static final String TRIGGER_GROUP = "batch-transfer-triggers";
+
+    private final Scheduler quartzScheduler;
+    private final java.util.Map<Long, Runnable> taskRunnables = new java.util.concurrent.ConcurrentHashMap<>();
 
     public BatchTaskSchedulerUploaderDecorator(UploadService delegate, ConfigFileManager configFileManager)
             throws SchedulerException {
         this.delegate = delegate;
         this.agentConfig = delegate != null ? delegate.getAgentConfig() : null;
         this.configFileManager = configFileManager;
-        Scheduler quartzScheduler = new StdSchedulerFactory().getScheduler();
-        quartzScheduler.start();
-        this.quartzTaskScheduler = new QuartzTaskScheduler(quartzScheduler);
+        this.quartzScheduler = new StdSchedulerFactory().getScheduler();
+        this.quartzScheduler.start();
     }
 
     public BatchTaskSchedulerUploaderDecorator(UploadService delegate, ConfigFileManager configFileManager,
@@ -98,8 +101,8 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
 
     public void startAllRunningTasks() {
         log.info("启动所有RUNNING状态的任务...");
-        if (configFileManager == null || quartzTaskScheduler == null) {
-            log.warn("configFileManager或quartzTaskScheduler未初始化，跳过启动");
+        if (configFileManager == null || quartzScheduler == null) {
+            log.warn("configFileManager或quartzScheduler未初始化，跳过启动");
             return;
         }
         List<AgentTaskConfig> allConfigs = configFileManager.loadAllTaskConfigs();
@@ -128,25 +131,108 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
 
         Runnable task = createTaskRunnable(config);
 
-        quartzTaskScheduler.startTask(config, task);
+        try {
+            String jobName = "batch-task-" + taskId;
+            String triggerName = "batch-trigger-" + taskId;
+
+            deleteTask(taskId);
+
+            taskRunnables.put(taskId, task);
+
+            JobDataMap jobDataMap = new JobDataMap();
+            jobDataMap.put(BatchTransferJob.TASK_DATA_KEY, config);
+            jobDataMap.put(BatchTransferJob.TASK_RUNNABLE_KEY, task);
+
+            JobDetail jobDetail = JobBuilder.newJob(BatchTransferJob.class)
+                    .withIdentity(jobName, JOB_GROUP)
+                    .usingJobData(jobDataMap)
+                    .build();
+
+            CronScheduleBuilder scheduleBuilder = CronScheduleBuilder
+                    .cronSchedule(cronExpression)
+                    .withMisfireHandlingInstructionDoNothing();
+
+            CronTrigger trigger = TriggerBuilder.newTrigger()
+                    .withIdentity(triggerName, TRIGGER_GROUP)
+                    .withSchedule(scheduleBuilder)
+                    .build();
+
+            quartzScheduler.scheduleJob(jobDetail, trigger);
+            quartzScheduler.triggerJob(new JobKey(jobName, JOB_GROUP));
+
+            log.info("✅ Quartz任务启动: taskId={}, cron={}", taskId, cronExpression);
+        } catch (SchedulerException e) {
+            log.error("❌ 启动Quartz任务失败: taskId={}, error={}", taskId, e.getMessage());
+            throw new RuntimeException("启动任务失败: " + e.getMessage(), e);
+        }
+
         log.info("任务已启动: taskId={}, cron={}", taskId, cronExpression);
     }
 
     public void pauseTask(Long taskId) {
-        quartzTaskScheduler.pauseTask(taskId);
+        try {
+            JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
+            if (quartzScheduler.checkExists(jobKey)) {
+                quartzScheduler.pauseJob(jobKey);
+                log.info("⏸️  Quartz任务已暂停: taskId={}", taskId);
+            } else {
+                log.warn("⚠️  任务不存在，无法暂停: taskId={}", taskId);
+            }
+        } catch (SchedulerException e) {
+            log.error("❌ 暂停任务失败: taskId={}, error={}", taskId, e.getMessage());
+            throw new RuntimeException("暂停任务失败: " + e.getMessage(), e);
+        }
         log.info("任务已暂停: taskId={}", taskId);
     }
 
     public void resumeTask(Long taskId) {
-        quartzTaskScheduler.resumeTask(taskId);
+        try {
+            JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
+            if (quartzScheduler.checkExists(jobKey)) {
+                quartzScheduler.resumeJob(jobKey);
+                log.info("▶️  Quartz任务已恢复: taskId={}", taskId);
+            } else {
+                log.warn("⚠️  任务不存在，无法恢复: taskId={}", taskId);
+            }
+        } catch (SchedulerException e) {
+            log.error("❌ 恢复任务失败: taskId={}, error={}", taskId, e.getMessage());
+            throw new RuntimeException("恢复任务失败: " + e.getMessage(), e);
+        }
         log.info("任务已恢复: taskId={}", taskId);
     }
 
     public void updateTask(AgentTaskConfig config) {
         Long taskId = config.getTaskId();
 
-        if (quartzTaskScheduler.isTaskRunning(taskId)) {
-            quartzTaskScheduler.updateTask(config);
+        if (isTaskRunning(taskId)) {
+            try {
+                TriggerKey triggerKey = new TriggerKey("batch-trigger-" + taskId, TRIGGER_GROUP);
+
+                if (quartzScheduler.checkExists(triggerKey)) {
+                    String cronExpression = config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null;
+                    CronScheduleBuilder scheduleBuilder = CronScheduleBuilder
+                            .cronSchedule(cronExpression)
+                            .withMisfireHandlingInstructionDoNothing();
+
+                    CronTrigger newTrigger = TriggerBuilder.newTrigger()
+                            .withIdentity(triggerKey)
+                            .withSchedule(scheduleBuilder)
+                            .build();
+
+                    quartzScheduler.rescheduleJob(triggerKey, newTrigger);
+                    log.info("🔄 Quartz任务已更新: taskId={}, newCron={}", taskId, cronExpression);
+                } else {
+                    Runnable task = taskRunnables.get(taskId);
+                    if (task != null) {
+                        startTask(config);
+                    } else {
+                        log.warn("⚠️  无法更新任务，找不到原任务Runnable: taskId={}", taskId);
+                    }
+                }
+            } catch (SchedulerException e) {
+                log.error("❌ 更新任务失败: taskId={}, error={}", taskId, e.getMessage());
+                throw new RuntimeException("更新任务失败: " + e.getMessage(), e);
+            }
             log.info("任务已更新: taskId={}", taskId);
         } else {
             startTask(config);
@@ -155,7 +241,17 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     }
 
     public void deleteTask(Long taskId) {
-        quartzTaskScheduler.deleteTask(taskId);
+        try {
+            JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
+            if (quartzScheduler.checkExists(jobKey)) {
+                quartzScheduler.deleteJob(jobKey);
+                taskRunnables.remove(taskId);
+                log.info("🗑️  Quartz任务已删除: taskId={}", taskId);
+            }
+        } catch (SchedulerException e) {
+            log.error("❌ 删除任务失败: taskId={}, error={}", taskId, e.getMessage());
+            throw new RuntimeException("删除任务失败: " + e.getMessage(), e);
+        }
         if (configFileManager != null) {
             configFileManager.deleteTaskConfig(taskId);
         }
@@ -163,17 +259,29 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     }
 
     public void shutdown() {
-        if (quartzTaskScheduler != null) {
-            quartzTaskScheduler.shutdown();
+        try {
+            for (JobKey jobKey : quartzScheduler.getJobKeys(GroupMatcher.jobGroupEquals(JOB_GROUP))) {
+                quartzScheduler.deleteJob(jobKey);
+            }
+            taskRunnables.clear();
+            log.info("⏹️  所有Quartz任务已停止");
+        } catch (SchedulerException e) {
+            log.error("❌ 停止所有任务失败: {}", e.getMessage());
         }
         log.info("BatchTaskSchedulerUploaderDecorator已关闭");
     }
 
     public boolean isTaskRunning(Long taskId) {
-        if (quartzTaskScheduler == null) {
+        if (quartzScheduler == null) {
             return false;
         }
-        return quartzTaskScheduler.isTaskRunning(taskId);
+        try {
+            JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
+            return quartzScheduler.checkExists(jobKey);
+        } catch (SchedulerException e) {
+            log.error("❌ 检查任务状态失败: taskId={}, error={}", taskId, e.getMessage());
+            return false;
+        }
     }
 
     public void completeTask(Long taskId) {

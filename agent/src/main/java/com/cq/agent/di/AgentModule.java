@@ -5,7 +5,6 @@ import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.VersionManager;
 import com.cq.agent.batch.report.FallbackPersistenceService;
 import com.cq.agent.batch.report.ProgressReporter;
-import com.cq.agent.batch.scheduler.FileRetryScheduler;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.agent.client.download.AgentDownloader;
@@ -43,7 +42,6 @@ public class AgentModule extends AbstractModule {
         bind(BatchTaskSchedulerUploaderDecorator.class).toProvider(BatchTaskSchedulerProvider.class).in(Singleton.class);
         bind(ConfigChangeListener.class).toProvider(ConfigChangeListenerProvider.class).in(Singleton.class);
         bind(FallbackPersistenceService.class).toProvider(FallbackPersistenceServiceProvider.class).in(Singleton.class);
-        bind(FileRetryScheduler.class).toProvider(FileRetrySchedulerProvider.class).in(Singleton.class);
         bind(HttpServer.class).toProvider(HttpServerProvider.class).in(Singleton.class);
         bind(AgentRegistryService.class).toProvider(AgentRegistryServiceProvider.class).in(Singleton.class);
         bind(AgentBootstrap.class).in(Singleton.class);

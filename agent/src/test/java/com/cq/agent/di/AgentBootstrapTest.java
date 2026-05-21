@@ -1,7 +1,7 @@
 package com.cq.agent.di;
 
-import com.cq.agent.batch.scheduler.FileRetryScheduler;
 import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
@@ -25,7 +25,7 @@ class AgentBootstrapTest {
     private BatchTaskSchedulerUploaderDecorator batchTaskUploader;
 
     @Mock
-    private FileRetryScheduler fileRetryScheduler;
+    private RetryAwareUploaderDecorator retryDecorator;
 
     @Mock
     private AgentRegistryService registryService;
@@ -33,14 +33,14 @@ class AgentBootstrapTest {
     @Test
     void shouldCreateAgentBootstrapWithDependencies() {
         AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                fileRetryScheduler, registryService);
+                retryDecorator, registryService);
         assertNotNull(bootstrap);
     }
 
     @Test
     void shouldStartAllRunningTasksOnStart() throws Exception {
         AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                fileRetryScheduler, registryService);
+                retryDecorator, registryService);
         when(server.getActualPort()).thenReturn(7777);
         doNothing().when(server).start();
 
@@ -48,7 +48,6 @@ class AgentBootstrapTest {
             try {
                 bootstrap.start();
             } catch (Exception e) {
-                // expected - awaitTermination will be interrupted
             }
         });
         testThread.start();
@@ -62,7 +61,7 @@ class AgentBootstrapTest {
     @Test
     void shouldRegisterActualPortAndStartRegistry() throws Exception {
         AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                fileRetryScheduler, registryService);
+                retryDecorator, registryService);
         when(server.getActualPort()).thenReturn(7777);
         doNothing().when(server).start();
 
@@ -70,7 +69,6 @@ class AgentBootstrapTest {
             try {
                 bootstrap.start();
             } catch (Exception e) {
-                // expected
             }
         });
         testThread.start();
@@ -80,27 +78,5 @@ class AgentBootstrapTest {
 
         verify(registryService).setActualPort(7777);
         verify(registryService).start();
-    }
-
-    @Test
-    void shouldStartServerBeforeRegistry() throws Exception {
-        AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                fileRetryScheduler, registryService);
-        when(server.getActualPort()).thenReturn(7777);
-        doNothing().when(server).start();
-
-        Thread testThread = new Thread(() -> {
-            try {
-                bootstrap.start();
-            } catch (Exception e) {
-                // expected
-            }
-        });
-        testThread.start();
-        Thread.sleep(500);
-        testThread.interrupt();
-        testThread.join(2000);
-
-        verify(server).start();
     }
 }

@@ -139,45 +139,6 @@ public class BatchUploadListener implements UploadListener {
     }
 
     /**
-     * 恢复模式构造函数 - 用于重试场景，复用已有 subtaskId，不创建新子任务记录
-     *
-     * @param taskId            任务ID
-     * @param existingSubtaskId 已有的子任务ID（来自原始失败的 UploadTask）
-     * @param scannedFile       扫描到的文件
-     * @param config            任务配置
-     * @param targetAgent       目标Agent信息
-     * @param progressReporter  进度上报器
-     * @param successQueueDir   上传成功队列目录
-     * @param sendingQueueDir   发送中队列目录
-     * @param scanBatchId       扫描批次ID
-     * @param fileBatchId       文件批次ID
-     * @param fileBatchTracker  文件批次完成追踪器
-     */
-    public BatchUploadListener(Long taskId, Long existingSubtaskId, ScannedFile scannedFile,
-            AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
-            String successQueueDir, String sendingQueueDir,
-            Long scanBatchId, Long fileBatchId,
-            FileBatchCompletionTracker fileBatchTracker) {
-        this.taskId = taskId;
-        this.scanBatchId = scanBatchId;
-        this.fileBatchId = fileBatchId;
-        this.scannedFile = scannedFile;
-        this.config = config;
-        this.targetAgent = targetAgent;
-        this.progressReporter = progressReporter;
-        this.successQueueDir = successQueueDir;
-        this.sendingQueueDir = sendingQueueDir;
-        this.fileBatchTracker = fileBatchTracker;
-
-        this.subtaskId = existingSubtaskId;
-
-        log.info("✅ 恢复模式上传监听器(重试): subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
-                subtaskId, scannedFile.getFileName(),
-                targetAgent != null ? targetAgent.getAgentId() : "null",
-                scanBatchId, fileBatchId);
-    }
-
-    /**
      * 测试用构造函数 - 仅用于单元测试，不触发子任务创建
      */
     BatchUploadListener(Long taskId, ScannedFile scannedFile,
@@ -193,6 +154,26 @@ public class BatchUploadListener implements UploadListener {
         this.sendingQueueDir = null;
         this.fileBatchTracker = null;
         this.subtaskId = null;
+    }
+
+    /**
+     * 重试工厂方法 - 用于失败重试场景，复用已有 subtaskId，不创建新子任务记录
+     * 替代原有的恢复模式构造函数
+     */
+    public static BatchUploadListener forRetry(Long taskId, Long existingSubtaskId, ScannedFile scannedFile,
+            AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
+            String successQueueDir, String sendingQueueDir,
+            Long scanBatchId, Long fileBatchId,
+            FileBatchCompletionTracker fileBatchTracker) {
+        BatchUploadListener listener = new BatchUploadListener(taskId, scannedFile, config, targetAgent,
+                progressReporter, successQueueDir, sendingQueueDir, scanBatchId, fileBatchId, fileBatchTracker);
+        listener.subtaskId = existingSubtaskId;
+
+        log.info("✅ 恢复模式上传监听器(重试): subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
+                existingSubtaskId, scannedFile.getFileName(),
+                targetAgent != null ? targetAgent.getAgentId() : "null",
+                scanBatchId, fileBatchId);
+        return listener;
     }
 
     /**
@@ -453,9 +434,7 @@ public class BatchUploadListener implements UploadListener {
      * 构建进度事件（用于/progress接口）
      */
     private SubTaskEvent buildProgressEvent() {
-        SubTaskEvent event = buildBaseEvent("SENDING");
-        event.setStartedAt(transferStartTime != null ? new Date(transferStartTime) : new Date());
-        return event;
+        return buildBaseEvent("SENDING");
     }
 
     /**
@@ -475,7 +454,6 @@ public class BatchUploadListener implements UploadListener {
         long startTime = transferStartTime != null ? transferStartTime : System.currentTimeMillis();
         long completedTime = System.currentTimeMillis();
         long durationMs = completedTime - startTime;
-        event.setStartedAt(new Date(startTime));
         event.setCompletedAt(new Date(completedTime));
         event.setDurationMs(durationMs);
 
@@ -504,7 +482,6 @@ public class BatchUploadListener implements UploadListener {
             startTime = System.currentTimeMillis();
         }
 
-        event.setStartedAt(new Date(startTime));
         event.setDurationMs(System.currentTimeMillis() - startTime);
 
         return event;

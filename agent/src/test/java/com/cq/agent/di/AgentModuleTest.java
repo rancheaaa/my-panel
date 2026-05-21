@@ -3,7 +3,6 @@ package com.cq.agent.di;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.report.FallbackPersistenceService;
-import com.cq.agent.batch.scheduler.FileRetryScheduler;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.agent.client.upload.AgentUploader;
@@ -97,12 +96,6 @@ class AgentModuleTest {
     void shouldCreateFallbackPersistenceService() {
         FallbackPersistenceService service = injector.getInstance(FallbackPersistenceService.class);
         assertNotNull(service);
-    }
-
-    @Test
-    void shouldCreateFileRetryScheduler() {
-        FileRetryScheduler scheduler = injector.getInstance(FileRetryScheduler.class);
-        assertNotNull(scheduler);
     }
 
     @Test

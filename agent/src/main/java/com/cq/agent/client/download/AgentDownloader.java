@@ -62,7 +62,6 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         try {
             task.setScannedStartTime(Util.currentTime());
             updateTaskStatus(task, DownloadTaskStatus.SCANNED);
-            task.incrementRetryCount();
 
             String listenerClassName = task.getListenerClassName();
             if (listenerClassName != null && !listenerCache.containsKey(transferId)) {

@@ -66,7 +66,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         try {
             task.setScannedStartTime(Util.currentTime());
             updateTaskStatus(task, UploadTaskStatus.SCANNED);
-            task.incrementRetryCount();
 
             String listenerClassName = task.getListenerClassName();
             if (listenerClassName != null && !listenerCache.containsKey(transferId)) {

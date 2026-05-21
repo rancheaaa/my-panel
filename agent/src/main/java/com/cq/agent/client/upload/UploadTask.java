@@ -54,7 +54,7 @@ public class UploadTask implements TaskInfo {
 
     private List<Integer> missingChunks;
     private AtomicInteger uploadChunksCount = new AtomicInteger(0);
-    private final AtomicInteger retryCount = new AtomicInteger(-1);
+    private final AtomicInteger retryCount = new AtomicInteger(0);
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 

@@ -46,7 +46,7 @@ public class DownloadTask implements TaskInfo {
         this.status = DownloadTaskStatus.PREPARED;
         this.createTime = Util.currentTime();
         this.updateTime = this.createTime;
-        this.retryCount = -1;
+        this.retryCount = 0;
         this.downloadedChunksCount = 0;
         this.remoteAgentApiUrl = remoteAgentApiUrl;
         this.remoteAgentUsername = remoteAgentUsername;

@@ -598,6 +598,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 uploadMetaStore.saveTask(task);
             }
 
+            renameSourceFileToFailed(task);
             moveToFinalFailureQueue(task);
             deleteFailedTaskJsonFile(task.getTransferId());
             reportFinalFailure(task);
@@ -607,6 +608,31 @@ public class RetryAwareUploaderDecorator implements UploadService {
         } catch (Exception e) {
             logger.error("❌ 标记最终失败异常: transferId={}, error={}",
                     task.getTransferId(), e.getMessage());
+        }
+    }
+
+    private void renameSourceFileToFailed(UploadTask task) {
+        String localFilePath = task.getLocalFilePath();
+        if (localFilePath == null || localFilePath.isBlank()) {
+            logger.debug("源文件路径为空，跳过重命名: transferId={}", task.getTransferId());
+            return;
+        }
+        try {
+            java.io.File sourceFile = new java.io.File(localFilePath);
+            if (!sourceFile.exists()) {
+                logger.debug("源文件不存在，跳过重命名: path={}", localFilePath);
+                return;
+            }
+            String failedFilePath = localFilePath + ".failed";
+            java.io.File failedFile = new java.io.File(failedFilePath);
+            boolean renamed = sourceFile.renameTo(failedFile);
+            if (renamed) {
+                logger.info("📝 源文件已重命名为.failed: {} -> {}", localFilePath, failedFilePath);
+            } else {
+                logger.warn("⚠️ 源文件重命名失败: {} -> {}", localFilePath, failedFilePath);
+            }
+        } catch (Exception e) {
+            logger.error("❌ 源文件重命名为.failed异常: path={}, error={}", localFilePath, e.getMessage());
         }
     }
 

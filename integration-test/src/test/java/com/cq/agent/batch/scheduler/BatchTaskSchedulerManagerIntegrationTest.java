@@ -1,59 +1,82 @@
 package com.cq.agent.batch.scheduler;
 
 import com.cq.agent.batch.config.ConfigFileManager;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
 import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.*;
+
+import java.nio.file.Path;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * TDD测试：验证组件集成到主功能
- * 核心要求：
- * 1. BatchTaskSchedulerManager应使用RetryAwareUploaderDecorator管理重试
- * 2. 任务执行时应正确调用这些组件
+ * 组件集成测试
+ * 验证BatchTaskSchedulerUploaderDecorator继承RetryAwareUploaderDecorator
  */
-@DisplayName("组件集成 - TDD")
+@DisplayName("组件集成 - 继承关系验证")
 class BatchTaskSchedulerManagerIntegrationTest {
 
     @Mock
     private ConfigFileManager configFileManager;
 
-    @Mock
-    private RetryAwareUploaderDecorator retryAwareUploader;
-
-    private BatchTaskSchedulerManager schedulerManager;
     private AutoCloseable mocks;
 
+    @TempDir
+    Path tempDir;
+
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
-        schedulerManager = new BatchTaskSchedulerManager(configFileManager);
-        schedulerManager.setRetryAwareUploader(retryAwareUploader);
     }
 
     @AfterEach
     void tearDown() throws Exception {
-        if (schedulerManager != null) {
-            schedulerManager.shutdown();
-        }
         mocks.close();
     }
 
-    // ==================== Red Phase: 组件集成测试 ====================
-
     @Test
-    @DisplayName("1. [集成] BatchTaskSchedulerManager应有RetryAwareUploaderDecorator实例")
-    void testHasRetryAwareUploader() {
-        assertNotNull(schedulerManager.getRetryAwareUploader(), "应设置RetryAwareUploaderDecorator");
-        assertSame(retryAwareUploader, schedulerManager.getRetryAwareUploader(), "应为同一个实例");
-        System.out.println("✅ RetryAwareUploaderDecorator已集成");
+    @DisplayName("1. BatchTaskSchedulerUploaderDecorator IS-A RetryAwareUploaderDecorator")
+    void testInheritanceRelationship() {
+        AgentConfig agentConfig = new AgentConfig();
+        agentConfig.setUploadSendingQueueDir(tempDir.resolve("sending").toString());
+        agentConfig.setUploadFailRetryQueueDir(tempDir.resolve("fail-retry").toString());
+        agentConfig.setUploadFinalFailureQueueDir(tempDir.resolve("final-failure").toString());
+
+        try {
+            BatchTaskSchedulerUploaderDecorator batchTaskUploader =
+                    new BatchTaskSchedulerUploaderDecorator(agentConfig, configFileManager);
+
+            // 验证继承关系
+            assertInstanceOf(RetryAwareUploaderDecorator.class, batchTaskUploader,
+                    "BatchTaskSchedulerUploaderDecorator应继承RetryAwareUploaderDecorator");
+            assertInstanceOf(com.cq.agent.client.upload.AgentUploader.class, batchTaskUploader,
+                    "BatchTaskSchedulerUploaderDecorator应间接继承AgentUploader");
+
+            batchTaskUploader.shutdown();
+            System.out.println("✅ 继承关系验证通过");
+        } catch (Exception e) {
+            fail("创建BatchTaskSchedulerUploaderDecorator失败: " + e.getMessage());
+        }
     }
 
     @Test
-    @DisplayName("8. [集成] 关闭时应清理所有资源")
+    @DisplayName("2. 关闭时应清理所有资源")
     void testShutdown_shouldCleanupAll() {
-        schedulerManager.shutdown();
+        AgentConfig agentConfig = new AgentConfig();
+        agentConfig.setUploadSendingQueueDir(tempDir.resolve("sending").toString());
+        agentConfig.setUploadFailRetryQueueDir(tempDir.resolve("fail-retry").toString());
+        agentConfig.setUploadFinalFailureQueueDir(tempDir.resolve("final-failure").toString());
 
-        System.out.println("✅ 关闭时资源已清理");
+        try {
+            BatchTaskSchedulerUploaderDecorator batchTaskUploader =
+                    new BatchTaskSchedulerUploaderDecorator(agentConfig, configFileManager);
+            batchTaskUploader.shutdown();
+            System.out.println("✅ 关闭时资源已清理");
+        } catch (Exception e) {
+            fail("shutdown失败: " + e.getMessage());
+        }
     }
 }

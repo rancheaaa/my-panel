@@ -45,15 +45,15 @@ public class BatchUploadListener implements UploadListener {
      */
     @Getter
     private Long taskId;
-    private final Long scanBatchId;
-    private final Long fileBatchId;
-    private final ScannedFile scannedFile;
-    private final AgentTaskConfig config;
-    private final TargetAgentInfo targetAgent;
-    private final ProgressReporter progressReporter;
-    private final String successQueueDir;
-    private final String sendingQueueDir;
-    private final FileBatchCompletionTracker fileBatchTracker;
+    private Long scanBatchId;
+    private Long fileBatchId;
+    private ScannedFile scannedFile;
+    private AgentTaskConfig config;
+    private TargetAgentInfo targetAgent;
+    private ProgressReporter progressReporter;
+    private String successQueueDir;
+    private String sendingQueueDir;
+    private FileBatchCompletionTracker fileBatchTracker;
 
     /**
      * 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
@@ -158,15 +158,25 @@ public class BatchUploadListener implements UploadListener {
 
     /**
      * 重试工厂方法 - 用于失败重试场景，复用已有 subtaskId，不创建新子任务记录
-     * 替代原有的恢复模式构造函数
+     * 注意：不调用全参构造函数，避免触发createSubTaskOnProxy()创建幽灵子任务
      */
     public static BatchUploadListener forRetry(Long taskId, Long existingSubtaskId, ScannedFile scannedFile,
             AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
             String successQueueDir, String sendingQueueDir,
             Long scanBatchId, Long fileBatchId,
             FileBatchCompletionTracker fileBatchTracker) {
-        BatchUploadListener listener = new BatchUploadListener(taskId, scannedFile, config, targetAgent,
-                progressReporter, successQueueDir, sendingQueueDir, scanBatchId, fileBatchId, fileBatchTracker);
+        // 直接赋值，不调用构造函数（避免触发createSubTaskOnProxy）
+        BatchUploadListener listener = new BatchUploadListener();
+        listener.taskId = taskId;
+        listener.scanBatchId = scanBatchId;
+        listener.fileBatchId = fileBatchId;
+        listener.scannedFile = scannedFile;
+        listener.config = config;
+        listener.targetAgent = targetAgent;
+        listener.progressReporter = progressReporter;
+        listener.successQueueDir = successQueueDir;
+        listener.sendingQueueDir = sendingQueueDir;
+        listener.fileBatchTracker = fileBatchTracker;
         listener.subtaskId = existingSubtaskId;
 
         log.info("✅ 恢复模式上传监听器(重试): subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
@@ -174,6 +184,21 @@ public class BatchUploadListener implements UploadListener {
                 targetAgent != null ? targetAgent.getAgentId() : "null",
                 scanBatchId, fileBatchId);
         return listener;
+    }
+
+    /**
+     * 默认构造函数（仅供forRetry工厂方法使用）
+     */
+    private BatchUploadListener() {
+        this.scanBatchId = null;
+        this.fileBatchId = null;
+        this.scannedFile = null;
+        this.config = null;
+        this.targetAgent = null;
+        this.progressReporter = null;
+        this.successQueueDir = null;
+        this.sendingQueueDir = null;
+        this.fileBatchTracker = null;
     }
 
     /**
@@ -361,8 +386,10 @@ public class BatchUploadListener implements UploadListener {
                     }
                 }
             } catch (Exception e) {
-                log.warn("标记文件批次完成状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
-                executePostTransferAction();
+                // markCompleted异常时无法确定是否所有目标都已完成，
+                // 不应调用executePostTransferAction（可能过早删除/恢复源文件导致其他目标无法传输）
+                // 仅记录错误，等待下次扫描或人工干预
+                log.error("❌ 标记文件批次完成状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
             }
         } else {
             // 非批量场景（单目标），直接执行传输后操作
@@ -458,7 +485,7 @@ public class BatchUploadListener implements UploadListener {
         event.setDurationMs(durationMs);
 
         // 计算平均传输速度：即使传输很快（durationMs很小），也能正确计算
-        long speed = durationMs > 0 ? scannedFile.getFileSize() * 1000L / durationMs : null;
+        Long speed = durationMs > 0 ? scannedFile.getFileSize() * 1000L / durationMs : null;
         event.setSpeedBytesPerSec(speed);
 
         return event;
@@ -511,59 +538,19 @@ public class BatchUploadListener implements UploadListener {
         if (targetAgent == null || scannedFile == null) {
             return null;
         }
-        String targetDir = targetAgent.getTargetDir();
-        if (targetDir == null) {
-            return null;
-        }
-
-        TransferConfig transferConfig = config != null ? config.getTransferConfig() : null;
-        boolean preserveDir = transferConfig != null && transferConfig.isPreserveDirStructure();
-
-        // 使用原始路径计算目标路径（不使用隐藏文件路径）
+        String sourceDir = config != null ? config.getSourceDir() : null;
         String originalPath = scannedFile.getOriginalAbsolutePath();
+        String fileName = scannedFile.getFileName();
+        String targetDir = targetAgent.getTargetDir();
+        TransferConfig transferConfig = config != null ? config.getTransferConfig() : null;
 
-        String relativePath;
-        if (preserveDir) {
-            String sourceDir = config.getSourceDir();
-            if (sourceDir != null && !sourceDir.trim().isEmpty()) {
-                String absPath = normalizePathSeparator(originalPath);
-                String normSourceDir = normalizePathSeparator(sourceDir);
-
-                if (absPath.startsWith(normSourceDir)) {
-                    relativePath = absPath.substring(normSourceDir.length());
-                    if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
-                        relativePath = relativePath.substring(1);
-                    }
-                    relativePath = relativePath.replace("\\", "/");
-                } else {
-                    log.warn("preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}", sourceDir,
-                            originalPath);
-                    relativePath = scannedFile.getFileName();
-                }
-            } else {
-                log.warn("preserveDirStructure=true但sourceDir为空，使用文件名");
-                relativePath = scannedFile.getFileName();
-            }
-        } else {
-            relativePath = scannedFile.getFileName();
-        }
-
-        String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
-        String result = targetDir + separator + relativePath;
-        log.debug("computeTargetPath: preserveDir={}, sourceDir={}, sourceFile={}, relativePath={}, targetPath={}",
-                preserveDir, config != null ? config.getSourceDir() : "null",
-                originalPath, relativePath, result);
+        String result = TargetPathComputer.compute(sourceDir, originalPath, fileName, targetDir, transferConfig);
+        log.debug("computeTargetPath: sourceDir={}, sourceFile={}, targetPath={}", sourceDir, originalPath, result);
         return result;
     }
 
-    private String normalizePathSeparator(String path) {
-        if (path == null)
-            return null;
-        return path.replace("/", "\\").trim();
-    }
-
     /**
-     * 传输成功后，将uploadSendingQueue目录下的UPLOAD_SUCCESS-upload-*.json控制文件
+     * 传输成功后，将uploadSendingQueue目录下当前transferId对应的控制文件
      * 移动到uploadSuccessQueue目录下（如果目录不存在则新建）
      */
     private void moveControlFileToSuccessQueue() {
@@ -587,13 +574,32 @@ public class BatchUploadListener implements UploadListener {
                 log.info("📁 创建上传成功队列目录: {}", successQueueDir);
             }
 
-            // 查找UPLOAD_SUCCESS-upload-*.json控制文件并移动
-            try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(sendingDir,
-                    "UPLOAD_SUCCESS-upload-*.json")) {
-                for (Path controlFile : stream) {
-                    Path targetPath = successDir.resolve(controlFile.getFileName());
-                    Files.move(controlFile, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                    log.info("✅ 控制文件已移动到成功队列: {} -> {}", controlFile, targetPath);
+            // 只移动当前transferId对应的控制文件，避免误移动其他并发传输的文件
+            String transferId = currentTransferId;
+            if (transferId == null) {
+                log.debug("currentTransferId为空，使用通配符模式移动");
+                try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(sendingDir,
+                        "UPLOAD_SUCCESS-upload-*.json")) {
+                    for (Path controlFile : stream) {
+                        Path targetPath = successDir.resolve(controlFile.getFileName());
+                        Files.move(controlFile, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        log.info("✅ 控制文件已移动到成功队列: {} -> {}", controlFile, targetPath);
+                    }
+                }
+            } else {
+                // 精确匹配当前transferId的控制文件
+                String globPattern = "UPLOAD_SUCCESS-upload-*" + transferId + "*.json";
+                boolean moved = false;
+                try (java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(sendingDir, globPattern)) {
+                    for (Path controlFile : stream) {
+                        Path targetPath = successDir.resolve(controlFile.getFileName());
+                        Files.move(controlFile, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        log.info("✅ 控制文件已移动到成功队列: {} -> {}", controlFile, targetPath);
+                        moved = true;
+                    }
+                }
+                if (!moved) {
+                    log.debug("未找到transferId={}对应的成功控制文件", transferId);
                 }
             }
         } catch (Exception e) {

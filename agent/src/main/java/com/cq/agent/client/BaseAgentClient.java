@@ -177,7 +177,8 @@ public abstract class BaseAgentClient<TASK extends TaskInfo, LISTENER> {
                 if (task != null) {
                     String taskKey = getTaskKey(task);
                     handleListenerError(taskKey, t.getMessage());
-                    listenerCache.remove(taskKey);
+                    // 不移除listener：任务可能被移到失败队列等待重试，
+                    // listener需要保留以便重试时复用，只有在真正传输成功时才移除
                 }
                 logger.error("Worker {} 错误", id, t);
             }

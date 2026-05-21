@@ -1,7 +1,6 @@
 package com.cq.agent.di;
 
 import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
@@ -25,22 +24,19 @@ class AgentBootstrapTest {
     private BatchTaskSchedulerUploaderDecorator batchTaskUploader;
 
     @Mock
-    private RetryAwareUploaderDecorator retryDecorator;
-
-    @Mock
     private AgentRegistryService registryService;
 
     @Test
     void shouldCreateAgentBootstrapWithDependencies() {
         AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                retryDecorator, registryService);
+                registryService);
         assertNotNull(bootstrap);
     }
 
     @Test
     void shouldStartAllRunningTasksOnStart() throws Exception {
         AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                retryDecorator, registryService);
+                registryService);
         when(server.getActualPort()).thenReturn(7777);
         doNothing().when(server).start();
 
@@ -61,7 +57,7 @@ class AgentBootstrapTest {
     @Test
     void shouldRegisterActualPortAndStartRegistry() throws Exception {
         AgentBootstrap bootstrap = new AgentBootstrap(server, config, batchTaskUploader,
-                retryDecorator, registryService);
+                registryService);
         when(server.getActualPort()).thenReturn(7777);
         doNothing().when(server).start();
 

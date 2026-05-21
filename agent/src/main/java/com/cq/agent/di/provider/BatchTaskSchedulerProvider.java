@@ -5,42 +5,54 @@ import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.config.AgentConfig;
 import com.google.inject.Provider;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
+
+/**
+ * BatchTaskSchedulerUploaderDecorator的Guice Provider
+ * 创建继承RetryAwareUploaderDecorator的批量调度装饰者实例
+ * 该实例同时是AgentUploader、RetryAwareUploaderDecorator和BatchTaskSchedulerUploaderDecorator
+ */
 public class BatchTaskSchedulerProvider implements Provider<BatchTaskSchedulerUploaderDecorator> {
 
     private static final Logger logger = LoggerFactory.getLogger(BatchTaskSchedulerProvider.class);
 
-    private final RetryAwareUploaderDecorator retryAwareUploader;
+    private final AgentConfig config;
     private final ConfigFileManager configFileManager;
-    private final FileScanner fileScanner;
-    private final ProgressReporter progressReporter;
     private final FileBatchCompletionTracker fileBatchTracker;
+    private final ProgressReporter progressReporter;
+    private final FileScanner fileScanner;
 
     @Inject
-    public BatchTaskSchedulerProvider(RetryAwareUploaderDecorator retryAwareUploader,
+    public BatchTaskSchedulerProvider(AgentConfig config,
                                       ConfigFileManager configFileManager,
-                                      FileScanner fileScanner,
+                                      FileBatchCompletionTracker fileBatchTracker,
                                       ProgressReporter progressReporter,
-                                      FileBatchCompletionTracker fileBatchTracker) {
-        this.retryAwareUploader = retryAwareUploader;
+                                      FileScanner fileScanner) {
+        this.config = config;
         this.configFileManager = configFileManager;
-        this.fileScanner = fileScanner;
-        this.progressReporter = progressReporter;
         this.fileBatchTracker = fileBatchTracker;
+        this.progressReporter = progressReporter;
+        this.fileScanner = fileScanner;
     }
 
     @Override
     public BatchTaskSchedulerUploaderDecorator get() {
         try {
+            Path uploadFinalFailureQueueDir = Path.of(config.getUploadFinalFailureQueueDir());
+
             BatchTaskSchedulerUploaderDecorator batchTaskUploader =
-                    new BatchTaskSchedulerUploaderDecorator(retryAwareUploader, configFileManager,
-                            retryAwareUploader, fileScanner, progressReporter, fileBatchTracker);
-            logger.info("BatchTaskSchedulerUploaderDecorator initialized successfully");
+                    new BatchTaskSchedulerUploaderDecorator(
+                            config, configFileManager, fileBatchTracker,
+                            progressReporter, fileScanner, uploadFinalFailureQueueDir);
+            // 初始化AgentUploader的工作线程
+            batchTaskUploader.init();
+            logger.info("BatchTaskSchedulerUploaderDecorator initialized (inheritance mode)");
             return batchTaskUploader;
         } catch (Exception e) {
             logger.error("Failed to initialize BatchTaskSchedulerUploaderDecorator: {}", e.getMessage(), e);

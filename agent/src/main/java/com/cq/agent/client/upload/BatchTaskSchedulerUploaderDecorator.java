@@ -20,39 +20,31 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BatchTaskSchedulerUploaderDecorator implements UploadService {
+/**
+ * 批量任务调度上传装饰者（继承RetryAwareUploaderDecorator）
+ * 在重试感知上传能力的基础上，增加批量任务调度功能：
+ * - Quartz定时扫描与调度
+ * - 文件路由策略（广播/轮询/随机/区域）
+ * - 文件批次追踪与传输后操作
+ * 设计原则：
+ * - 继承RetryAwareUploaderDecorator（间接继承AgentUploader）
+ * - 直接调用父类方法，无需委托转换
+ * - 单一职责：只关注批量调度逻辑
+ */
+public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecorator {
 
     private static final Logger log = LoggerFactory.getLogger(BatchTaskSchedulerUploaderDecorator.class);
-
-    @Getter
-    private final UploadService delegate;
-
-    private final AgentConfig agentConfig;
-
-    @Setter
-    @Getter
-    private ProgressReporter progressReporter;
-
-    @Setter
-    @Getter
-    private FileBatchCompletionTracker fileBatchTracker;
-
-    @Getter
-    private ConfigFileManager configFileManager;
 
     @Setter
     @Getter
     private FileScanner fileScanner;
-
-    @Setter
-    @Getter
-    private RetryAwareUploaderDecorator retryAwareUploader;
 
     private static final String JOB_GROUP = "batch-transfer";
     private static final String TRIGGER_GROUP = "batch-transfer-triggers";
@@ -60,52 +52,64 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     private final Scheduler quartzScheduler;
     private final java.util.Map<Long, Runnable> taskRunnables = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public BatchTaskSchedulerUploaderDecorator(UploadService delegate, ConfigFileManager configFileManager)
+    /**
+     * 构造函数（简单模式）
+     */
+    public BatchTaskSchedulerUploaderDecorator(AgentConfig agentConfig, ConfigFileManager configFileManager)
             throws SchedulerException {
-        this.delegate = delegate;
-        this.agentConfig = delegate != null ? delegate.getAgentConfig() : null;
-        this.configFileManager = configFileManager;
+        super(agentConfig);
         this.quartzScheduler = new StdSchedulerFactory().getScheduler();
         this.quartzScheduler.start();
     }
 
-    public BatchTaskSchedulerUploaderDecorator(UploadService delegate, ConfigFileManager configFileManager,
-            RetryAwareUploaderDecorator retryAwareUploader, FileScanner fileScanner,
-            ProgressReporter progressReporter, FileBatchCompletionTracker fileBatchTracker) throws SchedulerException {
-        this(delegate, configFileManager);
-        this.retryAwareUploader = retryAwareUploader;
+    /**
+     * 构造函数（完整依赖注入模式）
+     */
+    public BatchTaskSchedulerUploaderDecorator(AgentConfig agentConfig, ConfigFileManager configFileManager,
+            FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
+            FileScanner fileScanner, Path uploadFinalFailureQueueDir) throws SchedulerException {
+        super(agentConfig, fileBatchTracker, progressReporter, configFileManager, uploadFinalFailureQueueDir);
         this.fileScanner = fileScanner;
-        this.progressReporter = progressReporter;
-        this.fileBatchTracker = fileBatchTracker;
-    }
-
-    // ==================== UploadService 接口实现 ====================
-
-    @Override
-    public boolean uploadFile(String localFilePath, String remoteTargetInfo, UploadListener listener) {
-        return delegate.uploadFile(localFilePath, remoteTargetInfo, listener);
+        this.quartzScheduler = new StdSchedulerFactory().getScheduler();
+        this.quartzScheduler.start();
     }
 
     @Override
-    public AgentConfig getAgentConfig() {
-        return delegate.getAgentConfig();
+    public void shutdown() {
+        // 先停止Quartz调度任务
+        try {
+            for (JobKey jobKey : quartzScheduler.getJobKeys(GroupMatcher.jobGroupEquals(JOB_GROUP))) {
+                quartzScheduler.deleteJob(jobKey);
+            }
+            taskRunnables.clear();
+            log.info("⏹️  所有Quartz任务已停止");
+        } catch (SchedulerException e) {
+            log.error("❌ 停止所有任务失败: {}", e.getMessage());
+        }
+        try {
+            if (quartzScheduler != null && !quartzScheduler.isShutdown()) {
+                quartzScheduler.shutdown(true);
+            }
+        } catch (SchedulerException e) {
+            log.error("❌ 关闭Quartz调度器异常: {}", e.getMessage());
+        }
+        // 再调用父类shutdown（关闭重试调度器 + AgentUploader工作线程）
+        super.shutdown();
+        log.info("BatchTaskSchedulerUploaderDecorator已关闭");
     }
 
-    @Override
-    public boolean resubmitTask(UploadTask task, UploadListener listener) {
-        return this.delegate.resubmitTask(task, listener);
-    }
-
+    // ==================== UploadService接口方法已由父类AgentUploader实现，无需重写
     // ====================
-    // 任务生命周期管理（原BatchTaskSchedulerManager职能）====================
+
+    // ==================== 任务生命周期管理 ====================
 
     public void startAllRunningTasks() {
         log.info("启动所有RUNNING状态的任务...");
-        if (configFileManager == null || quartzScheduler == null) {
+        if (getConfigFileManager() == null || quartzScheduler == null) {
             log.warn("configFileManager或quartzScheduler未初始化，跳过启动");
             return;
         }
-        List<AgentTaskConfig> allConfigs = configFileManager.loadAllTaskConfigs();
+        List<AgentTaskConfig> allConfigs = getConfigFileManager().loadAllTaskConfigs();
         int startedCount = 0;
 
         for (AgentTaskConfig config : allConfigs) {
@@ -209,7 +213,8 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                 TriggerKey triggerKey = new TriggerKey("batch-trigger-" + taskId, TRIGGER_GROUP);
 
                 if (quartzScheduler.checkExists(triggerKey)) {
-                    String cronExpression = config.getScanConfig() != null ? config.getScanConfig().getCronExpression() : null;
+                    String cronExpression = config.getScanConfig() != null ? config.getScanConfig().getCronExpression()
+                            : null;
                     CronScheduleBuilder scheduleBuilder = CronScheduleBuilder
                             .cronSchedule(cronExpression)
                             .withMisfireHandlingInstructionDoNothing();
@@ -252,23 +257,10 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
             log.error("❌ 删除任务失败: taskId={}, error={}", taskId, e.getMessage());
             throw new RuntimeException("删除任务失败: " + e.getMessage(), e);
         }
-        if (configFileManager != null) {
-            configFileManager.deleteTaskConfig(taskId);
+        if (getConfigFileManager() != null) {
+            getConfigFileManager().deleteTaskConfig(taskId);
         }
         log.info("任务已删除: taskId={}", taskId);
-    }
-
-    public void shutdown() {
-        try {
-            for (JobKey jobKey : quartzScheduler.getJobKeys(GroupMatcher.jobGroupEquals(JOB_GROUP))) {
-                quartzScheduler.deleteJob(jobKey);
-            }
-            taskRunnables.clear();
-            log.info("⏹️  所有Quartz任务已停止");
-        } catch (SchedulerException e) {
-            log.error("❌ 停止所有任务失败: {}", e.getMessage());
-        }
-        log.info("BatchTaskSchedulerUploaderDecorator已关闭");
     }
 
     public boolean isTaskRunning(Long taskId) {
@@ -285,10 +277,9 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     }
 
     public void completeTask(Long taskId) {
-        if (retryAwareUploader != null) {
-            retryAwareUploader.recordSuccess(taskId);
-            log.info("任务已完成: taskId={}", taskId);
-        }
+        // 直接调用父类RetryAwareUploaderDecorator的recordSuccess方法
+        recordSuccess(taskId);
+        log.info("任务已完成: taskId={}", taskId);
     }
 
     // ==================== 核心执行流程 ====================
@@ -316,10 +307,10 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     }
 
     private AgentTaskConfig loadLatestConfig(Long initialTaskId, AgentTaskConfig fallback) {
-        if (configFileManager == null) {
+        if (getConfigFileManager() == null) {
             return fallback;
         }
-        AgentTaskConfig loaded = configFileManager.loadTaskConfig(initialTaskId);
+        AgentTaskConfig loaded = getConfigFileManager().loadTaskConfig(initialTaskId);
         return loaded != null ? loaded : fallback;
     }
 
@@ -404,10 +395,12 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                     if (TransferFileStateManager.isTransferring(Paths.get(localFilePath))) {
                         log.info("文件已在传输中（隐藏文件存在），跳过: fileName={}, target={}",
                                 scannedFile.getFileName(), targetAgent.getAgentId());
+                        result.incrementSkipped();
                         continue;
                     }
 
                     if (shouldSkipTargetCompleted(localFilePath, taskId, targetAgent, scannedFile)) {
+                        result.incrementSkipped();
                         continue;
                     }
 
@@ -418,16 +411,20 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                             taskId, scannedFile, config, targetAgent,
                             scanBatchId, fileBatchId);
 
-                    boolean submitted = delegate.uploadFile(hiddenPath.toString(), remoteTargetInfo, listener);
-                    result.incrementSubmitted();
+                    // 直接调用父类AgentUploader的uploadFile方法
+                    boolean submitted = uploadFile(hiddenPath.toString(), remoteTargetInfo, listener);
 
-                    if (!submitted) {
+                    if (submitted) {
+                        result.incrementSubmitted();
+                    } else {
                         handleUploadFailure(fileBatchId, targetAgent, scannedFile, failedFiles);
                     }
                 } catch (Exception e) {
                     log.error("文件传输异常: fileName={}, target={}, error={}",
                             scannedFile.getFileName(), targetAgent.getAgentId(), e.getMessage());
                     failedFiles.add(scannedFile.getFileName() + "->" + targetAgent.getAgentId());
+                    // 异常时尝试恢复隐藏文件，避免文件停留在.transferring状态
+                    unhideFileOnFailure(scannedFile);
                 }
             }
         }
@@ -444,11 +441,11 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
 
     private void initFileBatchIfNeeded(Long fileBatchId, Long scanBatchId, ScannedFile scannedFile,
             AgentTaskConfig config, List<TargetAgentInfo> routedTargets) {
-        if (routedTargets.size() <= 1 || fileBatchTracker == null) {
+        if (routedTargets.size() <= 1 || getFileBatchTracker() == null) {
             return;
         }
         try {
-            fileBatchTracker.initFileBatchIfAbsent(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
+            getFileBatchTracker().initFileBatchIfAbsent(fileBatchId, scanBatchId, scannedFile, config, routedTargets);
         } catch (Exception e) {
             log.warn("初始化文件批次追踪失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
         }
@@ -457,10 +454,6 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     /**
      * 将文件标记为传输中（重命名为隐藏文件）。
      * 如果文件已经被隐藏（一对多场景中第一个目标已隐藏），直接返回已有的隐藏路径。
-     *
-     * @param scannedFile 扫描到的文件
-     * @return 隐藏后的文件路径
-     * @throws IOException 如果文件不存在或隐藏失败
      */
     private Path hideFileBeforeUpload(ScannedFile scannedFile) throws IOException {
         Path originalPath = Paths.get(scannedFile.getAbsolutePath());
@@ -475,7 +468,6 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
         if (TransferFileStateManager.isTransferring(originalPath)) {
             Path hiddenPath = TransferFileStateManager.getTransferringPath(originalPath);
             log.debug("文件已在传输中，使用已有隐藏路径: {}", hiddenPath);
-            // 更新scannedFile的路径为隐藏路径
             scannedFile.setOriginalAbsolutePath(scannedFile.getAbsolutePath());
             scannedFile.setAbsolutePath(hiddenPath.toString());
             return hiddenPath;
@@ -483,7 +475,6 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
 
         // 首次隐藏：将原始文件重命名为隐藏文件
         Path hiddenPath = TransferFileStateManager.hideFile(originalPath);
-        // 保存原始路径，更新为隐藏路径
         scannedFile.setOriginalAbsolutePath(originalPath.toString());
         scannedFile.setAbsolutePath(hiddenPath.toString());
         return hiddenPath;
@@ -491,14 +482,14 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
 
     private boolean shouldSkipTargetCompleted(String localFilePath, Long taskId,
             TargetAgentInfo targetAgent, ScannedFile scannedFile) {
-        if (fileBatchTracker == null) {
+        if (getFileBatchTracker() == null) {
             return false;
         }
         String targetAgentKey = extractTargetAgentKeyFromInfo(targetAgent);
         if (targetAgentKey == null) {
             return false;
         }
-        if (fileBatchTracker.isTargetCompletedInBatch(localFilePath, taskId, targetAgentKey)) {
+        if (getFileBatchTracker().isTargetCompletedInBatch(localFilePath, taskId, targetAgentKey)) {
             log.info("文件目标已完成，跳过: fileName={}, target={}",
                     scannedFile.getFileName(), targetAgent.getAgentId());
             return true;
@@ -511,24 +502,58 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
         log.warn("文件上传提交失败: fileName={}, target={}",
                 scannedFile.getFileName(), targetAgent.getAgentId());
         failedFiles.add(scannedFile.getFileName() + "->" + targetAgent.getAgentId());
-        if (fileBatchTracker != null && fileBatchId != null) {
+        if (getFileBatchTracker() != null && fileBatchId != null) {
             try {
-                fileBatchTracker.markFailed(fileBatchId, targetAgent.getAgentId(), true);
+                // 提交失败是临时性失败（队列满等），不是最终失败，isFinal=false
+                getFileBatchTracker().markFailed(fileBatchId, targetAgent.getAgentId(), false);
             } catch (Exception e) {
                 log.warn("标记批次失败状态异常: fileBatchId={}, error={}", fileBatchId, e.getMessage());
             }
         }
+        // 提交失败时尝试恢复隐藏文件，避免文件停留在.transferring状态
+        unhideFileOnFailure(scannedFile);
+    }
+
+    /**
+     * 上传失败时尝试恢复隐藏文件
+     * 仅当当前没有其他目标正在传输该文件时才恢复
+     */
+    private void unhideFileOnFailure(ScannedFile scannedFile) {
+        try {
+            String filePath = scannedFile.getAbsolutePath();
+            if (filePath != null && TransferFileStateManager.isTransferringFile(Path.of(filePath))) {
+                // 检查是否还有其他目标在传输该文件（通过inflightTasks判断）
+                boolean hasOtherTransfers = isInflightUploadForFile(filePath);
+                if (!hasOtherTransfers) {
+                    Path restored = TransferFileStateManager.unhideFileSafely(Path.of(filePath));
+                    if (restored != null) {
+                        scannedFile.setAbsolutePath(restored.toString());
+                        log.info("上传失败后恢复隐藏文件: {} -> {}", filePath, restored.getFileName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("恢复隐藏文件失败: fileName={}, error={}", scannedFile.getFileName(), e.getMessage());
+        }
+    }
+
+    /**
+     * 检查指定文件路径是否还有正在进行的上传任务
+     * 广播模式下（1文件→多目标），如果其他目标仍在传输，不应恢复隐藏文件
+     */
+    private boolean isInflightUploadForFile(String filePath) {
+        return hasInflightUploadForFile(filePath);
     }
 
     private UploadListener createBatchUploadListener(Long taskId, ScannedFile scannedFile,
             AgentTaskConfig config, TargetAgentInfo targetAgent,
             Long scanBatchId, Long fileBatchId) {
         return new BatchUploadListener(
-                taskId, scannedFile, config, targetAgent, progressReporter,
-                agentConfig != null ? agentConfig.getUploadSuccessQueueDir() : null,
-                agentConfig != null ? agentConfig.getUploadSendingQueueDir() : null,
+                taskId, scannedFile, config, targetAgent, getGlobalProgressReporter(),
+                getAgentConfig() != null ? getAgentConfig().getUploadSuccessQueueDir() : null,
+                getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null,
                 scanBatchId, fileBatchId,
-                fileBatchTracker);
+                getFileBatchTracker());
     }
 
     @SuppressWarnings("all")
@@ -567,39 +592,17 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
                 targetDir = "/";
             }
 
-            TransferConfig transferConfig = config.getTransferConfig();
-            boolean preserveDir = transferConfig != null && transferConfig.isPreserveDirStructure();
+            // 使用共享工具计算目标路径（消除与BatchUploadListener的重复逻辑）
+            String destPath = com.cq.agent.batch.scheduler.TargetPathComputer.compute(
+                    config.getSourceDir(),
+                    scannedFile.getOriginalAbsolutePath(),
+                    scannedFile.getFileName(),
+                    targetDir,
+                    config.getTransferConfig());
 
-            // 使用原始路径计算远程目标路径（不使用隐藏文件路径）
-            String originalPath = scannedFile.getOriginalAbsolutePath();
-
-            String relativePath;
-            if (preserveDir) {
-                String sourceDir = config.getSourceDir();
-                if (sourceDir != null && !sourceDir.trim().isEmpty()) {
-                    String absPath = normalizePath(originalPath);
-                    String normSourceDir = normalizePath(sourceDir);
-
-                    if (absPath.startsWith(normSourceDir)) {
-                        relativePath = absPath.substring(normSourceDir.length());
-                        if (relativePath.startsWith("/") || relativePath.startsWith("\\")) {
-                            relativePath = relativePath.substring(1);
-                        }
-                        relativePath = relativePath.replace("\\", "/");
-                    } else {
-                        log.warn("preserveDirStructure=true但sourceDir不匹配: sourceDir={}, filePath={}",
-                                sourceDir, originalPath);
-                        relativePath = scannedFile.getFileName();
-                    }
-                } else {
-                    relativePath = scannedFile.getFileName();
-                }
-            } else {
-                relativePath = scannedFile.getFileName();
+            if (destPath == null) {
+                destPath = targetDir;
             }
-
-            String separator = targetDir.endsWith("/") || targetDir.endsWith("\\") ? "" : "/";
-            String destPath = targetDir + separator + relativePath;
 
             return ipPort + "@" + username + ":" + destPath;
 
@@ -607,12 +610,6 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
             log.error("构建remoteTargetInfo失败: error={}", e.getMessage());
             throw new RuntimeException("构建目标路径失败: " + e.getMessage(), e);
         }
-    }
-
-    private String normalizePath(String path) {
-        if (path == null)
-            return null;
-        return path.replace("/", "\\").trim();
     }
 
     private Long generateScanBatchId(Long taskId) {
@@ -636,12 +633,17 @@ public class BatchTaskSchedulerUploaderDecorator implements UploadService {
     @Data
     public static class BatchUploadResult {
         private int submittedCount = 0;
+        private int skippedCount = 0;
         private int totalSubtasks = 0;
         private int scannedCount = 0;
         private List<String> failedFiles = List.of();
 
         public void incrementSubmitted() {
             submittedCount++;
+        }
+
+        public void incrementSkipped() {
+            skippedCount++;
         }
 
         public boolean hasFailures() {

@@ -22,6 +22,11 @@ import com.cq.agent.service.FileService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
 
+/**
+ * Agent Guice模块
+ * 继承链: BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecorator extends AgentUploader
+ * 单实例绑定: AgentUploader/RetryAwareUploaderDecorator/UploadService 均指向 BatchTaskSchedulerUploaderDecorator 实例
+ */
 public class AgentModule extends AbstractModule {
 
     @Override
@@ -35,11 +40,15 @@ public class AgentModule extends AbstractModule {
         bind(ConfigFileManager.class).toProvider(ConfigFileManagerProvider.class).in(Singleton.class);
         bind(FileBatchCompletionTracker.class).toProvider(FileBatchCompletionTrackerProvider.class).in(Singleton.class);
         bind(ProgressReporter.class).toProvider(ProgressReporterProvider.class).in(Singleton.class);
-        bind(AgentUploader.class).toProvider(AgentUploaderProvider.class).in(Singleton.class);
         bind(AgentDownloader.class).toProvider(AgentDownloaderProvider.class).in(Singleton.class);
-        bind(RetryAwareUploaderDecorator.class).toProvider(RetryAwareUploaderProvider.class).in(Singleton.class);
-        bind(UploadService.class).to(RetryAwareUploaderDecorator.class);
+
+        // 核心上传组件：单实例绑定
+        // BatchTaskSchedulerUploaderDecorator IS-A RetryAwareUploaderDecorator IS-A AgentUploader
         bind(BatchTaskSchedulerUploaderDecorator.class).toProvider(BatchTaskSchedulerProvider.class).in(Singleton.class);
+        bind(RetryAwareUploaderDecorator.class).to(BatchTaskSchedulerUploaderDecorator.class);
+        bind(AgentUploader.class).to(BatchTaskSchedulerUploaderDecorator.class);
+        bind(UploadService.class).to(BatchTaskSchedulerUploaderDecorator.class);
+
         bind(ConfigChangeListener.class).toProvider(ConfigChangeListenerProvider.class).in(Singleton.class);
         bind(FallbackPersistenceService.class).toProvider(FallbackPersistenceServiceProvider.class).in(Singleton.class);
         bind(HttpServer.class).toProvider(HttpServerProvider.class).in(Singleton.class);

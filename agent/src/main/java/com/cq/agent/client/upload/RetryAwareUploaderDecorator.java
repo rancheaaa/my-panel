@@ -9,7 +9,6 @@ import com.cq.panel.common.dto.batch.RetryConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.report.SubTaskEvent;
-import com.cq.agent.client.TransferMetaStore;
 import com.cq.agent.config.AgentConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.google.gson.Gson;
@@ -21,6 +20,7 @@ import org.quartz.*;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,19 +32,19 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
- * 重试感知的上传装饰者（基于接口）
+ * 重试感知的上传装饰者（继承AgentUploader）
  * 将 RetryManager 的功能集成到装饰者中，提供：
  * - 失败队列扫描与自动重试
  * - 指数退避策略
  * - 最大重试次数控制
  * - 任务配置管理
  * 设计原则：
+ * - 继承AgentUploader，直接调用父类方法，无需委托转换
  * - 统一AgentTaskConfig获取的方法，全部从taskConfigMap中获取
- * - 实现 UploadService 接口（与核心类相同的契约）
- * - 通过组合包装原始 UploadService
+ * - listener统一由父类AgentUploader的listenerCache管理，不再内部维护retryListenerCache
  * - 单一职责：只关注重试逻辑
  */
-public class RetryAwareUploaderDecorator implements UploadService {
+public class RetryAwareUploaderDecorator extends AgentUploader {
 
     private static final Logger logger = LoggerFactory.getLogger(RetryAwareUploaderDecorator.class);
 
@@ -57,28 +57,21 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
     private static final int DEFAULT_MAX_SCAN_COUNT = 100;
 
-    /** 委托对象（必须实现 UploadService 接口） */
-    @Getter
-    private final UploadService delegate;
-
     /** 全局ProgressReporter实例 */
     @Getter
     private ProgressReporter globalProgressReporter;
 
     // ===== 配置文件管理器 =====
+    @Getter
     private ConfigFileManager configFileManager;
 
-    // ===== 依赖项 =====
-    private TransferMetaStore<UploadTask> uploadMetaStore;
-    private Path uploadFailQueueDir;
+    // ===== 最终失败队列目录 =====
     private Path uploadFinalFailureQueueDir;
 
     // ===== 状态跟踪 =====
     private final Map<Long, AgentTaskConfig> taskConfigMap = new ConcurrentHashMap<>();
 
-    /** 重试监听器缓存（按transferId复用，避免每次重试都new） */
-    private final ConcurrentHashMap<String, BatchUploadListener> retryListenerCache = new ConcurrentHashMap<>();
-
+    @Getter
     @Setter
     private volatile FileBatchCompletionTracker fileBatchTracker;
 
@@ -87,32 +80,44 @@ public class RetryAwareUploaderDecorator implements UploadService {
     @Setter
     private Function<Long, Long> retryExecutor;
 
-    // ===== Quartz 失败队列扫描调度器（原 FileRetryScheduler 职能）=====
+    // ===== Quartz 失败队列扫描调度器 =====
     private Scheduler retryScheduler;
 
     /**
-     * 构造函数（使用默认重试配置）
-     * 
-     * @param delegate 被装饰的上传服务实例
+     * 构造函数（简单模式，用于测试）
+     *
+     * @param agentConfig Agent配置
      */
-    public RetryAwareUploaderDecorator(UploadService delegate) {
-        this.delegate = delegate;
+    public RetryAwareUploaderDecorator(AgentConfig agentConfig) {
+        super(agentConfig);
     }
 
-    public RetryAwareUploaderDecorator(UploadService delegate,
+    /**
+     * 构造函数（完整依赖注入模式）
+     *
+     * @param agentConfig                Agent配置
+     * @param fileBatchTracker           文件批次完成追踪器
+     * @param progressReporter           进度上报器
+     * @param configFileManager          配置文件管理器
+     * @param uploadFinalFailureQueueDir 最终失败队列目录
+     */
+    public RetryAwareUploaderDecorator(AgentConfig agentConfig,
             FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
-            TransferMetaStore<UploadTask> uploadMetaStore, Path uploadFailQueueDir,
             ConfigFileManager configFileManager, Path uploadFinalFailureQueueDir) {
-        this.delegate = delegate;
+        super(agentConfig);
         this.fileBatchTracker = fileBatchTracker;
         this.globalProgressReporter = progressReporter;
-        this.uploadMetaStore = uploadMetaStore;
-        this.uploadFailQueueDir = uploadFailQueueDir;
         this.configFileManager = configFileManager;
         this.uploadFinalFailureQueueDir = uploadFinalFailureQueueDir;
         initRetryScheduler(5 * 60 * 1000L);
         loadRetryConfigFromPersistence();
-        logger.info("✅ 重试装饰者初始化完成（依赖注入模式）");
+        logger.info("✅ 重试装饰者初始化完成（继承模式）");
+    }
+
+    @Override
+    public void shutdown() {
+        shutdownRetryScheduler();
+        super.shutdown();
     }
 
     private void initRetryScheduler(long scanIntervalMs) {
@@ -150,50 +155,31 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
     }
 
-    // ==================== UploadService 接口实现 ====================
-
-    @Override
-    public boolean uploadFile(String localFilePath, String remoteTargetInfo, UploadListener listener) {
-        return delegate.uploadFile(localFilePath, remoteTargetInfo, listener);
-    }
-
-    @Override
-    public AgentConfig getAgentConfig() {
-        return delegate.getAgentConfig();
-    }
-
-    @Override
-    public boolean resubmitTask(UploadTask task, UploadListener listener) {
-        return this.delegate.resubmitTask(task, listener);
-    }
+    // ==================== UploadService接口方法已由父类AgentUploader实现，无需重写
+    // ====================
 
     public AgentTaskConfig loadRetryConfigFromPersistenceByTaskId(long id) {
         if (configFileManager == null) {
-            logger.error("⏭️ ConfigFileManager未初始化，跳过加载持久化配置");
+            logger.debug("ConfigFileManager未初始化，跳过加载持久化配置");
             return null;
         }
 
         try {
-            List<AgentTaskConfig> allConfigs = configFileManager.loadAllTaskConfigs();
-            if (allConfigs.isEmpty()) {
-                logger.info("📭 本地无持久化配置");
-                return null;
+            // 直接按taskId加载单个配置，避免加载全部配置文件
+            AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(id);
+            if (taskConfig == null) {
+                logger.debug("本地无taskId={}的持久化配置", id);
             }
-
-            for (AgentTaskConfig taskConfig : allConfigs) {
-                if (taskConfig.getTaskId() == id) {
-                    return taskConfig;
-                }
-            }
+            return taskConfig;
         } catch (Exception e) {
-            logger.error("❌ 加载持久化重试配置失败: {}", e.getMessage(), e);
+            logger.error("❌ 加载持久化重试配置失败: taskId={}, error={}", id, e.getMessage(), e);
+            return null;
         }
-        return null;
     }
 
     /**
      * 从本地持久化的JSON配置中加载重试参数
-     * 优先级：任务配置 > 全局默认值
+     * 注册所有启用重试的任务配置
      */
     public void loadRetryConfigFromPersistence() {
         if (configFileManager == null) {
@@ -208,17 +194,20 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 return;
             }
 
+            int registeredCount = 0;
             for (AgentTaskConfig taskConfig : allConfigs) {
+                registerTaskConfig(taskConfig.getTaskId(), taskConfig);
                 RetryConfig retryConfig = taskConfig.getRetryConfig();
                 if (retryConfig != null && retryConfig.isEnabled()) {
-                    registerTaskConfig(taskConfig.getTaskId(), taskConfig);
-                    logger.info("✅ 从持久化配置加载重试参数: taskId={}, maxRetries={}, intervalMin={}min",
-                            taskConfig.getTaskId(), retryConfig.getMaxRetryCount(), retryConfig.getIntervalMin());
-                    return;
+                    registeredCount++;
                 }
             }
 
-            logger.info("⚠️ 所有持久化配置均未启用重试，使用默认值");
+            if (registeredCount > 0) {
+                logger.info("✅ 从持久化配置加载完成: 总配置={}, 启用重试={}", allConfigs.size(), registeredCount);
+            } else {
+                logger.info("⚠️ 所有持久化配置均未启用重试，使用默认值");
+            }
 
         } catch (Exception e) {
             logger.error("❌ 加载持久化重试配置失败: {}", e.getMessage(), e);
@@ -240,13 +229,14 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     try {
                         return Files.getLastModifiedTime(path).toMillis();
                     } catch (IOException e) {
-                        return Long.MAX_VALUE;
+                        // IO异常的文件排到最后（使用当前时间+1小时，避免Long.MAX_VALUE溢出风险）
+                        return System.currentTimeMillis() + 3_600_000L;
                     }
                 }));
 
         try (Stream<Path> paths = Files.list(failedQueueDir)) {
             paths.filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(".json"))
+                    .filter(path -> path.getFileName().toString().endsWith(".json"))
                     .forEach(path -> {
                         oldestFilesHeap.offer(path);
                         if (oldestFilesHeap.size() > maxScanCount) {
@@ -268,7 +258,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
             try {
                 return Files.getLastModifiedTime(path).toMillis();
             } catch (IOException e) {
-                return Long.MAX_VALUE;
+                return System.currentTimeMillis() + 3_600_000L;
             }
         }));
 
@@ -281,7 +271,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     logger.warn("跳过无效的失败任务文件: path={}", path);
                     continue;
                 }
-                refreshFileTimestamp(path);
+                // 不在这里刷新文件时间戳：刷新会导致所有文件时间戳变为当前时间，
+                // 破坏按修改时间排序的语义，下次扫描无法正确按"最老优先"排序
                 failedTasks.add(task);
 
             } catch (IOException | JsonSyntaxException e) {
@@ -294,7 +285,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
         return failedTasks;
     }
 
-    private void reportNextRetryTime(UploadTask task, AgentTaskConfig config, int currentRetries, long nextRetryTimeMs) {
+    private void reportNextRetryTime(UploadTask task, AgentTaskConfig config, int currentRetries,
+            long nextRetryTimeMs) {
         if (globalProgressReporter == null || task.getSubtaskId() == null) {
             return;
         }
@@ -356,24 +348,18 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
     }
 
-    private void refreshFileTimestamp(Path filePath) {
-        try {
-            Files.setLastModifiedTime(filePath, java.nio.file.attribute.FileTime.from(java.time.Instant.now()));
-        } catch (IOException e) {
-            logger.warn("刷新文件时间戳失败: path={}", filePath, e);
-        }
-    }
-
     private void deleteFailedTaskJsonFile(String transferId) {
-        retryListenerCache.remove(transferId);
-        if (uploadFailQueueDir == null || transferId == null || transferId.isEmpty()) {
+        // 不移除listener：重试提交成功后listener需要保留给新的传输过程使用
+        // listener只在真正传输成功(AgentUploader.processTask成功路径)或最终失败(markAsFinalFailure)时移除
+        if (failedQueueDir == null || transferId == null || transferId.isEmpty()) {
             return;
         }
 
-        try (Stream<Path> paths = Files.list(uploadFailQueueDir)) {
+        // 文件名格式: {STATUS}-upload-{transferId}.json，使用正则精确匹配避免contains误删
+        String regex = ".+-upload-" + java.util.regex.Pattern.quote(transferId) + "\\.json$";
+        try (Stream<Path> paths = Files.list(failedQueueDir)) {
             paths.filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(".json"))
-                    .filter(path -> path.getFileName().toString().contains(transferId))
+                    .filter(path -> path.getFileName().toString().matches(regex))
                     .forEach(path -> {
                         try {
                             Files.deleteIfExists(path);
@@ -383,7 +369,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
                         }
                     });
         } catch (IOException e) {
-            logger.error("❌ 扫描失败队列目录删除文件失败: dir={}", uploadFailQueueDir, e);
+            logger.error("❌ 扫描失败队列目录删除文件失败: dir={}", failedQueueDir, e);
         }
     }
 
@@ -391,13 +377,13 @@ public class RetryAwareUploaderDecorator implements UploadService {
      * 扫描上传失败队列并重试（Quartz Job 调用）
      */
     public void scanAndRetryFailedUploads() {
-        if (uploadMetaStore == null || uploadFailQueueDir == null) {
+        if (metaStore == null || failedQueueDir == null) {
             logger.debug("⏭️ 上传失败队列未初始化，跳过扫描");
             return;
         }
 
         try {
-            List<UploadTask> failedTasks = recoverFailedTasks(uploadFailQueueDir);
+            List<UploadTask> failedTasks = recoverFailedTasks(failedQueueDir);
 
             if (failedTasks.isEmpty()) {
                 logger.debug("📭 上传失败队列为空");
@@ -412,8 +398,10 @@ public class RetryAwareUploaderDecorator implements UploadService {
             for (UploadTask task : failedTasks) {
                 try {
                     if (shouldRetryFailedFile(task)) {
-                        retrySingleUploadFile(task);
-                        retriedCount++;
+                        boolean retried = retrySingleUploadFile(task);
+                        if (retried) {
+                            retriedCount++;
+                        }
                     } else {
                         markAsFinalFailure(task);
                         finalFailureCount++;
@@ -446,7 +434,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
         }
 
         if (config == null || config.getRetryConfig() == null || !config.getRetryConfig().isEnabled()) {
-            logger.debug("任务未启用重试或配置不存在: taskId={}, transferId={}",
+            logger.info("任务未启用重试或配置不存在，标记为最终失败: taskId={}, transferId={}",
                     task.getTaskId(), task.getTransferId());
             return false;
         }
@@ -466,14 +454,15 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     return false;
                 }
             } catch (Exception e) {
+                // 解析创建时间失败不应阻止重试，跳过maxDays检查继续后续判断
                 logger.warn("⚠️ 解析任务创建时间失败，跳过maxDays检查: transferId={}", task.getTransferId());
-                return false;
             }
         }
-        // 检查是否超过最大重试次数
+        // 检查是否超过最大重试次数（retryCount表示已重试次数，>=maxRetryCount时不再重试）
         final int retryCount = task.getRetryCount();
-        if (retryCount > config.getRetryConfig().getMaxRetryCount()) {
-            logger.info("重试次数已达最大: transferId={}, retryCount={}", task.getTransferId(), retryCount);
+        if (retryCount >= config.getRetryConfig().getMaxRetryCount()) {
+            logger.info("重试次数已达最大: transferId={}, retryCount={}, maxRetryCount={}",
+                    task.getTransferId(), retryCount, config.getRetryConfig().getMaxRetryCount());
             return false;
         }
         return true;
@@ -481,10 +470,16 @@ public class RetryAwareUploaderDecorator implements UploadService {
 
     /**
      * 重试单个失败的上传文件
+     * 
+     * @return true=已提交重试, false=未到重试时间或提交失败
      */
-    private void retrySingleUploadFile(UploadTask task) {
+    private boolean retrySingleUploadFile(UploadTask task) {
         try {
             AgentTaskConfig config = findTaskConfigForUpload(task.getTaskId());
+            if (config == null || config.getRetryConfig() == null) {
+                logger.warn("任务配置或重试配置为空，跳过重试: transferId={}", task.getTransferId());
+                return false;
+            }
             final long currentTimeMs = System.currentTimeMillis();
             long nextRetryTimeMs = calculateNextRetryTimeMs(task);
             String backoffType = config.getRetryConfig().getBackoffType();
@@ -492,66 +487,64 @@ public class RetryAwareUploaderDecorator implements UploadService {
             int currentRetries = task.getRetryCount();
             final Integer intervalMin = config.getRetryConfig().getIntervalMin();
             final Integer maxDays = config.getRetryConfig().getMaxDays();
-            if(!isReached) {
+            if (!isReached) {
                 reportNextRetryTime(task, config, currentRetries, nextRetryTimeMs);
                 logger.debug("该任务未到达重试时间: transferId={}, currentRetries={}, backoffType={}, " +
-                                "intervalMin={}min, maxDays={}d, nextRetryTime={}, currentTime={}",
+                        "intervalMin={}min, maxDays={}d, nextRetryTime={}, currentTime={}",
                         task.getTransferId(), currentRetries, backoffType,
                         intervalMin, maxDays, LocalDateTime.ofInstant(
                                 java.time.Instant.ofEpochMilli(nextRetryTimeMs),
                                 java.time.ZoneId.systemDefault()).format(FORMATTER),
                         LocalDateTime.now().format(FORMATTER));
-                return;
+                return false;
             }
             String transferId = task.getTransferId();
 
-            task.incrementRetryCount();
-            int newRetryCount = task.getRetryCount();
+            // 先创建listener和提交任务，成功后再增加retryCount
+            // 避免提交失败时retryCount已被增加并持久化，导致下次扫描时提前达到最大重试次数
+            task.setStatus(UploadTaskStatus.PREPARED);
+            task.setExceptionDesc(null);
+            task.updateTimestamp();
+
+            UploadListener retryListener = createOrGetRetryListener(task);
 
             logger.info("🔄 准备重试: transferId={}, file={}, retryCount={}/{}, status={}",
                     transferId, task.getLocalFilePath(),
-                    newRetryCount, getMaxRetriesForTask(task),
+                    currentRetries + 1, getMaxRetriesForTask(task),
                     task.getStatus());
 
-            task.setStatus(UploadTaskStatus.PREPARED);
-            task.setExceptionDesc(null);
-
-            // 更新时间戳
-            task.updateTimestamp();
-
-            if (uploadMetaStore != null) {
-                uploadMetaStore.saveTask(task);
-
-                logger.info("💾 已更新任务状态: transferId={}, retryCount={}, 状态已重置为PREPARED",
-                        transferId, newRetryCount);
-            }
-
-            UploadListener retryListener = createRetryListener(task);
-            logger.info("🔄 下一次重试时间: transferId={}, nextRetryTime={}",
-                    transferId, LocalDateTime.ofInstant(
-                            java.time.Instant.ofEpochMilli(nextRetryTimeMs),
-                            java.time.ZoneId.systemDefault()).format(FORMATTER));
-            logger.info("🚀 重新提交上传任务: transferId={}, file={}, retryCount={}",
-                    transferId, task.getLocalFilePath(), newRetryCount);
-
+            // 直接调用父类AgentUploader的resubmitTask方法
             boolean submitted = resubmitTask(task, retryListener);
 
             if (submitted) {
+                // 提交成功后才增加retryCount并持久化
+                task.incrementRetryCount();
+                int newRetryCount = task.getRetryCount();
+                if (metaStore != null) {
+                    metaStore.saveTask(task);
+                    logger.info("已更新任务状态: transferId={}, retryCount={}, 状态已重置为PREPARED",
+                            transferId, newRetryCount);
+                }
                 deleteFailedTaskJsonFile(transferId);
                 logger.info("✅ 重试任务提交成功: transferId={}, retryCount={}", transferId, newRetryCount);
+                return true;
             } else {
-                logger.warn("⚠️ 重试任务提交失败: transferId={}, retryCount={}", transferId, newRetryCount);
+                // 提交失败，不增加retryCount，任务保持原状态等待下次扫描
+                logger.warn("⚠️ 重试任务提交失败: transferId={}, retryCount保持不变={}", transferId, currentRetries);
+                return false;
             }
 
         } catch (Exception e) {
             logger.error("❌ 重试失败文件异常: transferId={}, error={}",
                     task.getTransferId(), e.getMessage());
+            return false;
         }
     }
 
-    private UploadListener createRetryListener(UploadTask task) {
+    private UploadListener createOrGetRetryListener(UploadTask task) {
         String transferId = task.getTransferId();
-        BatchUploadListener cached = retryListenerCache.get(transferId);
+        // 从父类listenerCache中查找已缓存的listener
+        UploadListener cached = getListener(transferId);
         if (cached != null) {
             logger.debug("复用缓存的重试监听器: transferId={}", transferId);
             return cached;
@@ -575,6 +568,10 @@ public class RetryAwareUploaderDecorator implements UploadService {
             if (TransferFileStateManager.isTransferringFile(filePathObj)) {
                 Path originalPath = TransferFileStateManager.getOriginalPath(filePathObj);
                 restoredFile.setOriginalAbsolutePath(originalPath.toString());
+            } else {
+                // 文件不是隐藏状态时，originalAbsolutePath使用absolutePath作为fallback
+                // 避免computeTargetPath在preserveDirStructure=true时因originalAbsolutePath为null而NPE
+                restoredFile.setOriginalAbsolutePath(filePath);
             }
 
             AgentTaskConfig agentTaskConfig = findTaskConfigForUpload(taskId);
@@ -594,7 +591,8 @@ public class RetryAwareUploaderDecorator implements UploadService {
                     scanBatchId, fileBatchId,
                     fileBatchTracker);
 
-            BatchUploadListener prev = retryListenerCache.putIfAbsent(transferId, retryListener);
+            // 使用父类的putListenerIfAbsent原子操作，避免并发重复创建
+            UploadListener prev = putListenerIfAbsent(transferId, retryListener);
             if (prev != null) {
                 return prev;
             }
@@ -636,14 +634,16 @@ public class RetryAwareUploaderDecorator implements UploadService {
     }
 
     /**
-     * 标记上传任务为最终失败（达到最大重试次数）
+     * 标记上传任务为最终失败（不可再重试）
+     * 原因可能是：达到最大重试次数、超过最大重试天数、重试未启用等
      */
     public void markAsFinalFailure(UploadTask task) {
         try {
             String transferId = task.getTransferId();
-            retryListenerCache.remove(transferId);
+            // 从父类listenerCache中移除listener
+            removeListener(transferId);
 
-            logger.error("❌ 达到最大重试次数，标记为最终失败: transferId={}, file={}, retryCount={}/{}",
+            logger.error("❌ 标记为最终失败(不可再重试): transferId={}, file={}, retryCount={}/{}",
                     transferId, task.getLocalFilePath(),
                     task.getRetryCount(), getMaxRetriesForTask(task));
 
@@ -651,10 +651,10 @@ public class RetryAwareUploaderDecorator implements UploadService {
             task.updateTimestamp();
 
             String originalDesc = task.getExceptionDesc() != null ? task.getExceptionDesc() : "";
-            task.setExceptionDesc(originalDesc + " | FINAL_FAILURE: 达到最大重试次数");
+            task.setExceptionDesc(originalDesc + " | FINAL_FAILURE: 不可重试");
 
-            if (uploadMetaStore != null) {
-                uploadMetaStore.saveTask(task);
+            if (metaStore != null) {
+                metaStore.saveTask(task);
             }
 
             renameSourceFileToFailed(task);
@@ -677,18 +677,37 @@ public class RetryAwareUploaderDecorator implements UploadService {
             return;
         }
         try {
-            java.io.File sourceFile = new java.io.File(localFilePath);
+            Path sourcePath = Path.of(localFilePath);
+
+            // 如果文件处于隐藏状态(.transferring)，先恢复为原始文件名
+            if (TransferFileStateManager.isTransferringFile(sourcePath)) {
+                // 广播模式下，检查是否还有其他目标正在传输或重试该文件
+                // 如果有，不能恢复隐藏文件，否则其他目标的重试会因为文件不存在而失败
+                boolean hasOtherTransfers = hasInflightUploadForFile(localFilePath);
+                if (hasOtherTransfers) {
+                    logger.info("其他目标仍在传输该文件，跳过重命名: transferId={}, file={}",
+                            task.getTransferId(), localFilePath);
+                    return;
+                }
+                Path restoredPath = TransferFileStateManager.unhideFileSafely(sourcePath);
+                if (restoredPath != null) {
+                    logger.info("隐藏文件已恢复: {} -> {}", sourcePath.getFileName(), restoredPath.getFileName());
+                    sourcePath = restoredPath;
+                }
+            }
+
+            java.io.File sourceFile = sourcePath.toFile();
             if (!sourceFile.exists()) {
-                logger.debug("源文件不存在，跳过重命名: path={}", localFilePath);
+                logger.debug("源文件不存在，跳过重命名: path={}", sourcePath);
                 return;
             }
-            String failedFilePath = localFilePath + ".failed";
+            String failedFilePath = sourcePath + ".failed";
             java.io.File failedFile = new java.io.File(failedFilePath);
             boolean renamed = sourceFile.renameTo(failedFile);
             if (renamed) {
-                logger.info("📝 源文件已重命名为.failed: {} -> {}", localFilePath, failedFilePath);
+                logger.info("📝 源文件已重命名为.failed: {} -> {}", sourcePath, failedFilePath);
             } else {
-                logger.warn("⚠️ 源文件重命名失败: {} -> {}", localFilePath, failedFilePath);
+                logger.warn("⚠️ 源文件重命名失败: {} -> {}", sourcePath, failedFilePath);
             }
         } catch (Exception e) {
             logger.error("❌ 源文件重命名为.failed异常: path={}, error={}", localFilePath, e.getMessage());
@@ -696,7 +715,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
     }
 
     private void moveToFinalFailureQueue(UploadTask task) {
-        if (uploadFinalFailureQueueDir == null || uploadMetaStore == null) {
+        if (uploadFinalFailureQueueDir == null || metaStore == null) {
             logger.debug("最终失败队列目录或元数据存储未初始化，跳过移动: transferId={}", task.getTransferId());
             return;
         }
@@ -705,7 +724,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
                 Files.createDirectories(uploadFinalFailureQueueDir);
                 logger.info("📁 创建最终失败队列目录: dir={}", uploadFinalFailureQueueDir);
             }
-            uploadMetaStore.moveToFailedQueue(task.getTransferId(), uploadFinalFailureQueueDir);
+            metaStore.moveToFailedQueue(task.getTransferId(), uploadFinalFailureQueueDir);
             logger.info("📦 控制文件已移至最终失败队列: transferId={}, dir={}",
                     task.getTransferId(), uploadFinalFailureQueueDir);
         } catch (Exception e) {
@@ -724,7 +743,7 @@ public class RetryAwareUploaderDecorator implements UploadService {
             event.setTaskId(task.getTaskId());
             event.setStatus("FAILED");
             event.setErrorCode("FINAL_FAILURE");
-            event.setErrorMessage("达到最大重试次数: retryCount=" + task.getRetryCount());
+            event.setErrorMessage("不可重试: retryCount=" + task.getRetryCount());
             AgentTaskConfig config = findTaskConfigForUpload(task.getTaskId());
             if (config != null) {
                 event.setSourceAgentId(config.getSourceAgentId());

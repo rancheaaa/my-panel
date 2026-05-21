@@ -99,7 +99,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             if (resp.getData() == null) {
                 ApiResponse<ChunkInitResponse> chunkInitResponse = initUpload(task);
                 if (!chunkInitResponse.isSuccess() || chunkInitResponse.getData() == null) {
-                    String errorMsg = chunkInitResponse.getMsg() != null ? chunkInitResponse.getMsg() : "initUpload returned null data";
+                    String errorMsg = chunkInitResponse.getMsg() != null ? chunkInitResponse.getMsg()
+                            : "initUpload returned null data";
                     throw new IOException("Upload init failed: " + errorMsg);
                 }
                 logger.debug("[traceId={}] Upload initialized: transferId={}, totalChunks={}, chunkSize={}",
@@ -161,6 +162,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
                 task.setUploadSuccessTime(Util.currentTime());
                 updateTaskStatus(task, UploadTaskStatus.UPLOAD_SUCCESS);
                 handleListenerSuccess(transferId, task);
+                // 传输真正成功，移除listener
+                removeListener(transferId);
                 inflightTasks.remove(task.getTransferId());
             } else {
                 logger.error("[traceId={}] Verify remote file {} failed", traceId, task.getRemoteTargetPath());
@@ -182,8 +185,8 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
 
             handleListenerError(transferId, e.getMessage());
             inflightTasks.remove(task.getTransferId());
-        } finally {
-            listenerCache.remove(transferId);
+            // 失败时不移除listener：任务可能被移到失败队列等待重试，
+            // listener需要保留以便重试时复用，只有在真正传输成功时才移除
         }
     }
 
@@ -233,20 +236,22 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
 
     public boolean uploadFile(String localFilePath, String remoteTargetInfo, UploadListener listener) {
         String traceId = java.util.UUID.randomUUID().toString().replace("-", "");
-        // todo 返回false，也要往失败队列中写入json
         try {
             if (taskQueue.size() > maxQueueDepth) {
-                handleListenerError(listener, "Download queue depth is reached: " + maxQueueDepth);
+                String errorMsg = "Upload queue depth is reached: " + maxQueueDepth;
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, errorMsg);
                 return false;
             }
             if (localFilePath == null || localFilePath.isBlank()) {
-                handleListenerError(listener, "localFilePath must not be null or blank");
+                String errorMsg = "localFilePath must not be null or blank";
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, errorMsg);
                 return false;
             }
             // remoteTargetPath like 192.168.1.100:7777@root:/tmp/upload
             // ip:port@username:destFilePath
             if (remoteTargetInfo == null || remoteTargetInfo.isBlank()) {
-                handleListenerError(listener, "remoteTargetPath must not be null or blank");
+                String errorMsg = "remoteTargetPath must not be null or blank";
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, errorMsg);
                 return false;
             }
 
@@ -254,19 +259,20 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             try {
                 remoteAgentInfo = Util.resolveRemoteAgentInfo(remoteTargetInfo);
             } catch (Exception e) {
-                handleListenerError(listener, e.getMessage());
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, e.getMessage());
                 return false;
             }
 
             if (!new File(localFilePath).isAbsolute()) {
-                handleListenerError(listener, "localFilePath must be an absolute path: " + localFilePath);
+                String errorMsg = "localFilePath must be an absolute path: " + localFilePath;
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, errorMsg);
                 return false;
             }
 
             String fileCheck = Util.checkLocalFileReadable(localFilePath);
             if (fileCheck != null) {
                 logger.error("[traceId={}] Local file validation failed: {}", traceId, fileCheck);
-                handleListenerError(listener, fileCheck);
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, fileCheck);
                 return false;
             }
 
@@ -276,7 +282,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             if (maxFileSize > 0 && fileSize > maxFileSize) {
                 String errorMsg = "File size exceeds maximum allowed size: " + maxFileSize + "bytes";
                 logger.error("[traceId={}] {}", traceId, errorMsg);
-                handleListenerError(listener, errorMsg);
+                handleUploadRejection(listener, localFilePath, remoteTargetInfo, errorMsg);
                 return false;
             }
 
@@ -311,7 +317,12 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             if (!this.inflightTasks.containsKey(task.getTransferId())) {
                 this.inflightTasks.put(task.getTransferId(), task);
             }
-            return taskQueue.offer(task);
+            boolean offered = taskQueue.offer(task);
+            if (!offered) {
+                // offer失败时从inflightTasks移除，避免泄漏导致hasInflightUploadForFile误判
+                inflightTasks.remove(task.getTransferId());
+            }
+            return offered;
         } catch (Exception e) {
             logger.error("upload file with error!", e);
             handleListenerError(listener, "upload file with error!");
@@ -328,10 +339,15 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             }
             inflightTasks.put(transferId, task);
             boolean offered = taskQueue.offer(task);
+            if (!offered) {
+                // offer失败时从inflightTasks移除，避免泄漏导致hasInflightUploadForFile误判
+                inflightTasks.remove(transferId);
+            }
             logger.info("[transferId={}] 任务重新提交到处理队列: offered={}", transferId, offered);
             return offered;
         } catch (Exception e) {
             logger.error("[transferId={}] 重新提交任务失败: {}", transferId, e.getMessage(), e);
+            inflightTasks.remove(task.getTransferId());
             handleListenerError(listener, "resubmit task failed: " + e.getMessage());
             return false;
         }
@@ -610,6 +626,18 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         return inflightTasks.isEmpty();
     }
 
+    /**
+     * 检查指定文件路径是否有正在进行的上传任务
+     * 用于广播模式下判断是否可以安全恢复隐藏文件
+     */
+    public boolean hasInflightUploadForFile(String localFilePath) {
+        if (localFilePath == null || inflightTasks.isEmpty()) {
+            return false;
+        }
+        return inflightTasks.values().stream()
+                .anyMatch(task -> localFilePath.equals(task.getLocalFilePath()));
+    }
+
     void clearAllInflightTasks() {
         inflightTasks.clear();
     }
@@ -619,5 +647,84 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
      */
     public Path getFailedQueueDir() {
         return failedQueueDir;
+    }
+
+    /**
+     * 获取指定transferId的listener（供子类/装饰者访问）
+     */
+    public UploadListener getListener(String transferId) {
+        return listenerCache.get(transferId);
+    }
+
+    /**
+     * 移除指定transferId的listener（供子类/装饰者在确认最终状态后调用）
+     */
+    public void removeListener(String transferId) {
+        listenerCache.remove(transferId);
+    }
+
+    /**
+     * 将listener放入缓存（供子类/装饰者调用）
+     */
+    public void putListener(String transferId, UploadListener listener) {
+        listenerCache.put(transferId, listener);
+    }
+
+    /**
+     * 将listener放入缓存（原子操作，如果已存在则保留旧的并返回旧值）
+     * 供子类/装饰者调用
+     */
+    public UploadListener putListenerIfAbsent(String transferId, UploadListener listener) {
+        return listenerCache.putIfAbsent(transferId, listener);
+    }
+
+    /**
+     * 处理上传提交被拒绝的场景（队列满、参数校验失败等）
+     * 1. 通知listener错误
+     * 2. 将任务写入失败队列，以便后续重试
+     */
+    private void handleUploadRejection(UploadListener listener, String localFilePath,
+            String remoteTargetInfo, String errorMsg) {
+        // 通知listener
+        handleListenerError(listener, errorMsg);
+
+        // 尝试将任务写入失败队列，以便后续重试
+        if (localFilePath != null && !localFilePath.isBlank()
+                && remoteTargetInfo != null && !remoteTargetInfo.isBlank()
+                && metaStore != null && failedQueueDir != null) {
+            try {
+                RemoteAgentInfo remoteAgentInfo = Util.resolveRemoteAgentInfo(remoteTargetInfo);
+                File localFile = new File(localFilePath);
+                long fileSize = localFile.exists() ? localFile.length() : 0L;
+
+                UploadTask rejectedTask = new UploadTask(localFilePath,
+                        remoteAgentInfo.getDestFilePath(), fileSize,
+                        "http://" + remoteAgentInfo.getIp() + ":" + remoteAgentInfo.getPort() + "/",
+                        remoteAgentInfo.getUsername());
+                rejectedTask.setTransferId(UUID.randomUUID().toString().replace("-", ""));
+                rejectedTask.setTraceId(UUID.randomUUID().toString().replace("-", ""));
+                rejectedTask.setStatus(UploadTaskStatus.FAILED);
+                rejectedTask.setExceptionDesc(errorMsg);
+                rejectedTask.updateTimestamp();
+
+                Path localPathObj = Path.of(localFilePath);
+                if (TransferFileStateManager.isTransferringFile(localPathObj)) {
+                    rejectedTask.setFileName(
+                            TransferFileStateManager.getOriginalPath(localPathObj).getFileName().toString());
+                } else {
+                    rejectedTask.setFileName(localPathObj.getFileName().toString());
+                }
+
+                // 先saveTask写入sendingQueueDir，再moveToFailedQueue移动到失败队列
+                // moveToFailedQueue只移动已有的控制文件，不saveTask的话文件不存在
+                if (metaStore != null) {
+                    metaStore.saveTask(rejectedTask);
+                }
+                metaStore.moveToFailedQueue(rejectedTask.getTransferId(), failedQueueDir);
+                logger.info("被拒绝的上传任务已写入失败队列: localFile={}, error={}", localFilePath, errorMsg);
+            } catch (Exception e) {
+                logger.warn("写入失败队列异常: localFile={}, error={}", localFilePath, e.getMessage());
+            }
+        }
     }
 }

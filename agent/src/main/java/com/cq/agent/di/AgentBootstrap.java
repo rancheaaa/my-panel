@@ -1,7 +1,6 @@
 package com.cq.agent.di;
 
 import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
@@ -17,19 +16,16 @@ public class AgentBootstrap {
     private final HttpServer server;
     private final AgentConfig config;
     private final BatchTaskSchedulerUploaderDecorator batchTaskUploader;
-    private final RetryAwareUploaderDecorator retryDecorator;
     private final AgentRegistryService registryService;
 
     @Inject
     public AgentBootstrap(HttpServer server,
                           AgentConfig config,
                           BatchTaskSchedulerUploaderDecorator batchTaskUploader,
-                          RetryAwareUploaderDecorator retryDecorator,
                           AgentRegistryService registryService) {
         this.server = server;
         this.config = config;
         this.batchTaskUploader = batchTaskUploader;
-        this.retryDecorator = retryDecorator;
         this.registryService = registryService;
     }
 
@@ -39,8 +35,9 @@ public class AgentBootstrap {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             logger.info("Shutdown signal received");
             registryService.stop();
+            // BatchTaskSchedulerUploaderDecorator.shutdown() 会依次关闭:
+            // Quartz调度器 -> RetryScheduler -> AgentUploader工作线程
             batchTaskUploader.shutdown();
-            retryDecorator.shutdownRetryScheduler();
             server.stop();
         }));
 

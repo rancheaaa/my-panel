@@ -251,8 +251,8 @@ public class AgentConfig {
         this.filebatchPendingDir = getStringProperty("filebatch.pending.dir",
                 "/tmp/my-panel/admin/data/transfers/filebatchPending");
 
-        // Failed queue scan interval (default: 30 seconds)
-        this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 30 * 1000L);
+        // Failed queue scan interval (default: 10 seconds)
+        this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 10 * 1000L);
 
         // Validate configuration
         validateConfiguration();

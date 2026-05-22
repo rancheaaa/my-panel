@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button, Pagination, Dropdown } from 'antd';
+import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button, Pagination, Dropdown, Form } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -18,7 +18,9 @@ import {
   CodeOutlined,
   BugOutlined,
   UserOutlined,
-  ColumnHeightOutlined
+  ColumnHeightOutlined,
+  UpOutlined,
+  DownOutlined
 } from '@ant-design/icons';
 import { useSubtasks } from './hooks/useSubtasks';
 import './index.scss';
@@ -93,6 +95,7 @@ const SubtaskListPage = () => {
   const [fileBatchId, setFileBatchId] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [tableSize, setTableSize] = useState('small');
+  const [expand, setExpand] = useState(false);
 
   const { subtasks, loading, pagination, fetchSubtasks } = useSubtasks();
 
@@ -422,9 +425,9 @@ const SubtaskListPage = () => {
   return (
     <div className="batch-subtask-page">
       <div className="batch-subtask-container">
-        <Card size="small" className="search-card" bordered={false}>
-          <Row gutter={[16, 12]} align="middle">
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+        <Card size="small" className="search-card" bordered={false} style={{ marginBottom: 16, minHeight: expand ? 220 : 120, transition: 'min-height 0.3s ease' }}>
+          <Row gutter={[24, 16]}>
+            <Col span={6}>
               <Input
                 placeholder="任务ID(精确)"
                 allowClear
@@ -436,7 +439,7 @@ const SubtaskListPage = () => {
                 style={{ borderRadius: 8 }}
               />
             </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+            <Col span={6}>
               <Select
                 placeholder="状态(精确)"
                 allowClear
@@ -453,31 +456,7 @@ const SubtaskListPage = () => {
                 ]}
               />
             </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Input
-                placeholder="扫描批次ID(精确)"
-                allowClear
-                size="middle"
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                value={scanBatchId}
-                onChange={(e) => setScanBatchId(e.target.value)}
-                onPressEnter={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Input
-                placeholder="文件批次ID(精确)"
-                allowClear
-                size="middle"
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                value={fileBatchId}
-                onChange={(e) => setFileBatchId(e.target.value)}
-                onPressEnter={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+            <Col span={6}>
               <Search
                 placeholder="源节点名称(模糊)"
                 allowClear
@@ -488,7 +467,7 @@ const SubtaskListPage = () => {
                 style={{ borderRadius: 8 }}
               />
             </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+            <Col span={6}>
               <Search
                 placeholder="目标节点名称(模糊)"
                 allowClear
@@ -499,77 +478,100 @@ const SubtaskListPage = () => {
                 style={{ borderRadius: 8 }}
               />
             </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Search
-                placeholder="文件名(模糊)"
-                allowClear
-                size="middle"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Search
-                placeholder="源文件路径(模糊)"
-                allowClear
-                size="middle"
-                value={sourceFilePath}
-                onChange={(e) => setSourceFilePath(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Search
-                placeholder="目标文件路径(模糊)"
-                allowClear
-                size="middle"
-                value={targetFilePath}
-                onChange={(e) => setTargetFilePath(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Search
-                placeholder="源Agent ID(模糊)"
-                allowClear
-                size="middle"
-                value={sourceAgentId}
-                onChange={(e) => setSourceAgentId(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
-              <Search
-                placeholder="目标Agent ID(模糊)"
-                allowClear
-                size="middle"
-                value={targetAgentId}
-                onChange={(e) => setTargetAgentId(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
-            </Col>
-            <Col xs={24} sm={24} md={24} lg={4} xl={3}>
-              <Space size={8}>
+            {expand && (
+              <>
+                <Col span={6}>
+                  <Search
+                    placeholder="文件名(模糊)"
+                    allowClear
+                    size="middle"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    onSearch={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Search
+                    placeholder="源文件路径(模糊)"
+                    allowClear
+                    size="middle"
+                    value={sourceFilePath}
+                    onChange={(e) => setSourceFilePath(e.target.value)}
+                    onSearch={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Search
+                    placeholder="目标文件路径(模糊)"
+                    allowClear
+                    size="middle"
+                    value={targetFilePath}
+                    onChange={(e) => setTargetFilePath(e.target.value)}
+                    onSearch={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Search
+                    placeholder="源Agent ID(模糊)"
+                    allowClear
+                    size="middle"
+                    value={sourceAgentId}
+                    onChange={(e) => setSourceAgentId(e.target.value)}
+                    onSearch={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Search
+                    placeholder="目标Agent ID(模糊)"
+                    allowClear
+                    size="middle"
+                    value={targetAgentId}
+                    onChange={(e) => setTargetAgentId(e.target.value)}
+                    onSearch={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Input
+                    placeholder="扫描批次ID(精确)"
+                    allowClear
+                    size="middle"
+                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                    value={scanBatchId}
+                    onChange={(e) => setScanBatchId(e.target.value)}
+                    onPressEnter={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Input
+                    placeholder="文件批次ID(精确)"
+                    allowClear
+                    size="middle"
+                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                    value={fileBatchId}
+                    onChange={(e) => setFileBatchId(e.target.value)}
+                    onPressEnter={handleSearch}
+                    style={{ borderRadius: 8 }}
+                  />
+                </Col>
+              </>
+            )}
+            <Col span={24} style={{ textAlign: 'right', marginTop: expand ? 0 : 0 }}>
+              <Space>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} style={{ borderRadius: 8 }}>搜索</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset} style={{ borderRadius: 8 }}>重置</Button>
                 <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  onClick={handleSearch}
-                  style={{ borderRadius: 8 }}
+                  type="link"
+                  onClick={() => setExpand(!expand)}
+                  icon={expand ? <UpOutlined /> : <DownOutlined />}
+                  style={{ padding: '0 4px' }}
                 >
-                  搜索
-                </Button>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={handleReset}
-                  style={{ borderRadius: 8 }}
-                >
-                  重置
+                  {expand ? '收起' : '展开'}
                 </Button>
               </Space>
             </Col>
@@ -611,7 +613,7 @@ const SubtaskListPage = () => {
               rowKey="id"
               loading={loading}
               size={tableSize}
-              scroll={{ x: 2130, y: 'calc(100vh - 530px)' }}
+              scroll={{ x: 2130, y: 'calc(100vh - 550px)' }}
               pagination={false}
               rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
             />

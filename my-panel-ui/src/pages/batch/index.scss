@@ -16,9 +16,16 @@
 
     > .search-card {
       flex-shrink: 0;
+      border-radius: 12px !important;
+      border: 1px solid #e8ecf0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      background: #fff;
 
       .ant-card-body {
         padding: 16px 20px !important;
+        min-height: inherit;
+        display: flex;
+        flex-direction: column;
       }
     }
 

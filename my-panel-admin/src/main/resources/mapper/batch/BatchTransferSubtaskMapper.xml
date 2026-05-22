@@ -155,4 +155,45 @@
         group by status
     </select>
 
+    <select id="countSummary" resultType="java.util.Map">
+        select
+            count(*) as totalCount,
+            coalesce(sum(file_size_bytes), 0) as totalSizeBytes,
+            sum(case when status = 'COMPLETED' then 1 else 0 end) as completedCount,
+            coalesce(sum(case when status = 'COMPLETED' then file_size_bytes else 0 end), 0) as completedSizeBytes,
+            sum(case when status = 'SENDING' then 1 else 0 end) as sendingCount,
+            sum(case when status = 'FAILED' then 1 else 0 end) as failedCount,
+            sum(case when status = 'QUEUED' then 1 else 0 end) as queuedCount,
+            sum(case when status = 'RETRYING' then 1 else 0 end) as retryingCount,
+            coalesce(sum(transferred_bytes), 0) as totalTransferredBytes,
+            coalesce(avg(case when status in ('SENDING', 'RETRYING') then speed_bytes_per_sec else null end), 0) as avgSpeedBytesPerSec
+        from batch_transfer_subtask
+    </select>
+
+    <select id="countGroupByStatus" resultType="java.util.Map">
+        select status, count(*) as count
+        from batch_transfer_subtask
+        group by status
+    </select>
+
+    <select id="sumFileSizeGroupByStatus" resultType="java.util.Map">
+        select
+            sum(case when status = 'COMPLETED' then file_size_bytes else 0 end) as completedSizeBytes,
+            sum(case when status in ('QUEUED', 'SENDING', 'RETRYING') then file_size_bytes else 0 end) as pendingSizeBytes,
+            sum(case when status = 'FAILED' then file_size_bytes else 0 end) as failedSizeBytes
+        from batch_transfer_subtask
+    </select>
+
+    <select id="avgSpeedForCompleted" resultType="java.lang.Double">
+        select avg(speed_bytes_per_sec)
+        from batch_transfer_subtask
+        where status = 'COMPLETED' and speed_bytes_per_sec > 0
+    </select>
+
+    <select id="countToday" resultType="java.lang.Long">
+        select count(*)
+        from batch_transfer_subtask
+        where date(create_time) = curdate()
+    </select>
+
 </mapper>

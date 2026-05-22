@@ -135,4 +135,27 @@
         update batch_transfer_task set deleted = 1, update_time = now() where id = #{id}
     </update>
 
+    <select id="countSummary" resultType="java.util.Map">
+        select
+            count(*) as totalCount,
+            sum(case when status = 'READY' then 1 else 0 end) as readyCount,
+            sum(case when status = 'RUNNING' then 1 else 0 end) as runningCount,
+            sum(case when status = 'PAUSED' then 1 else 0 end) as pausedCount
+        from batch_transfer_task
+        where deleted = 0
+    </select>
+
+    <select id="countGroupByStatus" resultType="java.util.Map">
+        select status, count(*) as count
+        from batch_transfer_task
+        where deleted = 0
+        group by status
+    </select>
+
+    <select id="countToday" resultType="java.lang.Long">
+        select count(*)
+        from batch_transfer_task
+        where date(create_time) = curdate() and deleted = 0
+    </select>
+
 </mapper>

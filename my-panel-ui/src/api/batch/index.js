@@ -137,5 +137,35 @@ export const batchApi = {
       method: 'get',
       params: { agentId, dirPath }
     });
+  },
+
+  /**
+   * 获取传输明细文件汇总统计
+   */
+  getSubtaskSummary() {
+    return request({
+      url: '/batch/statistics/subtask-summary',
+      method: 'get'
+    });
+  },
+
+  /**
+   * 获取传输任务汇总统计
+   */
+  getTaskSummary() {
+    return request({
+      url: '/batch/statistics/task-summary',
+      method: 'get'
+    });
+  },
+
+  /**
+   * 获取全部汇总统计（任务+文件明细）
+   */
+  getFullSummary() {
+    return request({
+      url: '/batch/statistics/summary',
+      method: 'get'
+    });
   }
 };

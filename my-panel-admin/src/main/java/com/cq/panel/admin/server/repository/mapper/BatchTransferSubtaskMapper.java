@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 批量传输子任务Mapper接口
@@ -26,7 +27,7 @@ public interface BatchTransferSubtaskMapper {
      * 根据任务ID和状态查询
      */
     List<BatchTransferSubtask> selectByTaskIdAndStatus(
-        @Param("taskId") Long taskId, 
+        @Param("taskId") Long taskId,
         @Param("status") String status
     );
 
@@ -67,8 +68,8 @@ public interface BatchTransferSubtaskMapper {
      * 更新进度（部分字段更新）
      */
     int updateProgress(
-        @Param("id") Long id, 
-        @Param("transferredChunks") Integer chunks, 
+        @Param("id") Long id,
+        @Param("transferredChunks") Integer chunks,
         @Param("transferredBytes") Long bytes,
         @Param("speedBytesPerSec") Long speedBytesPerSec
     );
@@ -89,5 +90,30 @@ public interface BatchTransferSubtaskMapper {
     /**
      * 按任务ID统计各状态的子任务数量
      */
-    List<java.util.Map<String, Object>> countByTaskIdGroupByStatus(@Param("taskId") Long taskId);
+    List<Map<String, Object>> countByTaskIdGroupByStatus(@Param("taskId") Long taskId);
+
+    /**
+     * 统计所有子任务的汇总信息
+     */
+    Map<String, Object> countSummary();
+
+    /**
+     * 按状态分组统计子任务数量
+     */
+    List<Map<String, Object>> countGroupByStatus();
+
+    /**
+     * 按状态统计文件大小总和
+     */
+    Map<String, Object> sumFileSizeGroupByStatus();
+
+    /**
+     * 统计已完成任务的平均传输速度
+     */
+    Double avgSpeedForCompleted();
+
+    /**
+     * 统计今日新增的子任务数量
+     */
+    Long countToday();
 }

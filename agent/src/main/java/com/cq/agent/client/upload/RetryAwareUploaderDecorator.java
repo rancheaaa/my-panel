@@ -109,7 +109,7 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
         this.globalProgressReporter = progressReporter;
         this.configFileManager = configFileManager;
         this.uploadFinalFailureQueueDir = uploadFinalFailureQueueDir;
-        initRetryScheduler(5 * 60 * 1000L);
+        initRetryScheduler(agentConfig.getFailedQueueScanIntervalMs());
         loadRetryConfigFromPersistence();
         logger.info("✅ 重试装饰者初始化完成（继承模式）");
     }
@@ -154,9 +154,6 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
             logger.error("❌ 关闭失败队列扫描调度器异常: {}", e.getMessage(), e);
         }
     }
-
-    // ==================== UploadService接口方法已由父类AgentUploader实现，无需重写
-    // ====================
 
     public AgentTaskConfig loadRetryConfigFromPersistenceByTaskId(long id) {
         if (configFileManager == null) {
@@ -214,7 +211,7 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
         }
     }
 
-    // ==================== 核心重试方法（从RetryManager移植）====================
+    // ==================== 核心重试方法 ====================
     public List<UploadTask> recoverFailedTasks(Path failedQueueDir) {
         List<UploadTask> failedTasks = new ArrayList<>();
 
@@ -304,6 +301,30 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
             globalProgressReporter.reportRetrying(event);
         } catch (Exception e) {
             logger.warn("上报下一次重试时间失败: transferId={}, error={}", task.getTransferId(), e.getMessage());
+        }
+    }
+
+    /**
+     * 上报最新的retryCount到Proxy，确保Agent和Proxy两端重试计数一致
+     * Agent是重试计数的唯一权威来源，Proxy只存储Agent上报的值
+     */
+    private void reportRetryCountToProxy(UploadTask task, AgentTaskConfig config, int retryCount) {
+        if (globalProgressReporter == null || task.getSubtaskId() == null) {
+            return;
+        }
+        try {
+            SubTaskEvent event = new SubTaskEvent();
+            event.setSubtaskId(task.getSubtaskId());
+            event.setTaskId(task.getTaskId());
+            event.setStatus("RETRYING");
+            event.setRetryCount(retryCount);
+            if (config != null) {
+                event.setSourceAgentId(config.getSourceAgentId());
+                event.setSourceAgentName(config.getSourceAgentName());
+            }
+            globalProgressReporter.reportRetrying(event);
+        } catch (Exception e) {
+            logger.warn("上报重试计数失败: transferId={}, error={}", task.getTransferId(), e.getMessage());
         }
     }
 
@@ -506,7 +527,7 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
             task.setExceptionDesc(null);
             task.updateTimestamp();
 
-            UploadListener retryListener = createOrGetRetryListener(task);
+            UploadListener retryListener = getOrCreateRetryListener(task);
 
             logger.info("🔄 准备重试: transferId={}, file={}, retryCount={}/{}, status={}",
                     transferId, task.getLocalFilePath(),
@@ -526,6 +547,8 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
                             transferId, newRetryCount);
                 }
                 deleteFailedTaskJsonFile(transferId);
+                // 上报最新的retryCount到Proxy，确保两端一致
+                reportRetryCountToProxy(task, config, newRetryCount);
                 logger.info("✅ 重试任务提交成功: transferId={}, retryCount={}", transferId, newRetryCount);
                 return true;
             } else {
@@ -541,7 +564,7 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
         }
     }
 
-    private UploadListener createOrGetRetryListener(UploadTask task) {
+    private UploadListener getOrCreateRetryListener(UploadTask task) {
         String transferId = task.getTransferId();
         // 从父类listenerCache中查找已缓存的listener
         UploadListener cached = getListener(transferId);
@@ -738,20 +761,43 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
             return;
         }
         try {
+            AgentTaskConfig config = taskConfigMap.get(task.getTaskId());
+            if (config == null) {
+                config = loadRetryConfigFromPersistenceByTaskId(task.getTaskId());
+                if (config != null) {
+                    taskConfigMap.put(task.getTaskId(), config);
+                }
+            }
+            int retryCount = task.getRetryCount();
+            String errMsg;
+            if (config == null || config.getRetryConfig() == null || !config.getRetryConfig().isEnabled()) {
+                errMsg = "已达最大重试次数或者超过最大重试天数: retryCount=" + retryCount;
+            } else {
+                final int maxRetryCount = config.getRetryConfig().getMaxRetryCount();
+                final int maxDays = config.getRetryConfig().getMaxDays();
+                errMsg = "已达最大重试次数或者超过最大重试天数: retryCount=" + retryCount + ",maxRetryCount=" + maxRetryCount
+                        + ",maxRetryDay=" + maxDays;
+            }
             SubTaskEvent event = new SubTaskEvent();
             event.setSubtaskId(task.getSubtaskId());
             event.setTaskId(task.getTaskId());
             event.setStatus("FAILED");
             event.setErrorCode("FINAL_FAILURE");
-            event.setErrorMessage("不可重试: retryCount=" + task.getRetryCount());
-            AgentTaskConfig config = findTaskConfigForUpload(task.getTaskId());
-            if (config != null) {
-                event.setSourceAgentId(config.getSourceAgentId());
-                event.setSourceAgentName(config.getSourceAgentName());
+            event.setErrorMessage(errMsg);
+            long completedTime = System.currentTimeMillis();
+            event.setCompletedAt(new Date(completedTime));
+            if (task.getCreateTime() != null) {
+                try {
+                    long startedTime = LocalDateTime.parse(task.getCreateTime(),
+                            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))
+                            .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                    event.setDurationMs(completedTime - startedTime);
+                } catch (Exception ignored) {
+                }
             }
             globalProgressReporter.reportFailed(event);
-            logger.info("📡 已上报最终失败状态: transferId={}, subtaskId={}",
-                    task.getTransferId(), task.getSubtaskId());
+            logger.info("� 最终失败已上报: transferId={}, subtaskId={}, retryCount={}",
+                    task.getTransferId(), task.getSubtaskId(), retryCount);
         } catch (Exception e) {
             logger.warn("上报最终失败状态失败: transferId={}, error={}", task.getTransferId(), e.getMessage());
         }

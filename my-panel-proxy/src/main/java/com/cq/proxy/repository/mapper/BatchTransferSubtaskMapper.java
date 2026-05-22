@@ -103,11 +103,12 @@ public interface BatchTransferSubtaskMapper {
 
     /**
      * 更新状态为RETRYING
+     * Agent是重试计数的唯一权威来源，直接使用Agent上报的retryCount，不自增
      */
     @Update("""
             UPDATE batch_transfer_subtask
             SET status = 'RETRYING',
-                retry_count = retry_count + 1,
+                retry_count = #{retryCount},
                 last_retry_at = NOW(),
                 next_retry_after = #{nextRetryAfter},
                 update_time = NOW()
@@ -115,10 +116,6 @@ public interface BatchTransferSubtaskMapper {
             """)
     int updateStatusRetrying(
             @Param("id") Long id,
-            @Param("nextRetryAfter") Date nextRetryAfter);
-
-    /**
-     * 批量更新进度 (JDBC Batch)
-     */
-    int batchUpdateProgress(List<Map<String, Object>> progressList);
+            @Param("nextRetryAfter") Date nextRetryAfter,
+            @Param("retryCount") Integer retryCount);
 }

@@ -43,13 +43,12 @@ public interface BatchTransferSubtaskMapper {
         @Param("fileName") String fileName,
         @Param("scanBatchId") Long scanBatchId,
         @Param("fileBatchId") Long fileBatchId,
+        @Param("sourceAgentName") String sourceAgentName,
+        @Param("targetAgentName") String targetAgentName,
         @Param("offset") Integer offset,
         @Param("limit") Integer limit
     );
 
-    /**
-     * 统计符合条件的记录数
-     */
     long countByCondition(
         @Param("taskId") Long taskId,
         @Param("status") String status,
@@ -59,7 +58,9 @@ public interface BatchTransferSubtaskMapper {
         @Param("sourceAgentId") String sourceAgentId,
         @Param("fileName") String fileName,
         @Param("scanBatchId") Long scanBatchId,
-        @Param("fileBatchId") Long fileBatchId
+        @Param("fileBatchId") Long fileBatchId,
+        @Param("sourceAgentName") String sourceAgentName,
+        @Param("targetAgentName") String targetAgentName
     );
 
     /**

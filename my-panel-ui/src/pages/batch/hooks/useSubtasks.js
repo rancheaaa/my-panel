@@ -15,6 +15,8 @@ const subtaskApi = {
         targetFilePath: params?.targetFilePath || undefined,
         targetAgentId: params?.targetAgentId || undefined,
         sourceAgentId: params?.sourceAgentId || undefined,
+        sourceAgentName: params?.sourceAgentName || undefined,
+        targetAgentName: params?.targetAgentName || undefined,
         fileName: params?.fileName || undefined,
         scanBatchId: params?.scanBatchId || undefined,
         fileBatchId: params?.fileBatchId || undefined

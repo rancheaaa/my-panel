@@ -6,9 +6,6 @@ import com.cq.proxy.service.batch.ProgressService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 
 @RestController
@@ -142,8 +139,7 @@ public class ProgressReceiverController {
                 speed = dto.getTransferredBytes() * 1000L / dto.getDurationMs();
             }
             subtask.setSpeedBytesPerSec(speed);
-            subtask.setStartedAt(dto.getStartedAt() != null ? parseDateTime(dto.getStartedAt()) : null);
-            subtask.setCompletedAt(dto.getCompletedAt() != null ? parseDateTime(dto.getCompletedAt()) : new Date());
+            subtask.setCompletedAt(dto.getCompletedAt() != null ? dto.getCompletedAt() : new Date());
             subtask.setDurationMs(dto.getDurationMs());
             if (dto.getTargetPath() != null) {
                 subtask.setTargetPath(dto.getTargetPath());
@@ -176,8 +172,12 @@ public class ProgressReceiverController {
             subtask.setTransferredChunks(dto.getTransferredChunks());
             subtask.setTotalChunks(dto.getTotalChunks());
             subtask.setTransferredBytes(dto.getTransferredBytes());
-            subtask.setStartedAt(dto.getStartedAt() != null ? parseDateTime(dto.getStartedAt()) : null);
-            subtask.setCompletedAt(new Date());
+            // 优先使用Agent上报的completedAt，如果Agent未提供则使用Proxy本地时间
+            if (dto.getCompletedAt() != null) {
+                subtask.setCompletedAt(dto.getCompletedAt());
+            } else {
+                subtask.setCompletedAt(new Date());
+            }
             subtask.setDurationMs(dto.getDurationMs());
 
             progressService.updateSubTaskStatus(subtask);
@@ -199,10 +199,11 @@ public class ProgressReceiverController {
                 return ApiResponse.badRequest("缺少必填字段: subtaskId");
             }
 
-            long nextRetryAt = progressService.scheduleNextRetry(dto.getSubtaskId());
+            // Agent是重试计数的唯一权威来源，将Agent上报的retryCount传递给service
+            progressService.updateNextRetryTime(dto.getSubtaskId(), dto.getRetryCount(), dto.getNextRetryAfter());
 
-            log.info("🔄 子任务重试中: subtaskId={}, nextRetryAt={}", dto.getSubtaskId(), nextRetryAt);
-            return ApiResponse.success(new RetryResponse("RETRYING", nextRetryAt));
+            log.info("🔄 子任务重试中: subtaskId={}, nextRetryAt={}, retryCount={}", dto.getSubtaskId(), dto.getNextRetryAfter().toString(), dto.getRetryCount());
+            return ApiResponse.success(new RetryResponse("RETRYING", dto.getNextRetryAfter().toString()));
 
         } catch (Exception e) {
             log.error("❌ 重试通知处理失败: {}", e.getMessage());
@@ -245,7 +246,7 @@ public class ProgressReceiverController {
         if (dto.getFileSizeBytes() != null)
             subtask.setFileSizeBytes(dto.getFileSizeBytes());
         if (dto.getFileLastModified() != null)
-            subtask.setFileLastModified(parseDateTime(dto.getFileLastModified()));
+            subtask.setFileLastModified(dto.getFileLastModified());
 
         if (dto.getStatus() != null && !dto.getStatus().isBlank())
             subtask.setStatus(dto.getStatus());
@@ -262,9 +263,9 @@ public class ProgressReceiverController {
             subtask.setSpeedBytesPerSec(dto.getSpeedBytesPerSec());
 
         if (dto.getStartedAt() != null)
-            subtask.setStartedAt(parseDateTime(dto.getStartedAt()));
+            subtask.setStartedAt(dto.getStartedAt());
         if (dto.getCompletedAt() != null)
-            subtask.setCompletedAt(parseDateTime(dto.getCompletedAt()));
+            subtask.setCompletedAt(dto.getCompletedAt());
         if (dto.getDurationMs() != null)
             subtask.setDurationMs(dto.getDurationMs());
 
@@ -278,35 +279,10 @@ public class ProgressReceiverController {
         if (dto.getRetryCount() != null)
             subtask.setRetryCount(dto.getRetryCount());
         if (dto.getLastRetryAt() != null)
-            subtask.setLastRetryAt(parseDateTime(dto.getLastRetryAt()));
+            subtask.setLastRetryAt(dto.getLastRetryAt());
         if (dto.getNextRetryAfter() != null)
-            subtask.setNextRetryAfter(parseDateTime(dto.getNextRetryAfter()));
+            subtask.setNextRetryAfter(dto.getNextRetryAfter());
 
         return subtask;
-    }
-
-    /**
-     * 解析时间字符串为Date对象
-     * 支持两种格式：
-     * 1. Long类型的时间戳毫秒（如 "1778746500000"）
-     * 2. 日期字符串（如 "2026-05-14 15:55:00"）
-     */
-    private Date parseDateTime(String timeStr) {
-        if (timeStr == null || timeStr.isBlank()) {
-            return null;
-        }
-
-        try {
-            long timestamp = Long.parseLong(timeStr);
-            return new Date(timestamp);
-        } catch (NumberFormatException e) {
-            try {
-                SimpleDateFormat sdf = new SimpleDateFormat(DATE_FORMAT_PATTERN);
-                return sdf.parse(timeStr);
-            } catch (ParseException ex) {
-                log.warn("⚠️ 无法解析时间字符串: {}", timeStr);
-                return null;
-            }
-        }
     }
 }

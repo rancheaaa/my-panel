@@ -3,6 +3,8 @@ package com.cq.proxy.service.batch;
 import com.cq.proxy.dto.SubTaskDTO;
 import com.cq.proxy.repository.entity.BatchTransferSubtask;
 
+import java.util.Date;
+
 /**
  * 进度更新服务接口
  * 处理Agent上报的子任务进度信息
@@ -52,6 +54,9 @@ public interface ProgressService {
 
     /**
      * 调度下次重试
+     * @param subtaskId 子任务ID
+     * @param retryCount Agent端上报的重试次数（Agent是重试计数的唯一权威来源）
+     * @param nextRetryAfter 下一次重试时间
      */
-    long scheduleNextRetry(Long subtaskId);
+    void updateNextRetryTime(Long subtaskId, Integer retryCount, Date nextRetryAfter);
 }

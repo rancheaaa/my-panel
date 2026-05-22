@@ -34,25 +34,28 @@ public class BatchTransferSubtaskController extends BaseController {
     @RequirePermission("batch:subtask:list")
     @GetMapping("/list")
     public Result<Map<String, Object>> list(
-            @Parameter(description = "任务ID(可选)") @RequestParam(required = false) Long taskId,
-            @Parameter(description = "状态(可选): QUEUED/SENDING/COMPLETED/FAILED/RETRYING") @RequestParam(required = false) String status,
+            @Parameter(description = "任务ID(精确匹配)") @RequestParam(required = false) Long taskId,
+            @Parameter(description = "状态(精确匹配): QUEUED/SENDING/COMPLETED/FAILED/RETRYING") @RequestParam(required = false) String status,
             @Parameter(description = "源文件路径(模糊搜索)") @RequestParam(required = false) String sourceFilePath,
             @Parameter(description = "目标文件路径(模糊搜索)") @RequestParam(required = false) String targetFilePath,
             @Parameter(description = "目标Agent ID(模糊搜索)") @RequestParam(required = false) String targetAgentId,
             @Parameter(description = "源Agent ID(模糊搜索)") @RequestParam(required = false) String sourceAgentId,
+            @Parameter(description = "源节点名称(模糊搜索), 如 dell@172.20.10.5:7777") @RequestParam(required = false) String sourceAgentName,
+            @Parameter(description = "目标节点名称(模糊搜索), 如 cq@172.19.200.130:7778") @RequestParam(required = false) String targetAgentName,
             @Parameter(description = "文件名(模糊搜索)") @RequestParam(required = false) String fileName,
-            @Parameter(description = "扫描批次ID") @RequestParam(required = false) Long scanBatchId,
-            @Parameter(description = "文件批次ID") @RequestParam(required = false) Long fileBatchId,
+            @Parameter(description = "扫描批次ID(精确匹配)") @RequestParam(required = false) Long scanBatchId,
+            @Parameter(description = "文件批次ID(精确匹配)") @RequestParam(required = false) Long fileBatchId,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer pageSize) {
 
         int offset = (pageNum - 1) * pageSize;
         List<BatchTransferSubtask> list = subtaskMapper.selectPageList(
                 taskId, status, sourceFilePath, targetFilePath, targetAgentId,
-                sourceAgentId, fileName, scanBatchId, fileBatchId, offset, pageSize);
+                sourceAgentId, fileName, scanBatchId, fileBatchId, sourceAgentName, targetAgentName,
+                offset, pageSize);
         long total = subtaskMapper.countByCondition(
                 taskId, status, sourceFilePath, targetFilePath, targetAgentId,
-                sourceAgentId, fileName, scanBatchId, fileBatchId);
+                sourceAgentId, fileName, scanBatchId, fileBatchId, sourceAgentName, targetAgentName);
 
         List<BatchTransferSubtaskVO> voList = subtaskConverter.toVOList(list);
 
@@ -69,7 +72,7 @@ public class BatchTransferSubtaskController extends BaseController {
     @GetMapping("/{id}")
     public Result<BatchTransferSubtaskVO> getById(
             @Parameter(description = "子任务ID", required = true) @PathVariable Long id) {
-        List<BatchTransferSubtask> list = subtaskMapper.selectPageList(id, null, null, null, null, null, null, null, null, 0, 1);
+        List<BatchTransferSubtask> list = subtaskMapper.selectPageList(id, null, null, null, null, null, null, null, null, null, null, 0, 1);
         if (list == null || list.isEmpty()) {
             return Result.error("子任务不存在: " + id);
         }
@@ -82,7 +85,7 @@ public class BatchTransferSubtaskController extends BaseController {
     public Result<List<BatchTransferSubtaskVO>> getByTaskId(
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId) {
         List<BatchTransferSubtask> list = subtaskMapper.selectPageList(
-                taskId, null, null, null, null, null, null, null, null, 0, 1000);
+                taskId, null, null, null, null, null, null, null, null, null, null, 0, 1000);
         List<BatchTransferSubtaskVO> voList = subtaskConverter.toVOList(list);
         return Result.success(voList);
     }

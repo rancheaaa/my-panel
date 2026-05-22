@@ -22,5 +22,5 @@ public class RetryResponse implements Serializable {
     private String status;
 
     /** 下次重试时间（时间戳毫秒） */
-    private Long nextRetryAt;
+    private String nextRetryAt;
 }

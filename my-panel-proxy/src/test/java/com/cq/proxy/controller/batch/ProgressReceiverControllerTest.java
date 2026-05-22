@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.Date;
+
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -192,20 +194,19 @@ class ProgressReceiverControllerTest {
         // ==================== 5. 重试中状态通知 ====================
 
         @Test
-        @DisplayName("8. POST /api/batch/subtask/retrying - 计算下次重试时间")
+        @DisplayName("8. POST /api/batch/subtask/retrying - 计算下次重试时间并传递retryCount")
         void testReceiveRetrying_nextRetryAfterCalculated() throws Exception {
-                when(progressService.scheduleNextRetry(anyLong()))
-                                .thenReturn(System.currentTimeMillis() + 60000);
+                doNothing().when(progressService).updateNextRetryTime(anyLong(), any(), any());
 
                 mockMvc.perform(post("/api/batch/subtask/retrying")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"subtaskId\": 100, \"retryCount\": 2}"))
+                                .content("{\"subtaskId\": 100, \"retryCount\": 2, \"nextRetryAfter\": \"2026-05-22 10:00:00\"}"))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200))
                                 .andExpect(jsonPath("$.data.status").value("RETRYING"))
                                 .andExpect(jsonPath("$.data.nextRetryAt").exists());
 
-                verify(progressService).scheduleNextRetry(100L);
+                verify(progressService).updateNextRetryTime(eq(100L), eq(2), any(Date.class));
                 System.out.println("✅ 重试通知API成功");
         }
 
@@ -311,31 +312,31 @@ class ProgressReceiverControllerTest {
         }
 
         @Test
-        @DisplayName("13. 时间戳毫秒格式也支持（向后兼容）")
-        void testTimestampFormat_backwardCompatible() throws Exception {
+        @DisplayName("13. POST /api/batch/subtask/create - 日期字符串格式解析成功")
+        void testDateFormat_parsedSuccessfully() throws Exception {
                 when(progressService.createSubTask(any())).thenReturn(12345L);
 
-                String timestampJson = """
+                String dateFormatJson = """
                                 {
                                     "subtaskId": 12345,
                                     "taskId": 1,
                                     "status": "QUEUED",
                                     "fileName": "test.txt",
                                     "fileSizeBytes": 512,
-                                    "fileLastModified": "1778746500000",
-                                    "startedAt": "1778746490000"
+                                    "fileLastModified": "2026-05-20 11:12:35",
+                                    "startedAt": "2026-05-22 10:00:00"
                                 }
                                 """;
 
                 mockMvc.perform(post("/api/batch/subtask/create")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(timestampJson))
+                                .content(dateFormatJson))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200));
 
                 verify(progressService).createSubTask(argThat(subtask -> subtask.getFileLastModified() != null &&
                                 subtask.getStartedAt() != null));
-                System.out.println("✅ 时间戳毫秒格式向后兼容");
+                System.out.println("✅ 日期字符串格式解析成功");
         }
 
         // ==================== 辅助方法 ====================

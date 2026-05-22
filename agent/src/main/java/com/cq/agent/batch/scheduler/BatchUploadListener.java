@@ -299,6 +299,10 @@ public class BatchUploadListener implements UploadListener {
             this.currentTransferId = task.getTransferId();
         }
 
+        if (transferStartTime == null) {
+            transferStartTime = System.currentTimeMillis();
+        }
+
         if (scannedFile != null) {
             String fileName = scannedFile.getFileName();
             long fileSize = scannedFile.getFileSize();
@@ -334,10 +338,6 @@ public class BatchUploadListener implements UploadListener {
 
         if (actualTotalChunks == null && totalChunks > 0) {
             actualTotalChunks = totalChunks;
-        }
-
-        if (transferStartTime == null) {
-            transferStartTime = System.currentTimeMillis();
         }
 
         if (progressReporter != null) {
@@ -499,17 +499,18 @@ public class BatchUploadListener implements UploadListener {
         event.setErrorCode("UPLOAD_ERROR");
         event.setErrorMessage(errorMessage);
 
-        // 优先使用transferStartTime（传输开始时间），如果未开始传输则使用subtaskCreateTime（创建时间）
+        long completedTime = System.currentTimeMillis();
         long startTime;
         if (transferStartTime != null) {
             startTime = transferStartTime;
         } else if (subtaskCreateTime != null) {
             startTime = subtaskCreateTime;
         } else {
-            startTime = System.currentTimeMillis();
+            startTime = completedTime;
         }
 
-        event.setDurationMs(System.currentTimeMillis() - startTime);
+        event.setCompletedAt(new Date(completedTime));
+        event.setDurationMs(completedTime - startTime);
 
         return event;
     }

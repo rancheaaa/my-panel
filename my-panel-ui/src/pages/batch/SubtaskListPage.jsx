@@ -86,6 +86,8 @@ const SubtaskListPage = () => {
   const [targetFilePath, setTargetFilePath] = useState('');
   const [targetAgentId, setTargetAgentId] = useState('');
   const [sourceAgentId, setSourceAgentId] = useState('');
+  const [sourceAgentName, setSourceAgentName] = useState('');
+  const [targetAgentName, setTargetAgentName] = useState('');
   const [fileName, setFileName] = useState('');
   const [scanBatchId, setScanBatchId] = useState(null);
   const [fileBatchId, setFileBatchId] = useState(null);
@@ -109,6 +111,8 @@ const SubtaskListPage = () => {
       targetFilePath: targetFilePath || undefined,
       targetAgentId: targetAgentId || undefined,
       sourceAgentId: sourceAgentId || undefined,
+      sourceAgentName: sourceAgentName || undefined,
+      targetAgentName: targetAgentName || undefined,
       fileName: fileName || undefined,
       scanBatchId: scanBatchId || undefined,
       fileBatchId: fileBatchId || undefined
@@ -122,6 +126,8 @@ const SubtaskListPage = () => {
     setTargetFilePath('');
     setTargetAgentId('');
     setSourceAgentId('');
+    setSourceAgentName('');
+    setTargetAgentName('');
     setFileName('');
     setScanBatchId(null);
     setFileBatchId(null);
@@ -420,7 +426,7 @@ const SubtaskListPage = () => {
           <Row gutter={[16, 12]} align="middle">
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Input
-                placeholder="任务ID"
+                placeholder="任务ID(精确)"
                 allowClear
                 size="middle"
                 prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
@@ -432,7 +438,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Select
-                placeholder="状态"
+                placeholder="状态(精确)"
                 allowClear
                 size="middle"
                 value={statusFilter}
@@ -449,7 +455,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Input
-                placeholder="扫描批次ID"
+                placeholder="扫描批次ID(精确)"
                 allowClear
                 size="middle"
                 prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
@@ -461,7 +467,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Input
-                placeholder="文件批次ID"
+                placeholder="文件批次ID(精确)"
                 allowClear
                 size="middle"
                 prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
@@ -473,7 +479,29 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Search
-                placeholder="文件名"
+                placeholder="源节点名称(模糊)"
+                allowClear
+                size="middle"
+                value={sourceAgentName}
+                onChange={(e) => setSourceAgentName(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="目标节点名称(模糊)"
+                allowClear
+                size="middle"
+                value={targetAgentName}
+                onChange={(e) => setTargetAgentName(e.target.value)}
+                onSearch={handleSearch}
+                style={{ borderRadius: 8 }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} xl={3}>
+              <Search
+                placeholder="文件名(模糊)"
                 allowClear
                 size="middle"
                 value={fileName}
@@ -484,7 +512,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Search
-                placeholder="源文件路径"
+                placeholder="源文件路径(模糊)"
                 allowClear
                 size="middle"
                 value={sourceFilePath}
@@ -495,7 +523,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Search
-                placeholder="目标文件路径"
+                placeholder="目标文件路径(模糊)"
                 allowClear
                 size="middle"
                 value={targetFilePath}
@@ -506,7 +534,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Search
-                placeholder="源Agent ID"
+                placeholder="源Agent ID(模糊)"
                 allowClear
                 size="middle"
                 value={sourceAgentId}
@@ -517,7 +545,7 @@ const SubtaskListPage = () => {
             </Col>
             <Col xs={24} sm={12} md={6} lg={4} xl={3}>
               <Search
-                placeholder="目标Agent ID"
+                placeholder="目标Agent ID(模糊)"
                 allowClear
                 size="middle"
                 value={targetAgentId}

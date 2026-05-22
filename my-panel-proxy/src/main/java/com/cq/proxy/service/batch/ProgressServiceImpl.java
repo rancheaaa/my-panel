@@ -206,19 +206,15 @@ public class ProgressServiceImpl implements ProgressService {
     }
 
     @Override
-    public long scheduleNextRetry(Long subtaskId) {
-        long nextRetry = System.currentTimeMillis() + 5000L;
-
+    public void updateNextRetryTime(Long subtaskId, Integer retryCount, Date nextRetryAfter) {
         try {
-            Date nextRetryAfter = new Date(nextRetry);
-            subtaskMapper.updateStatusRetrying(subtaskId, nextRetryAfter);
+            // Agent是重试计数的唯一权威来源，Proxy直接使用Agent上报的retryCount
+            subtaskMapper.updateStatusRetrying(subtaskId, nextRetryAfter, retryCount);
 
-            log.info("🔄 重试状态已更新到DB: subtask={}, nextRetryAt={}", subtaskId, nextRetryAfter);
+            log.info("🔄 重试状态已更新到DB: subtask={}, nextRetryAt={}, retryCount={}", subtaskId, nextRetryAfter, retryCount);
         } catch (Exception e) {
             log.error("❌ 重试状态更新DB失败: subtask={}, error={}", subtaskId, e.getMessage());
             throw new RuntimeException("重试状态更新失败", e);
         }
-
-        return nextRetry;
     }
 }

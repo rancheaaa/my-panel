@@ -59,6 +59,12 @@
             </if>
             <if test="scanBatchId != null">AND scan_batch_id = #{scanBatchId}</if>
             <if test="fileBatchId != null">AND file_batch_id = #{fileBatchId}</if>
+            <if test="sourceAgentName != null and sourceAgentName != ''">
+                AND source_agent_name LIKE CONCAT('%', #{sourceAgentName}, '%')
+            </if>
+            <if test="targetAgentName != null and targetAgentName != ''">
+                AND target_agent_name LIKE CONCAT('%', #{targetAgentName}, '%')
+            </if>
         </where>
     </sql>
 

@@ -139,7 +139,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
             String jobName = "batch-task-" + taskId;
             String triggerName = "batch-trigger-" + taskId;
 
-            deleteTask(taskId);
+            removeExistingQuartzJob(taskId);
 
             taskRunnables.put(taskId, task);
 
@@ -242,6 +242,24 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
         } else {
             startTask(config);
             log.info("任务未运行，已启动: taskId={}", taskId);
+        }
+    }
+
+    /**
+     * 仅移除已存在的Quartz调度任务（不删除配置文件）
+     * 用于startTask()重启任务时清理旧的Quartz Job，保留磁盘上的配置文件
+     */
+    private void removeExistingQuartzJob(Long taskId) {
+        try {
+            JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
+            if (quartzScheduler.checkExists(jobKey)) {
+                quartzScheduler.deleteJob(jobKey);
+                taskRunnables.remove(taskId);
+                log.info("🔄 旧Quartz任务已移除(保留配置文件): taskId={}", taskId);
+            }
+        } catch (SchedulerException e) {
+            log.error("❌ 移除Quartz任务失败: taskId={}, error={}", taskId, e.getMessage());
+            throw new RuntimeException("移除Quartz任务失败: " + e.getMessage(), e);
         }
     }
 

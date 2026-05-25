@@ -139,6 +139,20 @@ const SubtaskListPage = () => {
 
   const columns = [
     {
+      title: '一对几',
+      dataIndex: 'targetCount',
+      key: 'targetCount',
+      width: 80,
+      align: 'center',
+      render: (count) => {
+        const label = count === 1 ? '1对1' : `1对${count}`;
+        const color = count === 1 ? '#1890ff' : count <= 3 ? '#faad14' : '#ff4d4f';
+        return (
+          <Tag color={color} style={{ borderRadius: 4, fontSize: 11 }}>{label}</Tag>
+        );
+      }
+    },
+    {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
@@ -186,7 +200,7 @@ const SubtaskListPage = () => {
       title: '文件名',
       dataIndex: 'fileName',
       key: 'fileName',
-      width: 160,
+      width: 400,
       ellipsis: true,
       render: (name) => (
         <Tooltip title={name}>
@@ -201,7 +215,7 @@ const SubtaskListPage = () => {
       title: '源路径',
       dataIndex: 'sourcePath',
       key: 'sourcePath',
-      width: 220,
+      width: 600,
       ellipsis: true,
       render: (path) => path ? (
         <Tooltip title={path}>
@@ -213,7 +227,7 @@ const SubtaskListPage = () => {
       title: '目标路径',
       dataIndex: 'targetPath',
       key: 'targetPath',
-      width: 200,
+      width: 600,
       ellipsis: true,
       render: (dir) => dir ? (
         <Tooltip title={dir}>
@@ -283,21 +297,38 @@ const SubtaskListPage = () => {
         const percent = getProgressPercent(record);
         const transferred = formatBytes(record.transferredBytes);
         const total = formatBytes(record.fileSizeBytes);
-        
+        const speed = formatSpeed(record.speedBytesPerSec);
+        const remainingBytes = (record.fileSizeBytes || 0) - (record.transferredBytes || 0);
+        const remaining = formatBytes(remainingBytes > 0 ? remainingBytes : 0);
+        const eta = record.speedBytesPerSec && record.speedBytesPerSec > 0 && remainingBytes > 0
+          ? formatDuration(Math.ceil(remainingBytes / record.speedBytesPerSec * 1000))
+          : '-';
+
         return (
-          <div>
-            <Progress 
-              percent={percent} 
-              size="small" 
-              status={record.status === 'FAILED' ? 'exception' : record.status === 'COMPLETED' ? 'success' : 'active'}
-              strokeColor={statusConfig[record.status]?.color}
-              style={{ marginBottom: 3 }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary" style={{ fontSize: 10 }}>{transferred} / {total}</Text>
-              <Text type="secondary" style={{ fontSize: 10 }}>{formatSpeed(record.speedBytesPerSec)}</Text>
+          <Tooltip title={
+            <div style={{ lineHeight: '22px' }}>
+              <div><strong>进度:</strong> {percent}%</div>
+              <div><strong>已传输:</strong> {transferred}</div>
+              <div><strong>总大小:</strong> {total}</div>
+              <div><strong>剩余:</strong> {remaining}</div>
+              <div><strong>速度:</strong> {speed}</div>
+              {eta !== '-' && <div><strong>预计剩余:</strong> {eta}</div>}
             </div>
-          </div>
+          }>
+            <div>
+              <Progress 
+                percent={percent} 
+                size="small" 
+                status={record.status === 'FAILED' ? 'exception' : record.status === 'COMPLETED' ? 'success' : 'active'}
+                strokeColor={statusConfig[record.status]?.color}
+                style={{ marginBottom: 3 }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text type="secondary" style={{ fontSize: 10 }}>{transferred} / {total}</Text>
+                <Text type="secondary" style={{ fontSize: 10 }}>{speed}</Text>
+              </div>
+            </div>
+          </Tooltip>
         );
       }
     },
@@ -613,7 +644,7 @@ const SubtaskListPage = () => {
               rowKey="id"
               loading={loading}
               size={tableSize}
-              scroll={{ x: 2130, y: 'calc(100vh - 500px)' }}
+              scroll={{ x: 2210, y: 'calc(100vh - 500px)' }}
               pagination={false}
               rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
             />

@@ -120,6 +120,7 @@ export const batchApi = {
       url: '/batch/task/list-with-status',
       method: 'get',
       params: {
+        id: params?.id || undefined,
         pageNum: params?.page || 1,
         pageSize: params?.size || 10,
         status: params?.status || undefined,

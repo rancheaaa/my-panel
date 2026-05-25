@@ -88,6 +88,9 @@ public class BatchTransferSubtask {
     /** Agent本地重试次数 */
     private Integer retryCount;
 
+    /** 一对几数量: 1-一对一 2-一对二 N一对N */
+    private Integer targetCount;
+
     /** 最后一次重试时间 */
     private Date lastRetryAt;
 

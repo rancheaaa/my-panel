@@ -29,6 +29,7 @@
         <result property="errorMessage" column="error_message"/>
         <result property="errorStackTrace" column="error_stack_trace"/>
         <result property="retryCount" column="retry_count"/>
+        <result property="targetCount" column="target_count"/>
         <result property="lastRetryAt" column="last_retry_at"/>
         <result property="nextRetryAfter" column="next_retry_after"/>
         <result property="createBy" column="create_by"/>
@@ -75,7 +76,7 @@
             status, transfer_id, transferred_chunks, total_chunks, transferred_bytes,
             speed_bytes_per_sec, started_at, completed_at, duration_ms,
             error_code, error_message, error_stack_trace,
-            retry_count, last_retry_at, next_retry_after,
+            retry_count, target_count, last_retry_at, next_retry_after,
             create_by, create_time, update_by, update_time, remark
         ) values (
             #{taskId}, #{scanBatchId}, #{fileBatchId}, #{sourceAgentId}, #{sourceAgentName}, #{targetAgentId}, #{targetAgentName},
@@ -83,7 +84,7 @@
             #{status}, #{transferId}, #{transferredChunks}, #{totalChunks}, #{transferredBytes},
             #{speedBytesPerSec}, #{startedAt}, #{completedAt}, #{durationMs},
             #{errorCode}, #{errorMessage}, #{errorStackTrace},
-            #{retryCount}, #{lastRetryAt}, #{nextRetryAfter},
+            #{retryCount}, #{targetCount}, #{lastRetryAt}, #{nextRetryAfter},
             #{createBy}, now(), #{updateBy}, now(), #{remark}
         )
     </insert>
@@ -104,7 +105,7 @@
              #{item.status}, #{item.transferId}, #{item.transferredChunks}, #{item.totalChunks}, #{item.transferredBytes},
              #{item.speedBytesPerSec}, #{item.startedAt}, #{item.completedAt}, #{item.durationMs},
              #{item.errorCode}, #{item.errorMessage}, #{item.errorStackTrace},
-             #{item.retryCount}, #{item.lastRetryAt}, #{item.nextRetryAfter},
+             #{item.retryCount}, #{item.targetCount}, #{item.lastRetryAt}, #{item.nextRetryAfter},
              #{item.createBy}, now(), #{item.updateBy}, now(), #{item.remark})
         </foreach>
     </insert>

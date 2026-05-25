@@ -278,6 +278,8 @@ public class ProgressReceiverController {
 
         if (dto.getRetryCount() != null)
             subtask.setRetryCount(dto.getRetryCount());
+        if (dto.getTargetCount() != null)
+            subtask.setTargetCount(dto.getTargetCount());
         if (dto.getLastRetryAt() != null)
             subtask.setLastRetryAt(dto.getLastRetryAt());
         if (dto.getNextRetryAfter() != null)

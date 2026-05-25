@@ -23,6 +23,7 @@
             <if test="errorMessage != null">error_message = #{errorMessage},</if>
             <if test="errorStackTrace != null">error_stack_trace = #{errorStackTrace},</if>
             <if test="retryCount != null">retry_count = #{retryCount},</if>
+            <if test="targetCount != null">target_count = #{targetCount},</if>
             <if test="lastRetryAt != null">last_retry_at = #{lastRetryAt},</if>
             <if test="nextRetryAfter != null">next_retry_after = #{nextRetryAfter},</if>
             update_time = NOW()

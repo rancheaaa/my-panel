@@ -276,6 +276,12 @@ public class FileBatchCompletionTracker {
         return GSON.fromJson(content, FileBatchState.class);
     }
 
+    public boolean fileBatchIdExist(Long fileBatchId) {
+        Path jsonPath = resolveJsonPath(fileBatchId);
+        boolean r1 = Files.exists(jsonPath);
+        return  r1 && batchStateMap.containsKey(String.valueOf(fileBatchId));
+    }
+
     public List<FileBatchState> recoverPendingBatches() {
         List<FileBatchState> result = new ArrayList<>();
         for (FileBatchState state : batchStateMap.values()) {

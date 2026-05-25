@@ -764,6 +764,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
     `error_message` text DEFAULT NULL COMMENT '错误详情',
     `error_stack_trace` text DEFAULT NULL COMMENT '异常堆栈(调试用)',
     `retry_count` int NOT NULL DEFAULT 0 COMMENT 'Agent本地重试次数',
+    `target_count` int NOT NULL DEFAULT 1 COMMENT '一对几数量: 1-一对一 2-一对二 N一对N',
     `last_retry_at` datetime DEFAULT NULL COMMENT '最后一次重试时间',
     `next_retry_after` datetime DEFAULT NULL COMMENT '下次可重试时间(Level 2)',
     `create_by` varchar(64) DEFAULT '' COMMENT '创建人(系统自动)',

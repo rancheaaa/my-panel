@@ -109,6 +109,7 @@
     <sql id="queryCondition">
         <where>
             deleted = 0
+            <if test="id != null and id != ''">and id = #{id}</if>
             <if test="status != null and status != ''">and status = #{status}</if>
             <if test="sourceAgentId != null and sourceAgentId != ''">and source_agent_id = #{sourceAgentId}</if>
             <if test="sourceAgentName != null and sourceAgentName != ''">and source_agent_name like concat('%', #{sourceAgentName}, '%')</if>
@@ -139,6 +140,7 @@
         from batch_transfer_task
         <where>
             deleted = 0
+            <if test="query.id != null and query.id != ''">and id = #{query.id}</if>
             <if test="query.status != null and query.status != ''">and status = #{query.status}</if>
             <if test="query.sourceAgentId != null and query.sourceAgentId != ''">and source_agent_id = #{query.sourceAgentId}</if>
             <if test="query.sourceAgentName != null and query.sourceAgentName != ''">and source_agent_name like concat('%', #{query.sourceAgentName}, '%')</if>

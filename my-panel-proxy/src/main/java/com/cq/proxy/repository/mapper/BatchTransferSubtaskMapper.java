@@ -26,7 +26,7 @@ public interface BatchTransferSubtaskMapper {
                 transferred_chunks, total_chunks, transferred_bytes, speed_bytes_per_sec,
                 started_at, completed_at, duration_ms,
                 error_code, error_message, error_stack_trace,
-                retry_count, last_retry_at, next_retry_after,
+                retry_count, target_count, last_retry_at, next_retry_after,
                 create_by, create_time, update_by, update_time, remark
             ) VALUES (
                 #{id}, #{taskId}, #{scanBatchId}, #{fileBatchId},
@@ -37,7 +37,7 @@ public interface BatchTransferSubtaskMapper {
                 #{transferredChunks}, #{totalChunks}, #{transferredBytes}, #{speedBytesPerSec},
                 #{startedAt}, #{completedAt}, #{durationMs},
                 #{errorCode}, #{errorMessage}, #{errorStackTrace},
-                #{retryCount}, #{lastRetryAt}, #{nextRetryAfter},
+                #{retryCount}, #{targetCount}, #{lastRetryAt}, #{nextRetryAfter},
                 #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
             )
             """)

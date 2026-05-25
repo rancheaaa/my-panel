@@ -255,6 +255,10 @@ public class BatchUploadListener implements UploadListener {
             event.setFileSizeBytes(scannedFile.getFileSize());
             event.setFileLastModified(new Date(scannedFile.getLastModified()));
 
+            if (config != null && config.getTargetAgents() != null) {
+                event.setTargetCount(config.getTargetAgents().size());
+            }
+
             // 记录子任务创建时间，作为startedAt的兜底
             long now = System.currentTimeMillis();
             this.subtaskCreateTime = now;
@@ -372,17 +376,22 @@ public class BatchUploadListener implements UploadListener {
             // 使用POST /api/batch/subtask/complete接口
             progressReporter.reportComplete(event);
         }
-
         if (fileBatchTracker != null && fileBatchId != null) {
             try {
-                boolean allDone = fileBatchTracker.markCompleted(fileBatchId,
-                        targetAgent != null ? targetAgent.getAgentId() : null);
-                if (allDone) {
+                final boolean result = fileBatchTracker.fileBatchIdExist(fileBatchId);
+                if (!result) {
+                    // 可能是一对一的传输任务。
                     executePostTransferAction();
-                    try {
-                        fileBatchTracker.deleteFileBatch(fileBatchId);
-                    } catch (Exception e) {
-                        log.warn("删除文件批次追踪文件失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                } else {
+                    boolean allDone = fileBatchTracker.markCompleted(fileBatchId,
+                            targetAgent != null ? targetAgent.getAgentId() : null);
+                    if (allDone) {
+                        executePostTransferAction();
+                        try {
+                            fileBatchTracker.deleteFileBatch(fileBatchId);
+                        } catch (Exception e) {
+                            log.warn("删除文件批次追踪文件失败: fileBatchId={}, error={}", fileBatchId, e.getMessage());
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -494,6 +503,7 @@ public class BatchUploadListener implements UploadListener {
     /**
      * 构建失败事件（用于/failed接口）
      */
+    @SuppressWarnings("all")
     private SubTaskEvent buildFailEvent(String errorMessage) {
         SubTaskEvent event = buildBaseEvent("FAILED");
         event.setErrorCode("UPLOAD_ERROR");

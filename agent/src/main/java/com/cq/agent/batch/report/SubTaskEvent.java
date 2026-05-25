@@ -61,4 +61,7 @@ public class SubTaskEvent {
     private Integer retryCount;
     private Date lastRetryAt;
     private Date nextRetryAfter;
+
+    /** 一对几数量: 1-一对一 2-一对二 N一对N */
+    private Integer targetCount;
 }

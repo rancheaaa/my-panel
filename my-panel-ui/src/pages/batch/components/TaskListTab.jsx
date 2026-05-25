@@ -579,6 +579,11 @@ const TaskListTab = ({
     const basicFields = (
       <>
         <Col span={6}>
+          <Form.Item name="id" label="任务ID">
+            <Input placeholder="精准匹配" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
           <Form.Item name="taskName" label="任务名称">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>

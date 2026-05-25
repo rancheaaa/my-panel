@@ -13,6 +13,9 @@ public class BatchTransferTaskQuery implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    @Schema(description = "任务主键ID(精准匹配)")
+    private String id;
+
     @Schema(description = "任务状态: READY/RUNNING/PAUSED(精确匹配)")
     private String status;
 

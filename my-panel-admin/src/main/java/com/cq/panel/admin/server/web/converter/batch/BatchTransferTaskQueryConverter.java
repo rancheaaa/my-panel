@@ -11,7 +11,6 @@ public interface BatchTransferTaskQueryConverter {
 
     BatchTransferTaskQueryConverter INSTANCE = Mappers.getMapper(BatchTransferTaskQueryConverter.class);
 
-    @Mapping(target = "id", ignore = true)
     @Mapping(target = "taskDescription", source = "taskDescription")
     @Mapping(target = "sourceAgentId", source = "sourceAgentId")
     @Mapping(target = "sourceAgentName", source = "sourceAgentName")

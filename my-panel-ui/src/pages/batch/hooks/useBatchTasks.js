@@ -10,6 +10,7 @@ export function useBatchTasks() {
     setLoading(true);
     try {
       const apiParams = {
+        id: params.id || undefined,
         page: params.page || 1,
         size: params.size || 10,
         status: params.status || undefined,

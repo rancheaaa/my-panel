@@ -96,6 +96,9 @@ public class BatchTransferSubtaskVO implements Serializable {
     /** Agent本地重试次数 */
     private Integer retryCount;
 
+    /** 一对几数量: 1-一对一 2-一对二 N一对N */
+    private Integer targetCount;
+
     /** 最后一次重试时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date lastRetryAt;

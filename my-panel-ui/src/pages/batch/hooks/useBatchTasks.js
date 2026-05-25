@@ -9,7 +9,25 @@ export function useBatchTasks() {
   const fetchTasks = useCallback(async (params = {}) => {
     setLoading(true);
     try {
-      const res = await batchApi.getTaskListWithStatus(params);
+      const apiParams = {
+        page: params.page || 1,
+        size: params.size || 10,
+        status: params.status || undefined,
+        sourceAgentId: params.sourceAgentId || undefined,
+        sourceAgentName: params.sourceAgentName || undefined,
+        taskName: params.taskName || undefined,
+        taskDescription: params.taskDescription || undefined,
+        sourceDir: params.sourceDir || undefined,
+        targetAgentId: params.targetAgentId || undefined,
+        targetAgentName: params.targetAgentName || undefined,
+        targetDir: params.targetDir || undefined,
+        transferMode: params.transferMode || undefined,
+        routingStrategy: params.routingStrategy || undefined,
+        postTransferAction: params.postTransferAction || undefined,
+        retryEnabled: params.retryEnabled !== undefined ? params.retryEnabled : undefined,
+        preserveDirStructure: params.preserveDirStructure !== undefined ? params.preserveDirStructure : undefined
+      };
+      const res = await batchApi.getTaskListWithStatus(apiParams);
       if (res.code === 200) {
         setTasks(res.data || []);
         setPagination(prev => ({
@@ -33,10 +51,10 @@ export function useBatchTasks() {
         await fetchTasks();
         return res.data;
       }
-      return null;
+      throw new Error(res.msg || '创建任务失败');
     } catch (error) {
       console.error('创建任务失败:', error);
-      return null;
+      throw error;
     }
   }, [fetchTasks]);
 

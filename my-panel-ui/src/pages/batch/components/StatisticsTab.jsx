@@ -23,7 +23,7 @@ import {
   CloseCircleOutlined
 } from '@ant-design/icons';
 import { usePolling } from '../hooks/usePolling';
-import * as batchApi from '../../../api/batch';
+import { batchApi } from '../../../api/batch';
 
 const statusConfig = [
   { key: 'total', label: '总任务数', icon: <FileOutlined />, color: '#1890ff', bg: '#e6f7ff', border: '#91d5ff' },
@@ -273,7 +273,7 @@ const StatisticsTab = () => {
                   <div style={{ fontSize: 26, fontWeight: 700, color: '#52c41a', lineHeight: 1.1 }}>{subtaskSummary.completedCount || 0}</div>
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>已完成</div>
                 </div>
-                {(subtaskSummary.totalCount > 0) && <Progress type="circle" percent={subtaskSummary.progressPercent ? Math.min(subtaskSummary.progressPercent.toNumber(), 100) : 0} width={40} strokeColor="#52c41a" style={{ marginTop: -8 }} />}
+                {(subtaskSummary.totalCount > 0) && <Progress type="circle" percent={subtaskSummary.progressPercent ? Math.min(Number(subtaskSummary.progressPercent), 100) : 0} width={40} strokeColor="#52c41a" style={{ marginTop: -8 }} />}
               </div>
             </Card>
           </Col>
@@ -351,11 +351,11 @@ const StatisticsTab = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 13, color: '#666', fontWeight: 500 }}>总体传输进度</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#1890ff' }}>
-                {subtaskSummary.progressPercent ? subtaskSummary.progressPercent.toNumber().toFixed(2) : '0.00'}%
+                {subtaskSummary.progressPercent ? Number(subtaskSummary.progressPercent).toFixed(2) : '0.00'}%
               </span>
             </div>
             <Progress
-              percent={subtaskSummary.progressPercent ? Math.min(subtaskSummary.progressPercent.toNumber(), 100) : 0}
+              percent={subtaskSummary.progressPercent ? Math.min(Number(subtaskSummary.progressPercent), 100) : 0}
               strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
               strokeWidth={12}
               status="active"

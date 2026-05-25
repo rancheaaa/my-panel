@@ -27,22 +27,62 @@ public class BatchStatisticsServiceImpl implements IBatchStatisticsService {
         this.taskMapper = taskMapper;
     }
 
+    private static Object getFromMap(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value != null) {
+            return value;
+        }
+        String upperKey = key.toUpperCase();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static long getLong(Map<String, Object> map, String key) {
+        Object value = getFromMap(map, key);
+        if (value == null) {
+            return 0L;
+        }
+        return ((Number) value).longValue();
+    }
+
+    private static double getDouble(Map<String, Object> map, String key) {
+        Object value = getFromMap(map, key);
+        if (value == null) {
+            return 0D;
+        }
+        return ((Number) value).doubleValue();
+    }
+
+    private static String getString(Map<String, Object> map, String key) {
+        Object value = getFromMap(map, key);
+        if (value == null) {
+            return null;
+        }
+        return value.toString();
+    }
+
     @Override
     public SubtaskSummaryVO getSubtaskSummary() {
         SubtaskSummaryVO vo = new SubtaskSummaryVO();
 
         Map<String, Object> summary = subtaskMapper.countSummary();
-        vo.setTotalCount(((Number) summary.getOrDefault("totalCount", 0L)).longValue());
-        vo.setTotalSizeBytes(((Number) summary.getOrDefault("totalSizeBytes", 0L)).longValue());
-        vo.setCompletedCount(((Number) summary.getOrDefault("completedCount", 0L)).longValue());
-        vo.setCompletedSizeBytes(((Number) summary.getOrDefault("completedSizeBytes", 0L)).longValue());
-        vo.setSendingCount(((Number) summary.getOrDefault("sendingCount", 0L)).longValue());
-        vo.setFailedCount(((Number) summary.getOrDefault("failedCount", 0L)).longValue());
-        vo.setQueuedCount(((Number) summary.getOrDefault("queuedCount", 0L)).longValue());
-        vo.setRetryingCount(((Number) summary.getOrDefault("retryingCount", 0L)).longValue());
+        log.debug("[BatchStatistics] subtaskSummary raw map keys: {}", summary.keySet());
 
-        Long totalTransferred = ((Number) summary.getOrDefault("totalTransferredBytes", 0L)).longValue();
-        Double avgSpeed = (Double) summary.getOrDefault("avgSpeedBytesPerSec", 0D);
+        vo.setTotalCount(getLong(summary, "totalCount"));
+        vo.setTotalSizeBytes(getLong(summary, "totalSizeBytes"));
+        vo.setCompletedCount(getLong(summary, "completedCount"));
+        vo.setCompletedSizeBytes(getLong(summary, "completedSizeBytes"));
+        vo.setSendingCount(getLong(summary, "sendingCount"));
+        vo.setFailedCount(getLong(summary, "failedCount"));
+        vo.setQueuedCount(getLong(summary, "queuedCount"));
+        vo.setRetryingCount(getLong(summary, "retryingCount"));
+
+        long totalTransferred = getLong(summary, "totalTransferredBytes");
+        double avgSpeed = getDouble(summary, "avgSpeedBytesPerSec");
 
         if (vo.getTotalSizeBytes() != null && vo.getTotalSizeBytes() > 0) {
             BigDecimal progress = BigDecimal.valueOf(totalTransferred)
@@ -53,7 +93,7 @@ public class BatchStatisticsServiceImpl implements IBatchStatisticsService {
             vo.setProgressPercent(BigDecimal.ZERO);
         }
 
-        if (avgSpeed != null && avgSpeed > 0) {
+        if (avgSpeed > 0) {
             vo.setAvgSpeedBytesPerSec(BigDecimal.valueOf(avgSpeed).setScale(2, RoundingMode.HALF_UP));
         } else {
             vo.setAvgSpeedBytesPerSec(BigDecimal.ZERO);
@@ -62,9 +102,11 @@ public class BatchStatisticsServiceImpl implements IBatchStatisticsService {
         List<Map<String, Object>> statusList = subtaskMapper.countGroupByStatus();
         Map<String, Long> statusDistribution = new HashMap<>();
         for (Map<String, Object> item : statusList) {
-            String status = (String) item.get("status");
-            Long count = ((Number) item.get("count")).longValue();
-            statusDistribution.put(status, count);
+            String status = getString(item, "status");
+            Long count = getLong(item, "count");
+            if (status != null) {
+                statusDistribution.put(status, count);
+            }
         }
         vo.setStatusDistribution(statusDistribution);
 
@@ -79,18 +121,22 @@ public class BatchStatisticsServiceImpl implements IBatchStatisticsService {
         TaskSummaryVO vo = new TaskSummaryVO();
 
         Map<String, Object> summary = taskMapper.countSummary();
-        vo.setTotalCount(((Number) summary.getOrDefault("totalCount", 0L)).longValue());
-        vo.setReadyCount(((Number) summary.getOrDefault("readyCount", 0L)).longValue());
-        vo.setRunningCount(((Number) summary.getOrDefault("runningCount", 0L)).longValue());
-        vo.setPausedCount(((Number) summary.getOrDefault("pausedCount", 0L)).longValue());
+        log.debug("[BatchStatistics] taskSummary raw map keys: {}", summary.keySet());
+
+        vo.setTotalCount(getLong(summary, "totalCount"));
+        vo.setReadyCount(getLong(summary, "readyCount"));
+        vo.setRunningCount(getLong(summary, "runningCount"));
+        vo.setPausedCount(getLong(summary, "pausedCount"));
         vo.setActiveCount(vo.getRunningCount());
 
         List<Map<String, Object>> statusList = taskMapper.countGroupByStatus();
         Map<String, Long> statusDistribution = new HashMap<>();
         for (Map<String, Object> item : statusList) {
-            String status = (String) item.get("status");
-            Long count = ((Number) item.get("count")).longValue();
-            statusDistribution.put(status, count);
+            String status = getString(item, "status");
+            Long count = getLong(item, "count");
+            if (status != null) {
+                statusDistribution.put(status, count);
+            }
         }
         vo.setStatusDistribution(statusDistribution);
 

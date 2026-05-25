@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, message } from 'antd';
+import { Card, message, Alert } from 'antd';
 import TaskForm from './TaskForm';
 import { useBatchTasks } from '../hooks/useBatchTasks';
 
@@ -17,7 +17,17 @@ const CreateEditTab = () => {
       }
     } catch (error) {
       console.error('创建任务异常:', error);
-      message.error('❌ 创建任务时发生错误: ' + (error.message || '未知错误'));
+      const errorMsg = error.message || error.msg || '未知错误';
+      if (errorMsg.includes('必填字段未填写')) {
+        const fields = errorMsg.replace(/.*必填字段未填写:\s*/, '');
+        const fieldList = fields.split('、').filter(Boolean);
+        message.error({
+          content: '❌ 以下必填字段未填写',
+          duration: 5
+        });
+      } else {
+        message.error('❌ 创建任务时发生错误: ' + errorMsg);
+      }
     }
   };
 

@@ -4,6 +4,7 @@ import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
 import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
+import com.cq.panel.admin.server.web.converter.batch.BatchTransferTaskQueryConverter;
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -33,15 +34,15 @@ class BatchTransferTaskControllerTest {
 
     @Mock
     private AgentDirectoryChecker directoryChecker;
-
-    private BatchTransferTaskController controller;
+    @Mock
+    private BatchTransferTaskQueryConverter queryConverter;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
         // 创建控制器实例
-        controller = new BatchTransferTaskController(batchTransferTaskService, directoryChecker);
+        BatchTransferTaskController controller = new BatchTransferTaskController(batchTransferTaskService, directoryChecker, queryConverter);
         
         // 使用spy包装控制器以支持mock getUserId()
         controller = spy(controller);
@@ -167,7 +168,8 @@ class BatchTransferTaskControllerTest {
             createMockTask(),
             createMockTask()
         );
-        when(batchTransferTaskService.getTaskList(null, null, 1, 10)).thenReturn(mockList);
+        when(queryConverter.toDomain(any())).thenReturn(new BatchTransferTask());
+        when(batchTransferTaskService.getTaskList(any(), eq(1), eq(10))).thenReturn(mockList);
 
         mockMvc.perform(get("/batch/task/list"))
             .andExpect(status().isOk())
@@ -294,8 +296,9 @@ class BatchTransferTaskControllerTest {
     @Test
     @DisplayName("17. 条件过滤查询 - 按状态筛选")
     void testList_withStatusFilter() throws Exception {
-        List<BatchTransferTask> runningTasks = Arrays.asList(createMockTask());
-        when(batchTransferTaskService.getTaskList("RUNNING", null, 1, 10)).thenReturn(runningTasks);
+        List<BatchTransferTask> runningTasks = List.of(createMockTask());
+        when(queryConverter.toDomain(any())).thenReturn(new BatchTransferTask());
+        when(batchTransferTaskService.getTaskList(any(), eq(1), eq(10))).thenReturn(runningTasks);
 
         mockMvc.perform(get("/batch/task/list?status=RUNNING"))
             .andExpect(status().isOk())

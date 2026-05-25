@@ -123,7 +123,19 @@ export const batchApi = {
         pageNum: params?.page || 1,
         pageSize: params?.size || 10,
         status: params?.status || undefined,
-        taskName: params?.keyword || undefined
+        sourceAgentId: params?.sourceAgentId || undefined,
+        sourceAgentName: params?.sourceAgentName || undefined,
+        taskName: params?.taskName || undefined,
+        taskDescription: params?.taskDescription || undefined,
+        sourceDir: params?.sourceDir || undefined,
+        targetAgentId: params?.targetAgentId || undefined,
+        targetAgentName: params?.targetAgentName || undefined,
+        targetDir: params?.targetDir || undefined,
+        transferMode: params?.transferMode || undefined,
+        routingStrategy: params?.routingStrategy || undefined,
+        postTransferAction: params?.postTransferAction || undefined,
+        retryEnabled: params?.retryEnabled !== undefined ? params.retryEnabled : undefined,
+        preserveDirStructure: params?.preserveDirStructure !== undefined ? params.preserveDirStructure : undefined
       }
     });
   },

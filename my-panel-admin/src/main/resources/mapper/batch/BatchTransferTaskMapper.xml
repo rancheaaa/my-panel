@@ -106,15 +106,31 @@
         where id = #{id} and deleted = 0
     </select>
 
-    <select id="selectList" resultMap="BaseResultMap">
-        select <include refid="selectColumns"/>
-        from batch_transfer_task
+    <sql id="queryCondition">
         <where>
             deleted = 0
             <if test="status != null and status != ''">and status = #{status}</if>
             <if test="sourceAgentId != null and sourceAgentId != ''">and source_agent_id = #{sourceAgentId}</if>
+            <if test="sourceAgentName != null and sourceAgentName != ''">and source_agent_name like concat('%', #{sourceAgentName}, '%')</if>
             <if test="createBy != null and createBy != ''">and create_by = #{createBy}</if>
+            <if test="taskName != null and taskName != ''">and task_name like concat('%', #{taskName}, '%')</if>
+            <if test="taskDescription != null and taskDescription != ''">and task_description like concat('%', #{taskDescription}, '%')</if>
+            <if test="sourceDir != null and sourceDir != ''">and source_dir like concat('%', #{sourceDir}, '%')</if>
+            <if test="targetAgentIds != null and targetAgentIds != ''">and target_agent_ids like concat('%', #{targetAgentIds}, '%')</if>
+            <if test="targetAgentNames != null and targetAgentNames != ''">and target_agent_names like concat('%', #{targetAgentNames}, '%')</if>
+            <if test="targetDirs != null and targetDirs != ''">and target_dirs like concat('%', #{targetDirs}, '%')</if>
+            <if test="transferMode != null and transferMode != ''">and transfer_mode = #{transferMode}</if>
+            <if test="routingStrategy != null and routingStrategy != ''">and routing_strategy = #{routingStrategy}</if>
+            <if test="postTransferAction != null and postTransferAction != ''">and post_transfer_action = #{postTransferAction}</if>
+            <if test="retryEnabled != null">and retry_enabled = #{retryEnabled}</if>
+            <if test="preserveDirStructure != null">and preserve_dir_structure = #{preserveDirStructure}</if>
         </where>
+    </sql>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        select <include refid="selectColumns"/>
+        from batch_transfer_task
+        <include refid="queryCondition"/>
         order by create_time desc
     </select>
 
@@ -125,7 +141,19 @@
             deleted = 0
             <if test="query.status != null and query.status != ''">and status = #{query.status}</if>
             <if test="query.sourceAgentId != null and query.sourceAgentId != ''">and source_agent_id = #{query.sourceAgentId}</if>
+            <if test="query.sourceAgentName != null and query.sourceAgentName != ''">and source_agent_name like concat('%', #{query.sourceAgentName}, '%')</if>
             <if test="query.createBy != null and query.createBy != ''">and create_by = #{query.createBy}</if>
+            <if test="query.taskName != null and query.taskName != ''">and task_name like concat('%', #{query.taskName}, '%')</if>
+            <if test="query.taskDescription != null and query.taskDescription != ''">and task_description like concat('%', #{query.taskDescription}, '%')</if>
+            <if test="query.sourceDir != null and query.sourceDir != ''">and source_dir like concat('%', #{query.sourceDir}, '%')</if>
+            <if test="query.targetAgentIds != null and query.targetAgentIds != ''">and target_agent_ids like concat('%', #{query.targetAgentIds}, '%')</if>
+            <if test="query.targetAgentNames != null and query.targetAgentNames != ''">and target_agent_names like concat('%', #{query.targetAgentNames}, '%')</if>
+            <if test="query.targetDirs != null and query.targetDirs != ''">and target_dirs like concat('%', #{query.targetDirs}, '%')</if>
+            <if test="query.transferMode != null and query.transferMode != ''">and transfer_mode = #{query.transferMode}</if>
+            <if test="query.routingStrategy != null and query.routingStrategy != ''">and routing_strategy = #{query.routingStrategy}</if>
+            <if test="query.postTransferAction != null and query.postTransferAction != ''">and post_transfer_action = #{query.postTransferAction}</if>
+            <if test="query.retryEnabled != null">and retry_enabled = #{query.retryEnabled}</if>
+            <if test="query.preserveDirStructure != null">and preserve_dir_structure = #{query.preserveDirStructure}</if>
         </where>
         order by create_time desc
         limit #{offset}, #{limit}
@@ -155,7 +183,7 @@
     <select id="countToday" resultType="java.lang.Long">
         select count(*)
         from batch_transfer_task
-        where date(create_time) = curdate() and deleted = 0
+        where cast(create_time as date) = current_date and deleted = 0
     </select>
 
 </mapper>

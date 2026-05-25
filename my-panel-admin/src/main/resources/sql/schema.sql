@@ -643,7 +643,8 @@ CREATE TABLE IF NOT EXISTS `monitor_metric_sample` (
     KEY `idx_mms_time` (`sample_time`),
     KEY `idx_mms_category_name_time` (`metric_category`, `metric_name`, `sample_time`),
     KEY `idx_mms_scope_time` (`metric_scope`, `sample_time`),
-    KEY `idx_mms_service` (`service_id`, `sample_time`)
+    KEY `idx_mms_service` (`service_id`, `sample_time`),
+    KEY `idx_mms_group_latest` (`metric_category`, `metric_name`, `metric_scope`, `sample_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控指标采样明细';
 
 CREATE TABLE IF NOT EXISTS `monitor_alert_rule` (

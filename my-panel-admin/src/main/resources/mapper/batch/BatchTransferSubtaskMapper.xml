@@ -193,7 +193,7 @@
     <select id="countToday" resultType="java.lang.Long">
         select count(*)
         from batch_transfer_subtask
-        where date(create_time) = curdate()
+        where cast(create_time as date) = current_date
     </select>
 
 </mapper>

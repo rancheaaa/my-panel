@@ -205,23 +205,14 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
     }
 
     @Override
-    public List<BatchTransferTask> getTaskList(String status, String sourceAgentId, Integer pageNum, Integer pageSize) {
-        BatchTransferTask query = new BatchTransferTask();
-
-        if (status != null && !status.isEmpty()) {
-            query.setStatus(status);
-        }
-        if (sourceAgentId != null && !sourceAgentId.isEmpty()) {
-            query.setSourceAgentId(sourceAgentId);
-        }
-
+    public List<BatchTransferTask> getTaskList(BatchTransferTask query, Integer pageNum, Integer pageSize) {
         int offset = (pageNum - 1) * pageSize;
         return taskMapper.selectPageList(query, offset, pageSize);
     }
 
     @Override
-    public List<TaskListWithStatusVO> getTaskListWithNodeStatus(String status, String sourceAgentId, Integer pageNum, Integer pageSize) {
-        List<BatchTransferTask> tasks = getTaskList(status, sourceAgentId, pageNum, pageSize);
+    public List<TaskListWithStatusVO> getTaskListWithNodeStatus(BatchTransferTask query, Integer pageNum, Integer pageSize) {
+        List<BatchTransferTask> tasks = getTaskList(query, pageNum, pageSize);
         List<TaskListWithStatusVO> result = new ArrayList<>();
 
         for (BatchTransferTask task : tasks) {
@@ -371,29 +362,31 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         if (dto == null) {
             throw new IllegalArgumentException("任务信息不能为空");
         }
+        List<String> missingFields = new ArrayList<>();
         if (dto.getTaskName() == null || dto.getTaskName().trim().isEmpty()) {
-            throw new IllegalArgumentException("任务名称不能为空");
+            missingFields.add("任务名称");
         }
         if (dto.getSourceAgentId() == null || dto.getSourceAgentId().trim().isEmpty()) {
-            throw new IllegalArgumentException("源Agent ID不能为空");
+            missingFields.add("源节点");
         }
         if (dto.getSourceDir() == null || dto.getSourceDir().trim().isEmpty()) {
-            throw new IllegalArgumentException("源目录不能为空");
-        }
-        if (dto.getTargetDirs() == null || dto.getTargetDirs().trim().isEmpty()) {
-            throw new IllegalArgumentException("目标目录不能为空");
+            missingFields.add("源目录");
         }
         if (dto.getTargetAgentIds() == null || dto.getTargetAgentIds().isEmpty()) {
-            throw new IllegalArgumentException("目标Agent列表不能为空");
+            missingFields.add("目标节点");
         }
-        if (dto.getTargetAgentNames() == null || dto.getTargetAgentNames().isEmpty()) {
-            throw new IllegalArgumentException("目标节点名称列表不能为空");
+        if (dto.getTargetDirs() == null || dto.getTargetDirs().trim().isEmpty()) {
+            missingFields.add("目标目录");
+        }
+        if (dto.getScanCronExpression() == null || dto.getScanCronExpression().trim().isEmpty()) {
+            missingFields.add("执行频率(Cron)");
+        }
+        if (!missingFields.isEmpty()) {
+            throw new IllegalArgumentException("以下必填字段未填写: " + String.join("、", missingFields));
         }
 
-        if (dto.getScanCronExpression() != null && !dto.getScanCronExpression().trim().isEmpty()) {
-            if (!cronValidator.isValid(dto.getScanCronExpression())) {
-                throw new IllegalArgumentException("无效的Cron表达式: " + cronValidator.getErrorMessage(dto.getScanCronExpression()));
-            }
+        if (!cronValidator.isValid(dto.getScanCronExpression())) {
+            throw new IllegalArgumentException("无效的Cron表达式: " + cronValidator.getErrorMessage(dto.getScanCronExpression()));
         }
     }
 

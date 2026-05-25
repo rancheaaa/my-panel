@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input, Pagination, Dropdown } from 'antd';
+import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input, Pagination, Dropdown, Form, Select } from 'antd';
 const { Search } = Input;
+const { Option } = Select;
 import {
   PlayCircleOutlined,
   PauseCircleOutlined,
@@ -17,7 +18,9 @@ import {
   ClockCircleOutlined,
   SyncOutlined,
   SwapOutlined,
-  ColumnHeightOutlined
+  ColumnHeightOutlined,
+  DownOutlined,
+  UpOutlined
 } from '@ant-design/icons';
 import '../index.scss';
 
@@ -80,13 +83,13 @@ const dirExistsText = (dirExists, nodeStatus) => {
   return '未知';
 };
 
-const TaskListTab = ({ 
-  onCreateClick, 
+const TaskListTab = ({
+  onCreateClick,
   onEditClick,
   onViewClick,
-  tasks, 
-  loading, 
-  pagination, 
+  tasks,
+  loading,
+  pagination,
   fetchTasks,
   startTask,
   pauseTask,
@@ -94,19 +97,28 @@ const TaskListTab = ({
   stopTask,
   deleteTask
 }) => {
-  const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState(null);
+  const [searchForm] = Form.useForm();
   const [tableSize, setTableSize] = useState('middle');
+  const [expandSearch, setExpandSearch] = useState(false);
 
-  const filteredData = (tasks || []).filter(item => {
-    const t = item.task || item;
-    const matchSearch = !searchText ||
-      t.taskName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      t.sourceAgentId?.toLowerCase().includes(searchText.toLowerCase()) ||
-      t.sourceDir?.toLowerCase().includes(searchText.toLowerCase());
-    const matchStatus = !statusFilter || t.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const handleSearch = (values) => {
+    const params = {
+      page: 1,
+      size: pagination.pageSize || 10,
+      ...values
+    };
+    fetchTasks(params);
+  };
+
+  const handleReset = () => {
+    searchForm.resetFields();
+    fetchTasks({ page: 1, size: pagination.pageSize || 10 });
+  };
+
+  const handlePageChange = (page, size) => {
+    const values = searchForm.getFieldsValue();
+    fetchTasks({ page, size, ...values });
+  };
 
   const columns = [
     {
@@ -226,15 +238,6 @@ const TaskListTab = ({
       title: '状态',
       key: 'status',
       width: 100,
-      filters: [
-        { text: '就绪', value: 'READY' },
-        { text: '运行中', value: 'RUNNING' },
-        { text: '已暂停', value: 'PAUSED' },
-        { text: '已停止', value: 'STOPPED' },
-        { text: '已完成', value: 'COMPLETED' },
-        { text: '异常', value: 'ERROR' }
-      ],
-      onFilter: (value) => setStatusFilter(value),
       render: (_, record) => {
         const t = record.task || record;
         const s = statusMap[t.status] || statusMap.READY;
@@ -572,19 +575,141 @@ const TaskListTab = ({
     );
   };
 
+  const renderSearchForm = () => {
+    const basicFields = (
+      <>
+        <Col span={6}>
+          <Form.Item name="taskName" label="任务名称">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="status" label="任务状态">
+            <Select placeholder="精确匹配" allowClear>
+              <Option value="READY">就绪</Option>
+              <Option value="RUNNING">运行中</Option>
+              <Option value="PAUSED">已暂停</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="sourceAgentId" label="源Agent ID">
+            <Input placeholder="精确匹配" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="sourceAgentName" label="源节点名称">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+      </>
+    );
+
+    const extraFields = expandSearch ? (
+      <>
+        <Col span={6}>
+          <Form.Item name="sourceDir" label="源目录">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="targetAgentId" label="目标Agent ID">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="targetAgentName" label="目标节点名称">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="targetDir" label="目标目录">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="transferMode" label="传输模式">
+            <Select placeholder="精确匹配" allowClear>
+              <Option value="ONE_TO_ONE">一对一</Option>
+              <Option value="ONE_TO_MANY">一对多</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="routingStrategy" label="路由策略">
+            <Select placeholder="精确匹配" allowClear>
+              <Option value="ROUND_ROBIN">轮询</Option>
+              <Option value="RANDOM">随机</Option>
+              <Option value="REGION_BASED">区域</Option>
+              <Option value="BROADCAST">广播</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="postTransferAction" label="传输后操作">
+            <Select placeholder="精确匹配" allowClear>
+              <Option value="NONE">无操作</Option>
+              <Option value="DELETE">删除源文件</Option>
+              <Option value="BACKUP">备份</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="retryEnabled" label="启用重试">
+            <Select placeholder="精确匹配" allowClear>
+              <Option value={1}>是</Option>
+              <Option value={0}>否</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="preserveDirStructure" label="保持目录结构">
+            <Select placeholder="精确匹配" allowClear>
+              <Option value={1}>是</Option>
+              <Option value={0}>否</Option>
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item name="taskDescription" label="任务描述">
+            <Input placeholder="模糊搜索" allowClear />
+          </Form.Item>
+        </Col>
+      </>
+    ) : null;
+
+    return (
+      <Card size="small" className="search-card" bordered={false}>
+        <Form
+          form={searchForm}
+          onFinish={handleSearch}
+          autoComplete="off"
+        >
+          <Row gutter={[16, 8]}>
+            {basicFields}
+            {extraFields}
+            <Col span={24} style={{ textAlign: 'right' }}>
+              <Space>
+                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>搜索</Button>
+                <Button onClick={handleReset}>重置</Button>
+                <Button
+                  type="link"
+                  onClick={() => setExpandSearch(!expandSearch)}
+                  icon={expandSearch ? <UpOutlined /> : <DownOutlined />}
+                >
+                  {expandSearch ? '收起' : '展开'}
+                </Button>
+              </Space>
+            </Col>
+          </Row>
+        </Form>
+      </Card>
+    );
+  };
+
   return (
     <>
-      <Card size="small" className="search-card" bordered={false}>
-        <Search
-          placeholder="搜索任务名、Agent ID、目录..."
-          allowClear
-          size="middle"
-          prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-          onChange={(e) => setSearchText(e.target.value)}
-          style={{ width: 400 }}
-          onSearch={() => fetchTasks()}
-        />
-      </Card>
+      {renderSearchForm()}
 
       <Card size="small" className="table-card" bordered={false}>
         <div className="subtask-toolbar">
@@ -618,7 +743,7 @@ const TaskListTab = ({
         <div className="subtask-table-container">
           <Table
             columns={columns}
-            dataSource={filteredData}
+            dataSource={tasks || []}
             rowKey={(record) => { const t = record.task || record; return t.id; }}
             loading={loading}
             expandable={{
@@ -637,7 +762,7 @@ const TaskListTab = ({
             pageSize={pagination.pageSize || 10}
             total={pagination.total}
             showTotal={(t) => `共 ${t} 条`}
-            onChange={(page, size) => fetchTasks({ page, size, status: statusFilter, keyword: searchText })}
+            onChange={handlePageChange}
             showSizeChanger
             pageSizeOptions={['10', '20', '50']}
             showQuickJumper

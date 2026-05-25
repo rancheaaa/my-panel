@@ -5,7 +5,9 @@ import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
 import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskQuery;
 import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
+import com.cq.panel.admin.server.web.converter.batch.BatchTransferTaskQueryConverter;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
@@ -31,11 +33,14 @@ public class BatchTransferTaskController extends BaseController {
 
     private final IBatchTransferTaskService batchTransferTaskService;
     private final AgentDirectoryChecker directoryChecker;
+    private final BatchTransferTaskQueryConverter queryConverter;
 
     public BatchTransferTaskController(IBatchTransferTaskService batchTransferTaskService,
-                                       AgentDirectoryChecker directoryChecker) {
+                                       AgentDirectoryChecker directoryChecker,
+                                       BatchTransferTaskQueryConverter queryConverter) {
         this.batchTransferTaskService = batchTransferTaskService;
         this.directoryChecker = directoryChecker;
+        this.queryConverter = queryConverter;
     }
 
     /**
@@ -117,29 +122,18 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "查询任务列表", description = "根据状态、源Agent等条件分页查询任务列表")
     @RequirePermission("batch:task:list")
     @GetMapping("/list")
-    public Result<List<BatchTransferTask>> list(
-            @Parameter(description = "任务状态(可选): READY/RUNNING/PAUSED") @RequestParam(required = false) String status,
-            @Parameter(description = "源Agent ID(可选)") @RequestParam(required = false) String sourceAgentId,
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer pageSize) {
-        
-        List<BatchTransferTask> list = batchTransferTaskService.getTaskList(status, sourceAgentId, pageNum, pageSize);
+    public Result<List<BatchTransferTask>> list(BatchTransferTaskQuery query) {
+        BatchTransferTask domain = queryConverter.toDomain(query);
+        List<BatchTransferTask> list = batchTransferTaskService.getTaskList(domain, query.getPageNum(), query.getPageSize());
         return Result.success(list);
     }
 
-    /**
-     * 查询任务列表（包含节点在线状态和目录存在状态）
-     */
     @Operation(summary = "查询任务列表（带节点状态）", description = "查询任务列表，同时返回源节点和目标节点的在线状态及目录是否存在")
     @RequirePermission("batch:task:list")
     @GetMapping("/list-with-status")
-    public Result<List<TaskListWithStatusVO>> listWithStatus(
-            @Parameter(description = "任务状态(可选): READY/RUNNING/PAUSED") @RequestParam(required = false) String status,
-            @Parameter(description = "源Agent ID(可选)") @RequestParam(required = false) String sourceAgentId,
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer pageNum,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "10") Integer pageSize) {
-        
-        List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(status, sourceAgentId, pageNum, pageSize);
+    public Result<List<TaskListWithStatusVO>> listWithStatus(BatchTransferTaskQuery query) {
+        BatchTransferTask domain = queryConverter.toDomain(query);
+        List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(domain, query.getPageNum(), query.getPageSize());
         return Result.success(list);
     }
 

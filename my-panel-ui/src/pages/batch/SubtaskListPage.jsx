@@ -613,7 +613,7 @@ const SubtaskListPage = () => {
               rowKey="id"
               loading={loading}
               size={tableSize}
-              scroll={{ x: 2130, y: 'calc(100vh - 550px)' }}
+              scroll={{ x: 2130, y: 'calc(100vh - 500px)' }}
               pagination={false}
               rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
             />

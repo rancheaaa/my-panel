@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag, Space } from 'antd';
+import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag, Space, message } from 'antd';
 import {
   FileTextOutlined,
   CloudServerOutlined,
@@ -213,6 +213,43 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
     onSubmit(data);
   };
 
+  const onFinishFailed = ({ values, errorFields, outOfDate }) => {
+    const fieldLabels = {
+      taskName: '任务名称',
+      sourceAgentId: '源节点',
+      sourceDir: '源目录',
+      scanCronExpression: '执行频率(Cron)',
+      targets: '目标节点',
+      includePatterns: '文件匹配规则(包含/排除模式)',
+      excludePatterns: '文件匹配规则(包含/排除模式)',
+      routingConfig: '区域路由配置',
+      backupDir: '备份目录'
+    };
+    const missingFields = errorFields.map(err => {
+      const name = Array.isArray(err.name) ? err.name.join('.') : err.name;
+      if (name.startsWith('targets.')) {
+        const idx = name.match(/targets\.(\d+)/)?.[1];
+        const field = name.match(/targets\.\d+\.(.+)/)?.[1];
+        return `目标节点${idx ? '[' + (parseInt(idx) + 1) + ']' : ''}的${fieldLabels[field] || field}`;
+      }
+      return fieldLabels[name] || name;
+    });
+    const dedupedFields = [...new Set(missingFields)];
+    message.error({
+      content: (
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>以下必填字段未填写：</div>
+          <div>{dedupedFields.map((f, i) => <div key={i}>{i + 1}. {f}</div>)}</div>
+        </div>
+      ),
+      duration: 6
+    });
+    const firstErrorField = errorFields[0]?.name;
+    if (firstErrorField) {
+      form.scrollToField(firstErrorField, { scrollBehavior: 'smooth', block: 'center' });
+    }
+  };
+
   return (
     <div style={{ width: '100%' }}>
         <Form
@@ -220,6 +257,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
           layout="vertical"
           initialValues={initialValues}
           onFinish={onFinish}
+          onFinishFailed={onFinishFailed}
           requiredMark={false}
           size="middle"
           style={{ marginTop: 4 }}

@@ -28,11 +28,11 @@ public interface IBatchTransferTaskService {
 
     BatchTransferTask getTaskById(Long taskId);
 
-    List<BatchTransferTask> getTaskList(String status, String sourceAgentId, Integer pageNum, Integer pageSize);
+    List<BatchTransferTask> getTaskList(BatchTransferTask query, Integer pageNum, Integer pageSize);
 
     Map<String, Object> getStatistics();
 
     Map<String, Object> getTaskStatistics(Long taskId);
 
-    List<TaskListWithStatusVO> getTaskListWithNodeStatus(String status, String sourceAgentId, Integer pageNum, Integer pageSize);
+    List<TaskListWithStatusVO> getTaskListWithNodeStatus(BatchTransferTask query, Integer pageNum, Integer pageSize);
 }

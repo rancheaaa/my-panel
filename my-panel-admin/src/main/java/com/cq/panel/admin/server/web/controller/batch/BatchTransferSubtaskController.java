@@ -76,7 +76,7 @@ public class BatchTransferSubtaskController extends BaseController {
         if (list == null || list.isEmpty()) {
             return Result.error("子任务不存在: " + id);
         }
-        return Result.success(subtaskConverter.toVO(list.get(0)));
+        return Result.success(subtaskConverter.toVO(list.getFirst()));
     }
 
     @Operation(summary = "根据任务ID查询子任务", description = "查询指定任务下的所有文件传输明细")

@@ -23,7 +23,6 @@ import java.util.Map;
 
 /**
  * 批量传输任务 Controller
- * 
  * 提供任务的CRUD、状态管理、查询统计等REST API接口
  */
 @Tag(name = "批量传输任务管理", description = "批量传输任务相关接口")

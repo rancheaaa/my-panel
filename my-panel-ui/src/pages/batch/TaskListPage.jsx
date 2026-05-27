@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Modal, Typography, message } from 'antd';
 import { PlusCircleOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import TaskListTab from './components/TaskListTab';
 import TaskForm from './components/TaskForm';
 import { useBatchTasks } from './hooks/useBatchTasks';
@@ -132,6 +133,10 @@ const TaskListPage = () => {
       })(),
       maxScanFiles: task.maxScanFiles || 1000,
       scanCronExpression: task.scanCronExpression,
+      scheduledEnabled: task.scheduledEnabled === 1,
+      scheduledStartTime: task.scheduledStartTime ? dayjs(task.scheduledStartTime, 'HH:mm:ss') : undefined,
+      scheduledEndTime: task.scheduledEndTime ? dayjs(task.scheduledEndTime, 'HH:mm:ss') : undefined,
+      taskPriority: task.taskPriority,
       postTransferAction: task.postTransferAction || 'NONE',
       backupDir: task.backupDir,
       backupMode: task.backupMode || 'COPY',

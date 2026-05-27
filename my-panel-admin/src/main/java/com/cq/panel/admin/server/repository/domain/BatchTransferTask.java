@@ -97,6 +97,18 @@ public class BatchTransferTask extends BaseEntity {
     /** 任务运行状态: READY/RUNNING/PAUSED */
     private String status;
 
+    /** 是否开启定时传输: 0-否 1-是 */
+    private Integer scheduledEnabled;
+
+    /** 定时传输开始时间(HH:mm:ss) */
+    private String scheduledStartTime;
+
+    /** 定时传输结束时间(HH:mm:ss) */
+    private String scheduledEndTime;
+
+    /** 任务优先级: 1-最高 10-最低, 默认5 */
+    private Integer taskPriority;
+
     /** 首次启动时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date startedAt;

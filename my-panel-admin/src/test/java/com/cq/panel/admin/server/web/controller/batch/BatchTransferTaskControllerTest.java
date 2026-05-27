@@ -1,9 +1,9 @@
 package com.cq.panel.admin.server.web.controller.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
-import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
-import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
+import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
+import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
 import com.cq.panel.admin.server.web.converter.batch.BatchTransferTaskQueryConverter;
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
@@ -60,7 +60,7 @@ class BatchTransferTaskControllerTest {
     @Test
     @DisplayName("1. POST /batch/task - 创建任务成功")
     void testCreate_success() throws Exception {
-        when(batchTransferTaskService.createTask(any(BatchTransferTaskDTO.class), anyString()))
+        when(batchTransferTaskService.createTask(any(BatchTransferTaskCreateDTO.class), anyString()))
             .thenReturn(100L);
 
         mockMvc.perform(post("/batch/task")
@@ -77,7 +77,7 @@ class BatchTransferTaskControllerTest {
     @DisplayName("2. POST /batch/task - 参数验证失败")
     void testCreate_validationError() throws Exception {
         doThrow(new IllegalArgumentException("任务名称不能为空"))
-            .when(batchTransferTaskService).createTask(any(BatchTransferTaskDTO.class), anyString());
+            .when(batchTransferTaskService).createTask(any(BatchTransferTaskCreateDTO.class), anyString());
 
         String invalidJson = "{\"taskName\":\"\"}";
 
@@ -95,7 +95,7 @@ class BatchTransferTaskControllerTest {
     @DisplayName("3. POST /batch/task - 通配符冲突异常")
     void testCreate_conflictError() throws Exception {
         doThrow(new IllegalStateException("检测到通配符冲突!"))
-            .when(batchTransferTaskService).createTask(any(BatchTransferTaskDTO.class), anyString());
+            .when(batchTransferTaskService).createTask(any(BatchTransferTaskCreateDTO.class), anyString());
 
         mockMvc.perform(post("/batch/task")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -109,7 +109,7 @@ class BatchTransferTaskControllerTest {
     @Test
     @DisplayName("4. PUT /batch/task/{id} - 更新任务成功")
     void testUpdate_success() throws Exception {
-        doNothing().when(batchTransferTaskService).updateTask(anyLong(), any(BatchTransferTaskDTO.class), anyString());
+        doNothing().when(batchTransferTaskService).updateTask(anyLong(), any(BatchTransferTaskCreateDTO.class), anyString());
 
         mockMvc.perform(put("/batch/task/1")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -117,7 +117,7 @@ class BatchTransferTaskControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200));
 
-        verify(batchTransferTaskService, times(1)).updateTask(eq(1L), any(BatchTransferTaskDTO.class), anyString());
+        verify(batchTransferTaskService, times(1)).updateTask(eq(1L), any(BatchTransferTaskCreateDTO.class), anyString());
         System.out.println("✅ 更新任务API成功");
     }
 

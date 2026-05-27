@@ -1,7 +1,7 @@
 package com.cq.panel.admin.server.web.converter.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskQuery;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskQueryDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
@@ -32,5 +32,5 @@ public interface BatchTransferTaskQueryConverter {
     @Mapping(target = "updateBy", ignore = true)
     @Mapping(target = "updateTime", ignore = true)
     @Mapping(target = "remark", ignore = true)
-    BatchTransferTask toDomain(BatchTransferTaskQuery query);
+    BatchTransferTask toDomain(BatchTransferTaskQueryDTO query);
 }

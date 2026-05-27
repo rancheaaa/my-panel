@@ -6,12 +6,9 @@ import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
-import com.cq.panel.admin.server.service.batch.impl.BatchTransferTaskServiceImpl;
-import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
-import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
-import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
-import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
+import com.cq.panel.admin.server.repository.service.impl.BatchTransferTaskServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
@@ -82,7 +79,7 @@ class BatchTransferTaskServiceTest {
     @Test
     @DisplayName("1. 创建任务成功 - 返回任务ID")
     void testCreateTask_success_returnsId() {
-        BatchTransferTaskDTO dto = createValidDTO("新测试任务");
+        BatchTransferTaskCreateDTO dto = createValidDTO("新测试任务");
         
         when(taskMapper.insert(any(BatchTransferTask.class))).thenAnswer(invocation -> {
             BatchTransferTask task = invocation.getArgument(0);
@@ -111,7 +108,7 @@ class BatchTransferTaskServiceTest {
             .thenReturn(Arrays.asList("*.log"))
             .thenReturn(Arrays.asList("debug*"));
 
-        BatchTransferTaskDTO dto = createValidDTO("冲突任务");
+        BatchTransferTaskCreateDTO dto = createValidDTO("冲突任务");
         dto.setSourceDir("/var/log/app");
         dto.setIncludePatterns(Arrays.asList("*.log"));
 
@@ -136,7 +133,7 @@ class BatchTransferTaskServiceTest {
         });
         when(eventMapper.insertEvent(any())).thenReturn(1);
 
-        BatchTransferTaskDTO dto = createValidDTO("事务测试任务");
+        BatchTransferTaskCreateDTO dto = createValidDTO("事务测试任务");
         Long taskId = taskService.createTask(dto, "admin");
 
         ArgumentCaptor<BatchTransferTask> taskCaptor = ArgumentCaptor.forClass(BatchTransferTask.class);
@@ -155,7 +152,7 @@ class BatchTransferTaskServiceTest {
     @Test
     @DisplayName("4. 缺少必填字段 - 验证错误")
     void testCreateTask_missingRequiredField_validationError() {
-        BatchTransferTaskDTO dto = new BatchTransferTaskDTO();
+        BatchTransferTaskCreateDTO dto = new BatchTransferTaskCreateDTO();
         dto.setTaskName(null);
 
         assertThrows(IllegalArgumentException.class, () -> 
@@ -168,7 +165,7 @@ class BatchTransferTaskServiceTest {
     @Test
     @DisplayName("5. 空任务名 - 验证错误")
     void testCreateTask_emptyName_validationError() {
-        BatchTransferTaskDTO dto = createValidDTO("");
+        BatchTransferTaskCreateDTO dto = createValidDTO("");
         dto.setTaskName("");
 
         assertThrows(IllegalArgumentException.class, () -> 
@@ -185,7 +182,7 @@ class BatchTransferTaskServiceTest {
         when(eventMapper.insertEvent(any())).thenReturn(1);
         when(configSerializer.serializeForAgent(any())).thenReturn("{\"taskId\":1,\"taskName\":\"Payload测试任务\",\"targetAgents\":[{\"agentId\":\"agent-003\",\"agentName\":\"root@node3:7777\"}]}");
 
-        BatchTransferTaskDTO dto = createValidDTO("Payload测试任务");
+        BatchTransferTaskCreateDTO dto = createValidDTO("Payload测试任务");
         dto.setIncludePatterns(Arrays.asList("*.txt", "*.log"));
         dto.setTargetAgentIds(Arrays.asList("agent-003"));
         dto.setTargetAgentNames(Arrays.asList("root@node3:7777"));
@@ -209,7 +206,7 @@ class BatchTransferTaskServiceTest {
     void testCreateTask_defaultStatusReady() {
         when(taskMapper.insert(any())).thenReturn(1);
 
-        BatchTransferTaskDTO dto = createValidDTO("默认状态测试");
+        BatchTransferTaskCreateDTO dto = createValidDTO("默认状态测试");
         taskService.createTask(dto, "test-user");
 
         ArgumentCaptor<BatchTransferTask> taskCaptor = ArgumentCaptor.forClass(BatchTransferTask.class);
@@ -227,7 +224,7 @@ class BatchTransferTaskServiceTest {
         when(configSerializer.serializeForAgent(any())).thenReturn("{}");
         when(configSerializer.serialize(any(List.class))).thenReturn("[\"root@node1:7777\",\"root@node2:7777\"]");
 
-        BatchTransferTaskDTO dto = createValidDTO("Agent名称测试");
+        BatchTransferTaskCreateDTO dto = createValidDTO("Agent名称测试");
         dto.setSourceAgentName("root@192.168.1.100:8888");
         dto.setTargetAgentNames(Arrays.asList("root@node1:7777", "root@node2:7777"));
 
@@ -253,7 +250,7 @@ class BatchTransferTaskServiceTest {
         when(taskMapper.selectById(anyLong())).thenReturn(createExistingTask());
         when(taskMapper.updateById(any())).thenReturn(1);
 
-        BatchTransferTaskDTO dto = createValidDTO("更新后的任务名");
+        BatchTransferTaskCreateDTO dto = createValidDTO("更新后的任务名");
         taskService.updateTask(1L, dto, "test-user");
 
         ArgumentCaptor<BatchTransferTask> captor = ArgumentCaptor.forClass(BatchTransferTask.class);
@@ -277,7 +274,7 @@ class BatchTransferTaskServiceTest {
             .thenReturn(Arrays.asList("*.log"))
             .thenReturn(Arrays.asList("debug*"));
 
-        BatchTransferTaskDTO dto = createValidDTO("冲突更新任务");
+        BatchTransferTaskCreateDTO dto = createValidDTO("冲突更新任务");
         dto.setSourceDir("/var/log/app");
         dto.setIncludePatterns(Arrays.asList("*.log"));
 
@@ -294,7 +291,7 @@ class BatchTransferTaskServiceTest {
         when(taskMapper.selectById(anyLong())).thenReturn(createExistingTask());
         when(taskMapper.updateById(any())).thenReturn(1);
 
-        BatchTransferTaskDTO dto = createValidDTO("事件测试任务");
+        BatchTransferTaskCreateDTO dto = createValidDTO("事件测试任务");
         taskService.updateTask(1L, dto, "test-user");
 
         ArgumentCaptor<BatchSyncEvent> eventCaptor = ArgumentCaptor.forClass(BatchSyncEvent.class);
@@ -460,8 +457,8 @@ class BatchTransferTaskServiceTest {
 
     // ==================== 辅助方法 ====================
 
-    private BatchTransferTaskDTO createValidDTO(String taskName) {
-        BatchTransferTaskDTO dto = new BatchTransferTaskDTO();
+    private BatchTransferTaskCreateDTO createValidDTO(String taskName) {
+        BatchTransferTaskCreateDTO dto = new BatchTransferTaskCreateDTO();
         dto.setTaskName(taskName);
         dto.setTaskDescription("测试任务描述");
         dto.setSourceAgentId("agent-003");

@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.impl;
+package com.cq.panel.admin.server.repository.service.impl;
 
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.domain.BatchSyncEvent;
@@ -7,16 +7,14 @@ import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
-import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
-import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
-import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
-import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
-import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
+import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
+import com.cq.panel.admin.server.service.batch.BatchConfigSerializer;
+import com.cq.panel.admin.server.service.batch.CronExpressionValidator;
+import com.cq.panel.admin.server.service.batch.WildcardConflictDetector;
 import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.TaskNodeStatusVO;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +62,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long createTask(BatchTransferTaskDTO dto, String userId) {
+    public Long createTask(BatchTransferTaskCreateDTO dto, String userId) {
         validateCreateTask(dto);
 
         checkWildcardConflict(dto);
@@ -87,7 +85,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateTask(Long taskId, BatchTransferTaskDTO dto, String userId) {
+    public void updateTask(Long taskId, BatchTransferTaskCreateDTO dto, String userId) {
         BatchTransferTask existingTask = getExistingTask(taskId);
 
         checkWildcardConflictForUpdate(dto, existingTask);
@@ -358,7 +356,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         return stats;
     }
 
-    private void validateCreateTask(BatchTransferTaskDTO dto) {
+    private void validateCreateTask(BatchTransferTaskCreateDTO dto) {
         if (dto == null) {
             throw new IllegalArgumentException("任务信息不能为空");
         }
@@ -390,7 +388,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         }
     }
 
-    private void checkWildcardConflict(BatchTransferTaskDTO dto) {
+    private void checkWildcardConflict(BatchTransferTaskCreateDTO dto) {
         if (dto.getIncludePatterns() != null && !dto.getIncludePatterns().isEmpty()) {
             BatchTransferTask query = new BatchTransferTask();
             query.setSourceAgentId(dto.getSourceAgentId());
@@ -421,7 +419,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         }
     }
 
-    private void checkWildcardConflictForUpdate(BatchTransferTaskDTO dto, BatchTransferTask existingTask) {
+    private void checkWildcardConflictForUpdate(BatchTransferTaskCreateDTO dto, BatchTransferTask existingTask) {
         if (dto.getIncludePatterns() != null && !dto.getIncludePatterns().isEmpty()) {
             BatchTransferTask query = new BatchTransferTask();
             query.setSourceAgentId(dto.getSourceAgentId());
@@ -463,7 +461,7 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         return task;
     }
 
-    private BatchTransferTask convertToEntity(BatchTransferTaskDTO dto) {
+    private BatchTransferTask convertToEntity(BatchTransferTaskCreateDTO dto) {
         BatchTransferTask task = new BatchTransferTask();
         task.setTaskName(dto.getTaskName());
         task.setTaskDescription(dto.getTaskDescription());
@@ -489,6 +487,10 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         task.setTransferMode(dto.getTransferMode() != null ? dto.getTransferMode() : "ONE_TO_MANY");
         task.setRoutingStrategy(dto.getRoutingStrategy() != null ? dto.getRoutingStrategy() : "BROADCAST");
         task.setRoutingConfig(dto.getRoutingConfig());
+        task.setScheduledEnabled(dto.getScheduledEnabled() != null ? dto.getScheduledEnabled() : 0);
+        task.setScheduledStartTime(dto.getScheduledStartTime());
+        task.setScheduledEndTime(dto.getScheduledEndTime());
+        task.setTaskPriority(dto.getTaskPriority() != null ? dto.getTaskPriority() : 5);
         task.setRemark(dto.getRemark());
         return task;
     }

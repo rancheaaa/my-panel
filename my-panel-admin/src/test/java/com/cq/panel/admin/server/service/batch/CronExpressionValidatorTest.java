@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.util;
+package com.cq.panel.admin.server.service.batch;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

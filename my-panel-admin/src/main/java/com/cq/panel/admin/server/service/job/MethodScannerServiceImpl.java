@@ -1,6 +1,5 @@
-package com.cq.panel.admin.server.service.impl;
+package com.cq.panel.admin.server.service.job;
 
-import com.cq.panel.admin.server.service.IMethodScannerService;
 import com.cq.panel.admin.server.web.domain.vo.monitor.MethodInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.MethodValidationVO;
 import com.fasterxml.jackson.databind.ObjectMapper;

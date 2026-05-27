@@ -3,10 +3,10 @@ package com.cq.panel.admin.server.web.controller.batch;
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
-import com.cq.panel.admin.server.service.batch.IBatchTransferTaskService;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskQuery;
-import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
+import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskQueryDTO;
+import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
 import com.cq.panel.admin.server.web.converter.batch.BatchTransferTaskQueryConverter;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
 import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
@@ -49,7 +49,7 @@ public class BatchTransferTaskController extends BaseController {
     @Log(title = "批量传输任务", businessType = BusinessType.INSERT)
     @RequirePermission("batch:task:add")
     @PostMapping
-    public Result<Long> create(@Validated @RequestBody BatchTransferTaskDTO dto) {
+    public Result<Long> create(@Validated @RequestBody BatchTransferTaskCreateDTO dto) {
         try {
             Long taskId = batchTransferTaskService.createTask(dto, getUsername());
             return Result.success(taskId);
@@ -71,7 +71,7 @@ public class BatchTransferTaskController extends BaseController {
     @PutMapping("/{taskId}")
     public Result<Void> update(
             @Parameter(description = "任务ID", required = true) @PathVariable Long taskId,
-            @Validated @RequestBody BatchTransferTaskDTO dto) {
+            @Validated @RequestBody BatchTransferTaskCreateDTO dto) {
         try {
             batchTransferTaskService.updateTask(taskId, dto, getUsername());
             return Result.success();
@@ -121,7 +121,7 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "查询任务列表", description = "根据状态、源Agent等条件分页查询任务列表")
     @RequirePermission("batch:task:list")
     @GetMapping("/list")
-    public Result<List<BatchTransferTask>> list(BatchTransferTaskQuery query) {
+    public Result<List<BatchTransferTask>> list(BatchTransferTaskQueryDTO query) {
         BatchTransferTask domain = queryConverter.toDomain(query);
         List<BatchTransferTask> list = batchTransferTaskService.getTaskList(domain, query.getPageNum(), query.getPageSize());
         return Result.success(list);
@@ -130,7 +130,7 @@ public class BatchTransferTaskController extends BaseController {
     @Operation(summary = "查询任务列表（带节点状态）", description = "查询任务列表，同时返回源节点和目标节点的在线状态及目录是否存在")
     @RequirePermission("batch:task:list")
     @GetMapping("/list-with-status")
-    public Result<List<TaskListWithStatusVO>> listWithStatus(BatchTransferTaskQuery query) {
+    public Result<List<TaskListWithStatusVO>> listWithStatus(BatchTransferTaskQueryDTO query) {
         BatchTransferTask domain = queryConverter.toDomain(query);
         List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(domain, query.getPageNum(), query.getPageSize());
         return Result.success(list);

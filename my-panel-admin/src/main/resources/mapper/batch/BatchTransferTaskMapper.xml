@@ -29,6 +29,10 @@
         <result property="routingStrategy" column="routing_strategy"/>
         <result property="routingConfig" column="routing_config"/>
         <result property="status" column="status"/>
+        <result property="scheduledEnabled" column="scheduled_enabled"/>
+        <result property="scheduledStartTime" column="scheduled_start_time"/>
+        <result property="scheduledEndTime" column="scheduled_end_time"/>
+        <result property="taskPriority" column="task_priority"/>
         <result property="startedAt" column="started_at"/>
         <result property="deleted" column="deleted"/>
         <result property="createBy" column="create_by"/>
@@ -44,7 +48,8 @@
         target_agent_ids, target_agent_names, retry_enabled, retry_max_days, retry_interval_min,
         max_retry_count, retry_backoff_type, post_transfer_action, backup_dir, backup_mode,
         preserve_dir_structure, transfer_mode, routing_strategy, routing_config,
-        status, started_at, create_by, create_time, update_by, update_time, remark, deleted
+        status, scheduled_enabled, scheduled_start_time, scheduled_end_time, task_priority,
+        started_at, create_by, create_time, update_by, update_time, remark, deleted
     </sql>
 
     <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferTask" useGeneratedKeys="true" keyProperty="id">
@@ -54,14 +59,16 @@
             target_agent_ids, target_agent_names, retry_enabled, retry_max_days, retry_interval_min,
             max_retry_count, retry_backoff_type, post_transfer_action, backup_dir, backup_mode,
             preserve_dir_structure, transfer_mode, routing_strategy, routing_config,
-            status, create_by, create_time, update_by, update_time, remark
+            status, scheduled_enabled, scheduled_start_time, scheduled_end_time, task_priority,
+            create_by, create_time, update_by, update_time, remark
         ) values (
             #{taskName}, #{taskDescription}, #{sourceAgentId}, #{sourceAgentName}, #{sourceDir},
             #{targetDirs}, #{includePatterns}, #{excludePatterns}, #{scanCronExpression}, #{maxScanFiles},
             #{targetAgentIds}, #{targetAgentNames}, #{retryEnabled}, #{retryMaxDays}, #{retryIntervalMin},
             #{maxRetryCount}, #{retryBackoffType}, #{postTransferAction}, #{backupDir}, #{backupMode},
             #{preserveDirStructure}, #{transferMode}, #{routingStrategy}, #{routingConfig},
-            #{status}, #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
+            #{status}, #{scheduledEnabled}, #{scheduledStartTime}, #{scheduledEndTime}, #{taskPriority},
+            #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
         )
     </insert>
 
@@ -93,6 +100,10 @@
             <if test="routingStrategy != null">routing_strategy = #{routingStrategy},</if>
             <if test="routingConfig != null">routing_config = #{routingConfig},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="scheduledEnabled != null">scheduled_enabled = #{scheduledEnabled},</if>
+            <if test="scheduledStartTime != null">scheduled_start_time = #{scheduledStartTime},</if>
+            <if test="scheduledEndTime != null">scheduled_end_time = #{scheduledEndTime},</if>
+            <if test="taskPriority != null">task_priority = #{taskPriority},</if>
             <if test="startedAt != null">started_at = #{startedAt},</if>
             update_by = #{updateBy},
             update_time = now()

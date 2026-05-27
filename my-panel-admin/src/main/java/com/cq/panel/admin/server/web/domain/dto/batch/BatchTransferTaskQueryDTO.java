@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.dto;
+package com.cq.panel.admin.server.web.domain.dto.batch;
 
 import lombok.Data;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -8,7 +8,7 @@ import java.io.Serializable;
 
 @Data
 @Schema(description = "批量传输任务查询条件")
-public class BatchTransferTaskQuery implements Serializable {
+public class BatchTransferTaskQueryDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;

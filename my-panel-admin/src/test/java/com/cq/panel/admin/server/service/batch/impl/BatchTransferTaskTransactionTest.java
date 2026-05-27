@@ -6,11 +6,12 @@ import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
-import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
-import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
-import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
-import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.cq.panel.admin.server.repository.service.impl.BatchTransferTaskServiceImpl;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
+import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
+import com.cq.panel.admin.server.service.batch.BatchConfigSerializer;
+import com.cq.panel.admin.server.service.batch.CronExpressionValidator;
+import com.cq.panel.admin.server.service.batch.WildcardConflictDetector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
@@ -81,7 +82,7 @@ class BatchTransferTaskTransactionTest {
         // 事件插入失败（模拟数据库异常）
         when(eventMapper.insertEvent(any())).thenThrow(new RuntimeException("数据库连接失败：无法插入事件"));
 
-        BatchTransferTaskDTO dto = createTestDTO();
+        BatchTransferTaskCreateDTO dto = createTestDTO();
 
         // When & Then: 应该抛出异常，表示事务回滚
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
@@ -107,7 +108,7 @@ class BatchTransferTaskTransactionTest {
         // 事件插入失败
         when(eventMapper.insertEvent(any())).thenThrow(new RuntimeException("事件表写入失败"));
 
-        BatchTransferTaskDTO dto = createTestDTO();
+        BatchTransferTaskCreateDTO dto = createTestDTO();
         dto.setTaskName("更新后的名称");
 
         // When & Then
@@ -298,7 +299,7 @@ class BatchTransferTaskTransactionTest {
         when(configSerializer.serialize(any())).thenReturn("{}");
         when(eventMapper.insertEvent(any())).thenReturn(1);
 
-        BatchTransferTaskDTO dto = createTestDTO();
+        BatchTransferTaskCreateDTO dto = createTestDTO();
         service.createTask(dto, "admin");
 
         ArgumentCaptor<BatchSyncEvent> eventCaptor = ArgumentCaptor.forClass(BatchSyncEvent.class);
@@ -318,8 +319,8 @@ class BatchTransferTaskTransactionTest {
 
     // ==================== 辅助方法 ====================
 
-    private BatchTransferTaskDTO createTestDTO() {
-        BatchTransferTaskDTO dto = new BatchTransferTaskDTO();
+    private BatchTransferTaskCreateDTO createTestDTO() {
+        BatchTransferTaskCreateDTO dto = new BatchTransferTaskCreateDTO();
         dto.setTaskName("测试任务");
         dto.setSourceAgentId("agent-001");
         dto.setSourceAgentName("root@10.0.0.1:7777");

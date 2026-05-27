@@ -45,15 +45,15 @@ public class BatchUploadListener implements UploadListener {
      */
     @Getter
     private Long taskId;
-    private Long scanBatchId;
-    private Long fileBatchId;
-    private ScannedFile scannedFile;
-    private AgentTaskConfig config;
-    private TargetAgentInfo targetAgent;
-    private ProgressReporter progressReporter;
-    private String successQueueDir;
-    private String sendingQueueDir;
-    private FileBatchCompletionTracker fileBatchTracker;
+    private final Long scanBatchId;
+    private final Long fileBatchId;
+    private final ScannedFile scannedFile;
+    private final AgentTaskConfig config;
+    private final TargetAgentInfo targetAgent;
+    private final ProgressReporter progressReporter;
+    private final String successQueueDir;
+    private final String sendingQueueDir;
+    private final FileBatchCompletionTracker fileBatchTracker;
 
     /**
      * 子任务ID（全局唯一：基于taskId + fileName哈希 + 时间戳）
@@ -129,14 +129,35 @@ public class BatchUploadListener implements UploadListener {
         // 生成全局唯一的subtaskId（避免重启后冲突）
         this.subtaskId = generateUniqueSubtaskId(taskId, scannedFile.getFileName(),
                 targetAgent != null ? targetAgent.getAgentId() : null);
-
-        // 立即创建子任务到Proxy数据库
-        createSubTaskOnProxy();
         log.info("✅ 新建上传监听器: subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
                 subtaskId, scannedFile.getFileName(),
                 targetAgent != null ? targetAgent.getAgentId() : "null",
                 scanBatchId, fileBatchId);
     }
+
+    public BatchUploadListener(Long subtaskId,Long taskId, ScannedFile scannedFile,
+                               AgentTaskConfig config, TargetAgentInfo targetAgent, ProgressReporter progressReporter,
+                               String successQueueDir, String sendingQueueDir,
+                               Long scanBatchId, Long fileBatchId,
+                               FileBatchCompletionTracker fileBatchTracker) {
+        this.taskId = taskId;
+        this.scanBatchId = scanBatchId;
+        this.fileBatchId = fileBatchId;
+        this.scannedFile = scannedFile;
+        this.config = config;
+        this.targetAgent = targetAgent;
+        this.progressReporter = progressReporter;
+        this.successQueueDir = successQueueDir;
+        this.sendingQueueDir = sendingQueueDir;
+        this.fileBatchTracker = fileBatchTracker;
+        this.subtaskId = subtaskId;
+        log.info("✅ 新建上传监听器: subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
+                subtaskId, scannedFile.getFileName(),
+                targetAgent != null ? targetAgent.getAgentId() : "null",
+                scanBatchId, fileBatchId);
+
+    }
+
 
     /**
      * 测试用构造函数 - 仅用于单元测试，不触发子任务创建
@@ -166,39 +187,14 @@ public class BatchUploadListener implements UploadListener {
             Long scanBatchId, Long fileBatchId,
             FileBatchCompletionTracker fileBatchTracker) {
         // 直接赋值，不调用构造函数（避免触发createSubTaskOnProxy）
-        BatchUploadListener listener = new BatchUploadListener();
-        listener.taskId = taskId;
-        listener.scanBatchId = scanBatchId;
-        listener.fileBatchId = fileBatchId;
-        listener.scannedFile = scannedFile;
-        listener.config = config;
-        listener.targetAgent = targetAgent;
-        listener.progressReporter = progressReporter;
-        listener.successQueueDir = successQueueDir;
-        listener.sendingQueueDir = sendingQueueDir;
-        listener.fileBatchTracker = fileBatchTracker;
-        listener.subtaskId = existingSubtaskId;
-
+        BatchUploadListener listener = new BatchUploadListener(existingSubtaskId, taskId, scannedFile,
+                config, targetAgent, progressReporter, successQueueDir, sendingQueueDir,
+                scanBatchId, fileBatchId, fileBatchTracker);
         log.info("✅ 恢复模式上传监听器(重试): subtaskId={}, file={}, target={}, scanBatch={}, fileBatch={}",
                 existingSubtaskId, scannedFile.getFileName(),
                 targetAgent != null ? targetAgent.getAgentId() : "null",
                 scanBatchId, fileBatchId);
         return listener;
-    }
-
-    /**
-     * 默认构造函数（仅供forRetry工厂方法使用）
-     */
-    private BatchUploadListener() {
-        this.scanBatchId = null;
-        this.fileBatchId = null;
-        this.scannedFile = null;
-        this.config = null;
-        this.targetAgent = null;
-        this.progressReporter = null;
-        this.successQueueDir = null;
-        this.sendingQueueDir = null;
-        this.fileBatchTracker = null;
     }
 
     /**
@@ -224,7 +220,7 @@ public class BatchUploadListener implements UploadListener {
      * 创建子任务并上报到Proxy（INSERT到batch_transfer_subtask表）
      * 使用接口：POST /api/batch/subtask/create
      */
-    private void createSubTaskOnProxy() {
+    private void createSubTaskOnProxy(String status) {
         if (progressReporter == null) {
             log.debug("ProgressReporter未设置，跳过子任务创建");
             return;
@@ -236,7 +232,7 @@ public class BatchUploadListener implements UploadListener {
             event.setTaskId(taskId);
             event.setScanBatchId(scanBatchId);
             event.setFileBatchId(fileBatchId);
-            event.setStatus("QUEUED");
+            event.setStatus(status);
 
             // Agent信息
             if (config != null) {
@@ -274,6 +270,14 @@ public class BatchUploadListener implements UploadListener {
         } catch (Exception e) {
             log.error("❌ 子任务创建异常: file={}, error={}", scannedFile.getFileName(), e.getMessage());
         }
+    }
+
+    public void createQueueSubTaskOnProxy() {
+        createSubTaskOnProxy("QUEUED");
+    }
+
+    public void createReadySubTaskOnProxy() {
+        createSubTaskOnProxy("SEND_TIME_NOT_ARRIVE");
     }
 
     @Override

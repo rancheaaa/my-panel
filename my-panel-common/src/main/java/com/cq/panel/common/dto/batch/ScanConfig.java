@@ -5,9 +5,6 @@ import lombok.NoArgsConstructor;
 import java.io.Serial;
 import java.io.Serializable;
 
-/**
- * 扫描配置 (scanConfig)
- */
 @Data
 @NoArgsConstructor
 public class ScanConfig implements Serializable {
@@ -15,9 +12,15 @@ public class ScanConfig implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** Cron表达式 */
     private String cronExpression;
 
-    /** 最大扫描文件数 */
     private Integer maxScanFiles;
+
+    private Boolean scheduledEnabled;
+
+    /** 每日定时传输开始时间(HH:mm:ss) */
+    private String scheduledStartTime;
+
+    /** 每日定时传输结束时间(HH:mm:ss) */
+    private String scheduledEndTime;
 }

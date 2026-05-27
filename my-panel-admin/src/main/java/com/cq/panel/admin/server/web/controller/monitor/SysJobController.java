@@ -9,7 +9,7 @@ import com.cq.panel.admin.server.web.domain.vo.monitor.MethodInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.MethodValidationVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.SysJobVO;
 import com.cq.panel.admin.server.web.converter.monitor.SysJobConverter;
-import com.cq.panel.admin.server.service.IMethodScannerService;
+import com.cq.panel.admin.server.service.job.IMethodScannerService;
 import com.cq.panel.admin.server.web.exception.job.TaskException;
 import com.github.pagehelper.PageInfo;
 import com.cq.panel.admin.server.annotation.Log;

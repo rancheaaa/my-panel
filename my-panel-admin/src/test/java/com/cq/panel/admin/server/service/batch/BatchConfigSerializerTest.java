@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.util;
+package com.cq.panel.admin.server.service.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;

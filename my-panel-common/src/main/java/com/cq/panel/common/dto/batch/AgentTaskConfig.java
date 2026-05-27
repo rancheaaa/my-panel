@@ -74,6 +74,9 @@ public class AgentTaskConfig implements Serializable {
 
     // ==================== 6. 嵌套配置对象 ====================
 
+    /** 任务优先级: 1-最高 10-最低 */
+    private Integer taskPriority;
+
     /**
      * 扫描调度配置
      * 

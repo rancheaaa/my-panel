@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.util;
+package com.cq.panel.admin.server.service.batch;
 
 import org.springframework.stereotype.Component;
 

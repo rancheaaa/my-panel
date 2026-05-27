@@ -425,10 +425,10 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
                     // 提交前将原始文件标记为传输中（重命名为隐藏文件）
                     Path hiddenPath = hideFileBeforeUpload(scannedFile);
 
-                    UploadListener listener = createBatchUploadListener(
+                    BatchUploadListener listener = createBatchUploadListener(
                             taskId, scannedFile, config, targetAgent,
                             scanBatchId, fileBatchId);
-
+                    listener.createQueueSubTaskOnProxy();
                     // 直接调用父类AgentUploader的uploadFile方法
                     boolean submitted = uploadFile(hiddenPath.toString(), remoteTargetInfo, listener);
 
@@ -541,7 +541,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
             String filePath = scannedFile.getAbsolutePath();
             if (filePath != null && TransferFileStateManager.isTransferringFile(Path.of(filePath))) {
                 // 检查是否还有其他目标在传输该文件（通过inflightTasks判断）
-                boolean hasOtherTransfers = isInflightUploadForFile(filePath);
+                boolean hasOtherTransfers = hasInflightUploadForFile(filePath);
                 if (!hasOtherTransfers) {
                     Path restored = TransferFileStateManager.unhideFileSafely(Path.of(filePath));
                     if (restored != null) {
@@ -555,15 +555,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
         }
     }
 
-    /**
-     * 检查指定文件路径是否还有正在进行的上传任务
-     * 广播模式下（1文件→多目标），如果其他目标仍在传输，不应恢复隐藏文件
-     */
-    private boolean isInflightUploadForFile(String filePath) {
-        return hasInflightUploadForFile(filePath);
-    }
-
-    private UploadListener createBatchUploadListener(Long taskId, ScannedFile scannedFile,
+    private BatchUploadListener createBatchUploadListener(Long taskId, ScannedFile scannedFile,
             AgentTaskConfig config, TargetAgentInfo targetAgent,
             Long scanBatchId, Long fileBatchId) {
         return new BatchUploadListener(

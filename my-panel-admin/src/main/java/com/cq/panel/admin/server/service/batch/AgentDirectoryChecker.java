@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.util;
+package com.cq.panel.admin.server.service.batch;
 
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;

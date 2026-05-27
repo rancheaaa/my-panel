@@ -6,11 +6,12 @@ import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchSyncEventMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferSubtaskMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
-import com.cq.panel.admin.server.service.batch.util.AgentDirectoryChecker;
-import com.cq.panel.admin.server.service.batch.util.BatchConfigSerializer;
-import com.cq.panel.admin.server.service.batch.util.CronExpressionValidator;
-import com.cq.panel.admin.server.service.batch.util.WildcardConflictDetector;
+import com.cq.panel.admin.server.repository.service.impl.BatchTransferTaskServiceImpl;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
+import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
+import com.cq.panel.admin.server.service.batch.BatchConfigSerializer;
+import com.cq.panel.admin.server.service.batch.CronExpressionValidator;
+import com.cq.panel.admin.server.service.batch.WildcardConflictDetector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
@@ -54,7 +55,7 @@ class BatchSyncEventSpecTest {
     @Test
     @DisplayName("1. 创建任务时 - 事件应包含expire_at（24小时后过期）")
     void testCreateTask_eventHasExpireAt() throws Exception {
-        BatchTransferTaskDTO dto = createTestDTO();
+        BatchTransferTaskCreateDTO dto = createTestDTO();
         when(taskMapper.insert(any())).thenAnswer(inv -> {
             BatchTransferTask task = inv.getArgument(0);
             task.setId(1L);
@@ -83,7 +84,7 @@ class BatchSyncEventSpecTest {
     @Test
     @DisplayName("2. 创建任务时 - 事件类型应为TASK_CREATED")
     void testCreateTask_eventType() throws Exception {
-        BatchTransferTaskDTO dto = createTestDTO();
+        BatchTransferTaskCreateDTO dto = createTestDTO();
         when(taskMapper.insert(any())).thenAnswer(inv -> {
             BatchTransferTask task = inv.getArgument(0);
             task.setId(1L);
@@ -109,7 +110,7 @@ class BatchSyncEventSpecTest {
     @Test
     @DisplayName("3. 更新任务时 - 事件类型应为TASK_UPDATED")
     void testUpdateTask_eventType() throws Exception {
-        BatchTransferTaskDTO dto = createTestDTO();
+        BatchTransferTaskCreateDTO dto = createTestDTO();
         BatchTransferTask existingTask = new BatchTransferTask();
         existingTask.setId(1L);
         existingTask.setStatus("READY");
@@ -176,8 +177,8 @@ class BatchSyncEventSpecTest {
         System.out.println("✅ 删除任务事件: TASK_DELETED");
     }
 
-    private BatchTransferTaskDTO createTestDTO() {
-        BatchTransferTaskDTO dto = new BatchTransferTaskDTO();
+    private BatchTransferTaskCreateDTO createTestDTO() {
+        BatchTransferTaskCreateDTO dto = new BatchTransferTaskCreateDTO();
         dto.setTaskName("测试任务");
         dto.setSourceAgentId("agent-001");
         dto.setSourceAgentName("root@10.0.0.1:7777");

@@ -1,7 +1,7 @@
-package com.cq.panel.admin.server.service.batch;
+package com.cq.panel.admin.server.repository.service;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
-import com.cq.panel.admin.server.service.batch.dto.BatchTransferTaskDTO;
+import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
 import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
 
 import java.util.List;
@@ -12,9 +12,9 @@ import java.util.Map;
  */
 public interface IBatchTransferTaskService {
 
-    Long createTask(BatchTransferTaskDTO dto, String userId);
+    Long createTask(BatchTransferTaskCreateDTO dto, String userId);
 
-    void updateTask(Long taskId, BatchTransferTaskDTO dto, String userId);
+    void updateTask(Long taskId, BatchTransferTaskCreateDTO dto, String userId);
 
     void startTask(Long taskId);
 

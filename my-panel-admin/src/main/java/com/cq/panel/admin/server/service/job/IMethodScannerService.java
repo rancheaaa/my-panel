@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service;
+package com.cq.panel.admin.server.service.job;
 
 import com.cq.panel.admin.server.web.domain.vo.monitor.MethodInfoVO;
 import com.cq.panel.admin.server.web.domain.vo.monitor.MethodValidationVO;

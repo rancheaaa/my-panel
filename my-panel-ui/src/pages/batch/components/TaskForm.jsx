@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag, Space, message } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Form, Input, Select, Button, InputNumber, Switch, Card, Row, Col, Tooltip, Tag, Space, message, TimePicker } from 'antd';
+import dayjs from 'dayjs';
 import {
   FileTextOutlined,
   CloudServerOutlined,
@@ -72,6 +73,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
   const [transferMode, setTransferMode] = useState('ONE_TO_ONE');
   const [sourceDirStatus, setSourceDirStatus] = useState(null);
   const [targetDirStatuses, setTargetDirStatuses] = useState({});
+  const initializedRef = useRef(false);
   const isDisabled = mode === 'detail';
   const isCreate = mode === 'create';
 
@@ -129,7 +131,9 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
   };
 
   useEffect(() => {
+    if (initializedRef.current) return;
     if (initialValues && Object.keys(initialValues).length > 0) {
+      initializedRef.current = true;
       const transformed = { ...initialValues };
       if (initialValues.includePatterns && typeof initialValues.includePatterns === 'string') {
         try { transformed.includePatterns = JSON.parse(initialValues.includePatterns); } catch (e) { transformed.includePatterns = []; }
@@ -142,6 +146,15 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
       }
       if (initialValues.preserveDirStructure !== undefined && typeof initialValues.preserveDirStructure !== 'boolean') {
         transformed.preserveDirStructure = initialValues.preserveDirStructure === 1;
+      }
+      if (initialValues.scheduledEnabled !== undefined && typeof initialValues.scheduledEnabled !== 'boolean') {
+        transformed.scheduledEnabled = initialValues.scheduledEnabled === 1;
+      }
+      if (initialValues.scheduledStartTime && typeof initialValues.scheduledStartTime === 'string') {
+        transformed.scheduledStartTime = dayjs(initialValues.scheduledStartTime, 'HH:mm:ss');
+      }
+      if (initialValues.scheduledEndTime && typeof initialValues.scheduledEndTime === 'string') {
+        transformed.scheduledEndTime = dayjs(initialValues.scheduledEndTime, 'HH:mm:ss');
       }
       if (initialValues.targetAgentIds) {
         const targetAgentIds = Array.isArray(initialValues.targetAgentIds)
@@ -205,8 +218,12 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
       targetAgentNames,
       targetDirs,
       routingConfig: values.routingStrategy === 'REGION_BASED' ? (values.routingConfig || null) : null,
-      retryEnabled: values.retryEnabled ? 1 : 0,
-      preserveDirStructure: values.preserveDirStructure ? 1 : 0
+      retryEnabled: (values.retryEnabled ?? true) ? 1 : 0,
+      preserveDirStructure: (values.preserveDirStructure ?? true) ? 1 : 0,
+      scheduledEnabled: (values.scheduledEnabled ?? false) ? 1 : 0,
+      scheduledStartTime: values.scheduledStartTime ? values.scheduledStartTime.format('HH:mm:ss') : null,
+      scheduledEndTime: values.scheduledEndTime ? values.scheduledEndTime.format('HH:mm:ss') : null,
+      taskPriority: values.taskPriority ?? 5
     };
 
     console.log('📤 最终提交到后端的数据:', data);
@@ -279,6 +296,20 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
           </Form.Item>
           <Form.Item label="任务描述" name="taskDescription" style={formItemStyle}>
             <TextArea rows={2} placeholder="简要描述此任务的用途和注意事项..." maxLength={500} showCount style={{ borderRadius: 6 }} disabled={isDisabled} />
+          </Form.Item>
+          <Form.Item label="任务优先级" name="taskPriority" initialValue={5} style={formItemStyle}>
+            <Select size="small" style={inputStyle} disabled={isDisabled}>
+              <Select.Option value={1}><Tag color="red" style={{ fontSize: 11, marginRight: 0 }}>1 - 最高</Tag></Select.Option>
+              <Select.Option value={2}><Tag color="volcano" style={{ fontSize: 11, marginRight: 0 }}>2 - 高</Tag></Select.Option>
+              <Select.Option value={3}><Tag color="orange" style={{ fontSize: 11, marginRight: 0 }}>3 - 较高</Tag></Select.Option>
+              <Select.Option value={4}><Tag color="gold" style={{ fontSize: 11, marginRight: 0 }}>4 - 中高</Tag></Select.Option>
+              <Select.Option value={5}><Tag color="blue" style={{ fontSize: 11, marginRight: 0 }}>5 - 中等</Tag></Select.Option>
+              <Select.Option value={6}><Tag color="cyan" style={{ fontSize: 11, marginRight: 0 }}>6 - 中低</Tag></Select.Option>
+              <Select.Option value={7}><Tag color="geekblue" style={{ fontSize: 11, marginRight: 0 }}>7 - 低</Tag></Select.Option>
+              <Select.Option value={8}><Tag color="purple" style={{ fontSize: 11, marginRight: 0 }}>8 - 较低</Tag></Select.Option>
+              <Select.Option value={9}><Tag color="default" style={{ fontSize: 11, marginRight: 0 }}>9 - 很低</Tag></Select.Option>
+              <Select.Option value={10}><Tag color="default" style={{ fontSize: 11, marginRight: 0 }}>10 - 最低</Tag></Select.Option>
+            </Select>
           </Form.Item>
         </Card>
 
@@ -692,6 +723,47 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                   </Select.OptGroup>
                 </Select>
               </Form.Item>
+              <div style={{ borderTop: '1px dashed #f0f0f0', margin: '8px 0 12px', paddingTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, marginRight: 8 }}>定时传输窗口</span>
+                  <Form.Item name="scheduledEnabled" valuePropName="checked" initialValue={false} noStyle>
+                    <Switch size="small" checkedChildren="开" unCheckedChildren="关" disabled={isDisabled} />
+                  </Form.Item>
+                </div>
+                <Form.Item noStyle shouldUpdate={(prev, cur) => prev.scheduledEnabled !== cur.scheduledEnabled}>
+                  {({ getFieldValue }) => {
+                    const scheduledEnabled = getFieldValue('scheduledEnabled');
+                    if (!scheduledEnabled) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '12px 0', color: '#bfbfbf', fontSize: 12, background: '#fafafa', borderRadius: 6, border: '1px dashed #d9d9d9' }}>
+                          <ClockCircleOutlined style={{ marginRight: 4 }} />
+                          未开启定时传输，任务将按Cron表达式持续执行
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ background: '#fff0f6', borderRadius: 6, border: '1px solid #ffadd2', padding: '10px 14px' }}>
+                        <Row gutter={12}>
+                          <Col span={12}>
+                            <Form.Item label="开始时间" name="scheduledStartTime" rules={[{ required: true, message: '请选择开始时间' }]} style={{ marginBottom: 0 }}>
+                              <TimePicker format="HH:mm:ss" placeholder="如 08:00:00" style={{ width: '100%' }} disabled={isDisabled} />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item label="结束时间" name="scheduledEndTime" rules={[{ required: true, message: '请选择结束时间' }]} style={{ marginBottom: 0 }}>
+                              <TimePicker format="HH:mm:ss" placeholder="如 18:00:00" style={{ width: '100%' }} disabled={isDisabled} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <div style={{ fontSize: 11.5, color: '#c41d7f', marginTop: 6 }}>
+                          <InfoCircleOutlined style={{ marginRight: 4 }} />
+                          每日在此时间窗口内执行传输任务
+                        </div>
+                      </div>
+                    );
+                  }}
+                </Form.Item>
+              </div>
               <div style={{ padding: '6px 10px', background: '#fff0f6', borderRadius: 4, border: '1px solid #ffadd2' }}>
                 <Tooltip title="选择预设频率后自动生成Cron表达式">
                   <span style={{ fontSize: 11.5, color: '#c41d7f' }}>

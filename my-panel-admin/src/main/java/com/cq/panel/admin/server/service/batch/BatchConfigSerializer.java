@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.service.batch.util;
+package com.cq.panel.admin.server.service.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
@@ -69,6 +69,7 @@ public class BatchConfigSerializer {
       config.setScanConfig(buildScanConfig(task));
       config.setTransferConfig(buildTransferConfig(task));
       config.setRetryConfig(buildRetryConfig(task));
+      config.setTaskPriority(task.getTaskPriority());
       if (task.getStartedAt() != null) {
         config.setStartedAt(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(task.getStartedAt()));
       }
@@ -98,6 +99,9 @@ public class BatchConfigSerializer {
     ScanConfig scanConfig = new ScanConfig();
     scanConfig.setCronExpression(task.getScanCronExpression());
     scanConfig.setMaxScanFiles(task.getMaxScanFiles());
+    scanConfig.setScheduledEnabled(task.getScheduledEnabled() != null && task.getScheduledEnabled() == 1);
+    scanConfig.setScheduledStartTime(task.getScheduledStartTime());
+    scanConfig.setScheduledEndTime(task.getScheduledEndTime());
     return scanConfig;
   }
 

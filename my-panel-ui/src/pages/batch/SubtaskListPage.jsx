@@ -200,7 +200,7 @@ const SubtaskListPage = () => {
       title: '文件名',
       dataIndex: 'fileName',
       key: 'fileName',
-      width: 400,
+      width: 200,
       ellipsis: true,
       render: (name) => (
         <Tooltip title={name}>
@@ -215,7 +215,7 @@ const SubtaskListPage = () => {
       title: '源路径',
       dataIndex: 'sourcePath',
       key: 'sourcePath',
-      width: 600,
+      width: 500,
       ellipsis: true,
       render: (path) => path ? (
         <Tooltip title={path}>
@@ -227,7 +227,7 @@ const SubtaskListPage = () => {
       title: '目标路径',
       dataIndex: 'targetPath',
       key: 'targetPath',
-      width: 600,
+      width: 500,
       ellipsis: true,
       render: (dir) => dir ? (
         <Tooltip title={dir}>

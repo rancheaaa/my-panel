@@ -447,7 +447,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                     <Select.Option value="ONE_TO_MANY">一对多</Select.Option>
                   </Select>
                 </Form.Item></Col>
-                <Col span={12}><Form.Item label="路由策略" name="routingStrategy" initialValue="ROUND_ROBIN" style={{ ...formItemStyle, marginBottom: 10 }}>
+                <Col span={12}><Form.Item label="路由策略" name="routingStrategy" initialValue="BROADCAST" style={{ ...formItemStyle, marginBottom: 10 }}>
                   <Select size="small" disabled={isDisabled}>
                     <Select.Option value="ROUND_ROBIN"><Tag color="blue" style={{ fontSize: 11, marginRight: 0 }}>轮询</Tag></Select.Option>
                     <Select.Option value="RANDOM"><Tag color="geekblue" style={{ fontSize: 11, marginRight: 0 }}>随机</Tag></Select.Option>
@@ -540,7 +540,7 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                           <InputNumber min={1} max={365} size="small" style={{ width: '100%' }} disabled={isDisabled} />
                         </Form.Item></Col>
                       </Row>
-                      <Form.Item label="退避方式" name="retryBackoffType" initialValue="EXPONENTIAL" style={{ ...formItemStyle, marginBottom: 0 }}>
+                      <Form.Item label="退避方式" name="retryBackoffType" initialValue="LINEAR" style={{ ...formItemStyle, marginBottom: 0 }}>
                         <Select size="small" disabled={isDisabled}><Select.Option value="LINEAR">线性</Select.Option><Select.Option value="EXPONENTIAL">指数</Select.Option></Select>
                       </Form.Item>
                     </>
@@ -619,105 +619,103 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
           </div>
         </Card>
 
-        {/* 第六行：定时调度（独立一行，全宽，必填） */}
-        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-          <div style={headerStyle('#eb2f96')}>
-            <span style={iconStyle('#eb2f96')}><ScheduleOutlined /></span>
-            <span style={titleStyle}>定时调度</span>
-            <Tag color="magenta" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
-          </div>
-          <Form.Item
-            label={<span>执行频率 <span style={{ color: '#ff4d4f' }}>*</span></span>}
-            name="scanCronExpression"
-            rules={[{ required: true, message: '请选择执行频率' }]}
-            style={{ ...formItemStyle, marginBottom: 8 }}
-          >
-            <Select
-              placeholder="请选择执行频率"
-              style={inputStyle}
-              optionLabelProp="label"
-              disabled={isDisabled}
-            >
-              <Select.OptGroup label="常用间隔">
-                <Select.Option value="0 */1 * * * ?" label={<Space><ClockCircleOutlined />每隔 1 分钟</Space>}>
-                  <div><strong>每隔 1 分钟</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */1 * * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 */5 * * * ?" label={<Space><ClockCircleOutlined />每隔 5 分钟</Space>}>
-                  <div><strong>每隔 5 分钟</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */5 * * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 */10 * * * ?" label={<Space><ClockCircleOutlined />每隔 10 分钟</Space>}>
-                  <div><strong>每隔 10 分钟</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */10 * * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 */30 * * * ?" label={<Space><ClockCircleOutlined />每隔 30 分钟</Space>}>
-                  <div><strong>每隔 30 分钟</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */30 * * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 0 */1 * * ?" label={<Space><ClockCircleOutlined />每隔 1 小时</Space>}>
-                  <div><strong>每隔 1 小时</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 */1 * * ?</div>
-                </Select.Option>
-              </Select.OptGroup>
-              <Select.OptGroup label="每日定时">
-                <Select.Option value="0 0 0 * * ?" label={<Space><ClockCircleOutlined />每天 00:00</Space>}>
-                  <div><strong>每天 00:00 (午夜)</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 0 * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 0 2 * * ?" label={<Space><ClockCircleOutlined />每天 02:00</Space>}>
-                  <div><strong>每天 02:00 (凌晨)</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 0 12 * * ?" label={<Space><ClockCircleOutlined />每天 12:00</Space>}>
-                  <div><strong>每天 12:00 (中午)</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 12 * * ?</div>
-                </Select.Option>
-                <Select.Option value="0 0 18 * * ?" label={<Space><ClockCircleOutlined />每天 18:00</Space>}>
-                  <div><strong>每天 18:00 (傍晚)</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 18 * * ?</div>
-                </Select.Option>
-              </Select.OptGroup>
-              <Select.OptGroup label="每周定时">
-                <Select.Option value="0 0 2 ? * MON" label={<Space><ClockCircleOutlined />每周一 02:00</Space>}>
-                  <div><strong>每周一 02:00</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * MON</div>
-                </Select.Option>
-                <Select.Option value="0 0 2 ? * SUN" label={<Space><ClockCircleOutlined />每周日 02:00</Space>}>
-                  <div><strong>每周日 02:00</strong></div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * SUN</div>
-                </Select.Option>
-              </Select.OptGroup>
-            </Select>
-          </Form.Item>
-          <div style={{ padding: '6px 10px', background: '#fff0f6', borderRadius: 4, border: '1px solid #ffadd2' }}>
-            <Tooltip title="选择预设频率后自动生成Cron表达式">
-              <span style={{ fontSize: 11.5, color: '#c41d7f' }}>
-                <InfoCircleOutlined style={{ marginRight: 4 }} />
-                请选择任务的执行频率，支持常用间隔、每日定时、每周定时等预设选项
-              </span>
-            </Tooltip>
-          </div>
-        </Card>
-
-        {/* 第七行：传输后操作（全宽） */}
-        <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
-          <div style={headerStyle('#2f54eb')}>
-            <span style={iconStyle('#2f54eb')}><SendOutlined /></span>
-            <span style={titleStyle}>传输后操作</span>
-            <Tag color="blue" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
-          </div>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="成功后操作" name="postTransferAction" initialValue="NONE" style={formItemStyle}>
+        {/* 第六行：定时调度 + 传输后操作（各占50%） */}
+        <Row gutter={16}>
+          <Col span={12}>
+            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+              <div style={headerStyle('#eb2f96')}>
+                <span style={iconStyle('#eb2f96')}><ScheduleOutlined /></span>
+                <span style={titleStyle}>定时调度</span>
+                <Tag color="magenta" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
+              </div>
+              <Form.Item
+                label={<span>执行频率 <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                name="scanCronExpression"
+                rules={[{ required: true, message: '请选择执行频率' }]}
+                style={{ ...formItemStyle, marginBottom: 8 }}
+              >
+                <Select
+                  placeholder="请选择执行频率"
+                  style={inputStyle}
+                  optionLabelProp="label"
+                  disabled={isDisabled}
+                >
+                  <Select.OptGroup label="常用间隔">
+                    <Select.Option value="0 */1 * * * ?" label={<Space><ClockCircleOutlined />每隔 1 分钟</Space>}>
+                      <div><strong>每隔 1 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */1 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 */5 * * * ?" label={<Space><ClockCircleOutlined />每隔 5 分钟</Space>}>
+                      <div><strong>每隔 5 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */5 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 */10 * * * ?" label={<Space><ClockCircleOutlined />每隔 10 分钟</Space>}>
+                      <div><strong>每隔 10 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */10 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 */30 * * * ?" label={<Space><ClockCircleOutlined />每隔 30 分钟</Space>}>
+                      <div><strong>每隔 30 分钟</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 */30 * * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 */1 * * ?" label={<Space><ClockCircleOutlined />每隔 1 小时</Space>}>
+                      <div><strong>每隔 1 小时</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 */1 * * ?</div>
+                    </Select.Option>
+                  </Select.OptGroup>
+                  <Select.OptGroup label="每日定时">
+                    <Select.Option value="0 0 0 * * ?" label={<Space><ClockCircleOutlined />每天 00:00</Space>}>
+                      <div><strong>每天 00:00 (午夜)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 0 * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 2 * * ?" label={<Space><ClockCircleOutlined />每天 02:00</Space>}>
+                      <div><strong>每天 02:00 (凌晨)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 12 * * ?" label={<Space><ClockCircleOutlined />每天 12:00</Space>}>
+                      <div><strong>每天 12:00 (中午)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 12 * * ?</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 18 * * ?" label={<Space><ClockCircleOutlined />每天 18:00</Space>}>
+                      <div><strong>每天 18:00 (傍晚)</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 18 * * ?</div>
+                    </Select.Option>
+                  </Select.OptGroup>
+                  <Select.OptGroup label="每周定时">
+                    <Select.Option value="0 0 2 ? * MON" label={<Space><ClockCircleOutlined />每周一 02:00</Space>}>
+                      <div><strong>每周一 02:00</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * MON</div>
+                    </Select.Option>
+                    <Select.Option value="0 0 2 ? * SUN" label={<Space><ClockCircleOutlined />每周日 02:00</Space>}>
+                      <div><strong>每周日 02:00</strong></div>
+                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>0 0 2 ? * SUN</div>
+                    </Select.Option>
+                  </Select.OptGroup>
+                </Select>
+              </Form.Item>
+              <div style={{ padding: '6px 10px', background: '#fff0f6', borderRadius: 4, border: '1px solid #ffadd2' }}>
+                <Tooltip title="选择预设频率后自动生成Cron表达式">
+                  <span style={{ fontSize: 11.5, color: '#c41d7f' }}>
+                    <InfoCircleOutlined style={{ marginRight: 4 }} />
+                    请选择任务的执行频率，支持常用间隔、每日定时、每周定时等预设选项
+                  </span>
+                </Tooltip>
+              </div>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card style={sectionStyle} styles={{ body: { padding: '16px 18px' }}}>
+              <div style={headerStyle('#2f54eb')}>
+                <span style={iconStyle('#2f54eb')}><SendOutlined /></span>
+                <span style={titleStyle}>传输后操作</span>
+                <Tag color="blue" style={{ marginLeft: 'auto', fontSize: 11 }}>必填</Tag>
+              </div>
+              <Form.Item label="成功后操作" name="postTransferAction" initialValue="DELETE" style={formItemStyle}>
                 <Select size="small" style={inputStyle} disabled={isDisabled}>
                   <Select.Option value="NONE">无操作</Select.Option>
                   <Select.Option value="DELETE"><span style={{ color: '#ff4d4f' }}>删除源文件</span></Select.Option>
                   <Select.Option value="BACKUP">备份源文件</Select.Option>
                 </Select>
               </Form.Item>
-            </Col>
-            <Col span={12}>
               <Form.Item noStyle shouldUpdate={(prev, cur) => prev.postTransferAction !== cur.postTransferAction}>
                 {({ getFieldValue }) =>
                   getFieldValue('postTransferAction') === 'BACKUP' && (
@@ -734,9 +732,9 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                   )
                 }
               </Form.Item>
-            </Col>
-          </Row>
-        </Card>
+            </Card>
+          </Col>
+        </Row>
 
         {/* 提交按钮 */}
         {!isDisabled && (

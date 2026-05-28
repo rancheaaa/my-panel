@@ -62,6 +62,7 @@ public class AgentConfig {
     private long uploadRetryDelayMs;
     private int uploadConnectTimeoutSeconds;
     private int uploadRequestTimeoutSeconds;
+    private int uploadTaskGlobalPriority;
 
     // Download client configuration
     private int downloadConcurrentDownloads;
@@ -217,6 +218,7 @@ public class AgentConfig {
         this.uploadRetryDelayMs = getLongProperty("upload.retry.delay.ms", 2000);
         this.uploadConnectTimeoutSeconds = getIntProperty("upload.connect.timeout.seconds", 10);
         this.uploadRequestTimeoutSeconds = getIntProperty("upload.request.timeout.seconds", 60);
+        this.uploadTaskGlobalPriority = getIntProperty("upload.task.global.priority", 5);
 
         // Download client configuration
         this.downloadConcurrentDownloads = getIntProperty("download.concurrent.downloads", 4);

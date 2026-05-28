@@ -2,7 +2,7 @@ package com.cq.agent.handler;
 
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.handler.batch.BatchConfigReceiveHandler;
 import com.cq.agent.handler.batch.BatchTaskControlHandler;
 import com.cq.agent.handler.download.ChunkDownloadHandler;
@@ -21,7 +21,7 @@ public class HandlerFactory {
 
     public HandlerFactory(FileService fileService, ChunkedTransferService chunkedTransferService,
                           ConfigFileManager configFileManager, ConfigChangeListener configChangeListener,
-                          BatchTaskSchedulerUploaderDecorator batchTaskUploader) {
+                          BatchTaskSchedulerUploader batchTaskUploader) {
         String apiPrefix = "/api/file";
         
         // File operations

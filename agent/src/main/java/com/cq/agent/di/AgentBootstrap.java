@@ -1,6 +1,6 @@
 package com.cq.agent.di;
 
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
@@ -15,13 +15,13 @@ public class AgentBootstrap {
 
     private final HttpServer server;
     private final AgentConfig config;
-    private final BatchTaskSchedulerUploaderDecorator batchTaskUploader;
+    private final BatchTaskSchedulerUploader batchTaskUploader;
     private final AgentRegistryService registryService;
 
     @Inject
     public AgentBootstrap(HttpServer server,
                           AgentConfig config,
-                          BatchTaskSchedulerUploaderDecorator batchTaskUploader,
+                          BatchTaskSchedulerUploader batchTaskUploader,
                           AgentRegistryService registryService) {
         this.server = server;
         this.config = config;

@@ -1,8 +1,8 @@
 package com.cq.agent.batch.scheduler;
 
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,11 +46,11 @@ class BatchTaskSchedulerManagerIntegrationTest {
         agentConfig.setUploadFinalFailureQueueDir(tempDir.resolve("final-failure").toString());
 
         try {
-            BatchTaskSchedulerUploaderDecorator batchTaskUploader =
-                    new BatchTaskSchedulerUploaderDecorator(agentConfig, configFileManager);
+            BatchTaskSchedulerUploader batchTaskUploader =
+                    new BatchTaskSchedulerUploader(agentConfig, configFileManager);
 
             // 验证继承关系
-            assertInstanceOf(RetryAwareUploaderDecorator.class, batchTaskUploader,
+            assertInstanceOf(RetryAwareUploader.class, batchTaskUploader,
                     "BatchTaskSchedulerUploaderDecorator应继承RetryAwareUploaderDecorator");
             assertInstanceOf(com.cq.agent.client.upload.AgentUploader.class, batchTaskUploader,
                     "BatchTaskSchedulerUploaderDecorator应间接继承AgentUploader");
@@ -71,8 +71,8 @@ class BatchTaskSchedulerManagerIntegrationTest {
         agentConfig.setUploadFinalFailureQueueDir(tempDir.resolve("final-failure").toString());
 
         try {
-            BatchTaskSchedulerUploaderDecorator batchTaskUploader =
-                    new BatchTaskSchedulerUploaderDecorator(agentConfig, configFileManager);
+            BatchTaskSchedulerUploader batchTaskUploader =
+                    new BatchTaskSchedulerUploader(agentConfig, configFileManager);
             batchTaskUploader.shutdown();
             System.out.println("✅ 关闭时资源已清理");
         } catch (Exception e) {

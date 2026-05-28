@@ -300,7 +300,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
             } else {
                 task.setFileName(localPathObj.getFileName().toString());
             }
-
+            task.setPriority(agentConfig.getUploadTaskGlobalPriority());
             task.updateTimestamp();
 
             if (listener != null) {
@@ -640,13 +640,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
     }
 
     /**
-     * 获取失败队列目录（用于日志和监控）
-     */
-    public Path getFailedQueueDir() {
-        return failedQueueDir;
-    }
-
-    /**
      * 获取指定transferId的listener（供子类/装饰者访问）
      */
     public UploadListener getListener(String transferId) {
@@ -658,13 +651,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
      */
     public void removeListener(String transferId) {
         listenerCache.remove(transferId);
-    }
-
-    /**
-     * 将listener放入缓存（供子类/装饰者调用）
-     */
-    public void putListener(String transferId, UploadListener listener) {
-        listenerCache.put(transferId, listener);
     }
 
     /**

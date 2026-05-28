@@ -44,9 +44,9 @@ import java.util.stream.Stream;
  * - listener统一由父类AgentUploader的listenerCache管理，不再内部维护retryListenerCache
  * - 单一职责：只关注重试逻辑
  */
-public class RetryAwareUploaderDecorator extends AgentUploader {
+public class RetryAwareUploader extends AgentUploader {
 
-    private static final Logger logger = LoggerFactory.getLogger(RetryAwareUploaderDecorator.class);
+    private static final Logger logger = LoggerFactory.getLogger(RetryAwareUploader.class);
 
     private static final Gson gson = new GsonBuilder()
             .setPrettyPrinting()
@@ -57,6 +57,9 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
 
     private static final int DEFAULT_MAX_SCAN_COUNT = 100;
 
+    @Getter
+    private AgentConfig agentConfig;
+
     /** 全局ProgressReporter实例 */
     @Getter
     private ProgressReporter globalProgressReporter;
@@ -66,7 +69,7 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
     private ConfigFileManager configFileManager;
 
     // ===== 最终失败队列目录 =====
-    private Path uploadFinalFailureQueueDir;
+    private final Path uploadFinalFailureQueueDir;
 
     // ===== 状态跟踪 =====
     private final Map<Long, AgentTaskConfig> taskConfigMap = new ConcurrentHashMap<>();
@@ -84,15 +87,6 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
     private Scheduler retryScheduler;
 
     /**
-     * 构造函数（简单模式，用于测试）
-     *
-     * @param agentConfig Agent配置
-     */
-    public RetryAwareUploaderDecorator(AgentConfig agentConfig) {
-        super(agentConfig);
-    }
-
-    /**
      * 构造函数（完整依赖注入模式）
      *
      * @param agentConfig                Agent配置
@@ -101,17 +95,22 @@ public class RetryAwareUploaderDecorator extends AgentUploader {
      * @param configFileManager          配置文件管理器
      * @param uploadFinalFailureQueueDir 最终失败队列目录
      */
-    public RetryAwareUploaderDecorator(AgentConfig agentConfig,
-            FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
-            ConfigFileManager configFileManager, Path uploadFinalFailureQueueDir) {
+    public RetryAwareUploader(AgentConfig agentConfig,
+                              FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
+                              ConfigFileManager configFileManager, Path uploadFinalFailureQueueDir) {
         super(agentConfig);
         this.fileBatchTracker = fileBatchTracker;
         this.globalProgressReporter = progressReporter;
         this.configFileManager = configFileManager;
         this.uploadFinalFailureQueueDir = uploadFinalFailureQueueDir;
+
+    }
+
+    public void init() {
         initRetryScheduler(agentConfig.getFailedQueueScanIntervalMs());
         loadRetryConfigFromPersistence();
-        logger.info("✅ 重试装饰者初始化完成（继承模式）");
+        super.init();
+        logger.info("✅ RetryAwareUploader初始化完成（继承模式）");
     }
 
     @Override

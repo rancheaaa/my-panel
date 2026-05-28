@@ -39,7 +39,7 @@
 // File: agent/src/test/java/com/cq/agent/batch/scheduler/FileRetrySchedulerTest.java
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -101,7 +101,7 @@ Expected: ❌ FAIL - 编译错误：`cannot find symbol: class FileRetrySchedule
 // File: agent/src/main/java/com/cq/agent/batch/scheduler/FileRetryScheduler.java
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

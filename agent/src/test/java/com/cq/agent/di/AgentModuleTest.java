@@ -3,11 +3,9 @@ package com.cq.agent.di;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.report.FallbackPersistenceService;
-import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
-import com.cq.agent.client.upload.AgentUploader;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import com.cq.agent.client.upload.UploadService;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
@@ -71,12 +69,12 @@ class AgentModuleTest {
     void shouldCreateUploadServiceAsRetryAware() {
         UploadService uploadService = injector.getInstance(UploadService.class);
         assertNotNull(uploadService);
-        assertInstanceOf(RetryAwareUploaderDecorator.class, uploadService);
+        assertInstanceOf(RetryAwareUploader.class, uploadService);
     }
 
     @Test
     void shouldCreateBatchTaskScheduler() {
-        BatchTaskSchedulerUploaderDecorator scheduler = injector.getInstance(BatchTaskSchedulerUploaderDecorator.class);
+        BatchTaskSchedulerUploader scheduler = injector.getInstance(BatchTaskSchedulerUploader.class);
         assertNotNull(scheduler);
     }
 
@@ -125,15 +123,15 @@ class AgentModuleTest {
 
     @Test
     void shouldReturnSameSingletonForRetryAwareUploader() {
-        RetryAwareUploaderDecorator instance1 = injector.getInstance(RetryAwareUploaderDecorator.class);
-        RetryAwareUploaderDecorator instance2 = injector.getInstance(RetryAwareUploaderDecorator.class);
+        RetryAwareUploader instance1 = injector.getInstance(RetryAwareUploader.class);
+        RetryAwareUploader instance2 = injector.getInstance(RetryAwareUploader.class);
         assertSame(instance1, instance2);
     }
 
     @Test
     void shouldReturnSameSingletonForBatchTaskScheduler() {
-        BatchTaskSchedulerUploaderDecorator instance1 = injector.getInstance(BatchTaskSchedulerUploaderDecorator.class);
-        BatchTaskSchedulerUploaderDecorator instance2 = injector.getInstance(BatchTaskSchedulerUploaderDecorator.class);
+        BatchTaskSchedulerUploader instance1 = injector.getInstance(BatchTaskSchedulerUploader.class);
+        BatchTaskSchedulerUploader instance2 = injector.getInstance(BatchTaskSchedulerUploader.class);
         assertSame(instance1, instance2);
     }
 }

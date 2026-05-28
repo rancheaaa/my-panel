@@ -4,21 +4,19 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.config.AgentConfig;
 import com.google.inject.Provider;
 import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
-
 /**
  * BatchTaskSchedulerUploaderDecorator的Guice Provider
  * 创建继承RetryAwareUploaderDecorator的批量调度装饰者实例
  * 该实例同时是AgentUploader、RetryAwareUploaderDecorator和BatchTaskSchedulerUploaderDecorator
  */
-public class BatchTaskSchedulerProvider implements Provider<BatchTaskSchedulerUploaderDecorator> {
+public class BatchTaskSchedulerProvider implements Provider<BatchTaskSchedulerUploader> {
 
     private static final Logger logger = LoggerFactory.getLogger(BatchTaskSchedulerProvider.class);
 
@@ -42,14 +40,12 @@ public class BatchTaskSchedulerProvider implements Provider<BatchTaskSchedulerUp
     }
 
     @Override
-    public BatchTaskSchedulerUploaderDecorator get() {
+    public BatchTaskSchedulerUploader get() {
         try {
-            Path uploadFinalFailureQueueDir = Path.of(config.getUploadFinalFailureQueueDir());
-
-            BatchTaskSchedulerUploaderDecorator batchTaskUploader =
-                    new BatchTaskSchedulerUploaderDecorator(
+            BatchTaskSchedulerUploader batchTaskUploader =
+                    new BatchTaskSchedulerUploader(
                             config, configFileManager, fileBatchTracker,
-                            progressReporter, fileScanner, uploadFinalFailureQueueDir);
+                            progressReporter, fileScanner);
             // 初始化AgentUploader的工作线程
             batchTaskUploader.init();
             logger.info("BatchTaskSchedulerUploaderDecorator initialized (inheritance mode)");

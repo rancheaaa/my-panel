@@ -723,6 +723,14 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                   </Select.OptGroup>
                 </Select>
               </Form.Item>
+                <div style={{ padding: '6px 10px', background: '#fff0f6', borderRadius: 4, border: '1px solid #ffadd2' }}>
+                    <Tooltip title="选择预设频率后自动生成Cron表达式">
+                  <span style={{ fontSize: 11.5, color: '#c41d7f' }}>
+                    <InfoCircleOutlined style={{ marginRight: 4 }} />
+                    请选择任务的执行频率，支持常用间隔、每日定时、每周定时等预设选项
+                  </span>
+                    </Tooltip>
+                </div>
               <div style={{ borderTop: '1px dashed #f0f0f0', margin: '8px 0 12px', paddingTop: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, marginRight: 8 }}>定时传输窗口</span>
@@ -763,14 +771,6 @@ const TaskForm = ({ onSubmit, initialValues = {}, loading = false, mode = 'creat
                     );
                   }}
                 </Form.Item>
-              </div>
-              <div style={{ padding: '6px 10px', background: '#fff0f6', borderRadius: 4, border: '1px solid #ffadd2' }}>
-                <Tooltip title="选择预设频率后自动生成Cron表达式">
-                  <span style={{ fontSize: 11.5, color: '#c41d7f' }}>
-                    <InfoCircleOutlined style={{ marginRight: 4 }} />
-                    请选择任务的执行频率，支持常用间隔、每日定时、每周定时等预设选项
-                  </span>
-                </Tooltip>
               </div>
             </Card>
           </Col>

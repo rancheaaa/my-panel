@@ -7,11 +7,8 @@ import com.cq.agent.batch.report.FallbackPersistenceService;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.scanner.FileScanner;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
-import com.cq.agent.client.download.AgentDownloader;
-import com.cq.agent.client.upload.AgentUploader;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
-import com.cq.agent.client.upload.UploadService;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.di.provider.*;
 import com.cq.agent.executor.CommandExecutor;
@@ -40,14 +37,11 @@ public class AgentModule extends AbstractModule {
         bind(ConfigFileManager.class).toProvider(ConfigFileManagerProvider.class).in(Singleton.class);
         bind(FileBatchCompletionTracker.class).toProvider(FileBatchCompletionTrackerProvider.class).in(Singleton.class);
         bind(ProgressReporter.class).toProvider(ProgressReporterProvider.class).in(Singleton.class);
-        bind(AgentDownloader.class).toProvider(AgentDownloaderProvider.class).in(Singleton.class);
 
         // 核心上传组件：单实例绑定
         // BatchTaskSchedulerUploaderDecorator IS-A RetryAwareUploaderDecorator IS-A AgentUploader
-        bind(BatchTaskSchedulerUploaderDecorator.class).toProvider(BatchTaskSchedulerProvider.class).in(Singleton.class);
-        bind(RetryAwareUploaderDecorator.class).to(BatchTaskSchedulerUploaderDecorator.class);
-        bind(AgentUploader.class).to(BatchTaskSchedulerUploaderDecorator.class);
-        bind(UploadService.class).to(BatchTaskSchedulerUploaderDecorator.class);
+        bind(BatchTaskSchedulerUploader.class).toProvider(BatchTaskSchedulerProvider.class).in(Singleton.class);
+        bind(RetryAwareUploader.class).toProvider(RetryAwareUploaderProvider.class);
 
         bind(ConfigChangeListener.class).toProvider(ConfigChangeListenerProvider.class).in(Singleton.class);
         bind(FallbackPersistenceService.class).toProvider(FallbackPersistenceServiceProvider.class).in(Singleton.class);

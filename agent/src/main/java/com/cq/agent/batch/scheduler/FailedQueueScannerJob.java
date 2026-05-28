@@ -1,6 +1,6 @@
 package com.cq.agent.batch.scheduler;
 
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -25,7 +25,7 @@ public class FailedQueueScannerJob implements Job {
         log.info("⏰ 开始扫描失败队列...");
 
         try {
-            RetryAwareUploaderDecorator retryDecorator = getRetryDecorator(context);
+            RetryAwareUploader retryDecorator = getRetryDecorator(context);
 
             if (retryDecorator != null) {
                 // 扫描上传失败队列（装饰者内部实现）
@@ -45,13 +45,13 @@ public class FailedQueueScannerJob implements Job {
     /**
      * 从执行上下文获取 RetryAwareUploaderDecorator 实例
      */
-    private RetryAwareUploaderDecorator getRetryDecorator(JobExecutionContext context) {
+    private RetryAwareUploader getRetryDecorator(JobExecutionContext context) {
         // 方式1: 从 JobDataMap 获取
         JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();
         if (jobDataMap != null) {
             Object retryDecorator = jobDataMap.get("retryAwareUploader");
-            if (retryDecorator instanceof RetryAwareUploaderDecorator) {
-                return (RetryAwareUploaderDecorator) retryDecorator;
+            if (retryDecorator instanceof RetryAwareUploader) {
+                return (RetryAwareUploader) retryDecorator;
             }
         }
 

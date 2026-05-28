@@ -3,7 +3,7 @@ package com.cq.agent.di.provider;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
-import com.cq.agent.client.upload.RetryAwareUploaderDecorator;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import com.cq.agent.config.AgentConfig;
 import com.google.inject.Provider;
 import com.google.inject.Inject;
@@ -16,7 +16,7 @@ import java.nio.file.Path;
  * RetryAwareUploaderDecorator的Guice Provider
  * 创建继承AgentUploader的重试装饰者实例
  */
-public class RetryAwareUploaderProvider implements Provider<RetryAwareUploaderDecorator> {
+public class RetryAwareUploaderProvider implements Provider<RetryAwareUploader> {
 
     private static final Logger logger = LoggerFactory.getLogger(RetryAwareUploaderProvider.class);
 
@@ -37,11 +37,11 @@ public class RetryAwareUploaderProvider implements Provider<RetryAwareUploaderDe
     }
 
     @Override
-    public RetryAwareUploaderDecorator get() {
+    public RetryAwareUploader get() {
         try {
             Path uploadFinalFailureQueueDir = Path.of(config.getUploadFinalFailureQueueDir());
 
-            RetryAwareUploaderDecorator retryAwareUploader = new RetryAwareUploaderDecorator(
+            RetryAwareUploader retryAwareUploader = new RetryAwareUploader(
                     config, fileBatchTracker, progressReporter,
                     configFileManager, uploadFinalFailureQueueDir);
             logger.info("RetryAwareUploaderDecorator initialized (inheritance mode)");

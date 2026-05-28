@@ -1,6 +1,6 @@
 package com.cq.agent.di;
 
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
@@ -21,7 +21,7 @@ class AgentBootstrapTest {
     private AgentConfig config;
 
     @Mock
-    private BatchTaskSchedulerUploaderDecorator batchTaskUploader;
+    private BatchTaskSchedulerUploader batchTaskUploader;
 
     @Mock
     private AgentRegistryService registryService;

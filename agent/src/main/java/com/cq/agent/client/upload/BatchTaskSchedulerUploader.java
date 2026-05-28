@@ -8,6 +8,7 @@ import com.cq.agent.batch.scheduler.BatchUploadListener;
 import com.cq.agent.batch.scheduler.BatchTransferJob;
 import com.cq.agent.batch.scheduler.TargetRouter;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
+import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.config.AgentConfig;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
@@ -20,12 +21,16 @@ import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 批量任务调度上传装饰者（继承RetryAwareUploaderDecorator）
@@ -34,30 +39,49 @@ import java.util.List;
  * - 文件路由策略（广播/轮询/随机/区域）
  * - 文件批次追踪与传输后操作
  * 设计原则：
- * - 继承RetryAwareUploaderDecorator（间接继承AgentUploader）
- * - 直接调用父类方法，无需委托转换
  * - 单一职责：只关注批量调度逻辑
  */
-public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecorator {
+public class BatchTaskSchedulerUploader {
 
-    private static final Logger log = LoggerFactory.getLogger(BatchTaskSchedulerUploaderDecorator.class);
+    private static final Logger log = LoggerFactory.getLogger(BatchTaskSchedulerUploader.class);
+
+    private static final int DEFAULT_TASK_PRIORITY = 5;
 
     @Setter
     @Getter
     private FileScanner fileScanner;
 
+    @Getter
+    private final ConfigFileManager configFileManager;
+
+    @Getter
+    private final FileBatchCompletionTracker fileBatchTracker;
+
+    @Getter
+    private final ProgressReporter progressReporter;
+
+    @Getter
+    private final AgentConfig agentConfig;
+
+    private static final int DEFAULT_AGENT_COUNT = 10;
     private static final String JOB_GROUP = "batch-transfer";
     private static final String TRIGGER_GROUP = "batch-transfer-triggers";
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final Scheduler quartzScheduler;
-    private final java.util.Map<Long, Runnable> taskRunnables = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<Long, Runnable> taskRunnableMap = new ConcurrentHashMap<>();
+
+    private final Map<Integer, AgentUploader> agentUploadMap = new ConcurrentHashMap<>();
 
     /**
      * 构造函数（简单模式）
      */
-    public BatchTaskSchedulerUploaderDecorator(AgentConfig agentConfig, ConfigFileManager configFileManager)
+    public BatchTaskSchedulerUploader(AgentConfig agentConfig, ConfigFileManager configFileManager)
             throws SchedulerException {
-        super(agentConfig);
+        this.agentConfig = agentConfig;
+        this.fileBatchTracker = new FileBatchCompletionTracker(agentConfig.getFilebatchPendingDir());
+        this.configFileManager = configFileManager;
+        this.progressReporter = new ProgressReporter(agentConfig);
         this.quartzScheduler = new StdSchedulerFactory().getScheduler();
         this.quartzScheduler.start();
     }
@@ -65,36 +89,50 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
     /**
      * 构造函数（完整依赖注入模式）
      */
-    public BatchTaskSchedulerUploaderDecorator(AgentConfig agentConfig, ConfigFileManager configFileManager,
-            FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
-            FileScanner fileScanner, Path uploadFinalFailureQueueDir) throws SchedulerException {
-        super(agentConfig, fileBatchTracker, progressReporter, configFileManager, uploadFinalFailureQueueDir);
+    public BatchTaskSchedulerUploader(AgentConfig agentConfig, ConfigFileManager configFileManager,
+                                      FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
+                                      FileScanner fileScanner) throws SchedulerException {
+        this.agentConfig = agentConfig;
         this.fileScanner = fileScanner;
+        this.configFileManager = configFileManager;
+        this.fileBatchTracker = fileBatchTracker;
+        this.progressReporter = progressReporter;
         this.quartzScheduler = new StdSchedulerFactory().getScheduler();
         this.quartzScheduler.start();
     }
 
-    @Override
+    public void init() {
+        int num  = DEFAULT_AGENT_COUNT + 1;
+        for (int i = 1; i <= DEFAULT_AGENT_COUNT; i++) {
+            final AgentConfig config = new AgentConfig();
+            config.setUploadConcurrentUploads(num - i);
+            config.setUploadTaskGlobalPriority(i);
+            final AgentUploader agentUploader = new AgentUploader(config);
+            agentUploader.init();
+            agentUploadMap.put(i, agentUploader);
+        }
+    }
+
     public void shutdown() {
         // 先停止Quartz调度任务
         try {
             for (JobKey jobKey : quartzScheduler.getJobKeys(GroupMatcher.jobGroupEquals(JOB_GROUP))) {
                 quartzScheduler.deleteJob(jobKey);
             }
-            taskRunnables.clear();
+            taskRunnableMap.clear();
             log.info("⏹️  所有Quartz任务已停止");
         } catch (SchedulerException e) {
             log.error("❌ 停止所有任务失败: {}", e.getMessage());
         }
         try {
-            if (quartzScheduler != null && !quartzScheduler.isShutdown()) {
+            if (!quartzScheduler.isShutdown()) {
                 quartzScheduler.shutdown(true);
             }
         } catch (SchedulerException e) {
             log.error("❌ 关闭Quartz调度器异常: {}", e.getMessage());
         }
         // 再调用父类shutdown（关闭重试调度器 + AgentUploader工作线程）
-        super.shutdown();
+        this.agentUploadMap.values().forEach(BaseAgentClient::shutdown);
         log.info("BatchTaskSchedulerUploaderDecorator已关闭");
     }
 
@@ -141,7 +179,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
 
             removeExistingQuartzJob(taskId);
 
-            taskRunnables.put(taskId, task);
+            taskRunnableMap.put(taskId, task);
 
             JobDataMap jobDataMap = new JobDataMap();
             jobDataMap.put(BatchTransferJob.TASK_DATA_KEY, config);
@@ -215,6 +253,10 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
                 if (quartzScheduler.checkExists(triggerKey)) {
                     String cronExpression = config.getScanConfig() != null ? config.getScanConfig().getCronExpression()
                             : null;
+                    if (cronExpression == null || cronExpression.isBlank()) {
+                        log.warn("任务缺少Cron表达式，无法更新: taskId={}", taskId);
+                        return;
+                    }
                     CronScheduleBuilder scheduleBuilder = CronScheduleBuilder
                             .cronSchedule(cronExpression)
                             .withMisfireHandlingInstructionDoNothing();
@@ -227,7 +269,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
                     quartzScheduler.rescheduleJob(triggerKey, newTrigger);
                     log.info("🔄 Quartz任务已更新: taskId={}, newCron={}", taskId, cronExpression);
                 } else {
-                    Runnable task = taskRunnables.get(taskId);
+                    Runnable task = taskRunnableMap.get(taskId);
                     if (task != null) {
                         startTask(config);
                     } else {
@@ -254,7 +296,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
             JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
             if (quartzScheduler.checkExists(jobKey)) {
                 quartzScheduler.deleteJob(jobKey);
-                taskRunnables.remove(taskId);
+                taskRunnableMap.remove(taskId);
                 log.info("🔄 旧Quartz任务已移除(保留配置文件): taskId={}", taskId);
             }
         } catch (SchedulerException e) {
@@ -268,7 +310,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
             JobKey jobKey = new JobKey("batch-task-" + taskId, JOB_GROUP);
             if (quartzScheduler.checkExists(jobKey)) {
                 quartzScheduler.deleteJob(jobKey);
-                taskRunnables.remove(taskId);
+                taskRunnableMap.remove(taskId);
                 log.info("🗑️  Quartz任务已删除: taskId={}", taskId);
             }
         } catch (SchedulerException e) {
@@ -295,8 +337,6 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
     }
 
     public void completeTask(Long taskId) {
-        // 直接调用父类RetryAwareUploaderDecorator的recordSuccess方法
-        recordSuccess(taskId);
         log.info("任务已完成: taskId={}", taskId);
     }
 
@@ -304,10 +344,25 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
 
     private Runnable createTaskRunnable(AgentTaskConfig initialConfig) {
         Long initialTaskId = initialConfig.getTaskId();
-
         return () -> {
             AgentTaskConfig config = loadLatestConfig(initialTaskId, initialConfig);
-
+            final Boolean scheduledEnabled = config.getScanConfig().getScheduledEnabled();
+            if (scheduledEnabled) {
+                String scheduledStartTime = config.getScanConfig().getScheduledStartTime();
+                String scheduledEndTime = config.getScanConfig().getScheduledEndTime();
+                LocalTime startTime = LocalTime.parse(scheduledStartTime, TIME_FORMATTER);
+                LocalTime endTime = LocalTime.parse(scheduledEndTime, TIME_FORMATTER);
+                if (LocalTime.now().isAfter(endTime)) {
+                    log.info("批量任务{}当前时间{}晚于执行时间范围内{}-{}，跳过本次调度",
+                            config.getTaskId(), LocalDateTime.now().format(TIME_FORMATTER), startTime, endTime);
+                    return;
+                }
+                if (LocalTime.now().isBefore(startTime)) {
+                    log.info("批量任务{}当前时间{}早于执行时间范围内{}-{}，跳过本次调度",
+                            config.getTaskId(), LocalDateTime.now().format(TIME_FORMATTER), startTime, endTime);
+                    return;
+                }
+            }
             log.info("开始执行任务: taskId={}, sourceDir={}, version={}",
                     config.getTaskId(), config.getSourceDir(), config.getVersion());
 
@@ -423,15 +478,20 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
                     }
 
                     // 提交前将原始文件标记为传输中（重命名为隐藏文件）
+                    final Integer taskPriority = config.getTaskPriority();
                     Path hiddenPath = hideFileBeforeUpload(scannedFile);
-
                     BatchUploadListener listener = createBatchUploadListener(
                             taskId, scannedFile, config, targetAgent,
                             scanBatchId, fileBatchId);
                     listener.createQueueSubTaskOnProxy();
                     // 直接调用父类AgentUploader的uploadFile方法
-                    boolean submitted = uploadFile(hiddenPath.toString(), remoteTargetInfo, listener);
-
+                    AgentUploader agentUploader;
+                    if (taskPriority >= 1 && taskPriority <= 10) {
+                        agentUploader = this.agentUploadMap.get(taskPriority);
+                    } else {
+                        agentUploader = this.agentUploadMap.get(DEFAULT_TASK_PRIORITY);
+                    }
+                    boolean submitted = agentUploader.uploadFile(hiddenPath.toString(), remoteTargetInfo, listener);
                     if (submitted) {
                         result.incrementSubmitted();
                     } else {
@@ -541,7 +601,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
             String filePath = scannedFile.getAbsolutePath();
             if (filePath != null && TransferFileStateManager.isTransferringFile(Path.of(filePath))) {
                 // 检查是否还有其他目标在传输该文件（通过inflightTasks判断）
-                boolean hasOtherTransfers = hasInflightUploadForFile(filePath);
+                boolean hasOtherTransfers = this.agentUploadMap.values().stream().anyMatch(upload -> upload.hasInflightUploadForFile(filePath));
                 if (!hasOtherTransfers) {
                     Path restored = TransferFileStateManager.unhideFileSafely(Path.of(filePath));
                     if (restored != null) {
@@ -559,7 +619,7 @@ public class BatchTaskSchedulerUploaderDecorator extends RetryAwareUploaderDecor
             AgentTaskConfig config, TargetAgentInfo targetAgent,
             Long scanBatchId, Long fileBatchId) {
         return new BatchUploadListener(
-                taskId, scannedFile, config, targetAgent, getGlobalProgressReporter(),
+                taskId, scannedFile, config, targetAgent, getProgressReporter(),
                 getAgentConfig() != null ? getAgentConfig().getUploadSuccessQueueDir() : null,
                 getAgentConfig() != null ? getAgentConfig().getUploadSendingQueueDir() : null,
                 scanBatchId, fileBatchId,

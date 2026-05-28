@@ -1,11 +1,11 @@
 package com.cq.agent;
 
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.RetryConfig;
 import com.cq.agent.batch.config.ConfigFileManager;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
 import com.cq.agent.config.AgentConfig;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,7 +26,7 @@ class AgentApplicationIntegrationTest {
     @TempDir
     Path tempDir;
 
-    private BatchTaskSchedulerUploaderDecorator batchTaskUploader;
+    private BatchTaskSchedulerUploader batchTaskUploader;
     private ConfigFileManager configFileManager;
     private String configDir;
 
@@ -41,7 +41,7 @@ class AgentApplicationIntegrationTest {
         agentConfig.setUploadFinalFailureQueueDir(tempDir.resolve("final-failure").toString());
         agentConfig.setUploadSuccessQueueDir(tempDir.resolve("success").toString());
 
-        batchTaskUploader = new BatchTaskSchedulerUploaderDecorator(agentConfig, configFileManager);
+        batchTaskUploader = new BatchTaskSchedulerUploader(agentConfig, configFileManager);
     }
 
     @AfterEach

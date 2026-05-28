@@ -2,7 +2,7 @@ package com.cq.agent.di.provider;
 
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.ConfigChangeListener;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.executor.CommandExecutor;
 import com.cq.agent.server.HttpServer;
@@ -19,7 +19,7 @@ public class HttpServerProvider implements Provider<HttpServer> {
     private final ChunkedTransferService chunkedTransferService;
     private final ConfigFileManager configFileManager;
     private final ConfigChangeListener configChangeListener;
-    private final BatchTaskSchedulerUploaderDecorator batchTaskUploader;
+    private final BatchTaskSchedulerUploader batchTaskUploader;
 
     @Inject
     public HttpServerProvider(AgentConfig config,
@@ -28,7 +28,7 @@ public class HttpServerProvider implements Provider<HttpServer> {
                               ChunkedTransferService chunkedTransferService,
                               ConfigFileManager configFileManager,
                               ConfigChangeListener configChangeListener,
-                              BatchTaskSchedulerUploaderDecorator batchTaskUploader) {
+                              BatchTaskSchedulerUploader batchTaskUploader) {
         this.config = config;
         this.commandExecutor = commandExecutor;
         this.fileService = fileService;

@@ -3,7 +3,8 @@ package com.cq.agent.di.provider;
 import com.cq.agent.batch.config.ConfigChangeListener;
 import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.batch.config.VersionManager;
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
+import com.cq.agent.client.upload.RetryAwareUploader;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.google.inject.Provider;
 import com.google.inject.Inject;
@@ -16,15 +17,18 @@ public class ConfigChangeListenerProvider implements Provider<ConfigChangeListen
 
     private final ConfigFileManager configFileManager;
     private final VersionManager versionManager;
-    private final BatchTaskSchedulerUploaderDecorator batchTaskUploader;
+    private final BatchTaskSchedulerUploader batchTaskUploader;
+    private final RetryAwareUploader retryAwareUploader;
 
     @Inject
     public ConfigChangeListenerProvider(ConfigFileManager configFileManager,
                                         VersionManager versionManager,
-                                        BatchTaskSchedulerUploaderDecorator batchTaskUploader) {
+                                        BatchTaskSchedulerUploader batchTaskUploader,
+                                        RetryAwareUploader retryAwareUploader) {
         this.configFileManager = configFileManager;
         this.versionManager = versionManager;
         this.batchTaskUploader = batchTaskUploader;
+        this.retryAwareUploader = retryAwareUploader;
     }
 
     @Override
@@ -35,7 +39,7 @@ public class ConfigChangeListenerProvider implements Provider<ConfigChangeListen
                     AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(taskId);
                     if (taskConfig != null) {
                         batchTaskUploader.updateTask(taskConfig);
-                        batchTaskUploader.registerTaskConfig(taskId, taskConfig);
+                        retryAwareUploader.registerTaskConfig(taskId, taskConfig);
                     }
                 },
                 ctx -> {
@@ -43,13 +47,13 @@ public class ConfigChangeListenerProvider implements Provider<ConfigChangeListen
                         AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                         if (taskConfig != null && "RUNNING".equals(taskConfig.getStatus())) {
                             batchTaskUploader.startTask(taskConfig);
-                            batchTaskUploader.registerTaskConfig(ctx.taskId, taskConfig);
+                            retryAwareUploader.registerTaskConfig(ctx.taskId, taskConfig);
                         }
                     } else if ("CONFIG_UPDATED".equals(ctx.field)) {
                         AgentTaskConfig taskConfig = configFileManager.loadTaskConfig(ctx.taskId);
                         if (taskConfig != null) {
                             batchTaskUploader.updateTask(taskConfig);
-                            batchTaskUploader.registerTaskConfig(ctx.taskId, taskConfig);
+                            retryAwareUploader.registerTaskConfig(ctx.taskId, taskConfig);
                         }
                     }
                 });

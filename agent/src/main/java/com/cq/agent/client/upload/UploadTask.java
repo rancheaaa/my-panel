@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Getter
 @Setter
 public class UploadTask implements TaskInfo {
+    private int priority = 5;
+
     private String localFilePath;
     private String remoteTargetPath;
     private String transferId;

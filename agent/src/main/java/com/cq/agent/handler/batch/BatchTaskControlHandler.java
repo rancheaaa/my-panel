@@ -1,8 +1,7 @@
 package com.cq.agent.handler.batch;
 
-import com.cq.agent.client.upload.BatchTaskSchedulerUploaderDecorator;
+import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.handler.IRequestHandler;
-import com.cq.agent.dto.ApiCode;
 import com.cq.agent.dto.ApiResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -30,9 +29,9 @@ public class BatchTaskControlHandler implements IRequestHandler {
     private static final Logger log = LoggerFactory.getLogger(BatchTaskControlHandler.class);
     private static final Gson GSON = new Gson();
 
-    private final BatchTaskSchedulerUploaderDecorator batchTaskUploader;
+    private final BatchTaskSchedulerUploader batchTaskUploader;
 
-    public BatchTaskControlHandler(BatchTaskSchedulerUploaderDecorator batchTaskUploader) {
+    public BatchTaskControlHandler(BatchTaskSchedulerUploader batchTaskUploader) {
         this.batchTaskUploader = batchTaskUploader;
     }
 

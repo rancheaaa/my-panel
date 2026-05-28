@@ -231,6 +231,11 @@ public class BatchTransferTaskServiceImpl implements IBatchTransferTaskService {
         return result;
     }
 
+    @Override
+    public long countByCondition(BatchTransferTask query) {
+        return taskMapper.countByCondition(query);
+    }
+
     /**
      * 构建单个节点状态
      */

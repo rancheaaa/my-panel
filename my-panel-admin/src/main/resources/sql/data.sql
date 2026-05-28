@@ -534,7 +534,8 @@ INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`,
 -- 15.9 三级按钮：传输明细操作权限
 INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2341, '子任务查询', 2340, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:subtask:query', '#', 'admin', NOW(), '', NULL, ''),
-(2342, '子任务列表', 2340, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:subtask:list', '#', 'admin', NOW(), '', NULL, '');
+(2342, '子任务列表', 2340, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:subtask:list', '#', 'admin', NOW(), '', NULL, ''),
+(2343, '子任务导出', 2340, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:subtask:export', '#', 'admin', NOW(), '', NULL, '');
 
 -- 15.8 更新角色权限：添加传输明细页面及新增按钮权限
 INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES

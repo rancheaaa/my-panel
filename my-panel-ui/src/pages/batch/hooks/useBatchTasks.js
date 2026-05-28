@@ -30,12 +30,12 @@ export function useBatchTasks() {
       };
       const res = await batchApi.getTaskListWithStatus(apiParams);
       if (res.code === 200) {
-        setTasks(res.data || []);
+        setTasks(res.data?.data || []);
         setPagination(prev => ({
           ...prev,
-          current: params.page || prev.current,
-          pageSize: params.size || prev.pageSize,
-          total: res.total || 0
+          current: res.data?.pageNum || params.page || prev.current,
+          pageSize: res.data?.pageSize || params.size || prev.pageSize,
+          total: res.data?.total || 0
         }));
       }
     } catch (error) {

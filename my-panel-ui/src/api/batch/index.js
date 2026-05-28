@@ -142,6 +142,59 @@ export const batchApi = {
   },
 
   /**
+   * 导出任务数据为Excel
+   */
+  exportTasks(params, ids) {
+    return request({
+      url: '/batch/task/export',
+      method: 'post',
+      params: {
+        status: params?.status || undefined,
+        sourceAgentId: params?.sourceAgentId || undefined,
+        sourceAgentName: params?.sourceAgentName || undefined,
+        taskName: params?.taskName || undefined,
+        taskDescription: params?.taskDescription || undefined,
+        sourceDir: params?.sourceDir || undefined,
+        targetAgentId: params?.targetAgentId || undefined,
+        targetAgentName: params?.targetAgentName || undefined,
+        targetDir: params?.targetDir || undefined,
+        transferMode: params?.transferMode || undefined,
+        routingStrategy: params?.routingStrategy || undefined,
+        postTransferAction: params?.postTransferAction || undefined,
+        retryEnabled: params?.retryEnabled !== undefined ? params.retryEnabled : undefined,
+        preserveDirStructure: params?.preserveDirStructure !== undefined ? params.preserveDirStructure : undefined,
+        ids: ids || undefined
+      },
+      responseType: 'blob'
+    });
+  },
+
+  /**
+   * 导出子任务数据为Excel
+   */
+  exportSubtasks(params, ids) {
+    return request({
+      url: '/batch/subtask/export',
+      method: 'post',
+      params: {
+        taskId: params?.taskId || undefined,
+        status: params?.status || undefined,
+        sourceFilePath: params?.sourceFilePath || undefined,
+        targetFilePath: params?.targetFilePath || undefined,
+        targetAgentId: params?.targetAgentId || undefined,
+        sourceAgentId: params?.sourceAgentId || undefined,
+        sourceAgentName: params?.sourceAgentName || undefined,
+        targetAgentName: params?.targetAgentName || undefined,
+        fileName: params?.fileName || undefined,
+        scanBatchId: params?.scanBatchId || undefined,
+        fileBatchId: params?.fileBatchId || undefined,
+        ids: ids || undefined
+      },
+      responseType: 'blob'
+    });
+  },
+
+  /**
    * 检查目录是否存在
    */
   checkDirectory(agentId, dirPath) {

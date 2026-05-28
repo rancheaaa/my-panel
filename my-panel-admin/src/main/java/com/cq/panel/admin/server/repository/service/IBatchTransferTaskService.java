@@ -35,4 +35,6 @@ public interface IBatchTransferTaskService {
     Map<String, Object> getTaskStatistics(Long taskId);
 
     List<TaskListWithStatusVO> getTaskListWithNodeStatus(BatchTransferTask query, Integer pageNum, Integer pageSize);
+
+    long countByCondition(BatchTransferTask query);
 }

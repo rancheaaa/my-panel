@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.web.controller.batch;
 
 import com.cq.panel.admin.server.annotation.Log;
 import com.cq.panel.admin.server.common.enums.BusinessType;
+import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
 import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import com.cq.panel.authlite.annotation.RequirePermission;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -115,25 +117,46 @@ public class BatchTransferTaskController extends BaseController {
         return Result.success(task);
     }
 
-    /**
-     * 查询任务列表（支持条件过滤和分页）
-     */
-    @Operation(summary = "查询任务列表", description = "根据状态、源Agent等条件分页查询任务列表")
-    @RequirePermission("batch:task:list")
-    @GetMapping("/list")
-    public Result<List<BatchTransferTask>> list(BatchTransferTaskQueryDTO query) {
-        BatchTransferTask domain = queryConverter.toDomain(query);
-        List<BatchTransferTask> list = batchTransferTaskService.getTaskList(domain, query.getPageNum(), query.getPageSize());
-        return Result.success(list);
-    }
-
     @Operation(summary = "查询任务列表（带节点状态）", description = "查询任务列表，同时返回源节点和目标节点的在线状态及目录是否存在")
     @RequirePermission("batch:task:list")
     @GetMapping("/list-with-status")
-    public Result<List<TaskListWithStatusVO>> listWithStatus(BatchTransferTaskQueryDTO query) {
+    public Result<Map<String, Object>> listWithStatus(BatchTransferTaskQueryDTO query) {
         BatchTransferTask domain = queryConverter.toDomain(query);
-        List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(domain, query.getPageNum(), query.getPageSize());
-        return Result.success(list);
+        int pageNum = query.getPageNum();
+        int pageSize = query.getPageSize();
+        List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(domain, pageNum, pageSize);
+        long total = batchTransferTaskService.countByCondition(domain);
+
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("data", list);
+        result.put("total", total);
+        result.put("pageNum", pageNum);
+        result.put("pageSize", pageSize);
+        return Result.success(result);
+    }
+
+    /**
+     * 导出批量传输任务数据
+     */
+    @Operation(summary = "导出任务数据", description = "导出任务列表数据为Excel文件，支持按条件筛选导出和按ID列表导出")
+    @Log(title = "批量传输任务", businessType = BusinessType.EXPORT)
+    @RequirePermission("batch:task:export")
+    @PostMapping("/export")
+    public void export(HttpServletResponse response,
+                       @Parameter(description = "查询参数") BatchTransferTaskQueryDTO query,
+                       @Parameter(description = "需要导出的任务ID列表，为空则导出全部") @RequestParam(required = false) List<Long> ids) {
+        List<BatchTransferTask> list;
+        if (ids != null && !ids.isEmpty()) {
+            list = ids.stream()
+                    .map(batchTransferTaskService::getTaskById)
+                    .filter(task -> task != null)
+                    .toList();
+        } else {
+            BatchTransferTask domain = queryConverter.toDomain(query);
+            list = batchTransferTaskService.getTaskList(domain, 1, Integer.MAX_VALUE);
+        }
+        ExcelUtil<BatchTransferTask> util = new ExcelUtil<>(BatchTransferTask.class);
+        util.exportExcel(response, list, "批量传输任务数据");
     }
 
     /**

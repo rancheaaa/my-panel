@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button, Pagination, Dropdown, Form } from 'antd';
+import { Table, Input, Select, Card, Row, Col, Space, Tag, Tooltip, Progress, Typography, Badge, Button, Pagination, Dropdown, Form, Drawer, message } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -20,9 +20,12 @@ import {
   UserOutlined,
   ColumnHeightOutlined,
   UpOutlined,
-  DownOutlined
+  DownOutlined,
+  FilterOutlined,
+  DownloadOutlined
 } from '@ant-design/icons';
 import { useSubtasks } from './hooks/useSubtasks';
+import { batchApi } from '../../api/batch';
 import './index.scss';
 
 const { Search } = Input;
@@ -82,6 +85,8 @@ function calculateDuration(record, now) {
 }
 
 const SubtaskListPage = () => {
+  const [searchForm] = Form.useForm();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [taskIdFilter, setTaskIdFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [sourceFilePath, setSourceFilePath] = useState('');
@@ -95,7 +100,7 @@ const SubtaskListPage = () => {
   const [fileBatchId, setFileBatchId] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [tableSize, setTableSize] = useState('small');
-  const [expand, setExpand] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
   const { subtasks, loading, pagination, fetchSubtasks } = useSubtasks();
 
@@ -120,6 +125,7 @@ const SubtaskListPage = () => {
       scanBatchId: scanBatchId || undefined,
       fileBatchId: fileBatchId || undefined
     });
+    setDrawerOpen(false);
   };
 
   const handleReset = () => {
@@ -134,7 +140,39 @@ const SubtaskListPage = () => {
     setFileName('');
     setScanBatchId(null);
     setFileBatchId(null);
+    searchForm.resetFields();
     fetchSubtasks();
+    setDrawerOpen(false);
+  };
+
+  const handleExport = async () => {
+    try {
+      const params = {
+        taskId: taskIdFilter || undefined,
+        status: statusFilter || undefined,
+        sourceFilePath: sourceFilePath || undefined,
+        targetFilePath: targetFilePath || undefined,
+        targetAgentId: targetAgentId || undefined,
+        sourceAgentId: sourceAgentId || undefined,
+        sourceAgentName: sourceAgentName || undefined,
+        targetAgentName: targetAgentName || undefined,
+        fileName: fileName || undefined,
+        scanBatchId: scanBatchId || undefined,
+        fileBatchId: fileBatchId || undefined
+      };
+      const ids = selectedRowKeys.length > 0 ? selectedRowKeys : undefined;
+      const res = await batchApi.exportSubtasks(params, ids);
+      const blob = new Blob([res], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `batch_subtask_${new Date().getTime()}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(link.href);
+      message.success(`导出成功，共 ${ids?.length || pagination.total} 条数据`);
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败');
+    }
   };
 
   const columns = [
@@ -453,165 +491,163 @@ const SubtaskListPage = () => {
     }
   ];
 
-  return (
-    <div className="batch-subtask-page">
-      <div className="batch-subtask-container">
-        <Card size="small" className="search-card" bordered={false} style={{ marginBottom: 16, minHeight: expand ? 220 : 120, transition: 'min-height 0.3s ease' }}>
-          <Row gutter={[24, 16]}>
-            <Col span={6}>
-              <Input
-                placeholder="任务ID(精确)"
-                allowClear
-                size="middle"
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                value={taskIdFilter}
-                onChange={(e) => setTaskIdFilter(e.target.value)}
-                onPressEnter={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
+  const renderSearchDrawer = () => {
+    return (
+      <Drawer
+        title="筛选条件"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        width={520}
+        styles={{ body: { padding: '16px 24px' } }}
+      >
+        <Form
+          form={searchForm}
+          layout="vertical"
+          autoComplete="off"
+        >
+          <Row gutter={[16, 0]}>
+            <Col span={12}>
+              <Form.Item name="taskId" label="任务ID">
+                <Input
+                  placeholder="精准匹配"
+                  allowClear
+                  value={taskIdFilter}
+                  onChange={(e) => setTaskIdFilter(e.target.value)}
+                />
+              </Form.Item>
             </Col>
-            <Col span={6}>
-              <Select
-                placeholder="状态(精确)"
-                allowClear
-                size="middle"
-                value={statusFilter}
-                onChange={(val) => setStatusFilter(val)}
-                style={{ width: '100%', borderRadius: 8 }}
-                options={[
-                  { value: 'QUEUED', label: '排队中' },
-                  { value: 'SENDING', label: '传输中' },
-                  { value: 'COMPLETED', label: '已完成' },
-                  { value: 'FAILED', label: '失败' },
-                  { value: 'RETRYING', label: '重试中' }
-                ]}
-              />
+            <Col span={12}>
+              <Form.Item name="status" label="状态">
+                <Select
+                  placeholder="精确匹配"
+                  allowClear
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(val)}
+                  options={[
+                    { value: 'QUEUED', label: '排队中' },
+                    { value: 'SENDING', label: '传输中' },
+                    { value: 'COMPLETED', label: '已完成' },
+                    { value: 'FAILED', label: '失败' },
+                    { value: 'RETRYING', label: '重试中' }
+                  ]}
+                />
+              </Form.Item>
             </Col>
-            <Col span={6}>
-              <Search
-                placeholder="源节点名称(模糊)"
-                allowClear
-                size="middle"
-                value={sourceAgentName}
-                onChange={(e) => setSourceAgentName(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
+            <Col span={12}>
+              <Form.Item name="sourceAgentName" label="源节点名称">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={sourceAgentName}
+                  onChange={(e) => setSourceAgentName(e.target.value)}
+                />
+              </Form.Item>
             </Col>
-            <Col span={6}>
-              <Search
-                placeholder="目标节点名称(模糊)"
-                allowClear
-                size="middle"
-                value={targetAgentName}
-                onChange={(e) => setTargetAgentName(e.target.value)}
-                onSearch={handleSearch}
-                style={{ borderRadius: 8 }}
-              />
+            <Col span={12}>
+              <Form.Item name="targetAgentName" label="目标节点名称">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={targetAgentName}
+                  onChange={(e) => setTargetAgentName(e.target.value)}
+                />
+              </Form.Item>
             </Col>
-            {expand && (
-              <>
-                <Col span={6}>
-                  <Search
-                    placeholder="文件名(模糊)"
-                    allowClear
-                    size="middle"
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Search
-                    placeholder="源文件路径(模糊)"
-                    allowClear
-                    size="middle"
-                    value={sourceFilePath}
-                    onChange={(e) => setSourceFilePath(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Search
-                    placeholder="目标文件路径(模糊)"
-                    allowClear
-                    size="middle"
-                    value={targetFilePath}
-                    onChange={(e) => setTargetFilePath(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Search
-                    placeholder="源Agent ID(模糊)"
-                    allowClear
-                    size="middle"
-                    value={sourceAgentId}
-                    onChange={(e) => setSourceAgentId(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Search
-                    placeholder="目标Agent ID(模糊)"
-                    allowClear
-                    size="middle"
-                    value={targetAgentId}
-                    onChange={(e) => setTargetAgentId(e.target.value)}
-                    onSearch={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Input
-                    placeholder="扫描批次ID(精确)"
-                    allowClear
-                    size="middle"
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                    value={scanBatchId}
-                    onChange={(e) => setScanBatchId(e.target.value)}
-                    onPressEnter={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-                <Col span={6}>
-                  <Input
-                    placeholder="文件批次ID(精确)"
-                    allowClear
-                    size="middle"
-                    prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-                    value={fileBatchId}
-                    onChange={(e) => setFileBatchId(e.target.value)}
-                    onPressEnter={handleSearch}
-                    style={{ borderRadius: 8 }}
-                  />
-                </Col>
-              </>
-            )}
-            <Col span={24} style={{ textAlign: 'right', marginTop: expand ? 0 : 0 }}>
-              <Space>
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} style={{ borderRadius: 8 }}>搜索</Button>
-                <Button icon={<ReloadOutlined />} onClick={handleReset} style={{ borderRadius: 8 }}>重置</Button>
-                <Button
-                  type="link"
-                  onClick={() => setExpand(!expand)}
-                  icon={expand ? <UpOutlined /> : <DownOutlined />}
-                  style={{ padding: '0 4px' }}
-                >
-                  {expand ? '收起' : '展开'}
-                </Button>
+            <Col span={12}>
+              <Form.Item name="fileName" label="文件名">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="sourceFilePath" label="源文件路径">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={sourceFilePath}
+                  onChange={(e) => setSourceFilePath(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="targetFilePath" label="目标文件路径">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={targetFilePath}
+                  onChange={(e) => setTargetFilePath(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="sourceAgentId" label="源Agent ID">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={sourceAgentId}
+                  onChange={(e) => setSourceAgentId(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="targetAgentId" label="目标Agent ID">
+                <Input
+                  placeholder="模糊搜索"
+                  allowClear
+                  value={targetAgentId}
+                  onChange={(e) => setTargetAgentId(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="scanBatchId" label="扫描批次ID">
+                <Input
+                  placeholder="精准匹配"
+                  allowClear
+                  value={scanBatchId}
+                  onChange={(e) => setScanBatchId(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="fileBatchId" label="文件批次ID">
+                <Input
+                  placeholder="精准匹配"
+                  allowClear
+                  value={fileBatchId}
+                  onChange={(e) => setFileBatchId(e.target.value)}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={24} style={{ marginTop: 16 }}>
+              <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+                <Button onClick={() => setDrawerOpen(false)}>取消</Button>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
+                <Button onClick={handleReset}>重置</Button>
               </Space>
             </Col>
           </Row>
-        </Card>
+        </Form>
+      </Drawer>
+    );
+  };
+
+  return (
+    <div className="batch-subtask-page">
+      <div className="batch-subtask-container">
+        {renderSearchDrawer()}
 
         <Card size="small" className="table-card" bordered={false}>
           <div className="subtask-toolbar">
             <Space size="large">
+              <Button icon={<FilterOutlined />} onClick={() => setDrawerOpen(true)}>筛选</Button>
+              <Button icon={<DownloadOutlined />} onClick={handleExport}>
+                {selectedRowKeys.length > 0 ? `导出选中(${selectedRowKeys.length})` : '导出全部'}
+              </Button>
               <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={() => fetchSubtasks()} shape="circle" />
               </Tooltip>
@@ -644,9 +680,13 @@ const SubtaskListPage = () => {
               rowKey="id"
               loading={loading}
               size={tableSize}
-              scroll={{ x: 2210, y: 'calc(100vh - 500px)' }}
+              scroll={{ x: 2210, y: 'calc(100vh - 340px)' }}
               pagination={false}
               rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
+              rowSelection={{
+                selectedRowKeys,
+                onChange: (keys) => setSelectedRowKeys(keys)
+              }}
             />
           </div>
 

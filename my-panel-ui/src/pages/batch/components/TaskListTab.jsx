@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input, Pagination, Dropdown, Form, Select } from 'antd';
+import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input, Pagination, Dropdown, Form, Select, Drawer, message } from 'antd';
 const { Search } = Input;
 const { Option } = Select;
 import {
@@ -20,8 +20,10 @@ import {
   SwapOutlined,
   ColumnHeightOutlined,
   DownOutlined,
-  UpOutlined
+  UpOutlined,
+  DownloadOutlined
 } from '@ant-design/icons';
+import { batchApi } from '../../../api/batch';
 import '../index.scss';
 
 const statusMap = {
@@ -99,7 +101,8 @@ const TaskListTab = ({
 }) => {
   const [searchForm] = Form.useForm();
   const [tableSize, setTableSize] = useState('middle');
-  const [expandSearch, setExpandSearch] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
   const handleSearch = (values) => {
     const params = {
@@ -108,16 +111,36 @@ const TaskListTab = ({
       ...values
     };
     fetchTasks(params);
+    setDrawerOpen(false);
   };
 
   const handleReset = () => {
     searchForm.resetFields();
     fetchTasks({ page: 1, size: pagination.pageSize || 10 });
+    setDrawerOpen(false);
   };
 
   const handlePageChange = (page, size) => {
     const values = searchForm.getFieldsValue();
     fetchTasks({ page, size, ...values });
+  };
+
+  const handleExport = async () => {
+    try {
+      const values = searchForm.getFieldsValue();
+      const ids = selectedRowKeys.length > 0 ? selectedRowKeys : undefined;
+      const res = await batchApi.exportTasks(values, ids);
+      const blob = new Blob([res], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `batch_task_${new Date().getTime()}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(link.href);
+      message.success(`导出成功，共 ${ids?.length || pagination.total} 条数据`);
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败');
+    }
   };
 
   const columns = [
@@ -575,20 +598,20 @@ const TaskListTab = ({
     );
   };
 
-  const renderSearchForm = () => {
-    const basicFields = (
+  const renderSearchDrawer = () => {
+    const allFields = (
       <>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="id" label="任务ID">
             <Input placeholder="精准匹配" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="taskName" label="任务名称">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="status" label="任务状态">
             <Select placeholder="精确匹配" allowClear>
               <Option value="READY">就绪</Option>
@@ -597,42 +620,37 @@ const TaskListTab = ({
             </Select>
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="sourceAgentId" label="源Agent ID">
             <Input placeholder="精确匹配" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="sourceAgentName" label="源节点名称">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
-      </>
-    );
-
-    const extraFields = expandSearch ? (
-      <>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="sourceDir" label="源目录">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="targetAgentId" label="目标Agent ID">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="targetAgentName" label="目标节点名称">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="targetDir" label="目标目录">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="transferMode" label="传输模式">
             <Select placeholder="精确匹配" allowClear>
               <Option value="ONE_TO_ONE">一对一</Option>
@@ -640,7 +658,7 @@ const TaskListTab = ({
             </Select>
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="routingStrategy" label="路由策略">
             <Select placeholder="精确匹配" allowClear>
               <Option value="ROUND_ROBIN">轮询</Option>
@@ -650,7 +668,7 @@ const TaskListTab = ({
             </Select>
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="postTransferAction" label="传输后操作">
             <Select placeholder="精确匹配" allowClear>
               <Option value="NONE">无操作</Option>
@@ -659,7 +677,7 @@ const TaskListTab = ({
             </Select>
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="retryEnabled" label="启用重试">
             <Select placeholder="精确匹配" allowClear>
               <Option value={1}>是</Option>
@@ -667,7 +685,7 @@ const TaskListTab = ({
             </Select>
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="preserveDirStructure" label="保持目录结构">
             <Select placeholder="精确匹配" allowClear>
               <Option value={1}>是</Option>
@@ -675,51 +693,55 @@ const TaskListTab = ({
             </Select>
           </Form.Item>
         </Col>
-        <Col span={6}>
+        <Col span={12}>
           <Form.Item name="taskDescription" label="任务描述">
             <Input placeholder="模糊搜索" allowClear />
           </Form.Item>
         </Col>
       </>
-    ) : null;
+    );
 
     return (
-      <Card size="small" className="search-card" bordered={false}>
+      <Drawer
+        title="筛选条件"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        width={520}
+        styles={{ body: { padding: '16px 24px' } }}
+      >
         <Form
           form={searchForm}
+          layout="vertical"
           onFinish={handleSearch}
           autoComplete="off"
         >
-          <Row gutter={[16, 8]}>
-            {basicFields}
-            {extraFields}
-            <Col span={24} style={{ textAlign: 'right' }}>
-              <Space>
+          <Row gutter={[16, 0]}>
+            {allFields}
+            <Col span={24} style={{ marginTop: 16 }}>
+              <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+                <Button onClick={() => setDrawerOpen(false)}>取消</Button>
                 <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>搜索</Button>
                 <Button onClick={handleReset}>重置</Button>
-                <Button
-                  type="link"
-                  onClick={() => setExpandSearch(!expandSearch)}
-                  icon={expandSearch ? <UpOutlined /> : <DownOutlined />}
-                >
-                  {expandSearch ? '收起' : '展开'}
-                </Button>
               </Space>
             </Col>
           </Row>
         </Form>
-      </Card>
+      </Drawer>
     );
   };
 
   return (
     <>
-      {renderSearchForm()}
+      {renderSearchDrawer()}
 
       <Card size="small" className="table-card" bordered={false}>
         <div className="subtask-toolbar">
           <Space size="large">
             <Button type="primary" icon={<PlusCircleOutlined />} onClick={onCreateClick}>新建任务</Button>
+            <Button icon={<FilterOutlined />} onClick={() => setDrawerOpen(true)}>筛选</Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExport}>
+              {selectedRowKeys.length > 0 ? `导出选中(${selectedRowKeys.length})` : '导出全部'}
+            </Button>
           </Space>
           <div style={{ flex: 1 }}></div>
           <Space size="large">
@@ -751,11 +773,15 @@ const TaskListTab = ({
             dataSource={tasks || []}
             rowKey={(record) => { const t = record.task || record; return t.id; }}
             loading={loading}
+            rowSelection={{
+              selectedRowKeys,
+              onChange: (keys) => setSelectedRowKeys(keys)
+            }}
             expandable={{
               expandedRowRender,
               rowExpandable: () => true
             }}
-            scroll={{ x: 1920, y: 'calc(100vh - 400px)' }}
+            scroll={{ x: 1920, y: 'calc(100vh - 200px)' }}
             pagination={false}
             size={tableSize}
           />

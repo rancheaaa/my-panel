@@ -64,6 +64,9 @@ public class HandlerFactory {
         
         // Batch task control (pause/resume/delete)
         handlerMap.put("/api/batch/task/control", new BatchTaskControlHandler(batchTaskUploader));
+
+        // Connectivity probe
+        handlerMap.put("/api/probe", new ProbeHandler(fileService, chunkedTransferService));
     }
 
     public IRequestHandler getHandler(String path) {

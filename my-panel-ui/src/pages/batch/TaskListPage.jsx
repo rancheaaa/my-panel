@@ -4,6 +4,7 @@ import { PlusCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import TaskListTab from './components/TaskListTab';
 import TaskForm from './components/TaskForm';
+import ConnectivityModal from './components/ConnectivityModal';
 import { useBatchTasks } from './hooks/useBatchTasks';
 import { batchApi } from '../../api/batch';
 import { listAgentRegistry } from '../../api/agent';
@@ -15,8 +16,10 @@ const TaskListPage = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [connModalOpen, setConnModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [detailTask, setDetailTask] = useState(null);
+  const [connTask, setConnTask] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [agentList, setAgentList] = useState([]);
 
@@ -94,6 +97,11 @@ const TaskListPage = () => {
     }
   };
 
+  const handleConnectivityClick = (record) => {
+    setConnTask(record);
+    setConnModalOpen(true);
+  };
+
   const getTaskInitialValues = (task) => {
     if (!task) return {};
     const targetAgentIds = Array.isArray(task.targetAgentIds)
@@ -160,6 +168,7 @@ const TaskListPage = () => {
         onCreateClick={() => setCreateModalOpen(true)}
         onEditClick={handleEditClick}
         onViewClick={handleViewClick}
+        onConnectivityClick={handleConnectivityClick}
       />
       </div>
       <Modal
@@ -203,6 +212,11 @@ const TaskListPage = () => {
           initialValues={getTaskInitialValues(detailTask)}
         />
       </Modal>
+      <ConnectivityModal
+        open={connModalOpen}
+        onClose={() => { setConnModalOpen(false); setConnTask(null); }}
+        task={connTask}
+      />
     </div>
   );
 };

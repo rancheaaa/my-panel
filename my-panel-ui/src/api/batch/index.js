@@ -305,5 +305,13 @@ export const batchApi = {
       url: `/batch/task-import/batch/${batchNo}`,
       method: 'delete'
     });
+  },
+
+  checkConnectivity(sourceNodeName, targetNodeName) {
+    return request({
+      url: '/batch/connectivity/check',
+      method: 'get',
+      params: { sourceNodeName, targetNodeName }
+    });
   }
 };

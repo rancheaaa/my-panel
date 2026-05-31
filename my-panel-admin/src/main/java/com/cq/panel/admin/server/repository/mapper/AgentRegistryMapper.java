@@ -89,4 +89,6 @@ public interface AgentRegistryMapper
      * @return Agent注册信息集合
      */
     List<AgentRegistry> selectAgentRegistryByIds(@Param("ids") List<String> ids);
+
+    AgentRegistry selectByNodeName(@Param("nodeName") String nodeName);
 }

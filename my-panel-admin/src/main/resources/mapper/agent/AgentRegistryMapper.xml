@@ -135,4 +135,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{id}
         </foreach>
     </select>
+
+    <select id="selectByNodeName" parameterType="String" resultMap="AgentRegistryResult">
+        <include refid="selectAgentRegistryVo"/>
+        where node_name = #{nodeName}
+        limit 1
+    </select>
 </mapper>

@@ -21,7 +21,8 @@ import {
   ColumnHeightOutlined,
   DownOutlined,
   UpOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+  ApiOutlined
 } from '@ant-design/icons';
 import { batchApi } from '../../../api/batch';
 import '../index.scss';
@@ -89,6 +90,7 @@ const TaskListTab = ({
   onCreateClick,
   onEditClick,
   onViewClick,
+  onConnectivityClick,
   tasks,
   loading,
   pagination,
@@ -494,7 +496,7 @@ const TaskListTab = ({
     {
       title: '操作',
       key: 'action',
-      width: 270,
+      width: 350,
       fixed: 'right',
       render: (_, record) => {
         const t = record.task || record;
@@ -534,6 +536,9 @@ const TaskListTab = ({
         });
         items.push({
           key: 'view', content: <><EyeOutlined /> 详情</>, onClick: () => onViewClick(t)
+        });
+        items.push({
+          key: 'connectivity', content: <><ApiOutlined /> 连通性</>, onClick: () => onConnectivityClick(t)
         });
 
         return (

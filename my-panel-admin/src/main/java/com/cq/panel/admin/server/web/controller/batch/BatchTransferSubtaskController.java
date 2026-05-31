@@ -92,23 +92,33 @@ public class BatchTransferSubtaskController extends BaseController {
     @PostMapping("/export")
     public void export(HttpServletResponse response,
                        BatchTransferSubtaskQueryDTO query,
-                       @Parameter(description = "需要导出的子任务ID列表，为空则导出全部") @RequestParam(required = false) List<Long> ids) {
+                       @Parameter(description = "需要导出的子任务ID列表，逗号分隔，为空则导出全部") @RequestParam(required = false) String ids) {
         List<BatchTransferSubtask> list;
         if (ids != null && !ids.isEmpty()) {
-            list = ids.stream()
-                    .map(id -> {
-                        List<BatchTransferSubtask> result = subtaskMapper.selectPageList(
-                                id, null, null, null, null, null, null, null, null, null, null, 0, 1);
-                        return result.isEmpty() ? null : result.getFirst();
-                    })
-                    .filter(subtask -> subtask != null)
+            List<Long> idList = java.util.Arrays.stream(ids.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .toList();
+            BatchTransferSubtask example = new BatchTransferSubtask();
+            list = subtaskMapper.selectList(example).stream()
+                    .filter(subtask -> idList.contains(subtask.getId()))
                     .toList();
         } else {
-            list = subtaskMapper.selectPageList(
-                    query.getTaskId(), query.getStatus(), query.getSourceFilePath(), query.getTargetFilePath(), query.getTargetAgentId(),
-                    query.getSourceAgentId(), query.getFileName(), query.getScanBatchId(), query.getFileBatchId(),
-                    query.getSourceAgentName(), query.getTargetAgentName(),
-                    0, Integer.MAX_VALUE);
+            BatchTransferSubtask example = new BatchTransferSubtask();
+            example.setTaskId(query.getTaskId());
+            example.setStatus(query.getStatus());
+            example.setSourcePath(query.getSourceFilePath());
+            example.setTargetPath(query.getTargetFilePath());
+            example.setTargetAgentId(query.getTargetAgentId());
+            example.setSourceAgentId(query.getSourceAgentId());
+            example.setFileName(query.getFileName());
+            example.setScanBatchId(query.getScanBatchId());
+            example.setFileBatchId(query.getFileBatchId());
+            example.setSourceAgentName(query.getSourceAgentName());
+            example.setTargetAgentName(query.getTargetAgentName());
+            list = subtaskMapper.selectList(example);
+            logger.info("导出子任务: 查询条件={}, 结果数={}", query, list.size());
         }
         ExcelUtil<BatchTransferSubtask> util = new ExcelUtil<>(BatchTransferSubtask.class);
         util.exportExcel(response, list, "批量传输子任务数据");

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import request from '../../../utils/request';
 
 const subtaskApi = {
@@ -29,18 +29,22 @@ export function useSubtasks() {
   const [subtasks, setSubtasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const paginationRef = useRef(pagination);
+  paginationRef.current = pagination;
 
   const fetchSubtasks = useCallback(async (params = {}) => {
     setLoading(true);
     try {
-      const res = await subtaskApi.getList(params);
+      const page = params?.page || paginationRef.current.current;
+      const size = params?.size || paginationRef.current.pageSize;
+      const res = await subtaskApi.getList({ page, size, ...params });
       if (res.code === 200) {
         setSubtasks(res.data?.data || []);
-        setPagination(prev => ({
-          ...prev,
-          total: res.data?.total || 0,
-          current: res.data?.pageNum || 1
-        }));
+        setPagination({
+          current: res.data?.pageNum || page,
+          pageSize: size,
+          total: res.data?.total || 0
+        });
       }
     } catch (error) {
       console.error('加载传输明细失败:', error);
@@ -51,7 +55,7 @@ export function useSubtasks() {
 
   useEffect(() => {
     fetchSubtasks();
-  }, [fetchSubtasks]);
+  }, []);
 
   return {
     subtasks,

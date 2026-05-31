@@ -160,7 +160,8 @@ const SubtaskListPage = () => {
         scanBatchId: scanBatchId || undefined,
         fileBatchId: fileBatchId || undefined
       };
-      const ids = selectedRowKeys.length > 0 ? selectedRowKeys : undefined;
+      const ids = selectedRowKeys.length > 0 ? selectedRowKeys.join(',') : undefined;
+      const total = selectedRowKeys.length > 0 ? selectedRowKeys.length : pagination.total;
       const res = await batchApi.exportSubtasks(params, ids);
       const blob = new Blob([res], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const link = document.createElement('a');
@@ -168,7 +169,7 @@ const SubtaskListPage = () => {
       link.download = `batch_subtask_${new Date().getTime()}.xlsx`;
       link.click();
       window.URL.revokeObjectURL(link.href);
-      message.success(`导出成功，共 ${ids?.length || pagination.total} 条数据`);
+      message.success(`导出成功，共 ${total} 条数据`);
     } catch (error) {
       console.error('导出失败:', error);
       message.error('导出失败');
@@ -177,7 +178,7 @@ const SubtaskListPage = () => {
 
   const columns = [
     {
-      title: '一对几',
+      title: '任务类型',
       dataIndex: 'targetCount',
       key: 'targetCount',
       width: 80,
@@ -643,17 +644,28 @@ const SubtaskListPage = () => {
 
         <Card size="small" className="table-card" bordered={false}>
           <div className="subtask-toolbar">
-            <Space size="large">
+            <Space size={12}>
               <Button icon={<FilterOutlined />} onClick={() => setDrawerOpen(true)}>筛选</Button>
               <Button icon={<DownloadOutlined />} onClick={handleExport}>
                 {selectedRowKeys.length > 0 ? `导出选中(${selectedRowKeys.length})` : '导出全部'}
               </Button>
+            </Space>
+            {pagination.total > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 16, padding: '4px 16px',
+                background: 'linear-gradient(135deg, #f6ffed 0%, #f0ffe8 100%)',
+                borderRadius: 10, border: '1px solid #d3f5b9'
+              }}>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>总计</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#52c41a', fontFamily: "'SF Mono', Monaco, Consolas, monospace" }}>{pagination.total}</span>
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>条明细</span>
+              </div>
+            )}
+            <div style={{ flex: 1 }}></div>
+            <Space size={12}>
               <Tooltip title="刷新">
                 <Button icon={<ReloadOutlined />} onClick={() => fetchSubtasks()} shape="circle" />
               </Tooltip>
-            </Space>
-            <div style={{ flex: 1 }}></div>
-            <Space size="large">
               <Tooltip title="密度">
                 <Dropdown
                   menu={{
@@ -680,7 +692,7 @@ const SubtaskListPage = () => {
               rowKey="id"
               loading={loading}
               size={tableSize}
-              scroll={{ x: 2210, y: 'calc(100vh - 340px)' }}
+              scroll={{ x: 2210 }}
               pagination={false}
               rowClassName={(record) => record.status === 'FAILED' ? 'row-error' : ''}
               rowSelection={{

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Row, Col, Input, Pagination, Dropdown, Form, Select, Drawer, message } from 'antd';
+import { Table, Tag, Space, Button, Popconfirm, Tooltip, Card, Input, Pagination, Dropdown, Form, Select, Drawer, message, Col, Row } from 'antd';
 const { Search } = Input;
 const { Option } = Select;
 import {
@@ -152,12 +152,19 @@ const TaskListTab = ({
       render: (_, record) => {
         const t = record.task || record;
         return (
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 13.5, color: '#1f1f1f', marginBottom: 2 }}>
-              {t.taskName || '-'}
+          <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={
+            <div style={{ padding: '4px 0' }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>任务名称:{t.taskName || '-'}</div>
+              <div style={{ fontSize: 12, color: '#888' }}>任务ID:{t.id}</div>
             </div>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c' }}>ID: {t.id}</div>
-          </div>
+          }>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: '#1f1f1f', marginBottom: 2 }}>
+                {t.taskName || '-'}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#8c8c8c' }}>{t.id}</div>
+            </div>
+          </Tooltip>
         );
       }
     },
@@ -302,7 +309,7 @@ const TaskListTab = ({
       }
     },
     {
-      title: '调度',
+      title: '扫描时间CRON',
       key: 'cron',
       width: 130,
       render: (_, record) => {
@@ -335,6 +342,18 @@ const TaskListTab = ({
             </span>
           </Tooltip>
         );
+      }
+    },
+    {
+      title: '扫描上限',
+      key: 'maxScanFiles',
+      width: 90,
+      align: 'center',
+      render: (_, record) => {
+        const t = record.task || record;
+        return t.maxScanFiles ? (
+          <span style={{ fontSize: 12, color: '#333', fontWeight: 500 }}>{t.maxScanFiles}</span>
+        ) : '-';
       }
     },
     {
@@ -381,7 +400,7 @@ const TaskListTab = ({
     {
       title: '传输后操作',
       key: 'postAction',
-      width: 120,
+      width: 150,
       render: (_, record) => {
         const t = record.task || record;
         const action = t.postTransferAction || 'NONE';
@@ -408,6 +427,20 @@ const TaskListTab = ({
           <span style={{ fontSize: 12, color: '#666' }}>
             <ClockCircleOutlined style={{ marginRight: 4, fontSize: 11, color: '#bfbfbf' }} />
             {t.createTime.replace('T', ' ').slice(0, 16)}
+          </span>
+        ) : '-';
+      }
+    },
+    {
+      title: '启动时间',
+      key: 'startedAt',
+      width: 150,
+      render: (_, record) => {
+        const t = record.task || record;
+        return t.startedAt ? (
+          <span style={{ fontSize: 12, color: '#1890ff' }}>
+            <PlayCircleOutlined style={{ marginRight: 4, fontSize: 11, color: '#1890ff' }} />
+            {t.startedAt.replace('T', ' ').slice(0, 16)}
           </span>
         ) : '-';
       }
@@ -442,6 +475,20 @@ const TaskListTab = ({
       render: (_, record) => {
         const t = record.task || record;
         return t.updateBy || '-';
+      }
+    },
+    {
+      title: '任务描述',
+      key: 'taskDescription',
+      width: 200,
+      ellipsis: true,
+      render: (_, record) => {
+        const t = record.task || record;
+        return t.taskDescription ? (
+          <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={t.taskDescription}>
+            <span style={{ fontSize: 12, color: '#666' }}>{t.taskDescription}</span>
+          </Tooltip>
+        ) : '-';
       }
     },
     {
@@ -526,77 +573,6 @@ const TaskListTab = ({
       }
     }
   ];
-
-  const expandedRowRender = (record) => {
-    const t = record.task || record;
-    let includePatterns = [], excludePatterns = [];
-    try { includePatterns = JSON.parse(t.includePatterns || '[]'); } catch (e) {}
-    try { excludePatterns = JSON.parse(t.excludePatterns || '[]'); } catch (e) {}
-
-    return (
-      <div style={{ background: '#fafafa', borderRadius: 8, padding: '16px 20px', margin: -4 }}>
-        <Row gutter={[32, 12]}>
-          <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>任务描述</div>
-            <div style={{ fontSize: 13, color: '#333' }}>{t.taskDescription || '-'}</div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>包含模式</div>
-            <div>{includePatterns.length > 0 ? includePatterns.map(p => <Tag key={p} color="green" style={{ marginBottom: 3, fontSize: 11.5 }}>{p}</Tag>) : <span style={{ color: '#bfbfbf' }}>全部文件</span>}</div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>排除模式</div>
-            <div>{excludePatterns.length > 0 ? excludePatterns.map(p => <Tag key={p} color="red" style={{ marginBottom: 3, fontSize: 11.5 }}>{p}</Tag>) : <span style={{ color: '#bfbfbf' }}>无排除</span>}</div>
-          </Col>
-        </Row>
-        <Row gutter={[32, 12]} style={{ marginTop: 8 }}>
-          <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>最大扫描数</div>
-            <div style={{ fontSize: 13, fontWeight: 500 }}>{t.maxScanFiles || '-'} 个文件</div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>目录结构</div>
-            <Tag color={t.preserveDirStructure === 1 ? 'blue' : 'default'} style={{ fontSize: 11.5 }}>
-              {t.preserveDirStructure === 1 ? '保持原始结构' : '扁平化'}
-            </Tag>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 11.5, color: '#8c8c8c', marginBottom: 4, fontWeight: 500 }}>传输后操作</div>
-            <Tag color={
-              t.postTransferAction === 'DELETE' ? 'red' :
-              t.postTransferAction === 'BACKUP' ? 'orange' : 'default'
-            } style={{ fontSize: 11.5 }}>
-              {t.postTransferAction === 'NONE' ? '无操作' :
-               t.postTransferAction === 'DELETE' ? '删除源文件' :
-               t.postTransferAction === 'BACKUP' ? `备份 → ${t.backupDir || '-'}` : t.postTransferAction}
-            </Tag>
-          </Col>
-        </Row>
-        {t.routingStrategy === 'REGION_BASED' && t.routingConfig && (
-          <Row gutter={[32, 12]} style={{ marginTop: 8 }}>
-            <Col span={24}>
-              <div style={{ fontSize: 11.5, color: '#722ed1', marginBottom: 4, fontWeight: 500 }}>区域路由配置</div>
-              <div style={{
-                background: '#f9f0ff',
-                border: '1px solid #d3adf7',
-                borderRadius: 6,
-                padding: '10px 14px'
-              }}>
-                <pre style={{
-                  margin: 0,
-                  fontSize: 12,
-                  fontFamily: 'Monaco, Consolas, monospace',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-all',
-                  color: '#333'
-                }}>{t.routingConfig}</pre>
-              </div>
-            </Col>
-          </Row>
-        )}
-      </div>
-    );
-  };
 
   const renderSearchDrawer = () => {
     const allFields = (
@@ -736,15 +712,26 @@ const TaskListTab = ({
 
       <Card size="small" className="table-card" bordered={false}>
         <div className="subtask-toolbar">
-          <Space size="large">
+          <Space size={12}>
             <Button type="primary" icon={<PlusCircleOutlined />} onClick={onCreateClick}>新建任务</Button>
             <Button icon={<FilterOutlined />} onClick={() => setDrawerOpen(true)}>筛选</Button>
             <Button icon={<DownloadOutlined />} onClick={handleExport}>
               {selectedRowKeys.length > 0 ? `导出选中(${selectedRowKeys.length})` : '导出全部'}
             </Button>
           </Space>
+          {pagination.total > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16, padding: '4px 16px',
+              background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f4ff 100%)',
+              borderRadius: 10, border: '1px solid #d6e8ff'
+            }}>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>总计</span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: '#1890ff', fontFamily: "'SF Mono', Monaco, Consolas, monospace" }}>{pagination.total}</span>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>条任务</span>
+            </div>
+          )}
           <div style={{ flex: 1 }}></div>
-          <Space size="large">
+          <Space size={12}>
             <Tooltip title="刷新">
               <Button icon={<ReloadOutlined />} onClick={() => fetchTasks()} shape="circle" />
             </Tooltip>
@@ -777,11 +764,8 @@ const TaskListTab = ({
               selectedRowKeys,
               onChange: (keys) => setSelectedRowKeys(keys)
             }}
-            expandable={{
-              expandedRowRender,
-              rowExpandable: () => true
-            }}
-            scroll={{ x: 1920, y: 'calc(100vh - 200px)' }}
+            expandable={undefined}
+            scroll={{ x: 2050 }}
             pagination={false}
             size={tableSize}
           />

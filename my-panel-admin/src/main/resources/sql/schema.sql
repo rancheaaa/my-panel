@@ -389,6 +389,7 @@ CREATE TABLE IF NOT EXISTS `agent_registry` (
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_node_name` (`node_name`),
     KEY `idx_node_name` (`node_name`),
     KEY `idx_agent_ip` (`agent_ip`),
     KEY `idx_app_id` (`app_id`),
@@ -543,11 +544,6 @@ CREATE TABLE IF NOT EXISTS `arch_edge` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='边缘关系表';
 
 -- 6.5 架构图版本历史表
-
-
-
-
-
 
 -- 6.11 架构图收藏表
 CREATE TABLE IF NOT EXISTS `arch_diagram_favorite` (
@@ -809,3 +805,53 @@ CREATE TABLE IF NOT EXISTS `batch_sync_event` (
     KEY `idx_expire_at` (`expire_at`),
     KEY `idx_next_retry` (`next_retry_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量任务配置同步事件队列';
+
+CREATE TABLE IF NOT EXISTS `batch_transfer_task_import` (
+    `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `batch_no` varchar(32) NOT NULL COMMENT '批次号',
+    `row_num` int NOT NULL COMMENT 'Excel行号(从2开始)',
+    `task_name` varchar(200) NOT NULL COMMENT '任务名称',
+    `task_description` varchar(500) DEFAULT NULL COMMENT '任务描述',
+    `source_agent_id` varchar(50) NOT NULL COMMENT '源Agent ID',
+    `source_agent_name` varchar(100) NOT NULL COMMENT '源节点名称',
+    `source_dir` varchar(500) NOT NULL COMMENT '源目录绝对路径',
+    `target_dirs` varchar(2000) DEFAULT NULL COMMENT '目标节点目录(分号分隔)',
+    `include_patterns` text DEFAULT NULL COMMENT '包含通配符(分号分隔)',
+    `exclude_patterns` text DEFAULT NULL COMMENT '排除通配符(分号分隔)',
+    `scan_cron_expression` varchar(100) DEFAULT NULL COMMENT '定时扫描Cron表达式',
+    `max_scan_files` int NOT NULL DEFAULT 10000 COMMENT '单次最大扫描文件数',
+    `target_agent_ids` text DEFAULT NULL COMMENT '目标Agent ID列表(分号分隔)',
+    `target_agent_names` text DEFAULT NULL COMMENT '目标节点名称列表(分号分隔)',
+    `retry_enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用自动重试: 0-否 1-是',
+    `retry_max_days` int NOT NULL DEFAULT 7 COMMENT '重试保留天数',
+    `retry_interval_min` int NOT NULL DEFAULT 30 COMMENT '首次重试间隔(分钟)',
+    `max_retry_count` int NOT NULL DEFAULT 10 COMMENT '单个子任务最大重试次数',
+    `retry_backoff_type` varchar(20) NOT NULL DEFAULT 'EXPONENTIAL' COMMENT '重试退避策略: LINEAR/EXPONENTIAL',
+    `post_transfer_action` varchar(20) NOT NULL DEFAULT 'NONE' COMMENT '传输后操作: NONE/DELETE/BACKUP',
+    `backup_dir` varchar(500) DEFAULT NULL COMMENT '备份目录绝对路径',
+    `backup_mode` varchar(10) DEFAULT 'COPY' COMMENT '备份模式: COPY/MOVE',
+    `preserve_dir_structure` tinyint NOT NULL DEFAULT 1 COMMENT '是否保持原始目录结构: 0-否 1-是',
+    `transfer_mode` varchar(20) NOT NULL DEFAULT 'ONE_TO_MANY' COMMENT '传输模式: ONE_TO_ONE/ONE_TO_MANY',
+    `routing_strategy` varchar(20) NOT NULL DEFAULT 'BROADCAST' COMMENT '路由策略: BROADCAST/ROUND_ROBIN/REGION_BASED/RANDOM',
+    `routing_config` text DEFAULT NULL COMMENT '路由策略配置JSON',
+    `status` varchar(20) NOT NULL DEFAULT 'READY' COMMENT '任务运行状态: READY/RUNNING/PAUSED',
+    `scheduled_enabled` tinyint NOT NULL DEFAULT 0 COMMENT '是否开启定时传输: 0-否 1-是',
+    `scheduled_start_time` time DEFAULT NULL COMMENT '每日定时传输开始时间',
+    `scheduled_end_time` time DEFAULT NULL COMMENT '每日定时传输结束时间',
+    `task_priority` int NOT NULL DEFAULT 5 COMMENT '任务优先级: 1-最高 10-最低',
+    `started_at` datetime DEFAULT NULL COMMENT '首次启动时间',
+    `validate_status` varchar(10) NOT NULL DEFAULT 'PENDING' COMMENT '校验状态: PENDING/PASS/FAIL',
+    `validate_message` varchar(500) DEFAULT NULL COMMENT '校验失败原因',
+    `import_status` varchar(10) NOT NULL DEFAULT 'PENDING' COMMENT '导入状态: PENDING/IMPORTED/ROLLBACK',
+    `imported_task_id` bigint DEFAULT NULL COMMENT '导入后对应的正式表任务ID',
+    `create_by` varchar(64) DEFAULT '' COMMENT '创建人',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` varchar(64) DEFAULT '' COMMENT '更新人',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark` varchar(500) DEFAULT NULL COMMENT '备注',
+    `file_name` varchar(200) DEFAULT NULL COMMENT '导入Excel文件名',
+    PRIMARY KEY (`id`),
+    KEY `idx_batch_no` (`batch_no`),
+    KEY `idx_import_status` (`import_status`),
+    KEY `idx_imported_task_id` (`imported_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='批量传输任务导入临时表';

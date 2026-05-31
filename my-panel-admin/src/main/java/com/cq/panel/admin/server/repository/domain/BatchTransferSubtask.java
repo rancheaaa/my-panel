@@ -18,17 +18,19 @@ public class BatchTransferSubtask implements java.io.Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 主键ID */
-    @Excel(name = "子任务ID", type = Excel.Type.EXPORT, cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "子任务ID", type = Excel.Type.EXPORT)
     private Long id;
 
     /** 关联的批量任务ID */
-    @Excel(name = "任务ID", type = Excel.Type.EXPORT, cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "任务ID", type = Excel.Type.EXPORT)
     private Long taskId;
 
     /** 扫描批次ID(一次调度触发扫描到的N个文件共享) */
+    @Excel(name = "扫描批次ID")
     private Long scanBatchId;
 
     /** 文件批次ID(同一文件传输到多个Agent共享) */
+    @Excel(name = "文件批次ID")
     private Long fileBatchId;
 
     /** 源Agent ID */
@@ -73,15 +75,19 @@ public class BatchTransferSubtask implements java.io.Serializable {
     private String status;
 
     /** 底层分块传输会话ID(关联AgentUploader的transferId) */
+    @Excel(name = "传输会话ID")
     private String transferId;
 
     /** 已传输的分块数 */
+    @Excel(name = "已传分块数", cellType = Excel.ColumnType.NUMERIC)
     private Integer transferredChunks;
 
     /** 总分块数 */
+    @Excel(name = "总分块数", cellType = Excel.ColumnType.NUMERIC)
     private Integer totalChunks;
 
     /** 已传输字节数 */
+    @Excel(name = "已传字节数", cellType = Excel.ColumnType.NUMERIC)
     private Long transferredBytes;
 
     /** 当前传输速率(字节/秒) */
@@ -103,9 +109,11 @@ public class BatchTransferSubtask implements java.io.Serializable {
     private Long durationMs;
 
     /** 错误码 */
+    @Excel(name = "错误码")
     private String errorCode;
 
     /** 错误详情 */
+    @Excel(name = "错误详情")
     private String errorMessage;
 
     /** 异常堆栈(调试用) */
@@ -121,10 +129,12 @@ public class BatchTransferSubtask implements java.io.Serializable {
 
     /** 最后一次重试时间 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "最后重试时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date lastRetryAt;
 
     /** 下次可重试时间(Level 2) */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Excel(name = "下次重试时间", width = 30, dateFormat = "yyyy-MM-dd HH:mm:ss")
     private Date nextRetryAfter;
 
     /** 创建人(系统自动) */

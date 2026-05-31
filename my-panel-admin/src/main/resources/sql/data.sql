@@ -545,3 +545,30 @@ INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 (4, 2340),
 (4, 2341),
 (4, 2342);
+
+-- ----------------------------
+-- 16. 批量任务导入功能菜单初始化数据
+-- ----------------------------
+
+-- 16.1 二级菜单：任务导入页面
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(2350, '任务导入', 2300, 4, 'batch/task-import', 'batch/TaskImportPage', NULL, '', 1, 0, 'C', '0', '0', 'batch:task:import', 'ImportOutlined', 'admin', NOW(), '', NULL, '批量任务导入菜单');
+
+-- 16.2 三级按钮：任务导入操作权限
+INSERT IGNORE INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
+(2351, '模板下载', 2350, 1, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:import', '#', 'admin', NOW(), '', NULL, ''),
+(2352, '批量上传', 2350, 2, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:import', '#', 'admin', NOW(), '', NULL, ''),
+(2353, '批量导入', 2350, 3, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:import', '#', 'admin', NOW(), '', NULL, ''),
+(2354, '批量回退', 2350, 4, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:import', '#', 'admin', NOW(), '', NULL, ''),
+(2355, '批量启用', 2350, 5, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:import', '#', 'admin', NOW(), '', NULL, ''),
+(2356, '批量暂停', 2350, 6, '#', '', '', '', 1, 0, 'F', '0', '0', 'batch:task:import', '#', 'admin', NOW(), '', NULL, '');
+
+-- 16.3 为超级管理员角色(role_id=1)分配任务导入权限
+INSERT IGNORE INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(1, 2350),
+(1, 2351),
+(1, 2352),
+(1, 2353),
+(1, 2354),
+(1, 2355),
+(1, 2356);

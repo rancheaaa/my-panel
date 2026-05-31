@@ -45,6 +45,10 @@ const mainLayoutChildren = [
       element: loadComponent('arch/architectureEdit/index')
   },
   {
+      path: '/batch/task-import',
+      element: loadComponent('batch/TaskImportPage')
+  },
+  {
     path: '*',
     element: <NotFound />,
   },

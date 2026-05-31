@@ -37,8 +37,8 @@ public interface BatchTransferSubtaskMapper {
     List<BatchTransferSubtask> selectPageList(
         @Param("taskId") Long taskId,
         @Param("status") String status,
-        @Param("sourcePath") String sourcePath,
-        @Param("targetPath") String targetPath,
+        @Param("sourceFilePath") String sourceFilePath,
+        @Param("targetFilePath") String targetFilePath,
         @Param("targetAgentId") String targetAgentId,
         @Param("sourceAgentId") String sourceAgentId,
         @Param("fileName") String fileName,
@@ -50,11 +50,16 @@ public interface BatchTransferSubtaskMapper {
         @Param("limit") Integer limit
     );
 
+    /**
+     * 查询子任务列表（按实体条件，不分页，用于导出）
+     */
+    List<BatchTransferSubtask> selectList(@Param("query") BatchTransferSubtask query);
+
     long countByCondition(
         @Param("taskId") Long taskId,
         @Param("status") String status,
-        @Param("sourcePath") String sourcePath,
-        @Param("targetPath") String targetPath,
+        @Param("sourceFilePath") String sourceFilePath,
+        @Param("targetFilePath") String targetFilePath,
         @Param("targetAgentId") String targetAgentId,
         @Param("sourceAgentId") String sourceAgentId,
         @Param("fileName") String fileName,

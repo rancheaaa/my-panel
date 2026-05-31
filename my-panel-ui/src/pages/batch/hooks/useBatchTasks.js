@@ -1,18 +1,22 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { batchApi } from '../../../api/batch';
 
 export function useBatchTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const paginationRef = useRef(pagination);
+  paginationRef.current = pagination;
 
   const fetchTasks = useCallback(async (params = {}) => {
     setLoading(true);
     try {
+      const page = params.page || paginationRef.current.current;
+      const size = params.size || paginationRef.current.pageSize;
       const apiParams = {
         id: params.id || undefined,
-        page: params.page || 1,
-        size: params.size || 10,
+        page,
+        size,
         status: params.status || undefined,
         sourceAgentId: params.sourceAgentId || undefined,
         sourceAgentName: params.sourceAgentName || undefined,
@@ -33,8 +37,8 @@ export function useBatchTasks() {
         setTasks(res.data?.data || []);
         setPagination(prev => ({
           ...prev,
-          current: res.data?.pageNum || params.page || prev.current,
-          pageSize: res.data?.pageSize || params.size || prev.pageSize,
+          current: res.data?.pageNum || page,
+          pageSize: res.data?.pageSize || size,
           total: res.data?.total || 0
         }));
       }

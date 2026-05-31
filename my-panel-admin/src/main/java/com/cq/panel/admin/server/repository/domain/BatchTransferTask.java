@@ -21,7 +21,7 @@ public class BatchTransferTask extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
     /** 任务ID */
-    @Excel(name = "任务ID", type = Excel.Type.EXPORT, cellType = Excel.ColumnType.NUMERIC)
+    @Excel(name = "任务ID", type = Excel.Type.EXPORT)
     private Long id;
 
     /** 任务名称 */

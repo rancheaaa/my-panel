@@ -51,10 +51,10 @@ public class ProgressServiceImpl implements ProgressService {
                 subtask.setRetryCount(0);
             }
             if (subtask.getCreateBy() == null || subtask.getCreateBy().isBlank()) {
-                subtask.setCreateBy(subtask.getSourceAgentId() != null ? subtask.getSourceAgentId() : "system");
+                subtask.setCreateBy("system");
             }
             if (subtask.getUpdateBy() == null || subtask.getUpdateBy().isBlank()) {
-                subtask.setUpdateBy(subtask.getSourceAgentId() != null ? subtask.getSourceAgentId() : "system");
+                subtask.setUpdateBy("system");
             }
             if (subtask.getCreateTime() == null) {
                 subtask.setCreateTime(new Date());

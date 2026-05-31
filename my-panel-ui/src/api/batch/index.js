@@ -173,23 +173,26 @@ export const batchApi = {
    * 导出子任务数据为Excel
    */
   exportSubtasks(params, ids) {
+    const queryParams = {
+      taskId: params?.taskId || undefined,
+      status: params?.status || undefined,
+      sourceFilePath: params?.sourceFilePath || undefined,
+      targetFilePath: params?.targetFilePath || undefined,
+      targetAgentId: params?.targetAgentId || undefined,
+      sourceAgentId: params?.sourceAgentId || undefined,
+      sourceAgentName: params?.sourceAgentName || undefined,
+      targetAgentName: params?.targetAgentName || undefined,
+      fileName: params?.fileName || undefined,
+      scanBatchId: params?.scanBatchId || undefined,
+      fileBatchId: params?.fileBatchId || undefined
+    };
+    if (ids) {
+      queryParams.ids = ids;
+    }
     return request({
       url: '/batch/subtask/export',
       method: 'post',
-      params: {
-        taskId: params?.taskId || undefined,
-        status: params?.status || undefined,
-        sourceFilePath: params?.sourceFilePath || undefined,
-        targetFilePath: params?.targetFilePath || undefined,
-        targetAgentId: params?.targetAgentId || undefined,
-        sourceAgentId: params?.sourceAgentId || undefined,
-        sourceAgentName: params?.sourceAgentName || undefined,
-        targetAgentName: params?.targetAgentName || undefined,
-        fileName: params?.fileName || undefined,
-        scanBatchId: params?.scanBatchId || undefined,
-        fileBatchId: params?.fileBatchId || undefined,
-        ids: ids || undefined
-      },
+      params: queryParams,
       responseType: 'blob'
     });
   },
@@ -232,6 +235,75 @@ export const batchApi = {
     return request({
       url: '/batch/statistics/summary',
       method: 'get'
+    });
+  },
+
+  downloadTemplate() {
+    return request({
+      url: '/batch/task-import/template',
+      method: 'post',
+      responseType: 'blob'
+    });
+  },
+
+  uploadTaskImport(formData) {
+    return request({
+      url: '/batch/task-import/upload',
+      method: 'post',
+      data: formData,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000
+    });
+  },
+
+  previewImport(batchNo) {
+    return request({
+      url: `/batch/task-import/preview/${batchNo}`,
+      method: 'get'
+    });
+  },
+
+  commitImport(batchNo, mode) {
+    return request({
+      url: `/batch/task-import/commit/${batchNo}`,
+      method: 'post',
+      params: { mode: mode || 'STRICT' }
+    });
+  },
+
+  rollbackImport(batchNo) {
+    return request({
+      url: `/batch/task-import/rollback/${batchNo}`,
+      method: 'post'
+    });
+  },
+
+  batchStartImport(batchNo) {
+    return request({
+      url: `/batch/task-import/batch-start/${batchNo}`,
+      method: 'put'
+    });
+  },
+
+  batchPauseImport(batchNo) {
+    return request({
+      url: `/batch/task-import/batch-pause/${batchNo}`,
+      method: 'put'
+    });
+  },
+
+  listImportBatches(keyword) {
+    return request({
+      url: '/batch/task-import/batches',
+      method: 'get',
+      params: keyword ? { keyword } : {}
+    });
+  },
+
+  deleteImportBatch(batchNo) {
+    return request({
+      url: `/batch/task-import/batch/${batchNo}`,
+      method: 'delete'
     });
   }
 };

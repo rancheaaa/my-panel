@@ -321,5 +321,13 @@ export const batchApi = {
       method: 'get',
       params: { sourceNodeName, targetNodeName }
     });
+  },
+
+  checkConnectivityOp(sourceNodeName, targetNodeName) {
+    return request({
+      url: '/batch/connectivity/check-op',
+      method: 'get',
+      params: { sourceNodeName, targetNodeName }
+    });
   }
 };

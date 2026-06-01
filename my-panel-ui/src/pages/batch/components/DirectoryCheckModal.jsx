@@ -17,7 +17,7 @@ const formatMB = (mb) => {
   return mb.toLocaleString() + ' MB';
 };
 
-const BoolTag = ({ value, trueText, falseText, trueColor, falseColor }) => {
+export const BoolTag = ({ value, trueText, falseText, trueColor, falseColor }) => {
   if (value == null) return <Tag color="#d9d9d9">未知</Tag>;
   return value
     ? <Tag color={trueColor || 'success'} icon={<CheckCircleOutlined />}>{trueText || '是'}</Tag>

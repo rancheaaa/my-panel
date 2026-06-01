@@ -42,6 +42,11 @@ public class DirectoryCheckServiceImpl implements IDirectoryCheckService {
     }
 
     @Override
+    public DirectoryCheckVO checkSingleDirectory(String agentId, String dirPath) {
+        return checkAgentDirectory(agentId, dirPath, "manual");
+    }
+
+    @Override
     public DirectoryCheckVO.DirectoryCheckResult checkDirectories(Long taskId) {
         BatchTransferTask task = taskMapper.selectById(taskId);
         if (task == null) {

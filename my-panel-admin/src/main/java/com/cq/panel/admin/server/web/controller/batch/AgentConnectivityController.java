@@ -29,4 +29,15 @@ public class AgentConnectivityController extends BaseController {
             @RequestParam String targetNodeName) {
         return Result.success(connectivityService.checkConnectivity(sourceNodeName, targetNodeName));
     }
+
+    @Operation(summary = "Agent连通性检测（运维管理入口）")
+    @GetMapping("/check-op")
+    @RequirePermission("op:agentConnectivity:check")
+    public Result<AgentConnectivityVO> checkConnectivityOp(
+            @Parameter(description = "源节点名称，如 cq@172.19.200.130:7777")
+            @RequestParam String sourceNodeName,
+            @Parameter(description = "目标节点名称，如 dell@192.168.1.8:7777")
+            @RequestParam String targetNodeName) {
+        return Result.success(connectivityService.checkConnectivity(sourceNodeName, targetNodeName));
+    }
 }

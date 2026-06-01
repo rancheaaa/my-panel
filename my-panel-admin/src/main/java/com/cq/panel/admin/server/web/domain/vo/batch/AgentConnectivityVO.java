@@ -37,11 +37,19 @@ public class AgentConnectivityVO {
 
     private PortProbeResult sourceToTarget;
 
+    private PortProbeResult targetToSource;
+
     private String connectivityStatus;
 
     private String failureReason;
 
     private List<String> checkDetails;
+
+    private List<String> reverseCheckDetails;
+
+    private String reverseStatus;
+
+    private String reverseFailureReason;
 
     @Data
     public static class PortProbeResult {

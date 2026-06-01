@@ -94,6 +94,15 @@ export function offlineTimeoutNodes(timeoutSeconds) {
   });
 }
 
+// 目录检测（单节点单目录）
+export function checkAgentDirectory(agentId, dirPath) {
+  return request({
+    url: '/op/dir-check',
+    method: 'get',
+    params: { agentId, dirPath }
+  });
+}
+
 // 查询命令执行历史列表
 export function listCommandHistory(query) {
   return request({

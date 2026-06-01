@@ -63,38 +63,45 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
 
         if (!validateInput(vo, sourceNodeName, targetNodeName, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：输入校验未通过"));
             return vo;
         }
 
         AgentRegistry source = agentRegistryMapper.selectByNodeName(sourceNodeName);
         if (!checkSourceExists(vo, source, sourceNodeName, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点不存在"));
             return vo;
         }
 
         AgentRegistry target = agentRegistryMapper.selectByNodeName(targetNodeName);
         if (!checkTargetExists(vo, target, targetNodeName, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点不存在"));
             return vo;
         }
 
         if (!checkSourceOnline(vo, source, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点离线"));
             return vo;
         }
 
         if (!checkSourceEnabled(vo, source, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点已禁用"));
             return vo;
         }
 
         if (!checkTargetOnline(vo, target, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点离线"));
             return vo;
         }
 
         if (!checkTargetEnabled(vo, target, details)) {
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点已禁用"));
             return vo;
         }
 
@@ -108,6 +115,7 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
             vo.setConnectivityStatus(Status.ADMIN_TO_SOURCE_UNREACHABLE.name());
             vo.setFailureReason("Admin无法连接源Agent: " + adminToSource.getFailureReason());
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接源Agent"));
             return vo;
         }
         details.add("✅ Admin[" + adminAddr + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
@@ -120,6 +128,7 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
             vo.setConnectivityStatus(Status.ADMIN_TO_TARGET_UNREACHABLE.name());
             vo.setFailureReason("Admin无法连接目标Agent: " + adminToTarget.getFailureReason());
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接目标Agent"));
             return vo;
         }
         details.add("✅ Admin[" + adminAddr + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
@@ -129,16 +138,32 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
                 target.getAgentIp(), target.getAgentPort());
         vo.setSourceToTarget(sourceToTarget);
         if (!sourceToTarget.isReachable()) {
-            details.add("❌ 源Agent → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + sourceToTarget.getFailureReason());
+            details.add("❌ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + sourceToTarget.getFailureReason());
             vo.setConnectivityStatus(Status.SOURCE_TO_TARGET_UNREACHABLE.name());
             vo.setFailureReason("源Agent无法连接目标Agent: " + sourceToTarget.getFailureReason());
             vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源Agent无法连接目标Agent"));
             return vo;
         }
-        details.add("✅ 源Agent → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
+        details.add("✅ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
+
+        // Layer 4: Target → Source (via target agent probe API)
+        List<String> reverseDetails = new ArrayList<>();
+        PortProbeResult targetToSource = probeViaAgent(target.getAgentIp(), target.getAgentPort(),
+                source.getAgentIp(), source.getAgentPort());
+        vo.setTargetToSource(targetToSource);
+        if (!targetToSource.isReachable()) {
+            reverseDetails.add("❌ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + targetToSource.getFailureReason());
+            vo.setReverseStatus(Status.UNREACHABLE.name());
+            vo.setReverseFailureReason("目标Agent无法连接源Agent: " + targetToSource.getFailureReason());
+        } else {
+            reverseDetails.add("✅ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
+            vo.setReverseStatus(Status.REACHABLE.name());
+        }
 
         vo.setConnectivityStatus(Status.REACHABLE.name());
         vo.setCheckDetails(details);
+        vo.setReverseCheckDetails(reverseDetails);
         return vo;
     }
 

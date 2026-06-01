@@ -1,0 +1,166 @@
+.dir-check-page {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.dcp-select-card {
+  .ant-card-body {
+    padding: 16px 20px;
+  }
+}
+
+.dcp-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.dcp-result-card-wrapper {
+  flex: 1;
+  min-height: 0;
+
+  .ant-card-body {
+    padding: 0;
+    height: 100%;
+    overflow-y: auto;
+  }
+}
+
+.dcp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+}
+
+// ==================== Result Card ====================
+
+.dcp-result-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  padding: 20px;
+  margin: 16px 20px;
+  background: #fafafa;
+  transition: all 0.3s ease;
+
+  &.has-error {
+    border-color: #ffccc7;
+    background: #fff2f0;
+  }
+
+  &.ok {
+    border-color: #b7eb8f;
+    background: #f6ffed;
+  }
+}
+
+.dcp-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.dcp-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.dcp-card-agent {
+  font-size: 13px;
+  color: #1890ff;
+  margin-left: 10px;
+  background: #e6f7ff;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.dcp-card-addr {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-left: 8px;
+}
+
+.dcp-card-path {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  background: #fff;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  border: 1px solid #e8e8e8;
+}
+
+.dcp-path-text {
+  font-size: 14px;
+  color: #595959;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  word-break: break-all;
+}
+
+.dcp-card-error {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  background: #fff1f0;
+  border-radius: 6px;
+  color: #ff4d4f;
+  font-size: 13px;
+}
+
+.dcp-card-section {
+  margin-bottom: 12px;
+}
+
+.dcp-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8c8c8c;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dcp-section-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.dcp-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dcp-item-label {
+  font-size: 12px;
+  color: #595959;
+  min-width: 60px;
+}
+
+.dcp-item-value {
+  font-size: 13px;
+  color: #1f1f1f;
+  font-weight: 500;
+}
+
+.dcp-perm-code {
+  font-size: 12px;
+  background: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 3px;
+  color: #595959;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+}
+
+.dcp-disk-bar {
+  width: 100%;
+  max-width: 340px;
+  margin-top: 6px;
+}

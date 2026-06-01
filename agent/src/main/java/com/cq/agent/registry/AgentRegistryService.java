@@ -173,10 +173,24 @@ public class AgentRegistryService {
     private AgentRegistryRequest buildUpRegistryRequest(Integer nodeStatus) {
         AgentRegistryRequest request = new AgentRegistryRequest();
 
-        // 节点名称
+        // Agent IP (先获取，用于构建节点名称)
+        String agentIp = config.getAgentIp();
+        if (agentIp == null || agentIp.isEmpty()) {
+            try {
+                agentIp = IpUtils.getLocalHost();
+            } catch (UnknownHostException | SocketException e) {
+                agentIp = "127.0.0.1";
+            }
+        }
+        request.setAgentIp(agentIp);
+        
+        // 节点名称 (格式: user@ip:port)
         String nodeName = config.getNodeName();
         if (nodeName == null || nodeName.isEmpty()) {
-            nodeName = "agent-" + config.getAgentId().substring(0, 8);
+            String userName = config.getAppId() != null && !config.getAppId().isEmpty() ? 
+                config.getAppId() : System.getProperty("user.name", "unknown");
+            int port = actualPort > 0 ? actualPort : config.getServerPort();
+            nodeName = userName + "@" + agentIp + ":" + port;
         }
         request.setNodeName(nodeName);
         
@@ -189,23 +203,11 @@ public class AgentRegistryService {
         
         // 应用ID
         if (config.getAppId() == null || config.getAppId().isEmpty()) {
-            // 获取当前运行环境下操作系统用户名作为应用ID
             final String userName = System.getProperty("user.name");
             logger.debug("set appId to {}", userName);
             config.setAppId(userName);
         }
         request.setAppId(config.getAppId());
-        
-        // Agent IP
-        String agentIp = config.getAgentIp();
-        if (agentIp == null || agentIp.isEmpty()) {
-            try {
-                agentIp = IpUtils.getLocalHost();
-            } catch (UnknownHostException | SocketException e) {
-                agentIp = "127.0.0.1";
-            }
-        }
-        request.setAgentIp(agentIp);
         
         // Agent端口
         int port = actualPort > 0 ? actualPort : config.getServerPort();

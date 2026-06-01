@@ -1,12 +1,13 @@
 package com.cq.agent.client.download;
 
-import com.cq.agent.client.upload.Util;
+import com.cq.agent.client.TaskInfo;
+import com.cq.agent.client.Util;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class DownloadTask {
+public class DownloadTask implements TaskInfo {
 
     private String transferId;
     private String traceId;
@@ -20,6 +21,8 @@ public class DownloadTask {
     private String createTime;
     private String updateTime;
     private String enqueuedTime;
+    private String scannedStartTime;
+    private String scannedEndTime;
     private String initDownloadStartTime;
     private String initDownloadEndTime;
     private String downloadChunksStartTime;
@@ -43,7 +46,7 @@ public class DownloadTask {
         this.status = DownloadTaskStatus.PREPARED;
         this.createTime = Util.currentTime();
         this.updateTime = this.createTime;
-        this.retryCount = -1;
+        this.retryCount = 0;
         this.downloadedChunksCount = 0;
         this.remoteAgentApiUrl = remoteAgentApiUrl;
         this.remoteAgentUsername = remoteAgentUsername;
@@ -72,6 +75,8 @@ public class DownloadTask {
                 ", createTime='" + createTime + '\'' +
                 ", updateTime='" + updateTime + '\'' +
                 ", enqueuedTime='" + enqueuedTime + '\'' +
+                ", scannedStartTime='" + scannedStartTime + '\'' +
+                ", scannedEndTime='" + scannedEndTime + '\'' +
                 ", initDownloadStartTime='" + initDownloadStartTime + '\'' +
                 ", initDownloadEndTime='" + initDownloadEndTime + '\'' +
                 ", downloadChunksStartTime='" + downloadChunksStartTime + '\'' +

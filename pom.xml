@@ -325,6 +325,13 @@
                 <version>${httpclient5.version}</version>
             </dependency>
 
+            <!-- Quartz Scheduler -->
+            <dependency>
+                <groupId>org.quartz-scheduler</groupId>
+                <artifactId>quartz</artifactId>
+                <version>2.3.2</version>
+            </dependency>
+
             <!-- JUnit 5 -->
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
@@ -358,6 +365,7 @@
         <module>my-panel-common</module>
         <module>cli-tools</module>
         <module>distribution</module>
+        <module>integration-test</module>
     </modules>
     <packaging>pom</packaging>
 

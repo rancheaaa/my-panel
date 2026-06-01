@@ -324,7 +324,7 @@ const MainLayout = () => {
             </div>
         </Header>
         <TagsView />
-        <Content style={{ margin: '16px 16px 0 16px', flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Content style={{ margin: '16px 16px 0 16px', flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingBottom: 32 }}>
             <AnimatePresence mode="wait">
                 <motion.div
                     key={location.pathname}
@@ -344,10 +344,8 @@ const MainLayout = () => {
                 </motion.div>
             </AnimatePresence>
         </Content>
-        <div style={{ padding: '16px' }}>
-          <div className="copyright-card">
+        <div className="copyright-card">
             Copyright MIT © {new Date().getFullYear()} My-Panel
-          </div>
         </div>
       </Layout>
     </Layout>

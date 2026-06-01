@@ -102,8 +102,9 @@ public class SimpleHttpClient implements HttpClient {
 
     /**
      * 执行HTTP请求
+     * 注意：禁用自动重定向以避免POST请求在302/303重定向时被降级为GET
      */
-    private <T> HttpResponse<T> executeRequest(String method, String url, Object body, 
+    private <T> HttpResponse<T> executeRequest(String method, String url, Object body,
                                               Type responseType, Map<String, String> headers) {
         HttpURLConnection connection = null;
         try {
@@ -113,24 +114,43 @@ public class SimpleHttpClient implements HttpClient {
             connection.setConnectTimeout(connectTimeout);
             connection.setReadTimeout(readTimeout);
             connection.setDoInput(true);
+            connection.setInstanceFollowRedirects(false);
 
-            // 设置请求头
-            headers.forEach(connection::setRequestProperty);
-            
-            // 如果是POST或PUT请求，设置请求体
-            if (body != null && ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
-                connection.setDoOutput(true);
-                
-                // 如果没有指定Content-Type，默认使用JSON
-                if (!headers.containsKey("Content-Type")) {
-                    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            int maxRedirects = 5;
+            for (int redirectCount = 0; redirectCount <= maxRedirects; redirectCount++) {
+                if (redirectCount > 0) {
+                    String location = connection.getHeaderField("Location");
+                    if (location == null) break;
+                    if (!location.startsWith("http")) {
+                        location = new URI(url).resolve(location).toString();
+                    }
+                    connection.disconnect();
+                    requestUrl = new URI(location).toURL();
+                    connection = (HttpURLConnection) requestUrl.openConnection();
+                    connection.setRequestMethod(method);
+                    connection.setConnectTimeout(connectTimeout);
+                    connection.setReadTimeout(readTimeout);
+                    connection.setDoInput(true);
+                    connection.setInstanceFollowRedirects(false);
                 }
-                
-                String requestBody = body instanceof String ? (String) body : body.toString();
-                try (OutputStream os = connection.getOutputStream()) {
-                    byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
-                    os.write(input, 0, input.length);
+
+                headers.forEach(connection::setRequestProperty);
+
+                if (body != null && ("POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method))) {
+                    connection.setDoOutput(true);
+                    if (!headers.containsKey("Content-Type")) {
+                        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                    }
+                    String requestBody = body instanceof String ? (String) body : body.toString();
+                    try (OutputStream os = connection.getOutputStream()) {
+                        byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+                        os.write(input, 0, input.length);
+                    }
                 }
+
+                int statusCode = connection.getResponseCode();
+                if (statusCode >= 300 && statusCode < 400 && redirectCount < maxRedirects) continue;
+                break;
             }
 
             // 获取响应

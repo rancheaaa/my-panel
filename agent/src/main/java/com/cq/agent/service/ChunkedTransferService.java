@@ -3,8 +3,7 @@ package com.cq.agent.service;
 import com.cq.agent.dto.*;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.model.UploadSession;
-import com.cq.agent.client.upload.PersistentMap;
-import org.rocksdb.RocksDBException;
+import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -26,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Chunked transfer service for large file uploads and downloads.
  * Supports resumable uploads and range-based downloads.
+ * Uses in-memory ConcurrentHashMap for session management (stateless design).
  */
 public class ChunkedTransferService {
 
@@ -40,10 +40,11 @@ public class ChunkedTransferService {
     private final long maxFileSize;
     private final long sessionTimeoutMs;
 
-    private final PersistentMap<String, UploadSession> uploadSessions;
+    private final ConcurrentHashMap<String, UploadSession> uploadSessions;
     private final ScheduledExecutorService cleanupExecutor;
 
-    public ChunkedTransferService(AgentConfig config) throws RocksDBException {
+    @Inject
+    public ChunkedTransferService(AgentConfig config) {
         String baseDir = config.getFileBaseDirectory();
         this.baseDirectory = Path.of(baseDir).toAbsolutePath().normalize();
         this.allowOutsideBase = config.isAllowOutsideBaseDirectory();
@@ -61,19 +62,8 @@ public class ChunkedTransferService {
             logger.error("Failed to create base directory: {}", tempDirectory, e);
         }
 
-        Path uploadSessionDbPath = baseDirectory.resolve(config.getUploadSessionsDbPath());
-        try {
-            if(!Files.exists(uploadSessionDbPath)) {
-                Files.createDirectories(uploadSessionDbPath);
-                logger.info("Chunked transfer service initialized upload session db dir: {}", uploadSessionDbPath);
-            }
-        } catch (IOException e) {
-            logger.error("Failed to create upload session db directory: {}", uploadSessionDbPath, e);
-        }
-
-        this.uploadSessions = new PersistentMap<>(uploadSessionDbPath.toAbsolutePath().normalize().toString(), "upload-sessions", String.class, UploadSession.class);
-        logger.info("Persistent upload sessions initialized at: {}", config.getUploadSessionsDbPath());
-        this.uploadSessions.getValues(1, 10).forEach(session -> logger.info("Loaded Session: {}", session));
+        this.uploadSessions = new ConcurrentHashMap<>();
+        logger.info("ChunkedTransferService initialized (memory-only mode)");
 
         cleanupExecutor = new ScheduledThreadPoolExecutor(1, r -> {
             Thread t = new Thread(r, "chunk-cleanup");
@@ -857,9 +847,6 @@ public class ChunkedTransferService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             cleanupExecutor.shutdownNow();
-        }
-        if (uploadSessions != null) {
-            uploadSessions.close();
         }
     }
 

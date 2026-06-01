@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.proxy.repository.mapper.BatchTransferSubtaskMapper">
+
+    <update id="updateByEntity" parameterType="com.cq.proxy.repository.entity.BatchTransferSubtask">
+        UPDATE batch_transfer_subtask
+        <set>
+            <if test="status != null">status = #{status},</if>
+            <if test="sourcePath != null">source_path = #{sourcePath},</if>
+            <if test="targetPath != null">target_path = #{targetPath},</if>
+            <if test="fileName != null">file_name = #{fileName},</if>
+            <if test="fileSizeBytes != null">file_size_bytes = #{fileSizeBytes},</if>
+            <if test="fileLastModified != null">file_last_modified = #{fileLastModified},</if>
+            <if test="transferId != null">transfer_id = #{transferId},</if>
+            <if test="transferredChunks != null">transferred_chunks = #{transferredChunks},</if>
+            <if test="totalChunks != null">total_chunks = #{totalChunks},</if>
+            <if test="transferredBytes != null">transferred_bytes = #{transferredBytes},</if>
+            <if test="speedBytesPerSec != null">speed_bytes_per_sec = #{speedBytesPerSec},</if>
+            <if test="startedAt != null">started_at = #{startedAt},</if>
+            <if test="completedAt != null">completed_at = #{completedAt},</if>
+            <if test="durationMs != null">duration_ms = #{durationMs},</if>
+            <if test="errorCode != null">error_code = #{errorCode},</if>
+            <if test="errorMessage != null">error_message = #{errorMessage},</if>
+            <if test="errorStackTrace != null">error_stack_trace = #{errorStackTrace},</if>
+            <if test="retryCount != null">retry_count = #{retryCount},</if>
+            <if test="targetCount != null">target_count = #{targetCount},</if>
+            <if test="lastRetryAt != null">last_retry_at = #{lastRetryAt},</if>
+            <if test="nextRetryAfter != null">next_retry_after = #{nextRetryAfter},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+</mapper>

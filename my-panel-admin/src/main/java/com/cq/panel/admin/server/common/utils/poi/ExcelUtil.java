@@ -726,7 +726,14 @@ public class ExcelUtil<T> {
             cell.setCellValue(MyStringUtils.isNull(cellValue) ? attr.defaultValue() : cellValue + attr.suffix());
         } else if (Excel.ColumnType.NUMERIC == attr.cellType()) {
             if (MyStringUtils.isNotNull(value)) {
-                cell.setCellValue(MyStringUtils.contains(Convert.toStr(value), ".") ? Convert.toDouble(value) : Convert.toInt(value));
+                String strVal = Convert.toStr(value);
+                if (MyStringUtils.contains(strVal, ".")) {
+                    cell.setCellValue(Convert.toDouble(value));
+                } else if (value instanceof Number) {
+                    cell.setCellValue(((Number) value).doubleValue());
+                } else {
+                    cell.setCellValue(Convert.toDouble(value));
+                }
             }
         } else if (Excel.ColumnType.IMAGE == attr.cellType()) {
             ClientAnchor anchor = new XSSFClientAnchor(0, 0, 0, 0, (short) cell.getColumnIndex(), cell.getRow().getRowNum(), (short) (cell.getColumnIndex() + 1), cell.getRow().getRowNum() + 1);

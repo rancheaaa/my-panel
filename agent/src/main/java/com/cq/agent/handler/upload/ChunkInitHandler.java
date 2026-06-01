@@ -32,7 +32,8 @@ public class ChunkInitHandler extends BaseHandler {
                 sendResponse(ctx, request, HttpResponseStatus.BAD_REQUEST, createErrorResponse(ApiCode.INVALID_REQUEST, "'destFileDir', 'destFileName' and 'totalSize' (positive) are required"));
                 return;
             }
-            log.debug("[traceId={}] receive init upload request: {}", traceId, body);
+            log.debug("[traceId={}] receive init upload request: transferId={}, destFileDir={}, destFileName={}, totalSize={}",
+                    traceId, body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
             ApiResponse<ChunkInitResponse> result = chunkedTransferService.initUpload(
                     traceId, body.getTransferId(), body.getDestFileDir(), body.getDestFileName(), body.getTotalSize());
             sendServiceResult(ctx, request, result);

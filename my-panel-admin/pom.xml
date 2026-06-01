@@ -244,6 +244,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- spring-security-test for MockMvc with security context -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>mockwebserver</artifactId>
@@ -325,6 +332,17 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Maven Surefire Plugin - 修复IsolatedClassLoader类加载问题 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <useSystemClassLoader>true</useSystemClassLoader>
+                    <forkCount>1</forkCount>
+                    <reuseForks>false</reuseForks>
+                </configuration>
             </plugin>
         </plugins>
     </build>

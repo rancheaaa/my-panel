@@ -1,17 +1,14 @@
 package com.cq.agent.config;
 
+import com.cq.panel.common.utils.IpUtils;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.*;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -57,15 +54,6 @@ public class AgentConfig {
     private int maxUploadRateKBPerSecond;
     private int maxDownloadRateKBPerSecond;
 
-    // Upload queue configuration
-    private String uploadQueueDbPath;
-    private String uploadMapDbPath;
-    private String uploadSessionsDbPath;
-
-    // Download queue configuration
-    private String downloadQueueDbPath;
-    private String downloadMapDbPath;
-
     // Upload client configuration
     private int uploadConcurrentUploads;
     private int uploadMaxQueueDepth;
@@ -74,6 +62,7 @@ public class AgentConfig {
     private long uploadRetryDelayMs;
     private int uploadConnectTimeoutSeconds;
     private int uploadRequestTimeoutSeconds;
+    private int uploadTaskGlobalPriority;
 
     // Download client configuration
     private int downloadConcurrentDownloads;
@@ -83,6 +72,25 @@ public class AgentConfig {
     private long downloadRetryDelayMs;
     private int downloadConnectTimeoutSeconds;
     private int downloadRequestTimeoutSeconds;
+
+    // Transfer metadata directories (for resumable uploads/downloads)
+    private String uploadSendingQueueDir;
+    private String downloadSendingQueueDir;
+
+    // Success task archive queue directories
+    private String uploadSuccessQueueDir;
+
+    // Progress fallback directory
+    private String progressFallbackDir;
+
+    // Failed task retry queue directories
+    private String uploadFailRetryQueueDir;
+    private String downloadFailRetryQueueDir;
+    private String uploadFinalFailureQueueDir;
+    private String filebatchPendingDir;
+
+    // Failed queue scan interval (milliseconds)
+    private long failedQueueScanIntervalMs;
 
     // Registry configuration
     private List<String> registryServerUrls;
@@ -145,7 +153,11 @@ public class AgentConfig {
 
         this.agentIp = getStringProperty("agent.ip", null);
         if (this.agentIp == null || this.agentIp.isBlank()) {
-            this.agentIp = findFirstNonLoopbackAddress();
+            try {
+                this.agentIp = IpUtils.getLocalHost();
+            } catch (Exception e) {
+                logger.error("get local ip failed", e);
+            }
             logger.info("agent.ip is {}", this.agentIp);
         }
 
@@ -156,7 +168,8 @@ public class AgentConfig {
         this.portProbeMaxSteps = getIntProperty("server.port.probe.max.steps", 10);
 
         // Registry server configuration
-        String registryServerUrlStr = getStringProperty("registry.server.url", "http://localhost:9876,http://localhost:9876");
+        String registryServerUrlStr = getStringProperty("registry.server.url",
+                "http://localhost:9876,http://localhost:9876");
         if (registryServerUrlStr != null && !registryServerUrlStr.isEmpty()) {
             String[] urls = registryServerUrlStr.split(",");
             List<String> urlList = new ArrayList<>();
@@ -195,15 +208,6 @@ public class AgentConfig {
         this.uploadSessionTimeoutMinutes = getLongProperty("upload.session.timeout.minutes", 60);
         this.maxUploadRateKBPerSecond = getIntProperty("upload.max.rate.kb.per.second", 0);
 
-        // Upload queue configuration
-        this.uploadQueueDbPath = getStringProperty("upload.queue.db.path", "upload_queue_db");
-        this.uploadMapDbPath = getStringProperty("upload.map.db.path", "upload_map_db");
-        this.uploadSessionsDbPath = getStringProperty("upload.sessions.db.path", "upload_sessions_db");
-
-        // Download queue configuration
-        this.downloadQueueDbPath = getStringProperty("download.queue.db.path", "download_queue_db");
-        this.downloadMapDbPath = getStringProperty("download.map.db.path", "download_map_db");
-
         this.maxDownloadRateKBPerSecond = getIntProperty("download.max.rate.kb.per.second", 0);
 
         // Upload client configuration
@@ -214,6 +218,7 @@ public class AgentConfig {
         this.uploadRetryDelayMs = getLongProperty("upload.retry.delay.ms", 2000);
         this.uploadConnectTimeoutSeconds = getIntProperty("upload.connect.timeout.seconds", 10);
         this.uploadRequestTimeoutSeconds = getIntProperty("upload.request.timeout.seconds", 60);
+        this.uploadTaskGlobalPriority = getIntProperty("upload.task.global.priority", 5);
 
         // Download client configuration
         this.downloadConcurrentDownloads = getIntProperty("download.concurrent.downloads", 4);
@@ -223,6 +228,33 @@ public class AgentConfig {
         this.downloadRetryDelayMs = getLongProperty("download.retry.delay.ms", 2000);
         this.downloadConnectTimeoutSeconds = getIntProperty("download.connect.timeout.seconds", 10);
         this.downloadRequestTimeoutSeconds = getIntProperty("download.request.timeout.seconds", 60);
+
+        // Transfer metadata directories
+        this.uploadSendingQueueDir = getStringProperty("upload.sending.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadSendingQueue");
+        this.downloadSendingQueueDir = getStringProperty("download.sending.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/downloadSendingQueue");
+
+        // Success task archive queue directories
+        this.uploadSuccessQueueDir = getStringProperty("upload.success.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadSuccessQueue");
+
+        // Progress fallback directory
+        this.progressFallbackDir = getStringProperty("progress.fallback.dir",
+                "/tmp/my-panel/admin/data/transfers/progress-fallback");
+
+        // Failed task retry queue directories
+        this.uploadFailRetryQueueDir = getStringProperty("upload.fail.retry.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadFailRetryQueue");
+        this.downloadFailRetryQueueDir = getStringProperty("download.fail.retry.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/downloadFailRetryQueue");
+        this.uploadFinalFailureQueueDir = getStringProperty("upload.final.failure.queue.dir",
+                "/tmp/my-panel/admin/data/transfers/uploadFinalFailureQueue");
+        this.filebatchPendingDir = getStringProperty("filebatch.pending.dir",
+                "/tmp/my-panel/admin/data/transfers/filebatchPending");
+
+        // Failed queue scan interval (default: 10 seconds)
+        this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 10 * 1000L);
 
         // Validate configuration
         validateConfiguration();
@@ -256,7 +288,8 @@ public class AgentConfig {
         }
 
         if (maxFileSize > 0 && chunkSize > maxFileSize) {
-            logger.warn("file.chunk.size.bytes ({}) is greater than file.max.size ({}), adjusting", chunkSize, maxFileSize);
+            logger.warn("file.chunk.size.bytes ({}) is greater than file.max.size ({}), adjusting", chunkSize,
+                    maxFileSize);
             chunkSize = (int) Math.min(maxFileSize, Integer.MAX_VALUE);
         }
 
@@ -266,7 +299,8 @@ public class AgentConfig {
         }
 
         if (maxContentLength < chunkSize) {
-            logger.warn("connection.max.content.length ({}) is less than file.chunk.size.bytes ({}), adjusting", maxContentLength, chunkSize);
+            logger.warn("connection.max.content.length ({}) is less than file.chunk.size.bytes ({}), adjusting",
+                    maxContentLength, chunkSize);
             maxContentLength = chunkSize;
         }
     }
@@ -276,11 +310,11 @@ public class AgentConfig {
         if (value != null) {
             return parseIntegerValue(key, value, defaultValue);
         }
-        
+
         logger.debug("Using default value for {}: {}", key, defaultValue);
         return defaultValue;
     }
-    
+
     private int parseIntegerValue(String key, String value, int defaultValue) {
         try {
             return Integer.parseInt(value.trim());
@@ -295,11 +329,11 @@ public class AgentConfig {
         if (value != null) {
             return parseLongValue(key, value, defaultValue);
         }
-        
+
         logger.debug("Using default Long value for {}: {}", key, defaultValue);
         return defaultValue;
     }
-    
+
     private long parseLongValue(String key, String value, long defaultValue) {
         try {
             return Long.parseLong(value.trim());
@@ -314,7 +348,7 @@ public class AgentConfig {
         if (value != null) {
             return value.trim();
         }
-        
+
         logger.debug("Using default String value for {}: {}", key, defaultValue);
         return defaultValue;
     }
@@ -325,23 +359,25 @@ public class AgentConfig {
         if (value != null) {
             return parseBooleanValue(key, value, defaultValue);
         }
-        
+
         logger.debug("Using default Boolean value for {}: {}", key, defaultValue);
         return defaultValue;
     }
-    
+
     private boolean parseBooleanValue(String key, String value, boolean defaultValue) {
         String trimmedValue = value.trim().toLowerCase();
-        if ("true".equals(trimmedValue) || "1".equals(trimmedValue) || "yes".equals(trimmedValue) || "on".equals(trimmedValue)) {
+        if ("true".equals(trimmedValue) || "1".equals(trimmedValue) || "yes".equals(trimmedValue)
+                || "on".equals(trimmedValue)) {
             return true;
-        } else if ("false".equals(trimmedValue) || "0".equals(trimmedValue) || "no".equals(trimmedValue) || "off".equals(trimmedValue)) {
+        } else if ("false".equals(trimmedValue) || "0".equals(trimmedValue) || "no".equals(trimmedValue)
+                || "off".equals(trimmedValue)) {
             return false;
         } else {
             logger.warn("Invalid boolean value for {}: {}, using default: {}", key, value, defaultValue);
             return defaultValue;
         }
     }
-    
+
     /**
      * 公共配置获取方法 - 按照优先级顺序获取配置值
      * 优先级: 系统属性 -> 环境变量 -> 配置文件
@@ -351,14 +387,14 @@ public class AgentConfig {
      */
     private String getConfigValue(String key) {
         String value;
-        
+
         // 1. 首先检查系统属性
         value = System.getProperty(key);
         if (value != null && !value.trim().isEmpty()) {
             logger.debug("Using system property for {}: {}", key, value);
             return value;
         }
-        
+
         // 2. 检查环境变量（将点转换为下划线，并转为大写）
         String envKey = key.replace('.', '_').toUpperCase();
         value = System.getenv(envKey);
@@ -366,39 +402,15 @@ public class AgentConfig {
             logger.debug("Using environment variable for {} ({}): {}", key, envKey, value);
             return value;
         }
-        
+
         // 3. 检查配置文件
         value = properties.getProperty(key);
         if (value != null && !value.trim().isEmpty()) {
             logger.debug("Using config file for {}: {}", key, value);
             return value;
         }
-        
+
         // 所有来源都没有找到配置值
         return null;
-    }
-
-    private String findFirstNonLoopbackAddress() {
-        try {
-            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-            while (networkInterfaces.hasMoreElements()) {
-                NetworkInterface networkInterface = networkInterfaces.nextElement();
-                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
-                    continue;
-                }
-                Enumeration<InetAddress> inetAddresses = networkInterface.getInetAddresses();
-                while (inetAddresses.hasMoreElements()) {
-                    InetAddress inetAddress = inetAddresses.nextElement();
-                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof java.net.Inet4Address) {
-                        logger.info("No agent.ip configured, automatically detected IP: {}", inetAddress.getHostAddress());
-                        return inetAddress.getHostAddress();
-                    }
-                }
-            }
-        } catch (SocketException e) {
-            logger.warn("Failed to get network interfaces, defaulting to 0.0.0.0", e);
-        }
-        logger.info("Could not find a suitable non-loopback IP, defaulting to 0.0.0.0");
-        return "0.0.0.0";
     }
 }

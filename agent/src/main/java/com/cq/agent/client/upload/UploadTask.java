@@ -1,5 +1,6 @@
 package com.cq.agent.client.upload;
 
+import com.cq.agent.client.TaskInfo;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -13,7 +14,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Getter
 @Setter
-public class UploadTask {
+public class UploadTask implements TaskInfo {
+    private int priority = 5;
+
     private String localFilePath;
     private String remoteTargetPath;
     private String transferId;
@@ -23,9 +26,19 @@ public class UploadTask {
     private final String remoteAgentApiUrl;
     private final String remoteAgentUsername;
 
+    /** 监听器状态恢复字段（用于重启恢复场景） */
+    private Long taskId;
+    private Long subtaskId;
+    private Long scanBatchId;
+    private Long fileBatchId;
+    private String fileName;
+    private long fileSize;
+
     private String createTime;
     private String updateTime;
     private String enqueuedTime;
+    private String scannedStartTime;
+    private String scannedEndTime;
     private String initUploadStartTime;
     private String initUploadEndTime;
     private String uploadChunksStartTime;
@@ -33,6 +46,9 @@ public class UploadTask {
     private String mergeChunksStartTime;
     private String mergeChunksEndTime;
     private String uploadSuccessTime;
+    private String verifyStartTime;
+    private String verifyEndTime;
+
     private int chunkSize;
     private int totalChunks;
     private final long totalSize;
@@ -40,7 +56,7 @@ public class UploadTask {
 
     private List<Integer> missingChunks;
     private AtomicInteger uploadChunksCount = new AtomicInteger(0);
-    private final AtomicInteger retryCount = new AtomicInteger(-1);
+    private final AtomicInteger retryCount = new AtomicInteger(0);
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
@@ -86,6 +102,8 @@ public class UploadTask {
                 ", createTime='" + createTime + '\'' +
                 ", updateTime='" + updateTime + '\'' +
                 ", enqueuedTime='" + enqueuedTime + '\'' +
+                ", scannedStartTime='" + scannedStartTime + '\'' +
+                ", scannedEndTime='" + scannedEndTime + '\'' +
                 ", initUploadStartTime='" + initUploadStartTime + '\'' +
                 ", initUploadEndTime='" + initUploadEndTime + '\'' +
                 ", uploadChunksStartTime='" + uploadChunksStartTime + '\'' +
@@ -93,6 +111,8 @@ public class UploadTask {
                 ", mergeChunksStartTime='" + mergeChunksStartTime + '\'' +
                 ", mergeChunksEndTime='" + mergeChunksEndTime + '\'' +
                 ", uploadSuccessTime='" + uploadSuccessTime + '\'' +
+                ", verifyStartTime='" + verifyStartTime + '\'' +
+                ", verifyEndTime='" + verifyEndTime + '\'' +
                 ", chunkSize=" + chunkSize +
                 ", totalChunks=" + totalChunks +
                 ", totalSize=" + totalSize +

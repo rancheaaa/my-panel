@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.cq.panel.admin.server.repository.domain.BatchTransferTask">
+        <id property="id" column="id"/>
+        <result property="taskName" column="task_name"/>
+        <result property="taskDescription" column="task_description"/>
+        <result property="sourceAgentId" column="source_agent_id"/>
+        <result property="sourceAgentName" column="source_agent_name"/>
+        <result property="sourceDir" column="source_dir"/>
+        <result property="targetDirs" column="target_dirs"/>
+        <result property="includePatterns" column="include_patterns"/>
+        <result property="excludePatterns" column="exclude_patterns"/>
+        <result property="scanCronExpression" column="scan_cron_expression"/>
+        <result property="maxScanFiles" column="max_scan_files"/>
+        <result property="targetAgentIds" column="target_agent_ids"/>
+        <result property="targetAgentNames" column="target_agent_names"/>
+        <result property="retryEnabled" column="retry_enabled"/>
+        <result property="retryMaxDays" column="retry_max_days"/>
+        <result property="retryIntervalMin" column="retry_interval_min"/>
+        <result property="maxRetryCount" column="max_retry_count"/>
+        <result property="retryBackoffType" column="retry_backoff_type"/>
+        <result property="postTransferAction" column="post_transfer_action"/>
+        <result property="backupDir" column="backup_dir"/>
+        <result property="backupMode" column="backup_mode"/>
+        <result property="preserveDirStructure" column="preserve_dir_structure"/>
+        <result property="transferMode" column="transfer_mode"/>
+        <result property="routingStrategy" column="routing_strategy"/>
+        <result property="routingConfig" column="routing_config"/>
+        <result property="status" column="status"/>
+        <result property="scheduledEnabled" column="scheduled_enabled"/>
+        <result property="scheduledStartTime" column="scheduled_start_time"/>
+        <result property="scheduledEndTime" column="scheduled_end_time"/>
+        <result property="taskPriority" column="task_priority"/>
+        <result property="startedAt" column="started_at"/>
+        <result property="deleted" column="deleted"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectColumns">
+        id, task_name, task_description, source_agent_id, source_agent_name, source_dir,
+        target_dirs, include_patterns, exclude_patterns, scan_cron_expression, max_scan_files,
+        target_agent_ids, target_agent_names, retry_enabled, retry_max_days, retry_interval_min,
+        max_retry_count, retry_backoff_type, post_transfer_action, backup_dir, backup_mode,
+        preserve_dir_structure, transfer_mode, routing_strategy, routing_config,
+        status, scheduled_enabled, scheduled_start_time, scheduled_end_time, task_priority,
+        started_at, create_by, create_time, update_by, update_time, remark, deleted
+    </sql>
+
+    <insert id="insert" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferTask" useGeneratedKeys="true" keyProperty="id">
+        insert into batch_transfer_task (
+            task_name, task_description, source_agent_id, source_agent_name, source_dir,
+            target_dirs, include_patterns, exclude_patterns, scan_cron_expression, max_scan_files,
+            target_agent_ids, target_agent_names, retry_enabled, retry_max_days, retry_interval_min,
+            max_retry_count, retry_backoff_type, post_transfer_action, backup_dir, backup_mode,
+            preserve_dir_structure, transfer_mode, routing_strategy, routing_config,
+            status, scheduled_enabled, scheduled_start_time, scheduled_end_time, task_priority,
+            create_by, create_time, update_by, update_time, remark
+        ) values (
+            #{taskName}, #{taskDescription}, #{sourceAgentId}, #{sourceAgentName}, #{sourceDir},
+            #{targetDirs}, #{includePatterns}, #{excludePatterns}, #{scanCronExpression}, #{maxScanFiles},
+            #{targetAgentIds}, #{targetAgentNames}, #{retryEnabled}, #{retryMaxDays}, #{retryIntervalMin},
+            #{maxRetryCount}, #{retryBackoffType}, #{postTransferAction}, #{backupDir}, #{backupMode},
+            #{preserveDirStructure}, #{transferMode}, #{routingStrategy}, #{routingConfig},
+            #{status}, #{scheduledEnabled}, #{scheduledStartTime}, #{scheduledEndTime}, #{taskPriority},
+            #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.cq.panel.admin.server.repository.domain.BatchTransferTask">
+        update batch_transfer_task
+        <set>
+            <if test="taskName != null">task_name = #{taskName},</if>
+            <if test="taskDescription != null">task_description = #{taskDescription},</if>
+            <if test="sourceAgentId != null">source_agent_id = #{sourceAgentId},</if>
+            <if test="sourceAgentName != null">source_agent_name = #{sourceAgentName},</if>
+            <if test="sourceDir != null">source_dir = #{sourceDir},</if>
+            <if test="targetDirs != null">target_dirs = #{targetDirs},</if>
+            <if test="includePatterns != null">include_patterns = #{includePatterns},</if>
+            <if test="excludePatterns != null">exclude_patterns = #{excludePatterns},</if>
+            <if test="scanCronExpression != null">scan_cron_expression = #{scanCronExpression},</if>
+            <if test="maxScanFiles != null">max_scan_files = #{maxScanFiles},</if>
+            <if test="targetAgentIds != null">target_agent_ids = #{targetAgentIds},</if>
+            <if test="targetAgentNames != null">target_agent_names = #{targetAgentNames},</if>
+            <if test="retryEnabled != null">retry_enabled = #{retryEnabled},</if>
+            <if test="retryMaxDays != null">retry_max_days = #{retryMaxDays},</if>
+            <if test="retryIntervalMin != null">retry_interval_min = #{retryIntervalMin},</if>
+            <if test="maxRetryCount != null">max_retry_count = #{maxRetryCount},</if>
+            <if test="retryBackoffType != null">retry_backoff_type = #{retryBackoffType},</if>
+            <if test="postTransferAction != null">post_transfer_action = #{postTransferAction},</if>
+            <if test="backupDir != null">backup_dir = #{backupDir},</if>
+            <if test="backupMode != null">backup_mode = #{backupMode},</if>
+            <if test="preserveDirStructure != null">preserve_dir_structure = #{preserveDirStructure},</if>
+            <if test="transferMode != null">transfer_mode = #{transferMode},</if>
+            <if test="routingStrategy != null">routing_strategy = #{routingStrategy},</if>
+            <if test="routingConfig != null">routing_config = #{routingConfig},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="scheduledEnabled != null">scheduled_enabled = #{scheduledEnabled},</if>
+            <if test="scheduledStartTime != null">scheduled_start_time = #{scheduledStartTime},</if>
+            <if test="scheduledEndTime != null">scheduled_end_time = #{scheduledEndTime},</if>
+            <if test="taskPriority != null">task_priority = #{taskPriority},</if>
+            <if test="startedAt != null">started_at = #{startedAt},</if>
+            update_by = #{updateBy},
+            update_time = now()
+        </set>
+        where id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        select <include refid="selectColumns"/>
+        from batch_transfer_task
+        where id = #{id} and deleted = 0
+    </select>
+
+    <sql id="queryCondition">
+        <where>
+            deleted = 0
+            <if test="id != null and id != ''">and id = #{id}</if>
+            <if test="status != null and status != ''">and status = #{status}</if>
+            <if test="sourceAgentId != null and sourceAgentId != ''">and source_agent_id = #{sourceAgentId}</if>
+            <if test="sourceAgentName != null and sourceAgentName != ''">and source_agent_name like concat('%', #{sourceAgentName}, '%')</if>
+            <if test="createBy != null and createBy != ''">and create_by = #{createBy}</if>
+            <if test="taskName != null and taskName != ''">and task_name like concat('%', #{taskName}, '%')</if>
+            <if test="taskDescription != null and taskDescription != ''">and task_description like concat('%', #{taskDescription}, '%')</if>
+            <if test="sourceDir != null and sourceDir != ''">and source_dir like concat('%', #{sourceDir}, '%')</if>
+            <if test="targetAgentIds != null and targetAgentIds != ''">and target_agent_ids like concat('%', #{targetAgentIds}, '%')</if>
+            <if test="targetAgentNames != null and targetAgentNames != ''">and target_agent_names like concat('%', #{targetAgentNames}, '%')</if>
+            <if test="targetDirs != null and targetDirs != ''">and target_dirs like concat('%', #{targetDirs}, '%')</if>
+            <if test="transferMode != null and transferMode != ''">and transfer_mode = #{transferMode}</if>
+            <if test="routingStrategy != null and routingStrategy != ''">and routing_strategy = #{routingStrategy}</if>
+            <if test="postTransferAction != null and postTransferAction != ''">and post_transfer_action = #{postTransferAction}</if>
+            <if test="retryEnabled != null">and retry_enabled = #{retryEnabled}</if>
+            <if test="preserveDirStructure != null">and preserve_dir_structure = #{preserveDirStructure}</if>
+        </where>
+    </sql>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        select <include refid="selectColumns"/>
+        from batch_transfer_task
+        <include refid="queryCondition"/>
+        order by create_time desc
+    </select>
+
+    <select id="selectPageList" resultMap="BaseResultMap">
+        select <include refid="selectColumns"/>
+        from batch_transfer_task
+        <where>
+            deleted = 0
+            <if test="query.id != null and query.id != ''">and id = #{query.id}</if>
+            <if test="query.status != null and query.status != ''">and status = #{query.status}</if>
+            <if test="query.sourceAgentId != null and query.sourceAgentId != ''">and source_agent_id = #{query.sourceAgentId}</if>
+            <if test="query.sourceAgentName != null and query.sourceAgentName != ''">and source_agent_name like concat('%', #{query.sourceAgentName}, '%')</if>
+            <if test="query.createBy != null and query.createBy != ''">and create_by = #{query.createBy}</if>
+            <if test="query.taskName != null and query.taskName != ''">and task_name like concat('%', #{query.taskName}, '%')</if>
+            <if test="query.taskDescription != null and query.taskDescription != ''">and task_description like concat('%', #{query.taskDescription}, '%')</if>
+            <if test="query.sourceDir != null and query.sourceDir != ''">and source_dir like concat('%', #{query.sourceDir}, '%')</if>
+            <if test="query.targetAgentIds != null and query.targetAgentIds != ''">and target_agent_ids like concat('%', #{query.targetAgentIds}, '%')</if>
+            <if test="query.targetAgentNames != null and query.targetAgentNames != ''">and target_agent_names like concat('%', #{query.targetAgentNames}, '%')</if>
+            <if test="query.targetDirs != null and query.targetDirs != ''">and target_dirs like concat('%', #{query.targetDirs}, '%')</if>
+            <if test="query.transferMode != null and query.transferMode != ''">and transfer_mode = #{query.transferMode}</if>
+            <if test="query.routingStrategy != null and query.routingStrategy != ''">and routing_strategy = #{query.routingStrategy}</if>
+            <if test="query.postTransferAction != null and query.postTransferAction != ''">and post_transfer_action = #{query.postTransferAction}</if>
+            <if test="query.retryEnabled != null">and retry_enabled = #{query.retryEnabled}</if>
+            <if test="query.preserveDirStructure != null">and preserve_dir_structure = #{query.preserveDirStructure}</if>
+        </where>
+        order by create_time desc
+        limit #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        select count(*)
+        from batch_transfer_task
+        <where>
+            deleted = 0
+            <if test="query.id != null and query.id != ''">and id = #{query.id}</if>
+            <if test="query.status != null and query.status != ''">and status = #{query.status}</if>
+            <if test="query.sourceAgentId != null and query.sourceAgentId != ''">and source_agent_id = #{query.sourceAgentId}</if>
+            <if test="query.sourceAgentName != null and query.sourceAgentName != ''">and source_agent_name like concat('%', #{query.sourceAgentName}, '%')</if>
+            <if test="query.createBy != null and query.createBy != ''">and create_by = #{query.createBy}</if>
+            <if test="query.taskName != null and query.taskName != ''">and task_name like concat('%', #{query.taskName}, '%')</if>
+            <if test="query.taskDescription != null and query.taskDescription != ''">and task_description like concat('%', #{query.taskDescription}, '%')</if>
+            <if test="query.sourceDir != null and query.sourceDir != ''">and source_dir like concat('%', #{query.sourceDir}, '%')</if>
+            <if test="query.targetAgentIds != null and query.targetAgentIds != ''">and target_agent_ids like concat('%', #{query.targetAgentIds}, '%')</if>
+            <if test="query.targetAgentNames != null and query.targetAgentNames != ''">and target_agent_names like concat('%', #{query.targetAgentNames}, '%')</if>
+            <if test="query.targetDirs != null and query.targetDirs != ''">and target_dirs like concat('%', #{query.targetDirs}, '%')</if>
+            <if test="query.transferMode != null and query.transferMode != ''">and transfer_mode = #{query.transferMode}</if>
+            <if test="query.routingStrategy != null and query.routingStrategy != ''">and routing_strategy = #{query.routingStrategy}</if>
+            <if test="query.postTransferAction != null and query.postTransferAction != ''">and post_transfer_action = #{query.postTransferAction}</if>
+            <if test="query.retryEnabled != null">and retry_enabled = #{query.retryEnabled}</if>
+            <if test="query.preserveDirStructure != null">and preserve_dir_structure = #{query.preserveDirStructure}</if>
+        </where>
+    </select>
+
+    <update id="deleteById">
+        update batch_transfer_task set deleted = 1, update_time = now() where id = #{id}
+    </update>
+
+    <select id="countSummary" resultType="java.util.Map">
+        select
+            count(*) as totalCount,
+            sum(case when status = 'READY' then 1 else 0 end) as readyCount,
+            sum(case when status = 'RUNNING' then 1 else 0 end) as runningCount,
+            sum(case when status = 'PAUSED' then 1 else 0 end) as pausedCount
+        from batch_transfer_task
+        where deleted = 0
+    </select>
+
+    <select id="countGroupByStatus" resultType="java.util.Map">
+        select status, count(*) as count
+        from batch_transfer_task
+        where deleted = 0
+        group by status
+    </select>
+
+    <select id="countToday" resultType="java.lang.Long">
+        select count(*)
+        from batch_transfer_task
+        where cast(create_time as date) = current_date and deleted = 0
+    </select>
+
+</mapper>

@@ -147,10 +147,10 @@ public class DynamicProxyServerList implements ServerList {
 
     @Override
     public void refresh() {
-        logger.info("Refreshing dynamic server list from proxy service");
+        logger.debug("Refreshing dynamic server list from proxy service");
         try {
             this.proxyServers = fetchProxyServers();
-            logger.info("Successfully refreshed proxy servers: {}", proxyServers);
+            logger.debug("Successfully refreshed proxy servers: {}", proxyServers);
         } catch (Exception e) {
             logger.error("Failed to refresh proxy server list", e);
         }

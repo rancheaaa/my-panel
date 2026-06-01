@@ -1,32 +1,33 @@
 package com.cq.agent.client;
 
-import com.cq.agent.client.upload.PersistentMap;
-import com.cq.agent.client.upload.PersistentQueue;
-import com.cq.agent.client.upload.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.ApiResponse;
 import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.*;
 
-public abstract class BaseAgentClient<TASK, LISTENER> {
+public abstract class BaseAgentClient<TASK extends TaskInfo, LISTENER> {
 
     protected static final Logger logger = LoggerFactory.getLogger(BaseAgentClient.class);
 
     protected final HttpClient httpClient;
     protected final Gson gson = new Gson();
-    protected final PersistentQueue<TASK> taskQueue;
-    protected final PersistentMap<String, TASK> taskInflightMap;
+    
+    protected final ConcurrentLinkedQueue<TASK> taskQueue;
+    protected final ConcurrentHashMap<String, TASK> inflightTasks = new ConcurrentHashMap<>();
     protected final ConcurrentHashMap<String, LISTENER> listenerCache = new ConcurrentHashMap<>();
+    
     protected final ExecutorService chunkExecutor;
     protected final ExecutorService workerExecutor;
     protected final int workerCount;
@@ -44,10 +45,14 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
     protected final TrafficRateLimiter rateLimiter;
     protected final int maxQueueDepth;
 
+    protected TransferMetaStore<TASK> metaStore;
+    protected Path failedQueueDir;
+
     protected BaseAgentClient(AgentConfig agentConfig, int concurrentThreads,
                             int maxQueueDepth, int workerCount, int maxRetries, long retryDelayMs,
-                            int connectTimeoutSeconds, int requestTimeoutSeconds, String queueDbPath, String mapDbPath,
-                            int maxRateKBPerSecond, Class<TASK> taskClass, String operationType) {
+                            int connectTimeoutSeconds, int requestTimeoutSeconds, String sendingQueueDirPath,
+                            int maxRateKBPerSecond, Class<TASK> taskClass, String operationType,
+                            String failedQueueDirPath) {
         if (concurrentThreads < 1 || concurrentThreads > 64) {
             throw new IllegalArgumentException("concurrentThreads must be between 1 and 64");
         }
@@ -62,13 +67,34 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         this.maxQueueDepth = maxQueueDepth;
 
         try {
+            this.taskQueue = new ConcurrentLinkedQueue<>();
 
-            this.taskQueue = new PersistentQueue<>(Util.resolveAndCreatePathIfAbsent(agentConfig.getFileBaseDirectory(), queueDbPath), operationType + "QueueDb", taskClass);
-            this.taskInflightMap = new PersistentMap<>(Util.resolveAndCreatePathIfAbsent(agentConfig.getFileBaseDirectory(), mapDbPath), operationType + "MapDb", String.class, taskClass);
-            logger.info("Persistent queue initialized at: {}", queueDbPath);
-            logger.info("Queue size on startup: {}", taskQueue.size());
-            if (!taskQueue.isEmpty()) {
-                logger.info("Resuming {} pending {} tasks from previous session", taskQueue.size(), operationType);
+            try {
+                Path metaDir = Path.of(sendingQueueDirPath);
+                if (!java.nio.file.Files.exists(metaDir)) {
+                    java.nio.file.Files.createDirectories(metaDir);
+                }
+                this.metaStore = new TransferMetaStore<>(metaDir, taskClass);
+                
+                List<TASK> pendingTasks = metaStore.recoverPendingTasks();
+                if (!pendingTasks.isEmpty()) {
+                    logger.info("恢复 {} 个待处理的 {} 任务", pendingTasks.size(), operationType);
+                    taskQueue.addAll(pendingTasks);
+                }
+            } catch (Exception e) {
+                logger.warn("初始化 TransferMetaStore 失败，将使用无持久化模式: {}", e.getMessage());
+                this.metaStore = null;
+            }
+
+            try {
+                this.failedQueueDir = Path.of(failedQueueDirPath);
+                if (!Files.exists(this.failedQueueDir)) {
+                    Files.createDirectories(this.failedQueueDir);
+                }
+                logger.info("{} 失败重试队列目录: {}", operationType, this.failedQueueDir.toAbsolutePath());
+            } catch (Exception e) {
+                logger.warn("初始化失败队列目录失败: {}", e.getMessage());
+                this.failedQueueDir = null;
             }
 
             this.maxRetries = Math.max(1, maxRetries);
@@ -80,10 +106,10 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             if (this.maxRateKBPerSecond > 0) {
                 long bytesPerSecond = (long) this.maxRateKBPerSecond * 1024;
                 this.rateLimiter = new TrafficRateLimiter(bytesPerSecond);
-                logger.info("Rate limiting enabled: max {} rate = {} KB/s", operationType, this.maxRateKBPerSecond);
+                logger.info("启用速率限制: {} 最大速率 = {} KB/s", operationType, this.maxRateKBPerSecond);
             } else {
                 this.rateLimiter = null;
-                logger.info("Rate limiting disabled (max{}RateKBPerSecond = 0)", operationType);
+                logger.info("禁用速率限制 (max{}RateKBPerSecond = 0)", operationType);
             }
 
             this.httpClient = HttpClient.newBuilder()
@@ -117,9 +143,12 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             );
             this.workerCount = workerCount;
             this.concurrentThreads = concurrentThreads;
+            
+            logger.info("BaseAgentClient 初始化完成: type={}, queueSize={}", operationType, taskQueue.size());
+            
         } catch (Exception e) {
-            logger.error("Failed to initialize BaseAgentClient: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to initialize BaseAgentClient", e);
+            logger.error("初始化 BaseAgentClient 失败: {}", e.getMessage(), e);
+            throw new RuntimeException("初始化 BaseAgentClient 失败", e);
         }
     }
 
@@ -128,7 +157,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             final int id = i;
             workerExecutor.submit(() -> runWorker(id));
         }
-        logger.info("Agent client initialized, queue size={}, workers={}", taskQueue.size(), workerCount);
+        logger.info("Agent 客户端已初始化: queueSize={}, workers={}", taskQueue.size(), workerCount);
     }
 
     protected void runWorker(int id) {
@@ -148,9 +177,10 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
                 if (task != null) {
                     String taskKey = getTaskKey(task);
                     handleListenerError(taskKey, t.getMessage());
-                    listenerCache.remove(taskKey);
+                    // 不移除listener：任务可能被移到失败队列等待重试，
+                    // listener需要保留以便重试时复用，只有在真正传输成功时才移除
                 }
-                logger.error("Worker {} error", id, t);
+                logger.error("Worker {} 错误", id, t);
             }
         }
     }
@@ -171,7 +201,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         try {
             onListenerProgress(listener, total, processed, progress);
         } catch (Exception e) {
-            logger.warn("Listener.onProgress failed: {}", e.getMessage());
+            logger.warn("Listener.onProgress 失败: {}", e.getMessage());
         }
     }
 
@@ -181,7 +211,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         try {
             onListenerBeforeSend(listener, task);
         } catch (Exception e) {
-            logger.warn("Listener.onBeforeSend failed: {}", e.getMessage());
+            logger.warn("Listener.onBeforeSend 失败: {}", e.getMessage());
             throw e;
         }
     }
@@ -192,7 +222,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         try {
             onListenerSuccess(listener, result);
         } catch (Exception e) {
-            logger.warn("Listener.onSuccess failed: {}", e.getMessage());
+            logger.warn("Listener.onSuccess 失败: {}", e.getMessage());
         }
     }
 
@@ -206,7 +236,7 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         try {
             onListenerError(listener, message);
         } catch (Exception e) {
-            logger.warn("Listener.onError failed: {}", e.getMessage());
+            logger.warn("Listener.onError 失败: {}", e.getMessage());
         }
     }
 
@@ -222,17 +252,17 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
             if (listenerClass.isInstance(instance)) {
                 return listenerClass.cast(instance);
             } else {
-                logger.error("Class {} does not implement {} interface", className, listenerClass.getSimpleName());
+                logger.error("类 {} 没有实现 {} 接口", className, listenerClass.getSimpleName());
                 return null;
             }
         } catch (ClassNotFoundException e) {
-            logger.error("Listener class not found: {}", className, e);
+            logger.error("未找到 Listener 类: {}", className, e);
             return null;
         } catch (NoSuchMethodException e) {
-            logger.error("Listener class {} has no default constructor", className, e);
+            logger.error("Listener 类 {} 没有默认构造函数", className, e);
             return null;
         } catch (Exception e) {
-            logger.error("Failed to create listener instance: {}", className, e);
+            logger.error("创建 Listener 实例失败: {}", className, e);
             return null;
         }
     }
@@ -259,8 +289,8 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
 
             return apiResponse;
         } catch (Exception e) {
-            logger.error("[traceId={}] POST {} failed", traceId, endpoint, e);
-            throw new IOException("API request failed: " + endpoint, e);
+            logger.error("[traceId={}] POST {} 失败", traceId, endpoint, e);
+            throw new IOException("API 请求失败: " + endpoint, e);
         }
     }
 
@@ -287,13 +317,13 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
 
             return apiResponse;
         } catch (Exception e) {
-            logger.error("[traceId={}] GET {} failed", traceId, endpoint, e);
-            throw new IOException("API request failed: " + endpoint, e);
+            logger.error("[traceId={}] GET {} 失败", traceId, endpoint, e);
+            throw new IOException("API 请求失败: " + endpoint, e);
         }
     }
 
     public void shutdown() {
-        logger.info("Shutting down agent client...");
+        logger.info("正在关闭 Agent 客户端...");
         shutdown = true;
         workerExecutor.shutdown();
         chunkExecutor.shutdown();
@@ -312,12 +342,6 @@ public abstract class BaseAgentClient<TASK, LISTENER> {
         if (rateLimiter != null) {
             rateLimiter.shutdown();
         }
-        if (taskQueue != null) {
-            taskQueue.close();
-        }
-        if (taskInflightMap != null) {
-            taskInflightMap.close();
-        }
-        logger.info("Agent client shut down");
+        logger.info("Agent 客户端已关闭");
     }
 }

@@ -13,7 +13,7 @@ public class TrafficRateLimiter {
     private final double maxRateKBPerSecond;
 
     public TrafficRateLimiter(long bytesPerSecond) {
-        this.rateLimiter = RateLimiter.create(bytesPerSecond / 1000.0);
+        this.rateLimiter = RateLimiter.create(bytesPerSecond);
         this.maxRateKBPerSecond = bytesPerSecond / 1024.0;
     }
 
@@ -21,10 +21,10 @@ public class TrafficRateLimiter {
         if (bytes <= 0) {
             return;
         }
-        
+
         long sleepMicros = (long) (rateLimiter.acquire(bytes) * 1_000_000);
         if (sleepMicros > 0) {
-            logger.debug("[traceId={}] Rate limiting: slept {}μs to respect max rate of {} KB/s", 
+            logger.debug("[traceId={}] Rate limiting: slept {}μs to respect max rate of {} KB/s",
                     traceId, sleepMicros, String.format("%.2f", maxRateKBPerSecond));
         }
     }

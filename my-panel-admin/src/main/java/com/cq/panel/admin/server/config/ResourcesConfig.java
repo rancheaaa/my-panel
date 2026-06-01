@@ -18,23 +18,22 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * @author cq
  */
 @Configuration
-public class ResourcesConfig implements WebMvcConfigurer
-{
+public class ResourcesConfig implements WebMvcConfigurer {
     private final RepeatSubmitInterceptor repeatSubmitInterceptor;
 
     private final LogInterceptor logInterceptor;
 
     private final AppConfig appConfig;
 
-    public ResourcesConfig(RepeatSubmitInterceptor repeatSubmitInterceptor, LogInterceptor logInterceptor, AppConfig appConfig) {
+    public ResourcesConfig(RepeatSubmitInterceptor repeatSubmitInterceptor, LogInterceptor logInterceptor,
+            AppConfig appConfig) {
         this.repeatSubmitInterceptor = repeatSubmitInterceptor;
         this.logInterceptor = logInterceptor;
         this.appConfig = appConfig;
     }
 
     @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry)
-    {
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // 本地文件上传路径
         registry.addResourceHandler(Constants.RESOURCE_PREFIX + "/**")
                 .addResourceLocations("file:" + appConfig.getProfile() + "/");
@@ -44,8 +43,7 @@ public class ResourcesConfig implements WebMvcConfigurer
      * 自定义拦截规则
      */
     @Override
-    public void addInterceptors(InterceptorRegistry registry)
-    {
+    public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(logInterceptor).addPathPatterns("/**");
         registry.addInterceptor(repeatSubmitInterceptor).addPathPatterns("/**");
     }
@@ -54,8 +52,7 @@ public class ResourcesConfig implements WebMvcConfigurer
      * 跨域配置
      */
     @Bean
-    public CorsFilter corsFilter()
-    {
+    public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
         // 设置访问源地址

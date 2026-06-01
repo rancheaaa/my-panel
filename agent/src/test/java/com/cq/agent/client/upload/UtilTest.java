@@ -1,6 +1,7 @@
 package com.cq.agent.client.upload;
 
 import com.cq.agent.client.RemoteAgentInfo;
+import com.cq.agent.client.Util;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

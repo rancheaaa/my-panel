@@ -2,30 +2,36 @@ package com.cq.panel.common.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
-/**
- *
- * @author cq 2026/4/3 16:59
- * @since 1.0.0
- */
 public class IpUtils {
 
     private static final Logger log = LoggerFactory.getLogger(IpUtils.class);
-    private static volatile String cachedLocalIp = null;
+    private static final AtomicReference<String> cachedLocalIp = new AtomicReference<>();
 
     public static String getLocalHost() throws SocketException, UnknownHostException {
-        if (cachedLocalIp != null) {
-            return cachedLocalIp;
+        String cached = cachedLocalIp.get();
+        if (cached != null) {
+            return cached;
         }
+        
         synchronized (IpUtils.class) {
-            if (cachedLocalIp != null) {
-                return cachedLocalIp;
+            cached = cachedLocalIp.get();
+            if (cached != null) {
+                return cached;
             }
             try {
                 String ip = resolveLocalIp();
-                cachedLocalIp = ip;
+                cachedLocalIp.set(ip);
                 log.info("Resolved and cached local IP: {}", ip);
                 return ip;
             } catch (Exception e) {
@@ -35,55 +41,50 @@ public class IpUtils {
         }
     }
 
-    private static String resolveLocalIp() throws SocketException, UnknownHostException {
-        try {
-            java.net.InetAddress address = getPreferredInetAddress();
-            if (address != null && !address.isLoopbackAddress()) {
-                return address.getHostAddress();
-            }
-
-            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = interfaces.nextElement();
-                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
-                    continue;
-                }
-
-                java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    java.net.InetAddress addr = addresses.nextElement();
-                    if (!addr.isLoopbackAddress() && addr instanceof java.net.Inet4Address) {
-                        return addr.getHostAddress();
-                    }
-                }
-            }
-
-            return java.net.InetAddress.getLocalHost().getHostAddress();
-
-        } catch (Exception e) {
-            log.error("无法获取本地IP地址", e);
-            throw e;
-        }
+    public static void clearCache() {
+        cachedLocalIp.set(null);
+        log.info("IP cache cleared");
     }
 
-    /**
-     * 获取首选网络地址，参考Spring Cloud的实现
-     * 优先选择静态IP，过滤DHCP分配的IP
-     */
-    private static java.net.InetAddress getPreferredInetAddress() {
+    private static String resolveLocalIp() throws SocketException, UnknownHostException {
+        InetAddress address = getPreferredInetAddress();
+        if (address != null && !address.isLoopbackAddress()) {
+            return address.getHostAddress();
+        }
+
+        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+        while (interfaces.hasMoreElements()) {
+            NetworkInterface networkInterface = interfaces.nextElement();
+            if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                continue;
+            }
+
+            Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+            while (addresses.hasMoreElements()) {
+                InetAddress addr = addresses.nextElement();
+                if (!addr.isLoopbackAddress() && addr instanceof Inet4Address) {
+                    return addr.getHostAddress();
+                }
+            }
+        }
+
+        return InetAddress.getLocalHost().getHostAddress();
+    }
+
+    private static InetAddress getPreferredInetAddress() {
         try {
-            java.util.List<NetworkInterfaceInfo> candidates = new java.util.ArrayList<>();
-            java.util.Enumeration<java.net.NetworkInterface> interfaces = java.net.NetworkInterface.getNetworkInterfaces();
+            List<NetworkInterfaceInfo> candidates = new ArrayList<>();
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             
             while (interfaces.hasMoreElements()) {
-                java.net.NetworkInterface networkInterface = interfaces.nextElement();
+                NetworkInterface networkInterface = interfaces.nextElement();
                 if (shouldIgnoreInterface(networkInterface)) {
                     continue;
                 }
 
-                java.util.Enumeration<java.net.InetAddress> addresses = networkInterface.getInetAddresses();
+                Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
                 while (addresses.hasMoreElements()) {
-                    java.net.InetAddress address = addresses.nextElement();
+                    InetAddress address = addresses.nextElement();
                     if (isPreferredAddress(address)) {
                         candidates.add(new NetworkInterfaceInfo(networkInterface, address));
                     }
@@ -91,7 +92,18 @@ public class IpUtils {
             }
             
             if (candidates.isEmpty()) {
+                log.warn("No suitable network interface found");
                 return null;
+            }
+            
+            log.debug("Found {} candidate network interfaces", candidates.size());
+            for (NetworkInterfaceInfo info : candidates) {
+                int score = calculateInterfaceScore(info.networkInterface);
+                log.debug("Interface: {} ({}) - IP: {} - Score: {}", 
+                    info.networkInterface.getName(), 
+                    info.networkInterface.getDisplayName(),
+                    info.address.getHostAddress(),
+                    score);
             }
             
             candidates.sort((a, b) -> {
@@ -100,25 +112,31 @@ public class IpUtils {
                 return Integer.compare(scoreB, scoreA);
             });
             
-            return candidates.getFirst().address;
+            NetworkInterfaceInfo selected = candidates.get(0);
+            log.info("Selected network interface: {} ({}) - IP: {}", 
+                selected.networkInterface.getName(),
+                selected.networkInterface.getDisplayName(),
+                selected.address.getHostAddress());
+            
+            return selected.address;
         } catch (Exception e) {
-            log.debug("获取首选网络地址失败", e);
+            log.error("获取首选网络地址失败", e);
         }
         return null;
     }
     
-    private static class NetworkInterfaceInfo {
-        final java.net.NetworkInterface networkInterface;
-        final java.net.InetAddress address;
+    static class NetworkInterfaceInfo {
+        final NetworkInterface networkInterface;
+        final InetAddress address;
         
-        NetworkInterfaceInfo(java.net.NetworkInterface networkInterface, java.net.InetAddress address) {
+        NetworkInterfaceInfo(NetworkInterface networkInterface, InetAddress address) {
             this.networkInterface = networkInterface;
             this.address = address;
         }
     }
 
     @SuppressWarnings("all")
-    private static int calculateInterfaceScore(java.net.NetworkInterface networkInterface) {
+    static int calculateInterfaceScore(NetworkInterface networkInterface) {
         int score = 0;
         String name = networkInterface.getName().toLowerCase();
         
@@ -137,12 +155,14 @@ public class IpUtils {
                 score += 180;
             } else if (name.startsWith("bond")) {
                 score += 150;
+            } else if (isWindowsPhysicalAdapter(name)) {
+                score += 190;
             } else if (name.startsWith("wlan") || name.startsWith("wlx")) {
                 score -= 100;
             }
             
             try {
-                java.lang.reflect.Method speedMethod = java.net.NetworkInterface.class.getMethod("getSpeed");
+                java.lang.reflect.Method speedMethod = NetworkInterface.class.getMethod("getSpeed");
                 Long speed = (Long) speedMethod.invoke(networkInterface);
                 if (speed != null && speed > 0) {
                     score += (int) Math.min(speed / 100000000, 100);
@@ -158,28 +178,36 @@ public class IpUtils {
         return score;
     }
 
-    /**
-     * 判断是否应该忽略该网络接口
-     */
-    private static boolean shouldIgnoreInterface(java.net.NetworkInterface networkInterface) {
+    private static boolean isWindowsPhysicalAdapter(String name) {
+        String[] windowsPhysicalPatterns = {
+            "ethernet", "wi-fi", "wifi", "local", "连接"
+        };
+        
+        for (String pattern : windowsPhysicalPatterns) {
+            if (name.contains(pattern.toLowerCase())) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    private static boolean shouldIgnoreInterface(NetworkInterface networkInterface) {
         try {
             String displayName = networkInterface.getDisplayName().toLowerCase();
             String name = networkInterface.getName().toLowerCase();
             
-            // 基础过滤条件
             if (networkInterface.isLoopback() ||
                     !networkInterface.isUp() ||
                     networkInterface.isPointToPoint()) {
                 return true;
             }
             
-            // 过滤Docker相关网卡
             if (isDockerInterface(displayName, name)) {
                 log.debug("忽略Docker网卡: {} ({})", displayName, name);
                 return true;
             }
             
-            // 过滤其他虚拟网卡
             if (isVirtualInterface(displayName, name)) {
                 log.debug("忽略虚拟网卡: {} ({})", displayName, name);
                 return true;
@@ -192,14 +220,11 @@ public class IpUtils {
         }
     }
     
-    /**
-     * 判断是否为Docker网卡
-     */
     private static boolean isDockerInterface(String displayName, String name) {
-        // Docker网卡名称模式
         String[] dockerPatterns = {
             "docker", "veth", "br-", "cni", "flannel", "calico", 
-            "weave", "kube", "k8s", "container", "podman"
+            "weave", "kube", "k8s", "container", "podman",
+            "vEthernet", "wsl", "hyper-v switch"
         };
         
         for (String pattern : dockerPatterns) {
@@ -208,29 +233,49 @@ public class IpUtils {
             }
         }
         
+        if (isDockerInternalNetwork(name, displayName)) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    private static boolean isDockerInternalNetwork(String name, String displayName) {
+        if (name.matches("br-[a-f0-9]{12}")) {
+            return true;
+        }
+        
+        if (name.matches("veth[0-9a-f]+")) {
+            return true;
+        }
+        
+        if (displayName.contains("Docker NAT") || displayName.contains("docker0")) {
+            return true;
+        }
+        
+        if (name.startsWith("virbr")) {
+            return true;
+        }
+        
         return false;
     }
     
-    /**
-     * 判断是否为虚拟网卡
-     */
     private static boolean isVirtualInterface(String displayName, String name) {
-        // 虚拟网卡名称模式
         String[] virtualPatterns = {
-            "virtual", "vmware", "virtualbox", "vbox", "hyper-v",
-            "vpn", "tun", "tap", "virbr", "vnet"
+            "virtual", "vmware", "virtualbox", "vbox",
+            "vpn", "tun", "tap", "virbr", "vnet",
+            "loopback", "hamachi"
         };
         
         for (String pattern : virtualPatterns) {
-            if (displayName.contains(pattern) || name.contains(pattern)) {
+            if (displayName.toLowerCase().contains(pattern) || name.toLowerCase().contains(pattern)) {
                 return true;
             }
         }
         
-        // 检查是否为虚拟接口
         try {
-            java.lang.reflect.Method isVirtualMethod = java.net.NetworkInterface.class.getMethod("isVirtual");
-            Boolean isVirtual = (Boolean) isVirtualMethod.invoke(java.net.NetworkInterface.getByName(name));
+            java.lang.reflect.Method isVirtualMethod = NetworkInterface.class.getMethod("isVirtual");
+            Boolean isVirtual = (Boolean) isVirtualMethod.invoke(NetworkInterface.getByName(name));
             if (isVirtual != null && isVirtual) {
                 return true;
             }
@@ -241,12 +286,9 @@ public class IpUtils {
         return false;
     }
 
-    /**
-     * 判断是否为优选地址
-     */
-    private static boolean isPreferredAddress(java.net.InetAddress address) {
+    private static boolean isPreferredAddress(InetAddress address) {
         return !address.isLoopbackAddress() &&
-                address instanceof java.net.Inet4Address &&
+                address instanceof Inet4Address &&
                 !address.isLinkLocalAddress() &&
                 !address.isMulticastAddress();
     }

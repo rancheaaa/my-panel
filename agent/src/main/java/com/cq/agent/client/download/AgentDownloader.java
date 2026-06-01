@@ -2,7 +2,7 @@ package com.cq.agent.client.download;
 
 import com.cq.agent.client.BaseAgentClient;
 import com.cq.agent.client.RemoteAgentInfo;
-import com.cq.agent.client.upload.Util;
+import com.cq.agent.client.Util;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.dto.*;
 import org.slf4j.Logger;
@@ -21,64 +21,76 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> {
+/**
+ * Agent download client for chunked file transfer.
+ * Uses memory queue and JSON file-based persistence for durability.
+ * Implements DownloadService interface for decorator pattern support.
+ */
+public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListener> implements DownloadService {
 
     private static final Logger logger = LoggerFactory.getLogger(AgentDownloader.class);
+
+    private final AgentConfig agentConfig;
 
     public AgentDownloader(AgentConfig agentConfig) {
         super(agentConfig, agentConfig.getDownloadConcurrentDownloads(),
                 agentConfig.getDownloadMaxQueueDepth(), agentConfig.getDownloadWorkerCount(),
                 agentConfig.getDownloadMaxRetries(), agentConfig.getDownloadRetryDelayMs(),
                 agentConfig.getDownloadConnectTimeoutSeconds(), agentConfig.getDownloadRequestTimeoutSeconds(),
-                agentConfig.getDownloadQueueDbPath(), agentConfig.getDownloadMapDbPath(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download");
+                agentConfig.getDownloadSendingQueueDir(), agentConfig.getMaxDownloadRateKBPerSecond(), DownloadTask.class, "download",
+                agentConfig.getDownloadFailRetryQueueDir());
+        this.agentConfig = agentConfig;
+    }
+
+    /**
+     * 获取Agent配置信息（DownloadService接口实现）
+     * @return 配置对象
+     */
+    @Override
+    public AgentConfig getAgentConfig() {
+        return agentConfig;
     }
 
     @Override
     protected void processTask(DownloadTask task) {
-        String taskKey = getTaskKey(task);
+        String transferId = task.getTransferId();
         String traceId = task.getTraceId();
 
         try {
-            task.setStatus(DownloadTaskStatus.SCANNED);
-            task.updateTimestamp();
-            task.incrementRetryCount();
-            this.taskInflightMap.put(task.getTransferId(), task);
+            task.setScannedStartTime(Util.currentTime());
+            updateTaskStatus(task, DownloadTaskStatus.SCANNED);
 
             String listenerClassName = task.getListenerClassName();
-            if (listenerClassName != null && !listenerCache.containsKey(taskKey)) {
+            if (listenerClassName != null && !listenerCache.containsKey(transferId)) {
                 DownloadListener listener = createListenerInstance(listenerClassName, DownloadListener.class);
                 if (listener != null) {
-                    listenerCache.put(taskKey, listener);
+                    listenerCache.put(transferId, listener);
                 }
             }
 
             File localFile = new File(task.getLocalFilePath());
             File parentDir = localFile.getParentFile();
             if (parentDir == null) {
-                logger.error("[traceId={}] Failed to get parent directory: {}", traceId, parentDir.getAbsolutePath());
-                throw new IOException("Failed to get parent directory: " + parentDir.getAbsolutePath());
+                logger.error("[traceId={}] Failed to get parent directory", traceId);
+                throw new IOException("Failed to get parent directory: " + task.getLocalFilePath());
             }
             if (!parentDir.exists()) {
                 final boolean res = parentDir.mkdirs();
                 if(!res) {
-                    logger.error("[traceId={}] Failed to create parent directory: {}", traceId, parentDir.getAbsolutePath());
                     throw new IOException("Failed to create parent directory: " + parentDir.getAbsolutePath());
                 }
             }
+            task.setScannedEndTime(Util.currentTime());
+
             final String tmpPath = parentDir.toPath().resolve("." + UUID.randomUUID().toString().replace("-", ""))
                     .normalize().toAbsolutePath().toString();
             task.setTmpLocalFilePath(tmpPath);
 
-            int chunkSize;
-            int totalChunks;
             task.setInitDownloadStartTime(Util.currentTime());
-            task.setStatus(DownloadTaskStatus.INIT_DOWNLOAD_COMPLETED);
-            task.updateTimestamp();
-            this.taskInflightMap.put(task.getTransferId(), task);
+            updateTaskStatus(task, DownloadTaskStatus.INIT_DOWNLOADING);
 
             ApiResponse<ChunkDownloadInfoResponse> chunkInitResponse = getDownloadInfo(task);
             logger.debug("[traceId={}] Download initialized: transferId={}, totalChunks={}, chunkSize={}",
@@ -86,79 +98,86 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                     chunkInitResponse.getData().getTotalChunks(),
                     chunkInitResponse.getData().getChunkSize());
 
-            chunkSize = chunkInitResponse.getData().getChunkSize();
-            totalChunks = chunkInitResponse.getData().getTotalChunks();
-
+            task.setChunkSize(chunkInitResponse.getData().getChunkSize());
+            task.setTotalChunks(chunkInitResponse.getData().getTotalChunks());
             task.setInitDownloadEndTime(Util.currentTime());
-            task.setStatus(DownloadTaskStatus.INIT_DOWNLOAD_COMPLETED);
-            task.updateTimestamp();
-
-            task.setChunkSize(chunkSize);
-            task.setTotalChunks(totalChunks);
-            this.taskInflightMap.put(task.getTransferId(), task);
+            updateTaskStatus(task, DownloadTaskStatus.INIT_DOWNLOAD_COMPLETED);
 
             try {
-                task.setStatus(DownloadTaskStatus.DOWNLOADING_CHUNKS);
-                task.updateTimestamp();
                 task.setDownloadChunksStartTime(Util.currentTime());
-                this.taskInflightMap.put(task.getTransferId(), task);
-
-                downloadChunks(task, localFile, taskKey, traceId);
-
+                updateTaskStatus(task, DownloadTaskStatus.DOWNLOADING_CHUNKS);
+                downloadChunks(task);
                 task.setDownloadChunksEndTime(Util.currentTime());
-                task.setStatus(DownloadTaskStatus.DOWNLOAD_CHUNKS_COMPLETED);
-                task.updateTimestamp();
-                this.taskInflightMap.put(task.getTransferId(), task);
+                updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_CHUNKS_COMPLETED);
             } catch (IOException e) {
                 logger.error("[traceId={}] Chunk download failed", traceId, e);
                 throw e;
             }
 
             try {
-                task.setStatus(DownloadTaskStatus.MERGING);
-                task.updateTimestamp();
                 task.setMergeChunksStartTime(Util.currentTime());
-                this.taskInflightMap.put(task.getTransferId(), task);
-
+                updateTaskStatus(task, DownloadTaskStatus.MERGING_CHUNKS);
                 mergeChunks(task);
-
                 task.setMergeChunksEndTime(Util.currentTime());
-                task.updateTimestamp();
-                this.taskInflightMap.put(task.getTransferId(), task);
+                updateTaskStatus(task, DownloadTaskStatus.MERGE_CHUNKS_COMPLETED);
             } catch (IOException e) {
                 logger.error("[traceId={}] Chunk merge failed", traceId, e);
                 throw e;
             }
 
             try {
-                task.setStatus(DownloadTaskStatus.VERIFYING);
-                task.updateTimestamp();
                 task.setVerifyStartTime(Util.currentTime());
-                this.taskInflightMap.put(task.getTransferId(), task);
-
-                verifyDownload(task, traceId);
-
+                updateTaskStatus(task, DownloadTaskStatus.VERIFYING_CHUNKS);
+                verifyDownload(task);
                 task.setVerifyEndTime(Util.currentTime());
+                updateTaskStatus(task, DownloadTaskStatus.VERIFY_CHUNKS_COMPLETED);
+
                 task.setDownloadSuccessTime(Util.currentTime());
-                task.setStatus(DownloadTaskStatus.DOWNLOAD_SUCCESS);
-                task.updateTimestamp();
-                this.taskInflightMap.put(task.getTransferId(), task);
-                handleListenerSuccess(taskKey, task);
+                updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_SUCCESS);
+                handleListenerSuccess(transferId, task);
+                inflightTasks.remove(task.getTransferId());
             } catch (IOException e) {
                 logger.error("[traceId={}] Verify download failed", traceId, e);
                 throw e;
             }
 
-            logger.info("[traceId={}] Download task completed: {}", traceId, taskKey);
+            logger.info("[traceId={}] Download task completed: {}", traceId, transferId);
         } catch (Exception e) {
-            logger.error("[traceId={}] Download task failed: {} - {}", traceId, taskKey, e.getMessage(), e);
-            task.setStatus(DownloadTaskStatus.FAILED);
-            task.updateTimestamp();
+            logger.error("[traceId={}] Download task failed: {} - {}", traceId, transferId, e.getMessage(), e);
             task.setExceptionDesc(e.getMessage());
-            this.taskInflightMap.put(task.getTransferId(), task);
-            handleListenerError(taskKey, e.getMessage());
+            updateTaskStatus(task, DownloadTaskStatus.FAILED);
+
+            if (metaStore != null && failedQueueDir != null) {
+                try {
+                    metaStore.moveToFailedQueue(task.getTransferId(), failedQueueDir);
+                } catch (IOException ex) {
+                    logger.warn("[traceId={}] 移动失败任务到重试队列失败: {}", traceId, ex.getMessage());
+                }
+            }
+
+            handleListenerError(transferId, e.getMessage());
+            inflightTasks.remove(task.getTransferId());
         } finally {
-            listenerCache.remove(taskKey);
+            listenerCache.remove(transferId);
+        }
+    }
+
+    public void updateTaskStatus(DownloadTask task, DownloadTaskStatus status) {
+        try {
+            task.setStatus(status);
+            task.updateTimestamp();
+        } catch (Exception e) {
+            logger.error("更新任务状态失败: {}", e.getMessage());
+        }
+
+        inflightTasks.put(task.getTransferId(), task);
+
+        if (metaStore != null) {
+            try {
+                metaStore.saveTask(task);
+            } catch (IOException e) {
+                logger.warn("保存任务元数据失败: {}", e.getMessage());
+            }
         }
     }
 
@@ -246,14 +265,16 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
             task.setListenerClassName(listener != null ? listener.getClass().getName() : null);
             task.updateTimestamp();
 
-            String taskKey = getTaskKey(task);
-
             if (listener != null) {
-                listenerCache.put(taskKey, listener);
+                listenerCache.put(task.getTransferId(), listener);
             }
 
-            if (!this.taskInflightMap.containsKey(task.getTransferId())) {
-                this.taskInflightMap.put(task.getTransferId(), task);
+            if (metaStore != null) {
+                metaStore.saveTask(task);
+            }
+
+            if (!this.inflightTasks.containsKey(task.getTransferId())) {
+                this.inflightTasks.put(task.getTransferId(), task);
             }
 
             return taskQueue.offer(task);
@@ -304,11 +325,12 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         return postApi(task.getRemoteAgentApiUrl(), "api/file/chunk/download/info", req, API_RESPONSE_DOWNLOAD_INIT, task.getTraceId());
     }
 
-    private File downloadChunk(DownloadTask task, int chunkIndex, String traceId) throws IOException, InterruptedException {
+    private File downloadChunk(DownloadTask task, int chunkIndex) throws IOException, InterruptedException {
+        String traceId = task.getTraceId();
         logger.debug("[traceId={}] Downloading chunk {} for transferId: {} using zero-copy", traceId, chunkIndex, task.getTransferId());
 
         File destFile = Paths.get(task.getRemoteFilePath()).toFile();
-        String destFileDir = com.cq.agent.client.upload.Util.transferToLinuxPath(destFile.getParent());
+        String destFileDir = Util.transferToLinuxPath(destFile.getParent());
         String destFileName = destFile.getName();
 
         ChunkDownloadRequest req = new ChunkDownloadRequest();
@@ -372,7 +394,8 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
     }
 
-    private void verifyDownload(DownloadTask task, String traceId) throws IOException {
+    private void verifyDownload(DownloadTask task) throws IOException {
+        String traceId = task.getTraceId();
         File localFile = new File(task.getLocalFilePath());
         if (!localFile.exists()) {
             throw new IOException("Downloaded file does not exist: " + task.getLocalFilePath());
@@ -531,52 +554,55 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
     }
 
-    private void downloadChunks(DownloadTask task, File file, String taskKey, String traceId) throws IOException {
+    private void downloadChunks(DownloadTask task) throws IOException {
+        String transferId = task.getTransferId();
+        String traceId = task.getTraceId();
+        File file = new File(task.getLocalFilePath());
         final String tmpLocalFilePath = task.getTmpLocalFilePath();
         File tmpDir = new File(tmpLocalFilePath);
-        
+
         if (!tmpDir.exists()) {
             tmpDir.mkdirs();
         }
-        
+
         List<Integer> missingChunks = scanDownloadedChunks(tmpDir, file.getName(), task.getChunkSize(), task.getTotalSize(), task.getTotalChunks(), traceId);
-        AtomicInteger downloadedCount = new AtomicInteger(task.getTotalChunks() - missingChunks.size());
-        DownloadListener listener = listenerCache.get(taskKey);
-        task.setDownloadedChunksCount(downloadedCount.get());
-        
-        logger.debug("[traceId={}] Scanned tmp directory: downloaded={}, missing={}", 
-                traceId, downloadedCount.get(), missingChunks.size());
+        int initialDownloadedCount = task.getTotalChunks() - missingChunks.size();
+        DownloadListener listener = listenerCache.get(transferId);
+        task.setDownloadedChunksCount(initialDownloadedCount);
+
+        logger.debug("[traceId={}] Scanned tmp directory: downloaded={}, missing={}",
+                traceId, initialDownloadedCount, missingChunks.size());
         try  {
             CompletableFuture<?>[] downloadFutures = missingChunks.stream()
                     .map(chunkIndex -> CompletableFuture.runAsync(() -> {
                         try {
                             if (listener != null) {
-                                handleListenerBeforeSend(taskKey, task);
+                                handleListenerBeforeSend(transferId, task);
                             }
-                            File chunkFile = downloadChunk(task, chunkIndex, traceId);
-                            
+                            File chunkFile = downloadChunk(task, chunkIndex);
+
                             long chunkSize = chunkFile.length();
                             if (chunkSize == 0) {
                                 throw new IOException("Empty chunk file downloaded for chunk " + chunkIndex);
                             }
-                            
+
                             int expectedChunkSize = calculateExpectedChunkSize(chunkIndex, task.getChunkSize(), task.getTotalSize());
                             if (chunkSize != expectedChunkSize) {
                                 throw new IOException(String.format(
                                         "Chunk size mismatch for chunk %d: expected=%d, actual=%d",
                                         chunkIndex, expectedChunkSize, chunkSize));
                             }
-                            
+
                             applyRateLimit((int) chunkSize, traceId);
 
-                            int currentDownloaded = downloadedCount.incrementAndGet();
                             task.incrementDownloadChunksCount();
+                            int currentDownloaded = task.getDownloadedChunksCount();
                             task.updateTimestamp();
-                            this.taskInflightMap.put(task.getTransferId(), task);
+                            this.inflightTasks.put(task.getTransferId(), task);
 
                             if (listener != null) {
                                 double progress = (double) currentDownloaded / task.getTotalChunks() * 100.0;
-                                handleListenerProgress(taskKey, task.getTotalChunks(), currentDownloaded, progress);
+                                handleListenerProgress(transferId, task.getTotalChunks(), currentDownloaded, progress);
                             }
                         } catch (Exception e) {
                              throw new CompletionException("Failed to download chunk " + chunkIndex, e);
@@ -651,5 +677,40 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
         }
         
         return missingChunks;
+    }
+
+    /**
+     * 重新提交失败的下载任务（内部方法，供 RetryManager 调用）
+     * 与 downloadFile() 的区别：
+     * - 不重新扫描文件
+     * - 直接使用已有的任务对象
+     * - 跳过文件存在性检查
+     *
+     * @param task 已有的 DownloadTask 对象（包含 remoteSourcePath, localTargetPath 等）
+     */
+    public void resubmitTask(DownloadTask task) {
+        String transferId = task.getTransferId();
+        String traceId = task.getTraceId();
+
+        logger.info("[traceId={}] 🔄 重新提交失败下载任务: transferId={}, file={}, retryCount={}",
+            traceId,
+            task.getTransferId(),
+            task.getLocalFilePath(),
+            task.getRetryCount());
+
+        boolean offered = taskQueue.offer(task);
+
+        if (offered) {
+            logger.debug("✅ 任务已加入工作队列: transferId={}", transferId);
+        } else {
+            logger.error("❌ 任务加入工作队列失败: transferId={}", transferId);
+        }
+    }
+
+    /**
+     * 获取失败队列目录
+     */
+    public Path getFailedQueueDir() {
+        return failedQueueDir;
     }
 }

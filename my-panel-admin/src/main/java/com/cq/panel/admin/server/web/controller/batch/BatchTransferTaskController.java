@@ -5,12 +5,13 @@ import com.cq.panel.admin.server.common.enums.BusinessType;
 import com.cq.panel.admin.server.common.utils.poi.ExcelUtil;
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.repository.service.IDirectoryCheckService;
 import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
 import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskQueryDTO;
+import com.cq.panel.admin.server.web.domain.vo.batch.DirectoryCheckVO;
 import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
 import com.cq.panel.admin.server.web.converter.batch.BatchTransferTaskQueryConverter;
 import com.cq.panel.admin.server.web.controller.base.BaseController;
-import com.cq.panel.admin.server.web.domain.vo.batch.TaskListWithStatusVO;
 import com.cq.panel.admin.server.web.domain.vo.base.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 批量传输任务 Controller
@@ -35,13 +37,16 @@ public class BatchTransferTaskController extends BaseController {
     private final IBatchTransferTaskService batchTransferTaskService;
     private final AgentDirectoryChecker directoryChecker;
     private final BatchTransferTaskQueryConverter queryConverter;
+    private final IDirectoryCheckService directoryCheckService;
 
     public BatchTransferTaskController(IBatchTransferTaskService batchTransferTaskService,
                                        AgentDirectoryChecker directoryChecker,
-                                       BatchTransferTaskQueryConverter queryConverter) {
+                                       BatchTransferTaskQueryConverter queryConverter,
+                                       IDirectoryCheckService directoryCheckService) {
         this.batchTransferTaskService = batchTransferTaskService;
         this.directoryChecker = directoryChecker;
         this.queryConverter = queryConverter;
+        this.directoryCheckService = directoryCheckService;
     }
 
     /**
@@ -117,14 +122,14 @@ public class BatchTransferTaskController extends BaseController {
         return Result.success(task);
     }
 
-    @Operation(summary = "查询任务列表（带节点状态）", description = "查询任务列表，同时返回源节点和目标节点的在线状态及目录是否存在")
+    @Operation(summary = "查询任务列表", description = "分页查询批量传输任务列表")
     @RequirePermission("batch:task:list")
     @GetMapping("/list-with-status")
     public Result<Map<String, Object>> listWithStatus(BatchTransferTaskQueryDTO query) {
         BatchTransferTask domain = queryConverter.toDomain(query);
         int pageNum = query.getPageNum();
         int pageSize = query.getPageSize();
-        List<TaskListWithStatusVO> list = batchTransferTaskService.getTaskListWithNodeStatus(domain, pageNum, pageSize);
+        List<BatchTransferTask> list = batchTransferTaskService.getTaskList(domain, pageNum, pageSize);
         long total = batchTransferTaskService.countByCondition(domain);
 
         Map<String, Object> result = new java.util.HashMap<>();
@@ -149,7 +154,7 @@ public class BatchTransferTaskController extends BaseController {
         if (ids != null && !ids.isEmpty()) {
             list = ids.stream()
                     .map(batchTransferTaskService::getTaskById)
-                    .filter(task -> task != null)
+                    .filter(Objects::nonNull)
                     .toList();
         } else {
             BatchTransferTask domain = queryConverter.toDomain(query);
@@ -214,6 +219,15 @@ public class BatchTransferTaskController extends BaseController {
             result.put("message", "目录不存在");
         }
         
+        return Result.success(result);
+    }
+
+    @Operation(summary = "目录检测", description = "检测任务发送和接收目录的存在性、读写执行权限、磁盘空间等")
+    @RequirePermission("batch:task:query")
+    @GetMapping("/dir-check")
+    public Result<DirectoryCheckVO.DirectoryCheckResult> checkDirectories(
+            @Parameter(description = "任务ID", required = true) @RequestParam Long taskId) {
+        DirectoryCheckVO.DirectoryCheckResult result = directoryCheckService.checkDirectories(taskId);
         return Result.success(result);
     }
 

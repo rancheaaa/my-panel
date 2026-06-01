@@ -22,7 +22,8 @@ import {
   DownOutlined,
   UpOutlined,
   DownloadOutlined,
-  ApiOutlined
+  ApiOutlined,
+  FolderOpenOutlined
 } from '@ant-design/icons';
 import { batchApi } from '../../../api/batch';
 import '../index.scss';
@@ -73,24 +74,12 @@ const tooltipStyle = {
   border: '1px solid #e8e8e8'
 };
 
-const nodeStatusText = (nodeStatus) => {
-  if (nodeStatus === 1) return '在线';
-  if (nodeStatus === 0) return '离线';
-  return '未知';
-};
-
-const dirExistsText = (dirExists, nodeStatus) => {
-  if (nodeStatus === 0) return '未知';
-  if (dirExists === true) return '存在';
-  if (dirExists === false) return '不存在';
-  return '未知';
-};
-
 const TaskListTab = ({
   onCreateClick,
   onEditClick,
   onViewClick,
   onConnectivityClick,
+  onDirCheckClick,
   tasks,
   loading,
   pagination,
@@ -149,7 +138,7 @@ const TaskListTab = ({
     {
       title: '任务',
       key: 'task',
-      width: 220,
+      width: 150,
       fixed: 'left',
       render: (_, record) => {
         const t = record.task || record;
@@ -173,42 +162,27 @@ const TaskListTab = ({
     {
       title: '发送节点',
       key: 'source',
-      width: 220,
+      width: 300,
       render: (_, record) => {
         const t = record.task || record;
-        const sourceStatus = record.sourceNodeStatus;
-        const agentName = sourceStatus?.agentName || t.sourceAgentName || t.sourceAgentId || '-';
+        const agentName = t.sourceAgentName || t.sourceAgentId || '-';
         const dir = t.sourceDir || '-';
-        const isOffline = sourceStatus?.nodeStatus === 0;
-        const isOnline = sourceStatus?.nodeStatus === 1;
-        const dirNotExists = sourceStatus?.dirExists === false && isOnline;
-
-        const nodeStatusLabel = nodeStatusText(sourceStatus?.nodeStatus);
-        const dirExistsLabel = dirExistsText(sourceStatus?.dirExists, sourceStatus?.nodeStatus);
 
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={`节点：${nodeStatusLabel}`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <CloudServerOutlined style={{ color: isOffline ? '#ff4d4f' : isOnline ? '#52c41a' : '#bfbfbf', fontSize: 12, flexShrink: 0 }} />
-                <span style={{
-                  fontWeight: 500, fontSize: 12.5,
-                  color: isOffline ? '#ff4d4f' : isOnline ? '#1f1f1f' : '#8c8c8c',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  cursor: 'help'
-                }}>{agentName}</span>
-              </div>
+            <CloudServerOutlined style={{ color: '#1890ff', fontSize: 12, flexShrink: 0 }} />
+            <Tooltip title={agentName} placement="topLeft">
+              <span style={{
+                fontWeight: 500, fontSize: 12.5, color: '#1f1f1f',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>{agentName}</span>
             </Tooltip>
-            <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={`目录：${dirExistsLabel}`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <FilterOutlined style={{ color: dirNotExists ? '#ff4d4f' : isOnline ? '#52c41a' : '#bfbfbf', fontSize: 10, flexShrink: 0 }} />
-                <span style={{
-                  fontSize: 11.5,
-                  color: dirNotExists ? '#ff4d4f' : isOnline ? '#52c41a' : '#bfbfbf',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  cursor: 'help'
-                }}>{dir}</span>
-              </div>
+            <FilterOutlined style={{ color: '#52c41a', fontSize: 10, flexShrink: 0 }} />
+            <Tooltip title={dir} placement="topLeft">
+              <span style={{
+                fontSize: 11.5, color: '#52c41a',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }}>{dir}</span>
             </Tooltip>
           </div>
         );
@@ -217,47 +191,36 @@ const TaskListTab = ({
     {
       title: '目标节点',
       key: 'target',
-      width: 220,
+      width: 300,
       render: (_, record) => {
-        const targetStatusList = record.targetNodeStatusList || [];
-        if (targetStatusList.length === 0) {
+        const t = record.task || record;
+        let targetNames = [];
+        let targetDirs = [];
+        try { targetNames = JSON.parse(t.targetAgentNames || '[]'); } catch (e) { targetNames = (t.targetAgentNames || '').split(';').filter(Boolean); }
+        try { targetDirs = JSON.parse(t.targetDirs || '[]'); } catch (e) { targetDirs = (t.targetDirs || '').split(';').filter(Boolean); }
+
+        if (targetNames.length === 0) {
           return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>;
         }
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {targetStatusList.map((status, idx) => {
-              const agentName = status.agentName || '-';
-              const dir = status.dirPath || '-';
-              const isOffline = status.nodeStatus === 0;
-              const isOnline = status.nodeStatus === 1;
-              const dirNotExists = status.dirExists === false && isOnline;
-
-              const nodeStatusLabel = nodeStatusText(status.nodeStatus);
-              const dirExistsLabel = dirExistsText(status.dirExists, status.nodeStatus);
-
+            {targetNames.map((name, idx) => {
+              const dir = targetDirs[idx] || '-';
               return (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={`节点：${nodeStatusLabel}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <ClusterOutlined style={{ color: isOffline ? '#ff4d4f' : isOnline ? '#722ed1' : '#bfbfbf', fontSize: 11, flexShrink: 0 }} />
-                      <span style={{
-                        fontWeight: 500, fontSize: 11.5,
-                        color: isOffline ? '#ff4d4f' : isOnline ? '#722ed1' : '#8c8c8c',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
-                        cursor: 'help'
-                      }}>{agentName}</span>
-                    </div>
+                  <ClusterOutlined style={{ color: '#722ed1', fontSize: 11, flexShrink: 0 }} />
+                  <Tooltip title={name || '-'} placement="topLeft">
+                    <span style={{
+                      fontWeight: 500, fontSize: 11.5, color: '#722ed1',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
+                    }}>{name || '-'}</span>
                   </Tooltip>
-                  <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={`目录：${dirExistsLabel}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <FilterOutlined style={{ color: dirNotExists ? '#ff4d4f' : isOnline ? '#52c41a' : '#bfbfbf', fontSize: 9, flexShrink: 0 }} />
-                      <span style={{
-                        fontSize: 11,
-                        color: dirNotExists ? '#ff4d4f' : isOnline ? '#52c41a' : '#bfbfbf',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
-                        cursor: 'help'
-                      }}>{dir}</span>
-                    </div>
+                  <FilterOutlined style={{ color: '#52c41a', fontSize: 9, flexShrink: 0 }} />
+                  <Tooltip title={dir} placement="topLeft">
+                    <span style={{
+                      fontSize: 11, color: '#52c41a',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
+                    }}>{dir}</span>
                   </Tooltip>
                 </div>
               );
@@ -496,7 +459,7 @@ const TaskListTab = ({
     {
       title: '操作',
       key: 'action',
-      width: 350,
+      width: 410,
       fixed: 'right',
       render: (_, record) => {
         const t = record.task || record;
@@ -539,6 +502,9 @@ const TaskListTab = ({
         });
         items.push({
           key: 'connectivity', content: <><ApiOutlined /> 连通性</>, onClick: () => onConnectivityClick(t)
+        });
+        items.push({
+          key: 'dircheck', content: <><FolderOpenOutlined /> 目录检测</>, onClick: () => onDirCheckClick(t)
         });
 
         return (

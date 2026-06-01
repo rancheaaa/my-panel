@@ -208,6 +208,14 @@ export const batchApi = {
     });
   },
 
+  checkDirectories(taskId) {
+    return request({
+      url: '/batch/task/dir-check',
+      method: 'get',
+      params: { taskId }
+    });
+  },
+
   /**
    * 获取传输明细文件汇总统计
    */

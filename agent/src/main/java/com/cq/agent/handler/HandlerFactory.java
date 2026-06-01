@@ -48,6 +48,7 @@ public class HandlerFactory {
         handlerMap.put(apiPrefix + "/checksum", new ChecksumHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/search", new SearchHandler(fileService, chunkedTransferService));
         handlerMap.put(apiPrefix + "/disk", new DiskHandler(fileService, chunkedTransferService));
+        handlerMap.put(apiPrefix + "/dir-check", new DirCheckHandler(fileService, chunkedTransferService));
 
         // Chunked transfer operations
         handlerMap.put(apiPrefix + "/chunk/init", new ChunkInitHandler(fileService, chunkedTransferService));

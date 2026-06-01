@@ -2,6 +2,7 @@ package com.cq.panel.admin.server.web.controller.batch;
 
 import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.service.IBatchTransferTaskService;
+import com.cq.panel.admin.server.repository.service.IDirectoryCheckService;
 import com.cq.panel.admin.server.web.domain.dto.batch.BatchTransferTaskCreateDTO;
 import com.cq.panel.admin.server.service.batch.AgentDirectoryChecker;
 import com.cq.panel.admin.server.web.converter.batch.BatchTransferTaskQueryConverter;
@@ -37,12 +38,15 @@ class BatchTransferTaskControllerTest {
     @Mock
     private BatchTransferTaskQueryConverter queryConverter;
 
+    @Mock
+    private IDirectoryCheckService directoryCheckService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
         // 创建控制器实例
-        BatchTransferTaskController controller = new BatchTransferTaskController(batchTransferTaskService, directoryChecker, queryConverter);
+        BatchTransferTaskController controller = new BatchTransferTaskController(batchTransferTaskService, directoryChecker, queryConverter, directoryCheckService);
         
         // 使用spy包装控制器以支持mock getUserId()
         controller = spy(controller);

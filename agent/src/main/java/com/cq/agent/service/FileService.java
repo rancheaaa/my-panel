@@ -717,4 +717,8 @@ public class FileService {
 
         return resolved;
     }
+
+    public Path resolvePathPublic(String path) {
+        return resolvePath(path);
+    }
 }

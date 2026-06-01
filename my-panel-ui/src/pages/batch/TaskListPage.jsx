@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import TaskListTab from './components/TaskListTab';
 import TaskForm from './components/TaskForm';
 import ConnectivityModal from './components/ConnectivityModal';
+import DirectoryCheckModal from './components/DirectoryCheckModal';
 import { useBatchTasks } from './hooks/useBatchTasks';
 import { batchApi } from '../../api/batch';
 import { listAgentRegistry } from '../../api/agent';
@@ -17,9 +18,11 @@ const TaskListPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [connModalOpen, setConnModalOpen] = useState(false);
+  const [dirCheckModalOpen, setDirCheckModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [detailTask, setDetailTask] = useState(null);
   const [connTask, setConnTask] = useState(null);
+  const [dirCheckTask, setDirCheckTask] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
   const [agentList, setAgentList] = useState([]);
 
@@ -102,6 +105,11 @@ const TaskListPage = () => {
     setConnModalOpen(true);
   };
 
+  const handleDirCheckClick = (record) => {
+    setDirCheckTask(record);
+    setDirCheckModalOpen(true);
+  };
+
   const getTaskInitialValues = (task) => {
     if (!task) return {};
     const targetAgentIds = Array.isArray(task.targetAgentIds)
@@ -169,6 +177,7 @@ const TaskListPage = () => {
         onEditClick={handleEditClick}
         onViewClick={handleViewClick}
         onConnectivityClick={handleConnectivityClick}
+        onDirCheckClick={handleDirCheckClick}
       />
       </div>
       <Modal
@@ -216,6 +225,11 @@ const TaskListPage = () => {
         open={connModalOpen}
         onClose={() => { setConnModalOpen(false); setConnTask(null); }}
         task={connTask}
+      />
+      <DirectoryCheckModal
+        open={dirCheckModalOpen}
+        onClose={() => { setDirCheckModalOpen(false); setDirCheckTask(null); }}
+        task={dirCheckTask}
       />
     </div>
   );

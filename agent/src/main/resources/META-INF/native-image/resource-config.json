@@ -1,0 +1,16 @@
+{
+  "resources": {
+    "includes": [
+      {
+        "pattern": "logback.xml"
+      },
+      {
+        "pattern": "agent.properties"
+      },
+      {
+        "pattern": "META-INF/services/.*"
+      }
+    ],
+    "bundles": []
+  }
+}

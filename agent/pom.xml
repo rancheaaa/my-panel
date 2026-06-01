@@ -129,7 +129,7 @@
                         <goals><goal>shade</goal></goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <minimizeJar>true</minimizeJar>
+                            <minimizeJar>false</minimizeJar>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -150,6 +150,33 @@
                     </execution>
                 </executions>
             </plugin>
+
+<!--            <plugin>-->
+<!--                <groupId>org.graalvm.buildtools</groupId>-->
+<!--                <artifactId>native-maven-plugin</artifactId>-->
+<!--                <version>0.10.3</version>-->
+<!--                <extensions>true</extensions>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>build-native</id>-->
+<!--                        <goals><goal>compile-no-fork</goal></goals>-->
+<!--                        <configuration>-->
+<!--                            <mainClass>com.cq.agent.AgentApplication</mainClass>-->
+<!--                            <imageName>my-agent</imageName>-->
+<!--                            <buildArgs>-->
+<!--                                &#45;&#45;no-fallback-->
+<!--                                -H:+ReportExceptionStackTraces-->
+<!--                                -H:-UseServiceLoaderFeature-->
+<!--                                &#45;&#45;allow-incomplete-classpath-->
+<!--                                &#45;&#45;initialize-at-build-time=org.slf4j,ch.qos.logback-->
+<!--                                -H:IncludeResources=logback.xml|agent.properties-->
+<!--                                -H:+AddAllCharsets-->
+<!--                            </buildArgs>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

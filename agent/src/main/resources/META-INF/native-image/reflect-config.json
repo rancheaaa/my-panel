@@ -398,6 +398,24 @@
     ]
   },
   {
+    "name": "com.cq.agent.batch.scheduler.FailedQueueScannerJob",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.cq.agent.batch.scheduler.BatchTransferJob",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
     "name": "com.cq.agent.batch.config.VersionManager",
     "allDeclaredFields": true,
     "queryAllDeclaredMethods": true,
@@ -410,14 +428,6 @@
     ]
   },
   {
-    "name": "com.cq.agent.batch.config.VersionManager$$FastClassByGuice$$32d773",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
     "name": "com.cq.agent.batch.scanner.FileScanner",
     "allDeclaredFields": true,
     "queryAllDeclaredMethods": true,
@@ -426,14 +436,6 @@
       {
         "name": "<init>",
         "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.batch.scanner.FileScanner$$FastClassByGuice$$4f7da0",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
       }
     ]
   },
@@ -456,233 +458,6 @@
           "com.cq.agent.client.upload.BatchTaskSchedulerUploader",
           "com.cq.agent.registry.AgentRegistryService"
         ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.AgentBootstrap$$FastClassByGuice$$5dbea0",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.AgentModule",
-    "queryAllDeclaredMethods": true
-  },
-  {
-    "name": "com.cq.agent.di.provider.AgentRegistryServiceProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.AgentRegistryServiceProvider$$FastClassByGuice$$e923bb",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.BatchTaskSchedulerProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig",
-          "com.cq.agent.batch.config.ConfigFileManager",
-          "com.cq.agent.batch.tracker.FileBatchCompletionTracker",
-          "com.cq.agent.batch.report.ProgressReporter",
-          "com.cq.agent.batch.scanner.FileScanner"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.BatchTaskSchedulerProvider$$FastClassByGuice$$9ae43b",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.ConfigChangeListenerProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.batch.config.ConfigFileManager",
-          "com.cq.agent.batch.config.VersionManager",
-          "com.cq.agent.client.upload.BatchTaskSchedulerUploader",
-          "com.cq.agent.client.upload.RetryAwareUploader"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.ConfigChangeListenerProvider$$FastClassByGuice$$bd9a72",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.ConfigFileManagerProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.ConfigFileManagerProvider$$FastClassByGuice$$603963",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.FallbackPersistenceServiceProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig",
-          "com.cq.agent.batch.report.ProgressReporter"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.FallbackPersistenceServiceProvider$$FastClassByGuice$$c9afe1",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.FileBatchCompletionTrackerProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.FileBatchCompletionTrackerProvider$$FastClassByGuice$$7ce7f4",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.HttpServerProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig",
-          "com.cq.agent.executor.CommandExecutor",
-          "com.cq.agent.service.FileService",
-          "com.cq.agent.service.ChunkedTransferService",
-          "com.cq.agent.batch.config.ConfigFileManager",
-          "com.cq.agent.batch.config.ConfigChangeListener",
-          "com.cq.agent.client.upload.BatchTaskSchedulerUploader"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.HttpServerProvider$$FastClassByGuice$$d8bc9b",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.ProgressReporterProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.ProgressReporterProvider$$FastClassByGuice$$856a1c",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.RetryAwareUploaderProvider",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "com.cq.agent.config.AgentConfig",
-          "com.cq.agent.batch.tracker.FileBatchCompletionTracker",
-          "com.cq.agent.batch.report.ProgressReporter",
-          "com.cq.agent.batch.config.ConfigFileManager"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.di.provider.RetryAwareUploaderProvider$$FastClassByGuice$$a6ddc2",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
       }
     ]
   },
@@ -851,14 +626,6 @@
     ]
   },
   {
-    "name": "com.cq.agent.executor.CommandExecutor$$FastClassByGuice$$4144a",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
     "name": "com.cq.agent.handler.CommonNettyHandler",
     "methods": [
       {
@@ -913,14 +680,6 @@
     ]
   },
   {
-    "name": "com.cq.agent.service.ChunkedTransferService$$FastClassByGuice$$2a164b",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
-      }
-    ]
-  },
-  {
     "name": "com.cq.agent.service.FileService",
     "allDeclaredFields": true,
     "queryAllDeclaredMethods": true,
@@ -931,14 +690,6 @@
         "parameterTypes": [
           "com.cq.agent.config.AgentConfig"
         ]
-      }
-    ]
-  },
-  {
-    "name": "com.cq.agent.service.FileService$$FastClassByGuice$$156be4",
-    "fields": [
-      {
-        "name": "GUICE$INVOKERS"
       }
     ]
   },
@@ -996,30 +747,6 @@
         "name": "thread"
       }
     ]
-  },
-  {
-    "name": "com.google.inject.AbstractModule",
-    "queryAllDeclaredMethods": true
-  },
-  {
-    "name": "com.google.inject.KotlinSupportImpl"
-  },
-  {
-    "name": "com.google.inject.internal.Annotations",
-    "methods": [
-      {
-        "name": "determineAnnotationToStringConfig",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "com.google.inject.internal.InjectorShell$RootModule",
-    "queryAllDeclaredMethods": true
-  },
-  {
-    "name": "com.google.inject.util.Modules$EmptyModule",
-    "queryAllDeclaredMethods": true
   },
   {
     "name": "com.sun.crypto.provider.AESCipher$General",
@@ -1910,15 +1637,6 @@
       },
       {
         "name": "isRecord",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "java.lang.ClassLoader$$DefineAccessByGuice$$/0x00007fdd7c149c00",
-    "methods": [
-      {
-        "name": "<init>",
         "parameterTypes": []
       }
     ]

@@ -99,6 +99,7 @@ public class RetryAwareUploader extends AgentUploader {
                               FileBatchCompletionTracker fileBatchTracker, ProgressReporter progressReporter,
                               ConfigFileManager configFileManager, Path uploadFinalFailureQueueDir) {
         super(agentConfig);
+        this.agentConfig = agentConfig;
         this.fileBatchTracker = fileBatchTracker;
         this.globalProgressReporter = progressReporter;
         this.configFileManager = configFileManager;

@@ -13,125 +13,124 @@ import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
 import com.cq.agent.service.ChunkedTransferService;
 import com.cq.agent.service.FileService;
-import com.google.inject.Injector;
-import com.google.inject.Guice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentModuleTest {
 
-    private Injector injector;
+    private AppContext ctx;
 
     @BeforeEach
     void setUp() {
-        injector = Guice.createInjector(new AgentModule());
+        AppContext.resetForTest();
+        ctx = AppContext.getInstance();
     }
 
     @Test
     void shouldCreateAgentConfig() {
-        AgentConfig config = injector.getInstance(AgentConfig.class);
+        AgentConfig config = ctx.getAgentConfig();
         assertNotNull(config);
         assertNotNull(config.getAgentId());
     }
 
     @Test
     void shouldCreateCommandExecutor() {
-        CommandExecutor executor = injector.getInstance(CommandExecutor.class);
+        CommandExecutor executor = ctx.getCommandExecutor();
         assertNotNull(executor);
     }
 
     @Test
     void shouldCreateFileService() {
-        FileService fileService = injector.getInstance(FileService.class);
+        FileService fileService = ctx.getFileService();
         assertNotNull(fileService);
     }
 
     @Test
     void shouldCreateChunkedTransferService() {
-        ChunkedTransferService service = injector.getInstance(ChunkedTransferService.class);
+        ChunkedTransferService service = ctx.getChunkedTransferService();
         assertNotNull(service);
     }
 
     @Test
     void shouldCreateConfigFileManager() {
-        ConfigFileManager manager = injector.getInstance(ConfigFileManager.class);
+        ConfigFileManager manager = ctx.getConfigFileManager();
         assertNotNull(manager);
     }
 
     @Test
     void shouldCreateConfigChangeListener() {
-        ConfigChangeListener listener = injector.getInstance(ConfigChangeListener.class);
+        ConfigChangeListener listener = ctx.getConfigChangeListener();
         assertNotNull(listener);
     }
 
     @Test
     void shouldCreateUploadServiceAsRetryAware() {
-        UploadService uploadService = injector.getInstance(UploadService.class);
+        UploadService uploadService = ctx.getUploadService();
         assertNotNull(uploadService);
         assertInstanceOf(RetryAwareUploader.class, uploadService);
     }
 
     @Test
     void shouldCreateBatchTaskScheduler() {
-        BatchTaskSchedulerUploader scheduler = injector.getInstance(BatchTaskSchedulerUploader.class);
+        BatchTaskSchedulerUploader scheduler = ctx.getBatchTaskSchedulerUploader();
         assertNotNull(scheduler);
     }
 
     @Test
     void shouldCreateFileBatchTracker() {
-        FileBatchCompletionTracker tracker = injector.getInstance(FileBatchCompletionTracker.class);
+        FileBatchCompletionTracker tracker = ctx.getFileBatchCompletionTracker();
         assertNotNull(tracker);
     }
 
     @Test
     void shouldCreateProgressReporter() {
-        com.cq.agent.batch.report.ProgressReporter reporter = injector.getInstance(com.cq.agent.batch.report.ProgressReporter.class);
+        com.cq.agent.batch.report.ProgressReporter reporter = ctx.getProgressReporter();
         assertNotNull(reporter);
     }
 
     @Test
     void shouldCreateFallbackPersistenceService() {
-        FallbackPersistenceService service = injector.getInstance(FallbackPersistenceService.class);
+        FallbackPersistenceService service = ctx.getFallbackPersistenceService();
         assertNotNull(service);
     }
 
     @Test
     void shouldCreateHttpServer() {
-        HttpServer server = injector.getInstance(HttpServer.class);
+        HttpServer server = ctx.getHttpServer();
         assertNotNull(server);
     }
 
     @Test
     void shouldCreateAgentRegistryService() {
-        AgentRegistryService service = injector.getInstance(AgentRegistryService.class);
+        AgentRegistryService service = ctx.getAgentRegistryService();
         assertNotNull(service);
     }
 
     @Test
     void shouldCreateAgentBootstrap() {
-        AgentBootstrap bootstrap = injector.getInstance(AgentBootstrap.class);
+        AgentBootstrap bootstrap = ctx.getAgentBootstrap();
         assertNotNull(bootstrap);
     }
 
     @Test
     void shouldReturnSameSingletonForAgentConfig() {
-        AgentConfig config1 = injector.getInstance(AgentConfig.class);
-        AgentConfig config2 = injector.getInstance(AgentConfig.class);
+        AgentConfig config1 = ctx.getAgentConfig();
+        AgentConfig config2 = ctx.getAgentConfig();
         assertSame(config1, config2);
     }
 
     @Test
     void shouldReturnSameSingletonForRetryAwareUploader() {
-        RetryAwareUploader instance1 = injector.getInstance(RetryAwareUploader.class);
-        RetryAwareUploader instance2 = injector.getInstance(RetryAwareUploader.class);
+        RetryAwareUploader instance1 = ctx.getRetryAwareUploader();
+        RetryAwareUploader instance2 = ctx.getRetryAwareUploader();
         assertSame(instance1, instance2);
     }
 
     @Test
     void shouldReturnSameSingletonForBatchTaskScheduler() {
-        BatchTaskSchedulerUploader instance1 = injector.getInstance(BatchTaskSchedulerUploader.class);
-        BatchTaskSchedulerUploader instance2 = injector.getInstance(BatchTaskSchedulerUploader.class);
+        BatchTaskSchedulerUploader instance1 = ctx.getBatchTaskSchedulerUploader();
+        BatchTaskSchedulerUploader instance2 = ctx.getBatchTaskSchedulerUploader();
         assertSame(instance1, instance2);
     }
 }

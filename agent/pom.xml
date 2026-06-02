@@ -56,14 +56,6 @@
             <artifactId>commons-exec</artifactId>
         </dependency>
 
-        <!-- Guice DI -->
-        <dependency>
-            <groupId>com.google.inject</groupId>
-            <artifactId>guice</artifactId>
-            <version>7.0.0</version>
-        </dependency>
-
-
         <!-- Quartz Scheduler -->
         <dependency>
             <groupId>org.quartz-scheduler</groupId>
@@ -188,7 +180,7 @@
                         <arg>-H:+ReportExceptionStackTraces</arg>
                         <arg>-H:+UnlockExperimentalVMOptions</arg>
                         <arg>--initialize-at-build-time=org.slf4j,org.apache.commons.exec</arg>
-                        <arg>--initialize-at-run-time=ch.qos.logback,io.netty,org.quartz,com.google.inject</arg>
+                        <arg>--initialize-at-run-time=ch.qos.logback,io.netty,org.quartz</arg>
                         <arg>-H:IncludeResources=logback.xml|agent.properties|quartz.properties|META-INF/services/.*</arg>
                         <arg>-H:+AddAllCharsets</arg>
                         <arg>--enable-url-protocols=http,https</arg>

@@ -3,7 +3,6 @@ package com.cq.agent.service;
 import com.cq.agent.dto.*;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.model.UploadSession;
-import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -43,7 +42,6 @@ public class ChunkedTransferService {
     private final ConcurrentHashMap<String, UploadSession> uploadSessions;
     private final ScheduledExecutorService cleanupExecutor;
 
-    @Inject
     public ChunkedTransferService(AgentConfig config) {
         String baseDir = config.getFileBaseDirectory();
         this.baseDirectory = Path.of(baseDir).toAbsolutePath().normalize();

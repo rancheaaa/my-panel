@@ -4,7 +4,6 @@ import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.AgentRegistryService;
 import com.cq.agent.server.HttpServer;
-import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
@@ -18,7 +17,6 @@ public class AgentBootstrap {
     private final BatchTaskSchedulerUploader batchTaskUploader;
     private final AgentRegistryService registryService;
 
-    @Inject
     public AgentBootstrap(HttpServer server,
                           AgentConfig config,
                           BatchTaskSchedulerUploader batchTaskUploader,

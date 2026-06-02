@@ -44,6 +44,7 @@ public class RetryAwareUploaderProvider implements Provider<RetryAwareUploader> 
             RetryAwareUploader retryAwareUploader = new RetryAwareUploader(
                     config, fileBatchTracker, progressReporter,
                     configFileManager, uploadFinalFailureQueueDir);
+            retryAwareUploader.initRetry();
             logger.info("RetryAwareUploaderDecorator initialized (inheritance mode)");
             return retryAwareUploader;
         } catch (Exception e) {

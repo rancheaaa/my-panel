@@ -106,7 +106,7 @@ public class RetryAwareUploader extends AgentUploader {
 
     }
 
-    public void init() {
+    public void initRetry() {
         initRetryScheduler(agentConfig.getFailedQueueScanIntervalMs());
         loadRetryConfigFromPersistence();
         super.init();

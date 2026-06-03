@@ -310,8 +310,6 @@ public class AgentConfig {
         if (value != null) {
             return parseIntegerValue(key, value, defaultValue);
         }
-
-        logger.debug("Using default value for {}: {}", key, defaultValue);
         return defaultValue;
     }
 
@@ -329,8 +327,6 @@ public class AgentConfig {
         if (value != null) {
             return parseLongValue(key, value, defaultValue);
         }
-
-        logger.debug("Using default Long value for {}: {}", key, defaultValue);
         return defaultValue;
     }
 
@@ -348,8 +344,6 @@ public class AgentConfig {
         if (value != null) {
             return value.trim();
         }
-
-        logger.debug("Using default String value for {}: {}", key, defaultValue);
         return defaultValue;
     }
 
@@ -360,7 +354,6 @@ public class AgentConfig {
             return parseBooleanValue(key, value, defaultValue);
         }
 
-        logger.debug("Using default Boolean value for {}: {}", key, defaultValue);
         return defaultValue;
     }
 

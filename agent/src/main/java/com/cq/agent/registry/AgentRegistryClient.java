@@ -74,9 +74,9 @@ public class AgentRegistryClient {
         if (loadBalancerClient == null) {
             throw new IllegalStateException("Registry server URL is not configured");
         }
-        
         logger.info("Registering agent to registry service");
-        
+        // 刷新服务器列表
+        this.serverList.refresh();
         try {
             String requestBody = gson.toJson(request);
             HttpResponse<String> response = loadBalancerClient.post(SERVICE_NAME, "/" + REGISTER_ENDPOINT, requestBody, String.class);
@@ -114,10 +114,8 @@ public class AgentRegistryClient {
      * @param agentIp Agent IP
      * @param agentPort Agent端口
      * @return 是否成功
-     * @throws IOException IO异常
-     * @throws InterruptedException 中断异常
      */
-    public boolean heartbeat(String agentIp, int agentPort) throws IOException, InterruptedException {
+    public boolean heartbeat(String agentIp, int agentPort) {
         if (loadBalancerClient == null) {
             logger.debug("Registry server URL is not configured, skipping heartbeat");
             return false;

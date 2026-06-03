@@ -2,9 +2,6 @@
   "resources": {
     "includes": [
       {
-        "pattern": "\\Q/quartz.properties\\E"
-      },
-      {
         "pattern": "\\QMETA-INF/services/ch.qos.logback.classic.spi.Configurator\\E"
       },
       {
@@ -42,15 +39,6 @@
       },
       {
         "pattern": "\\Qorg/publicsuffix/list/effective_tld_names.dat\\E"
-      },
-      {
-        "pattern": "\\Qorg/quartz/core/quartz-build.properties\\E"
-      },
-      {
-        "pattern": "\\Qorg/quartz/quartz.properties\\E"
-      },
-      {
-        "pattern": "\\Qquartz.properties\\E"
       },
       {
         "pattern": "jdk.jfr:\\Qjdk/jfr/internal/types/metadata.bin\\E"

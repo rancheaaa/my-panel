@@ -2,7 +2,6 @@ package com.cq.agent.client.upload;
 
 import com.cq.agent.batch.scanner.ScannedFile;
 import com.cq.agent.batch.scheduler.BatchUploadListener;
-import com.cq.agent.batch.scheduler.FailedQueueScannerJob;
 import com.cq.agent.batch.tracker.FileBatchCompletionTracker;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
 import com.cq.panel.common.dto.batch.RetryConfig;
@@ -11,13 +10,12 @@ import com.cq.agent.batch.report.ProgressReporter;
 import com.cq.agent.batch.report.SubTaskEvent;
 import com.cq.agent.config.AgentConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
+import com.cq.agent.scheduler.SimpleTaskScheduler;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import lombok.Getter;
 import lombok.Setter;
-import org.quartz.*;
-import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,8 +81,8 @@ public class RetryAwareUploader extends AgentUploader {
     @Setter
     private Function<Long, Long> retryExecutor;
 
-    // ===== Quartz 失败队列扫描调度器 =====
-    private Scheduler retryScheduler;
+    // ===== 轻量调度器（替代Quartz） =====
+    private SimpleTaskScheduler retryScheduler;
 
     /**
      * 构造函数（完整依赖注入模式）
@@ -122,22 +120,9 @@ public class RetryAwareUploader extends AgentUploader {
 
     private void initRetryScheduler(long scanIntervalMs) {
         try {
-            this.retryScheduler = new StdSchedulerFactory().getScheduler();
-            this.retryScheduler.start();
-
-            JobDetail failedQueueScannerJob = JobBuilder.newJob(FailedQueueScannerJob.class)
-                    .withIdentity("failedQueueScanner", "retry-group")
-                    .build();
-            failedQueueScannerJob.getJobDataMap().put("retryAwareUploader", this);
-
-            Trigger failedQueueScannerTrigger = TriggerBuilder.newTrigger()
-                    .withIdentity("failedQueueScannerTrigger", "retry-group")
-                    .withSchedule(SimpleScheduleBuilder.simpleSchedule()
-                            .withIntervalInMilliseconds(scanIntervalMs)
-                            .repeatForever())
-                    .build();
-
-            this.retryScheduler.scheduleJob(failedQueueScannerJob, failedQueueScannerTrigger);
+            this.retryScheduler = new SimpleTaskScheduler(1);
+            this.retryScheduler.scheduleFixedRate("failedQueueScanner",
+                    this::scanAndRetryFailedUploads, scanIntervalMs, scanIntervalMs);
             logger.info("✅ 失败队列扫描调度器已启动, 扫描间隔: {}ms", scanIntervalMs);
         } catch (Exception e) {
             logger.warn("⚠️ 初始化失败队列扫描调度器失败: {}", e.getMessage());
@@ -146,11 +131,11 @@ public class RetryAwareUploader extends AgentUploader {
 
     public void shutdownRetryScheduler() {
         try {
-            if (retryScheduler != null && !retryScheduler.isShutdown()) {
-                retryScheduler.shutdown(true);
+            if (retryScheduler != null) {
+                retryScheduler.shutdown();
                 logger.info("⏹️ 失败队列扫描调度器已关闭");
             }
-        } catch (SchedulerException e) {
+        } catch (Exception e) {
             logger.error("❌ 关闭失败队列扫描调度器异常: {}", e.getMessage(), e);
         }
     }

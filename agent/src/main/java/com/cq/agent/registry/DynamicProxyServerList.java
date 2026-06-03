@@ -40,7 +40,6 @@ public class DynamicProxyServerList implements ServerList {
         this.config = config;
         this.loadBalancerClient = createLoadBalancerClient();
         this.proxyServers = new ArrayList<>();
-        refresh();
     }
 
     /**
@@ -190,7 +189,7 @@ public class DynamicProxyServerList implements ServerList {
                         Server server = convertToServer(instance);
                         servers.add(server);
                     }
-                    logger.debug("Found {} available proxy servers", instances.size());
+                    logger.debug("Found {} available proxy servers {}", instances.size(), servers);
                     return servers;
                 }
             } else {

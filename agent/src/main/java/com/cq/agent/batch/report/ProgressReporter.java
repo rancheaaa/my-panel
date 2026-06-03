@@ -2,12 +2,7 @@ package com.cq.agent.batch.report;
 
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.registry.DynamicProxyServerList;
-import com.cq.panel.common.loadbalancer.HttpResponse;
-import com.cq.panel.common.loadbalancer.LoadBalancerAlgorithm;
-import com.cq.panel.common.loadbalancer.LoadBalancerClient;
-import com.cq.panel.common.loadbalancer.LoadBalancerConfig;
-import com.cq.panel.common.loadbalancer.LoadBalancerManager;
-import com.cq.panel.common.loadbalancer.Server;
+import com.cq.panel.common.loadbalancer.*;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import lombok.Setter;
@@ -36,6 +31,8 @@ public class ProgressReporter {
     private BiFunction<String, String, Boolean> httpClient;
     @Setter
     private FallbackPersistenceService fallbackPersistenceService;
+
+    private ServerList serverList;
 
     /**
      * 构造函数（推荐）- 自动创建带负载均衡的HTTP客户端
@@ -77,13 +74,12 @@ public class ProgressReporter {
 
             List<Server> servers = convertUrlsToServers(registryServerUrls);
             DynamicProxyServerList dynamicServerList = new DynamicProxyServerList(config);
-
             LoadBalancerClient client = loadBalancerManager.getClient(
                     PROXY_SERVICE_NAME,
                     dynamicServerList,
                     LoadBalancerAlgorithm.ROUND_ROBIN
             );
-
+            this.serverList = dynamicServerList;
             log.info("✅ LoadBalancerClient创建成功: {}个静态服务器 + 动态服务发现", servers.size());
             return client;
         } catch (Exception e) {
@@ -157,7 +153,8 @@ public class ProgressReporter {
             log.debug("HTTP客户端未设置，模拟创建成功");
             return true;
         }
-
+        // 刷新proxy列表
+        this.serverList.refresh();
         String url = proxyBaseUrl + "/api/batch/subtask/create";
         String data = GSON.toJson(event);
 

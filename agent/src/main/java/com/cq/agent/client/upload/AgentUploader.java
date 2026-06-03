@@ -372,10 +372,9 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         try (FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             for (int i = 0; i < totalToUpload; i++) {
                 final int chunkIndex = missingChunks.get(i);
+                byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
                 CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                     try {
-                        byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
-                        applyRateLimit(chunkData.length, traceId);
                         if (listener != null) {
                             handleListenerBeforeSend(transferId, task);
                         }
@@ -400,6 +399,7 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
                     }
                 }, chunkExecutor);
                 uploadFutures.add(future);
+                applyRateLimit(chunkData.length, traceId);
             }
 
             long waves = (long) Math.ceil((double) totalToUpload / this.concurrentThreads);

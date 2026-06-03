@@ -521,16 +521,6 @@ setport_mysql() {
         exit 1
     fi
 
-    # 关闭 SELinux 对 mysqld 的限制（让 mysqld_t 进入 permissive 模式）
-    if command -v semanage &>/dev/null && getenforce 2>/dev/null | grep -qi 'enforcing'; then
-        if ! semanage permissive -l | grep -q mysqld_t; then
-            info "SELinux: 将 mysqld_t 设为 permissive 模式（关闭对 MySQL 的 SELinux 限制）..."
-            semanage permissive -a mysqld_t 2>/dev/null || true
-        else
-            info "SELinux: mysqld_t 已在 permissive 模式"
-        fi
-    fi
-
     # 处理防火墙：放开新端口，移除旧端口
     if systemctl is-active --quiet firewalld 2>/dev/null; then
         info "防火墙: 放开新端口 ${new_port}/tcp..."

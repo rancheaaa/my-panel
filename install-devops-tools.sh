@@ -121,10 +121,9 @@ TOOLS=(
     "git:git:版本控制"
     "git-lfs:git-lfs:版本控制"
 
-    # ── Java/Python 运行时 ──
-    "java:java-21-openjdk:Java/Python运行时"
-    "python3:python3:Java/Python运行时"
-    "pip3:python3-pip:Java/Python运行时"
+    # ── Python 运行时 ──
+    "python3:python3:Python运行时"
+    "pip3:python3-pip:Python运行时"
 
     # ── 杂项 ──
     "screen:screen:杂项"

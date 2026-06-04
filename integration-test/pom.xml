@@ -21,6 +21,11 @@
     </properties>
 
     <dependencies>
+        <!-- Spring Boot 4 JDBC 自动配置模块 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
         <!-- Agent模块依赖 -->
         <dependency>
             <groupId>com.cq</groupId>

@@ -10,7 +10,7 @@ dayjs.locale('zh-cn');
 
 function App() {
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider locale={zhCN} getPopupContainer={() => document.body}>
       <RouterProvider router={router} />
     </ConfigProvider>
   );

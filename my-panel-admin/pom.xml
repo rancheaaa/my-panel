@@ -330,7 +330,6 @@
                 <configuration>
                     <mainClass>com.cq.panel.admin.server.App</mainClass>
                     <skip>false</skip>
-                    <classifier>exec</classifier>
                 </configuration>
                 <executions>
                     <execution>

@@ -293,7 +293,10 @@ install() {
                          fi
 
                          cd "$EXTRACT_DIR"
+                         CURRENT_USER=$(whoami)
                          ./configure --prefix="$NGINX_DIR" \
+                             --user=${CURRENT_USER} \
+                             --group=${CURRENT_USER} \
                              --with-http_ssl_module \
                              --with-http_v2_module \
                              --with-http_realip_module \
@@ -764,6 +767,7 @@ init_nginx_conf() {
 
     cat > "$CONF_FILE" <<EOF
 # MY-PANEL-ADMIN-CONFIG
+user $(whoami);
 pid $NGINX_PID_FILE;
 worker_processes  1;
 

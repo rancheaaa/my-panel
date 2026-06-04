@@ -33,13 +33,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Admin模块依赖 -->
-        <dependency>
-            <groupId>com.cq</groupId>
-            <artifactId>my-panel-admin</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <!-- Common模块依赖 -->
         <dependency>
             <groupId>com.cq</groupId>

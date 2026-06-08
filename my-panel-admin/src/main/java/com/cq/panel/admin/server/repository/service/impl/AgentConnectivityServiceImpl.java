@@ -67,41 +67,87 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
             return vo;
         }
 
+        // 提前查询两个节点，确保所有状态字段都能从DB获取
         AgentRegistry source = agentRegistryMapper.selectByNodeName(sourceNodeName);
-        if (!checkSourceExists(vo, source, sourceNodeName, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点不存在"));
-            return vo;
-        }
-
         AgentRegistry target = agentRegistryMapper.selectByNodeName(targetNodeName);
-        if (!checkTargetExists(vo, target, targetNodeName, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点不存在"));
-            return vo;
+
+        // 始终设置全部六个字段，不提前返回，确保非null
+        boolean sourceExists = source != null;
+        boolean targetExists = target != null;
+        vo.setSourceExists(sourceExists);
+        vo.setTargetExists(targetExists);
+
+        boolean sourceOnline = sourceExists && source.getNodeStatus() != null && source.getNodeStatus() == 1;
+        boolean targetOnline = targetExists && target.getNodeStatus() != null && target.getNodeStatus() == 1;
+        vo.setSourceOnline(sourceOnline);
+        vo.setTargetOnline(targetOnline);
+
+        boolean sourceEnabled = sourceExists && source.getNodeEnabled() != null && source.getNodeEnabled() == 0;
+        boolean targetEnabled = targetExists && target.getNodeEnabled() != null && target.getNodeEnabled() == 0;
+        vo.setSourceEnabled(sourceEnabled);
+        vo.setTargetEnabled(targetEnabled);
+
+        if (sourceExists) {
+            vo.setSourceIp(source.getAgentIp());
+            vo.setSourcePort(source.getAgentPort());
+        }
+        if (targetExists) {
+            vo.setTargetIp(target.getAgentIp());
+            vo.setTargetPort(target.getAgentPort());
         }
 
-        if (!checkSourceOnline(vo, source, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点离线"));
-            return vo;
+        // 逐项检查并记录详情，不提前返回
+        Status firstFailure = null;
+        String firstFailureReason = null;
+
+        if (!sourceExists) {
+            details.add("❌ 源节点 [" + sourceNodeName + "] 在注册表中不存在");
+            if (firstFailure == null) { firstFailure = Status.SOURCE_NOT_FOUND; firstFailureReason = "源节点不存在: " + sourceNodeName; }
+        } else {
+            details.add("✅ 源节点 [" + sourceNodeName + "] 存在，IP: " + source.getAgentIp() + ":" + source.getAgentPort());
         }
 
-        if (!checkSourceEnabled(vo, source, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点已禁用"));
-            return vo;
+        if (!targetExists) {
+            details.add("❌ 目标节点 [" + targetNodeName + "] 在注册表中不存在");
+            if (firstFailure == null) { firstFailure = Status.TARGET_NOT_FOUND; firstFailureReason = "目标节点不存在: " + targetNodeName; }
+        } else {
+            details.add("✅ 目标节点 [" + targetNodeName + "] 存在，IP: " + target.getAgentIp() + ":" + target.getAgentPort());
         }
 
-        if (!checkTargetOnline(vo, target, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点离线"));
-            return vo;
+        if (sourceExists && !sourceOnline) {
+            details.add("❌ 源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()));
+            if (firstFailure == null) { firstFailure = Status.SOURCE_OFFLINE; firstFailureReason = "源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()); }
+        } else if (sourceExists) {
+            details.add("✅ 源节点在线");
         }
 
-        if (!checkTargetEnabled(vo, target, details)) {
+        if (sourceExists && !sourceEnabled) {
+            details.add("❌ 源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()));
+            if (firstFailure == null) { firstFailure = Status.SOURCE_DISABLED; firstFailureReason = "源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()); }
+        } else if (sourceExists) {
+            details.add("✅ 源节点已启用");
+        }
+
+        if (targetExists && !targetOnline) {
+            details.add("❌ 目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()));
+            if (firstFailure == null) { firstFailure = Status.TARGET_OFFLINE; firstFailureReason = "目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()); }
+        } else if (targetExists) {
+            details.add("✅ 目标节点在线");
+        }
+
+        if (targetExists && !targetEnabled) {
+            details.add("❌ 目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()));
+            if (firstFailure == null) { firstFailure = Status.TARGET_DISABLED; firstFailureReason = "目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()); }
+        } else if (targetExists) {
+            details.add("✅ 目标节点已启用");
+        }
+
+        // 前置检查有失败项，跳过网络探测
+        if (firstFailure != null) {
+            vo.setConnectivityStatus(firstFailure.name());
+            vo.setFailureReason(firstFailureReason);
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点已禁用"));
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：前置检查未通过"));
             return vo;
         }
 
@@ -180,88 +226,6 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
             details.add("❌ 目标节点名称为空");
             return false;
         }
-        return true;
-    }
-
-    private boolean checkSourceExists(AgentConnectivityVO vo, AgentRegistry source, String sourceNodeName, List<String> details) {
-        if (source == null) {
-            vo.setSourceExists(false);
-            vo.setConnectivityStatus(Status.SOURCE_NOT_FOUND.name());
-            vo.setFailureReason("源节点不存在: " + sourceNodeName);
-            details.add("❌ 源节点 [" + sourceNodeName + "] 在注册表中不存在");
-            return false;
-        }
-        vo.setSourceExists(true);
-        vo.setSourceIp(source.getAgentIp());
-        vo.setSourcePort(source.getAgentPort());
-        details.add("✅ 源节点 [" + sourceNodeName + "] 存在，IP: " + source.getAgentIp() + ":" + source.getAgentPort());
-        return true;
-    }
-
-    private boolean checkTargetExists(AgentConnectivityVO vo, AgentRegistry target, String targetNodeName, List<String> details) {
-        if (target == null) {
-            vo.setTargetExists(false);
-            vo.setConnectivityStatus(Status.TARGET_NOT_FOUND.name());
-            vo.setFailureReason("目标节点不存在: " + targetNodeName);
-            details.add("❌ 目标节点 [" + targetNodeName + "] 在注册表中不存在");
-            return false;
-        }
-        vo.setTargetExists(true);
-        vo.setTargetIp(target.getAgentIp());
-        vo.setTargetPort(target.getAgentPort());
-        details.add("✅ 目标节点 [" + targetNodeName + "] 存在，IP: " + target.getAgentIp() + ":" + target.getAgentPort());
-        return true;
-    }
-
-    private boolean checkSourceOnline(AgentConnectivityVO vo, AgentRegistry source, List<String> details) {
-        boolean online = source.getNodeStatus() != null && source.getNodeStatus() == 1;
-        vo.setSourceOnline(online);
-        if (!online) {
-            vo.setConnectivityStatus(Status.SOURCE_OFFLINE.name());
-            vo.setFailureReason("源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()));
-            details.add("❌ 源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()));
-            return false;
-        }
-        details.add("✅ 源节点在线");
-        return true;
-    }
-
-    private boolean checkSourceEnabled(AgentConnectivityVO vo, AgentRegistry source, List<String> details) {
-        boolean enabled = source.getNodeEnabled() != null && source.getNodeEnabled() == 0;
-        vo.setSourceEnabled(enabled);
-        if (!enabled) {
-            vo.setConnectivityStatus(Status.SOURCE_DISABLED.name());
-            vo.setFailureReason("源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()));
-            details.add("❌ 源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()));
-            return false;
-        }
-        details.add("✅ 源节点已启用");
-        return true;
-    }
-
-    private boolean checkTargetOnline(AgentConnectivityVO vo, AgentRegistry target, List<String> details) {
-        boolean online = target.getNodeStatus() != null && target.getNodeStatus() == 1;
-        vo.setTargetOnline(online);
-        if (!online) {
-            vo.setConnectivityStatus(Status.TARGET_OFFLINE.name());
-            vo.setFailureReason("目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()));
-            details.add("❌ 目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()));
-            return false;
-        }
-        details.add("✅ 目标节点在线");
-        return true;
-    }
-
-    private boolean checkTargetEnabled(AgentConnectivityVO vo, AgentRegistry target, List<String> details) {
-        boolean enabled = target.getNodeEnabled() != null && target.getNodeEnabled() == 0;
-        vo.setTargetEnabled(enabled);
-        if (!enabled) {
-            vo.setConnectivityStatus(Status.TARGET_DISABLED.name());
-            vo.setFailureReason("目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()));
-            details.add("❌ 目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()));
-            return false;
-        }
-        details.add("✅ 目标节点已启用");
         return true;
     }
 

@@ -183,7 +183,7 @@ export default function AgentConnectivityPage() {
     try {
       const res = await listAgentRegistry({ pageNum: 1, pageSize: 1000 });
       if (res.data?.rows) {
-        setAgentList(res.data.rows.filter(a => a.nodeStatus === 1));
+        setAgentList(res.data.rows);
       }
     } catch (e) {
       console.error('加载Agent列表失败', e);

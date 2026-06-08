@@ -229,29 +229,31 @@ public class AgentConfig {
         this.downloadConnectTimeoutSeconds = getIntProperty("download.connect.timeout.seconds", 10);
         this.downloadRequestTimeoutSeconds = getIntProperty("download.request.timeout.seconds", 60);
 
-        // Transfer metadata directories
+        // Transfer metadata directories - all based on fileBaseDirectory for
+        // cross-platform compatibility
+        String dir = this.fileBaseDirectory;
         this.uploadSendingQueueDir = getStringProperty("upload.sending.queue.dir",
-                "/tmp/my-panel/admin/data/transfers/uploadSendingQueue");
+                resolveSubPath(dir, "transfers/uploadSendingQueue"));
         this.downloadSendingQueueDir = getStringProperty("download.sending.queue.dir",
-                "/tmp/my-panel/admin/data/transfers/downloadSendingQueue");
+                resolveSubPath(dir, "transfers/downloadSendingQueue"));
 
         // Success task archive queue directories
         this.uploadSuccessQueueDir = getStringProperty("upload.success.queue.dir",
-                "/tmp/my-panel/admin/data/transfers/uploadSuccessQueue");
+                resolveSubPath(dir, "transfers/uploadSuccessQueue"));
 
         // Progress fallback directory
         this.progressFallbackDir = getStringProperty("progress.fallback.dir",
-                "/tmp/my-panel/admin/data/transfers/progress-fallback");
+                resolveSubPath(dir, "transfers/progress-fallback"));
 
         // Failed task retry queue directories
         this.uploadFailRetryQueueDir = getStringProperty("upload.fail.retry.queue.dir",
-                "/tmp/my-panel/admin/data/transfers/uploadFailRetryQueue");
+                resolveSubPath(dir, "transfers/uploadFailRetryQueue"));
         this.downloadFailRetryQueueDir = getStringProperty("download.fail.retry.queue.dir",
-                "/tmp/my-panel/admin/data/transfers/downloadFailRetryQueue");
+                resolveSubPath(dir, "transfers/downloadFailRetryQueue"));
         this.uploadFinalFailureQueueDir = getStringProperty("upload.final.failure.queue.dir",
-                "/tmp/my-panel/admin/data/transfers/uploadFinalFailureQueue");
+                resolveSubPath(dir, "transfers/uploadFinalFailureQueue"));
         this.filebatchPendingDir = getStringProperty("filebatch.pending.dir",
-                "/tmp/my-panel/admin/data/transfers/filebatchPending");
+                resolveSubPath(dir, "transfers/filebatchPending"));
 
         // Failed queue scan interval (default: 10 seconds)
         this.failedQueueScanIntervalMs = getLongProperty("agent.failed.queue.scan.interval.ms", 10 * 1000L);
@@ -368,6 +370,28 @@ public class AgentConfig {
         } else {
             logger.warn("Invalid boolean value for {}: {}, using default: {}", key, value, defaultValue);
             return defaultValue;
+        }
+    }
+
+    /**
+     * 基于基础目录解析子路径，兼容Linux和Windows路径格式。
+     * 使用Path.resolve确保路径分隔符正确，并去除冗余的"."和".."。
+     *
+     * @param baseDir 基础目录，如 "/tmp/my-panel/admin/data" 或
+     *                "E:\\tmp\\my-panel\\admin\\data"
+     * @param subPath 子路径，如 "transfers/uploadSendingQueue"
+     * @return 拼接后的规范化路径字符串
+     */
+    private String resolveSubPath(String baseDir, String subPath) {
+        if (baseDir == null || baseDir.isBlank()) {
+            return subPath;
+        }
+        try {
+            return Path.of(baseDir).resolve(subPath).normalize().toString();
+        } catch (Exception e) {
+            logger.warn("Failed to resolve subPath '{}' against baseDir '{}', falling back to string concatenation: {}",
+                    subPath, baseDir, e.getMessage());
+            return baseDir + File.separator + subPath.replace('/', File.separatorChar);
         }
     }
 

@@ -60,7 +60,8 @@ public class AgentConnectivityVO {
         private boolean reachable;
         private String failureReason;
 
-        public static PortProbeResult of(String from, String to, String ip, int port, boolean reachable, String reason) {
+        public static PortProbeResult of(String from, String to, String ip, int port, boolean reachable,
+                String reason) {
             PortProbeResult r = new PortProbeResult();
             r.setFrom(from);
             r.setTo(to);

@@ -3,6 +3,7 @@ package com.cq.panel.admin.server.repository.service.impl;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.service.IAgentConnectivityService;
+import com.cq.panel.admin.server.service.ProxyClientService;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO.PortProbeResult;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO.Status;
@@ -14,15 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.URI;
 import java.net.UnknownHostException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,18 +24,17 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentConnectivityServiceImpl.class);
 
-    private static final int CONNECT_TIMEOUT_MS = 5000;
-    private static final int HTTP_TIMEOUT_S = 10;
-
     private final AgentRegistryMapper agentRegistryMapper;
     private final ObjectMapper objectMapper;
+    private final ProxyClientService proxyClientService;
 
     @Value("${server.port:8888}")
     private int adminPort;
 
-    public AgentConnectivityServiceImpl(AgentRegistryMapper agentRegistryMapper, ObjectMapper objectMapper) {
+    public AgentConnectivityServiceImpl(AgentRegistryMapper agentRegistryMapper, ObjectMapper objectMapper, ProxyClientService proxyClientService) {
         this.agentRegistryMapper = agentRegistryMapper;
         this.objectMapper = objectMapper;
+        this.proxyClientService = proxyClientService;
     }
 
     private String getAdminAddress() {
@@ -153,35 +145,47 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
 
         String adminAddr = getAdminAddress();
 
-        // Layer 1: Admin → Source
-        PortProbeResult adminToSource = probePort("admin", "源Agent", source.getAgentIp(), source.getAgentPort());
-        vo.setAdminToSource(adminToSource);
-        if (!adminToSource.isReachable()) {
-            details.add("❌ Admin[" + adminAddr + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + adminToSource.getFailureReason());
+        // Layer 0: Admin → Proxy 连通性检测（所有Agent请求都经过Proxy转发）
+        PortProbeResult adminToProxy = probeProxy();
+        vo.setAdminToProxy(adminToProxy);
+        if (!adminToProxy.isReachable()) {
+            details.add("❌ Admin[" + adminAddr + "] → Proxy 不可达 - " + adminToProxy.getFailureReason());
+            vo.setConnectivityStatus(Status.ADMIN_TO_PROXY_UNREACHABLE.name());
+            vo.setFailureReason("Admin无法连接Proxy服务: " + adminToProxy.getFailureReason());
+            vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接Proxy"));
+            return vo;
+        }
+        details.add("✅ Admin[" + adminAddr + "] → Proxy 可达");
+
+        // Layer 1: Proxy → Source Agent TCP端口探测
+        PortProbeResult proxyToSource = probePort("proxy", "源Agent", source.getAgentIp(), source.getAgentPort());
+        vo.setAdminToSource(proxyToSource);
+        if (!proxyToSource.isReachable()) {
+            details.add("❌ Proxy → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + proxyToSource.getFailureReason());
             vo.setConnectivityStatus(Status.ADMIN_TO_SOURCE_UNREACHABLE.name());
-            vo.setFailureReason("Admin无法连接源Agent: " + adminToSource.getFailureReason());
+            vo.setFailureReason("Proxy无法连接源Agent: " + proxyToSource.getFailureReason());
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接源Agent"));
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Proxy无法连接源Agent"));
             return vo;
         }
-        details.add("✅ Admin[" + adminAddr + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
+        details.add("✅ Proxy → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
 
-        // Layer 2: Admin → Target
-        PortProbeResult adminToTarget = probePort("admin", "目标Agent", target.getAgentIp(), target.getAgentPort());
-        vo.setAdminToTarget(adminToTarget);
-        if (!adminToTarget.isReachable()) {
-            details.add("❌ Admin[" + adminAddr + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + adminToTarget.getFailureReason());
+        // Layer 2: Proxy → Target Agent TCP端口探测
+        PortProbeResult proxyToTarget = probePort("proxy", "目标Agent", target.getAgentIp(), target.getAgentPort());
+        vo.setAdminToTarget(proxyToTarget);
+        if (!proxyToTarget.isReachable()) {
+            details.add("❌ Proxy → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + proxyToTarget.getFailureReason());
             vo.setConnectivityStatus(Status.ADMIN_TO_TARGET_UNREACHABLE.name());
-            vo.setFailureReason("Admin无法连接目标Agent: " + adminToTarget.getFailureReason());
+            vo.setFailureReason("Proxy无法连接目标Agent: " + proxyToTarget.getFailureReason());
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接目标Agent"));
+            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Proxy无法连接目标Agent"));
             return vo;
         }
-        details.add("✅ Admin[" + adminAddr + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
+        details.add("✅ Proxy → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
 
-        // Layer 3: Source → Target (via agent probe API)
-        PortProbeResult sourceToTarget = probeViaAgent(source.getAgentIp(), source.getAgentPort(),
-                target.getAgentIp(), target.getAgentPort());
+        // Layer 3: Source Agent → Target Agent (通过Proxy转发到源Agent执行探测)
+        PortProbeResult sourceToTarget = probeViaAgent(source.getId(), target.getAgentIp(), target.getAgentPort());
         vo.setSourceToTarget(sourceToTarget);
         if (!sourceToTarget.isReachable()) {
             details.add("❌ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + sourceToTarget.getFailureReason());
@@ -193,10 +197,9 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
         }
         details.add("✅ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
 
-        // Layer 4: Target → Source (via target agent probe API)
+        // Layer 4: Target Agent → Source Agent (通过Proxy转发到目标Agent执行反向探测)
         List<String> reverseDetails = new ArrayList<>();
-        PortProbeResult targetToSource = probeViaAgent(target.getAgentIp(), target.getAgentPort(),
-                source.getAgentIp(), source.getAgentPort());
+        PortProbeResult targetToSource = probeViaAgent(target.getId(), source.getAgentIp(), source.getAgentPort());
         vo.setTargetToSource(targetToSource);
         if (!targetToSource.isReachable()) {
             reverseDetails.add("❌ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + targetToSource.getFailureReason());
@@ -230,48 +233,65 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
     }
 
     public PortProbeResult probePort(String from, String to, String ip, int port) {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS);
-            return PortProbeResult.of(from, to, ip, port, true, null);
-        } catch (IOException e) {
-            String reason = classifyConnectionFailure(e);
+        try {
+            String proxyResponse = proxyClientService.tcpProbe(ip, port);
+            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+            if (dataNode != null && dataNode.path("reachable").asBoolean(false)) {
+                return PortProbeResult.of(from, to, ip, port, true, null);
+            } else {
+                String reason = dataNode != null ? dataNode.path("failureReason").asText("未知原因") : "Proxy探测失败";
+                log.warn("端口探测失败 {}:{} - {}", ip, port, reason);
+                return PortProbeResult.of(from, to, ip, port, false, reason);
+            }
+        } catch (Exception e) {
+            String reason = "Proxy探测请求失败: " + e.getMessage();
             log.warn("端口探测失败 {}:{} - {}", ip, port, reason);
             return PortProbeResult.of(from, to, ip, port, false, reason);
         }
     }
 
-    public PortProbeResult probeViaAgent(String sourceIp, int sourcePort, String targetIp, int targetPort) {
+    /**
+     * 检测Admin到Proxy的连通性
+     */
+    public PortProbeResult probeProxy() {
         try {
-            String url = String.format("http://%s:%d/api/probe?host=%s&port=%d",
-                    sourceIp, sourcePort, targetIp, targetPort);
-
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(HTTP_TIMEOUT_S))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(HTTP_TIMEOUT_S))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                JsonNode root = objectMapper.readTree(response.body());
-                boolean success = root.path("success").asBoolean(false);
-                if (success) {
-                    JsonNode data = root.path("data");
-                    boolean reachable = data.path("reachable").asBoolean(false);
-                    String reason = reachable ? null : extractFailureFromDetails(data);
-                    return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, reachable, reason);
-                } else {
-                    String msg = root.path("msg").asText("未知错误");
-                    return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Agent返回错误: " + msg);
-                }
+            String response = proxyClientService.ping();
+            JsonNode dataNode = proxyClientService.extractData(response);
+            if (dataNode != null && "UP".equals(dataNode.path("status").asText())) {
+                return PortProbeResult.of("admin", "proxy", "", 0, true, null);
             } else {
-                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false,
-                        "Agent返回HTTP " + response.statusCode());
+                String reason = "Proxy状态异常";
+                log.warn("Proxy Ping响应异常: {}", response);
+                return PortProbeResult.of("admin", "proxy", "", 0, false, reason);
+            }
+        } catch (Exception e) {
+            String reason = e.getMessage() != null ? e.getMessage() : "连接失败";
+            log.warn("Admin到Proxy连通性检测失败: {}", reason);
+            return PortProbeResult.of("admin", "proxy", "", 0, false, reason);
+        }
+    }
+
+    public PortProbeResult probeViaAgent(String sourceAgentId, String targetIp, int targetPort) {
+        try {
+            String proxyResponse = proxyClientService.probeViaAgent(sourceAgentId, targetIp, targetPort);
+            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+
+            if (dataNode == null) {
+                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Proxy转发失败");
+            }
+
+            // dataNode是Agent原始响应的JSON字符串
+            String agentResponseStr = dataNode.asText();
+            JsonNode agentRoot = objectMapper.readTree(agentResponseStr);
+            boolean success = agentRoot.path("success").asBoolean(false);
+            if (success) {
+                JsonNode data = agentRoot.path("data");
+                boolean reachable = data.path("reachable").asBoolean(false);
+                String reason = reachable ? null : extractFailureFromDetails(data);
+                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, reachable, reason);
+            } else {
+                String msg = agentRoot.path("msg").asText("未知错误");
+                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Agent返回错误: " + msg);
             }
         } catch (Exception e) {
             String reason = "调用源Agent探测接口失败: " + e.getMessage();
@@ -291,19 +311,6 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
             }
         }
         return "端口不可达";
-    }
-
-    public String classifyConnectionFailure(IOException e) {
-        String msg = e.getMessage();
-        if (msg == null) return "未知原因";
-        String lowerMsg = msg.toLowerCase();
-        if (lowerMsg.contains("connection refused")) return "连接被拒绝（目标进程未启动或端口未监听）";
-        if (lowerMsg.contains("network is unreachable") || lowerMsg.contains("no route to host")) return "网络不可达（可能因网络策略限制）";
-        if (lowerMsg.contains("connection timed out") || lowerMsg.contains("timed out")) return "连接超时（可能因防火墙拦截或网络不通）";
-        if (lowerMsg.contains("connection reset")) return "连接被重置（对端拒绝连接）";
-        if (lowerMsg.contains("unreachable")) return "目标主机不可达";
-        if (lowerMsg.contains("permission denied")) return "权限被拒绝（可能因安全策略限制）";
-        return "未知原因: " + msg;
     }
 
     private String nodeStatusDesc(Integer nodeStatus) {

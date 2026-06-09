@@ -5,21 +5,14 @@ import com.cq.panel.admin.server.repository.domain.BatchTransferTask;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
 import com.cq.panel.admin.server.repository.service.IDirectoryCheckService;
+import com.cq.panel.admin.server.service.ProxyClientService;
 import com.cq.panel.admin.server.web.domain.vo.batch.DirectoryCheckVO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,18 +20,20 @@ import java.util.List;
 public class DirectoryCheckServiceImpl implements IDirectoryCheckService {
 
     private static final Logger log = LoggerFactory.getLogger(DirectoryCheckServiceImpl.class);
-    private static final int HTTP_TIMEOUT_S = 10;
 
     private final BatchTransferTaskMapper taskMapper;
     private final AgentRegistryMapper agentRegistryMapper;
     private final ObjectMapper objectMapper;
+    private final ProxyClientService proxyClientService;
 
     public DirectoryCheckServiceImpl(BatchTransferTaskMapper taskMapper,
                                       AgentRegistryMapper agentRegistryMapper,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      ProxyClientService proxyClientService) {
         this.taskMapper = taskMapper;
         this.agentRegistryMapper = agentRegistryMapper;
         this.objectMapper = objectMapper;
+        this.proxyClientService = proxyClientService;
     }
 
     @Override
@@ -107,59 +102,44 @@ public class DirectoryCheckServiceImpl implements IDirectoryCheckService {
         }
 
         try {
-            String url = UriComponentsBuilder.newInstance()
-                    .scheme("http")
-                    .host(agent.getAgentIp())
-                    .port(agent.getAgentPort())
-                    .path("/api/file/dir-check")
-                    .queryParam("path", dirPath)
-                    .build()
-                    .toUriString();
+            String proxyResponse = proxyClientService.dirCheck(agentId, dirPath);
+            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
 
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(HTTP_TIMEOUT_S))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(HTTP_TIMEOUT_S))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                JsonNode root = objectMapper.readTree(response.body());
-                JsonNode data = root.path("data");
-
-                vo.setExists(getBoolean(data, "exists"));
-                vo.setIsDirectory(getBoolean(data, "isDirectory"));
-                vo.setCanRead(getBoolean(data, "canRead"));
-                vo.setCanWrite(getBoolean(data, "canWrite"));
-                vo.setCanExecute(getBoolean(data, "canExecute"));
-
-                if (data.has("posixPermissions")) {
-                    vo.setPosixPermissions(data.get("posixPermissions").asText());
-                }
-
-                vo.setDiskTotal(getLong(data, "diskTotal"));
-                vo.setDiskUsable(getLong(data, "diskUsable"));
-                vo.setDiskFree(getLong(data, "diskFree"));
-                vo.setDiskTotalMB(getLong(data, "diskTotalMB"));
-                vo.setDiskUsableMB(getLong(data, "diskUsableMB"));
-                vo.setDiskFreeMB(getLong(data, "diskFreeMB"));
-                vo.setDiskSufficient(getBoolean(data, "diskSufficient"));
-
-                if (data.has("errorMessage")) {
-                    vo.setErrorMessage(data.get("errorMessage").asText());
-                }
-            } else {
+            if (dataNode == null) {
                 vo.setExists(false);
                 vo.setCanRead(false);
                 vo.setCanWrite(false);
                 vo.setCanExecute(false);
                 vo.setDiskSufficient(false);
-                vo.setErrorMessage("Agent返回HTTP " + response.statusCode());
+                vo.setErrorMessage("Proxy转发失败");
+                return vo;
+            }
+
+            // dataNode是Agent原始响应的JSON字符串
+            String agentResponseStr = dataNode.asText();
+            JsonNode agentRoot = objectMapper.readTree(agentResponseStr);
+            JsonNode data = agentRoot.path("data");
+
+            vo.setExists(getBoolean(data, "exists"));
+            vo.setIsDirectory(getBoolean(data, "isDirectory"));
+            vo.setCanRead(getBoolean(data, "canRead"));
+            vo.setCanWrite(getBoolean(data, "canWrite"));
+            vo.setCanExecute(getBoolean(data, "canExecute"));
+
+            if (data.has("posixPermissions")) {
+                vo.setPosixPermissions(data.get("posixPermissions").asText());
+            }
+
+            vo.setDiskTotal(getLong(data, "diskTotal"));
+            vo.setDiskUsable(getLong(data, "diskUsable"));
+            vo.setDiskFree(getLong(data, "diskFree"));
+            vo.setDiskTotalMB(getLong(data, "diskTotalMB"));
+            vo.setDiskUsableMB(getLong(data, "diskUsableMB"));
+            vo.setDiskFreeMB(getLong(data, "diskFreeMB"));
+            vo.setDiskSufficient(getBoolean(data, "diskSufficient"));
+
+            if (data.has("errorMessage")) {
+                vo.setErrorMessage(data.get("errorMessage").asText());
             }
         } catch (Exception e) {
             log.warn("目录检测失败: agentId={}, path={}, error={}", agentId, dirPath, e.getMessage());

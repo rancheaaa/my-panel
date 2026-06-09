@@ -8,13 +8,12 @@ import com.cq.panel.admin.server.web.domain.vo.batch.ConfigVerifyResultVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.ConfigVerifyResultVO.FieldDiff;
 import com.cq.panel.admin.server.web.domain.vo.batch.ConfigVerifyResultVO.TaskVerifyResult;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.admin.server.service.ProxyClientService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
@@ -30,18 +29,18 @@ public class BatchConfigVerifyService {
     private final BatchTransferTaskMapper batchTransferTaskMapper;
     private final AgentRegistryMapper agentRegistryMapper;
     private final BatchConfigSerializer batchConfigSerializer;
-    private final RestTemplate restTemplate;
+    private final ProxyClientService proxyClientService;
     private final ObjectMapper objectMapper;
 
     public BatchConfigVerifyService(BatchTransferTaskMapper batchTransferTaskMapper,
                                      AgentRegistryMapper agentRegistryMapper,
                                      BatchConfigSerializer batchConfigSerializer,
-                                     RestTemplate restTemplate,
+                                     ProxyClientService proxyClientService,
                                      ObjectMapper objectMapper) {
         this.batchTransferTaskMapper = batchTransferTaskMapper;
         this.agentRegistryMapper = agentRegistryMapper;
         this.batchConfigSerializer = batchConfigSerializer;
-        this.restTemplate = restTemplate;
+        this.proxyClientService = proxyClientService;
         this.objectMapper = objectMapper;
     }
 
@@ -118,7 +117,7 @@ public class BatchConfigVerifyService {
     /**
      * 强制推送配置到 Agent
      */
-    public int pushConfig(String sourceAgentId) {
+    public int pushConfig(String sourceAgentId) throws Exception {
         AgentRegistry agent = agentRegistryMapper.selectAgentRegistryById(sourceAgentId);
         if (agent == null) {
             throw new RuntimeException("节点不存在: " + sourceAgentId);
@@ -134,7 +133,6 @@ public class BatchConfigVerifyService {
             throw new RuntimeException("生成配置包失败");
         }
 
-        String baseUrl = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort();
         final int CHUNK_SIZE = 1024 * 1024; // 1MB
         int totalChunks = (int) Math.ceil((double) zipData.length / CHUNK_SIZE);
 
@@ -144,28 +142,25 @@ public class BatchConfigVerifyService {
         initBody.put("totalChunks", totalChunks);
         initBody.put("chunkSize", CHUNK_SIZE);
 
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        String initBodyJson = objectMapper.writeValueAsString(initBody);
+        String initProxyResponse = proxyClientService.configPushInit(sourceAgentId, initBodyJson);
+        JsonNode initDataNode = proxyClientService.extractData(initProxyResponse);
 
-        String initUrl = baseUrl + "/api/config/push/init";
-        org.springframework.http.HttpEntity<Map<String, Object>> initEntity =
-                new org.springframework.http.HttpEntity<>(initBody, headers);
-        ResponseEntity<String> initResponse = restTemplate.postForEntity(initUrl, initEntity, String.class);
-
-        if (!initResponse.getStatusCode().is2xxSuccessful()) {
-            throw new RuntimeException("初始化推送会话失败: " + initResponse.getStatusCode());
+        if (initDataNode == null) {
+            throw new RuntimeException("初始化推送会话失败: Proxy转发失败");
         }
 
         String sessionId;
         try {
-            JsonNode initJson = objectMapper.readTree(initResponse.getBody());
+            // initDataNode是Agent原始响应的JSON字符串
+            String initAgentResponse = initDataNode.asText();
+            JsonNode initJson = objectMapper.readTree(initAgentResponse);
             sessionId = initJson.path("data").path("sessionId").asText();
         } catch (Exception e) {
             throw new RuntimeException("解析推送会话响应失败: " + e.getMessage());
         }
 
         // 逐片上传
-        String chunkUrl = baseUrl + "/api/config/push/chunk";
         for (int i = 0; i < totalChunks; i++) {
             int start = i * CHUNK_SIZE;
             int end = Math.min(start + CHUNK_SIZE, zipData.length);
@@ -177,26 +172,25 @@ public class BatchConfigVerifyService {
             chunkBody.put("chunkIndex", i);
             chunkBody.put("data", base64Chunk);
 
-            org.springframework.http.HttpEntity<Map<String, Object>> chunkEntity =
-                    new org.springframework.http.HttpEntity<>(chunkBody, headers);
-            restTemplate.postForEntity(chunkUrl, chunkEntity, String.class);
+            String chunkBodyJson = objectMapper.writeValueAsString(chunkBody);
+            proxyClientService.configPushChunk(sourceAgentId, chunkBodyJson);
         }
 
         // 完成推送
-        String completeUrl = baseUrl + "/api/config/push/complete";
         Map<String, Object> completeBody = new LinkedHashMap<>();
         completeBody.put("sessionId", sessionId);
 
-        org.springframework.http.HttpEntity<Map<String, Object>> completeEntity =
-                new org.springframework.http.HttpEntity<>(completeBody, headers);
-        ResponseEntity<String> completeResponse = restTemplate.postForEntity(completeUrl, completeEntity, String.class);
+        String completeBodyJson = objectMapper.writeValueAsString(completeBody);
+        String completeProxyResponse = proxyClientService.configPushComplete(sourceAgentId, completeBodyJson);
+        JsonNode completeDataNode = proxyClientService.extractData(completeProxyResponse);
 
-        if (!completeResponse.getStatusCode().is2xxSuccessful()) {
-            throw new RuntimeException("完成推送失败: " + completeResponse.getStatusCode());
+        if (completeDataNode == null) {
+            throw new RuntimeException("完成推送失败: Proxy转发失败");
         }
 
         try {
-            JsonNode completeJson = objectMapper.readTree(completeResponse.getBody());
+            String completeAgentResponse = completeDataNode.asText();
+            JsonNode completeJson = objectMapper.readTree(completeAgentResponse);
             return completeJson.path("data").path("filesCount").asInt();
         } catch (Exception e) {
             throw new RuntimeException("解析推送完成响应失败: " + e.getMessage());
@@ -294,13 +288,17 @@ public class BatchConfigVerifyService {
     private Map<Long, AgentTaskConfig> fetchAgentConfigs(AgentRegistry agent) {
         Map<Long, AgentTaskConfig> result = new LinkedHashMap<>();
         try {
-            String url = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort() + "/api/config/verify";
-            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            String proxyResponse = proxyClientService.configVerify(agent.getId());
+            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+
+            if (dataNode == null) {
                 return result;
             }
-            JsonNode root = objectMapper.readTree(response.getBody());
-            JsonNode tasksNode = root.path("data").path("tasks");
+
+            // dataNode是Agent原始响应的JSON字符串
+            String agentResponseStr = dataNode.asText();
+            JsonNode agentRoot = objectMapper.readTree(agentResponseStr);
+            JsonNode tasksNode = agentRoot.path("data").path("tasks");
             if (tasksNode.isArray()) {
                 for (JsonNode taskNode : tasksNode) {
                     String content = taskNode.path("content").asText();

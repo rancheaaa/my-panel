@@ -31,6 +31,8 @@ public class AgentConnectivityVO {
 
     private boolean targetEnabled;
 
+    private PortProbeResult adminToProxy;
+
     private PortProbeResult adminToSource;
 
     private PortProbeResult adminToTarget;
@@ -82,6 +84,7 @@ public class AgentConnectivityVO {
         TARGET_OFFLINE,
         SOURCE_DISABLED,
         TARGET_DISABLED,
+        ADMIN_TO_PROXY_UNREACHABLE,
         ADMIN_TO_SOURCE_UNREACHABLE,
         ADMIN_TO_TARGET_UNREACHABLE,
         SOURCE_TO_TARGET_UNREACHABLE,

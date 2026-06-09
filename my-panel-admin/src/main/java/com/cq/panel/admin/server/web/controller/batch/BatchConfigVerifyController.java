@@ -39,7 +39,7 @@ public class BatchConfigVerifyController extends BaseController {
     @Log(title = "配置推送", businessType = BusinessType.UPDATE)
     @RequirePermission("batch:config:push")
     @PostMapping("/push")
-    public Result<Integer> pushConfig(@Valid @RequestBody ConfigVerifyRequestDTO dto) {
+    public Result<Integer> pushConfig(@Valid @RequestBody ConfigVerifyRequestDTO dto) throws Exception {
         int filesCount = batchConfigVerifyService.pushConfig(dto.getSourceAgentId());
         return Result.success(filesCount);
     }

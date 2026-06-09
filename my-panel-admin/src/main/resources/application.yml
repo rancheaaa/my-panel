@@ -14,6 +14,8 @@ app:
   captchaType: math
   # 运行模式: cluster (redis) / standalone (memory)
   mode: cluster
+  # Proxy服务地址 (Admin通过Proxy转发请求到Agent)
+  proxy-url: ${PROXY_URL:http://localhost:9876}
   # 上传路径
   importPath: ${app.profile}/import
   # 下载路径

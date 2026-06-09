@@ -17,7 +17,7 @@ import java.util.List;
 public class ProxyHealthChecker {
 
     private static final Logger log = LoggerFactory.getLogger(ProxyHealthChecker.class);
-    private static final String PING_PATH = "/forward/ping";
+    private static final String PING_PATH = "/forward/agent/ping";
 
     private final RestTemplate restTemplate;
 

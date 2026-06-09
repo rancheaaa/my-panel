@@ -1,14 +1,16 @@
 package com.cq.panel.admin.server.service.proxy;
 
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
- * Proxy负载均衡配置属性
+ * Proxy负载均衡配置
  */
 @Data
-@Component
+@Configuration
 @ConfigurationProperties(prefix = "app.proxy")
 public class ProxyLoadBalancerConfig {
 
@@ -26,4 +28,14 @@ public class ProxyLoadBalancerConfig {
 
     /** 请求失败重试次数（不含首次请求） */
     private int retryCount = 2;
+
+    /**
+     * 从逗号分隔的URL字符串创建ProxyServerList
+     * 支持多地址负载均衡：http://10.0.0.1:9876,http://10.0.0.2:9876
+     */
+    @Bean
+    public ProxyServerList proxyServerList(
+            @Value("${app.proxy-urls:${app.proxy-url:http://localhost:9876}}") String proxyUrls) {
+        return ProxyServerList.fromUrls(proxyUrls);
+    }
 }

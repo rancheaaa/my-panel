@@ -14,8 +14,10 @@ import java.util.Map;
 /**
  * Agent请求转发Controller
  * 提供Admin调用的转发端点，实现Admin->Proxy->Agent的调用链路
+ * 基础路径: /forward/agent
  */
 @RestController
+@RequestMapping("/forward/agent")
 public class AgentForwardController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentForwardController.class);
@@ -28,9 +30,9 @@ public class AgentForwardController {
 
     /**
      * Ping检测端点，用于Admin验证与Proxy的连通性
-     * GET /forward/ping
+     * GET /forward/agent/ping
      */
-    @GetMapping("/forward/ping")
+    @GetMapping("/ping")
     public ResponseEntity<ApiResponse<Map<String, Object>>> ping() {
         Map<String, Object> data = Map.of(
                 "status", "UP",

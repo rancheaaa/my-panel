@@ -42,7 +42,7 @@ public class ProxyClientService {
      */
     public ProxyApiResponse<PingResult> ping() {
         return loadBalancer.executeWithFailover(server -> {
-            String body = getForString(server.getUrl() + "/forward/ping");
+            String body = getForString(server.getUrl() + "/forward/agent/ping");
             return parseResponse(body, new TypeReference<>() {
             });
         });

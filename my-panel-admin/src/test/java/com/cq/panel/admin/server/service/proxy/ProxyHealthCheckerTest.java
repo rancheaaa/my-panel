@@ -43,7 +43,7 @@ class ProxyHealthCheckerTest {
 
             Server server = new Server("10.0.0.1", 9876);
             assertTrue(healthChecker.isHealthy(server));
-            verify(restTemplate).getForEntity("http://10.0.0.1:9876/forward/ping", String.class);
+            verify(restTemplate).getForEntity("http://10.0.0.1:9876/forward/agent/ping", String.class);
         }
 
         @Test

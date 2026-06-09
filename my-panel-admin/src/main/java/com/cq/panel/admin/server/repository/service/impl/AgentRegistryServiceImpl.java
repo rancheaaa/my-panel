@@ -16,7 +16,7 @@ import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
 import com.cq.panel.admin.server.repository.service.IAgentCommandHistoryService;
 
 import com.cq.panel.admin.server.service.ProxyClientService;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -267,15 +267,14 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
             Date startTime = MyDateUtils.getNowDate();
             history.setStartTime(startTime);
 
-            String proxyResponse = proxyClientService.executeCommand(agentId, requestJson);
-            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+            ProxyApiResponse<String> proxyResponse = proxyClientService.executeCommand(agentId, requestJson);
 
             Date endTime = MyDateUtils.getNowDate();
             long duration = endTime.getTime() - startTime.getTime();
             history.setEndTime(endTime);
             history.setExecuteTime(duration);
 
-            if (dataNode == null)
+            if (!proxyResponse.isSuccess() || proxyResponse.getData() == null)
             {
                 history.setCommandStatus(1);
                 history.setError("Proxy转发失败");
@@ -283,8 +282,7 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
                 throw new RuntimeException("Proxy转发命令执行请求失败");
             }
 
-            // dataNode是Agent原始响应的JSON字符串，需要解析
-            AgentExecuteCommandResponse result = new ObjectMapper().readValue(dataNode.asText(), AgentExecuteCommandResponse.class);
+            AgentExecuteCommandResponse result = new ObjectMapper().readValue(proxyResponse.getData(), AgentExecuteCommandResponse.class);
 
             boolean success = result.isSuccess();
             int exitCode = result.getExitCode();

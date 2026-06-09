@@ -8,8 +8,14 @@ import com.cq.panel.admin.server.web.domain.vo.batch.ConfigVerifyResultVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.ConfigVerifyResultVO.FieldDiff;
 import com.cq.panel.admin.server.web.domain.vo.batch.ConfigVerifyResultVO.TaskVerifyResult;
 import com.cq.panel.common.dto.batch.AgentTaskConfig;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentConfigListData;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentConfigTaskItem;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentPushCompleteData;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentPushSessionData;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
 import com.cq.panel.admin.server.service.ProxyClientService;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -143,19 +149,23 @@ public class BatchConfigVerifyService {
         initBody.put("chunkSize", CHUNK_SIZE);
 
         String initBodyJson = objectMapper.writeValueAsString(initBody);
-        String initProxyResponse = proxyClientService.configPushInit(sourceAgentId, initBodyJson);
-        JsonNode initDataNode = proxyClientService.extractData(initProxyResponse);
+        ProxyApiResponse<String> initProxyResponse = proxyClientService.configPushInit(sourceAgentId, initBodyJson);
 
-        if (initDataNode == null) {
+        if (!initProxyResponse.isSuccess() || initProxyResponse.getData() == null) {
             throw new RuntimeException("初始化推送会话失败: Proxy转发失败");
         }
 
         String sessionId;
         try {
-            // initDataNode是Agent原始响应的JSON字符串
-            String initAgentResponse = initDataNode.asText();
-            JsonNode initJson = objectMapper.readTree(initAgentResponse);
-            sessionId = initJson.path("data").path("sessionId").asText();
+            AgentResponse<AgentPushSessionData> initAgentResp = proxyClientService.parseAgentResponse(
+                    initProxyResponse.getData(),
+                    new TypeReference<AgentResponse<AgentPushSessionData>>() {});
+            if (initAgentResp.getData() == null || initAgentResp.getData().getSessionId() == null) {
+                throw new RuntimeException("推送会话响应无sessionId");
+            }
+            sessionId = initAgentResp.getData().getSessionId();
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("解析推送会话响应失败: " + e.getMessage());
         }
@@ -181,17 +191,22 @@ public class BatchConfigVerifyService {
         completeBody.put("sessionId", sessionId);
 
         String completeBodyJson = objectMapper.writeValueAsString(completeBody);
-        String completeProxyResponse = proxyClientService.configPushComplete(sourceAgentId, completeBodyJson);
-        JsonNode completeDataNode = proxyClientService.extractData(completeProxyResponse);
+        ProxyApiResponse<String> completeProxyResponse = proxyClientService.configPushComplete(sourceAgentId, completeBodyJson);
 
-        if (completeDataNode == null) {
+        if (!completeProxyResponse.isSuccess() || completeProxyResponse.getData() == null) {
             throw new RuntimeException("完成推送失败: Proxy转发失败");
         }
 
         try {
-            String completeAgentResponse = completeDataNode.asText();
-            JsonNode completeJson = objectMapper.readTree(completeAgentResponse);
-            return completeJson.path("data").path("filesCount").asInt();
+            AgentResponse<AgentPushCompleteData> completeAgentResp = proxyClientService.parseAgentResponse(
+                    completeProxyResponse.getData(),
+                    new TypeReference<AgentResponse<AgentPushCompleteData>>() {});
+            if (completeAgentResp.getData() == null || completeAgentResp.getData().getFilesCount() == null) {
+                throw new RuntimeException("推送完成响应无filesCount");
+            }
+            return completeAgentResp.getData().getFilesCount();
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("解析推送完成响应失败: " + e.getMessage());
         }
@@ -288,28 +303,29 @@ public class BatchConfigVerifyService {
     private Map<Long, AgentTaskConfig> fetchAgentConfigs(AgentRegistry agent) {
         Map<Long, AgentTaskConfig> result = new LinkedHashMap<>();
         try {
-            String proxyResponse = proxyClientService.configVerify(agent.getId());
-            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+            ProxyApiResponse<String> proxyResponse = proxyClientService.configVerify(agent.getId());
 
-            if (dataNode == null) {
+            if (!proxyResponse.isSuccess() || proxyResponse.getData() == null) {
                 return result;
             }
 
-            // dataNode是Agent原始响应的JSON字符串
-            String agentResponseStr = dataNode.asText();
-            JsonNode agentRoot = objectMapper.readTree(agentResponseStr);
-            JsonNode tasksNode = agentRoot.path("data").path("tasks");
-            if (tasksNode.isArray()) {
-                for (JsonNode taskNode : tasksNode) {
-                    String content = taskNode.path("content").asText();
-                    Long taskId = taskNode.path("taskId").asLong(-1);
-                    if (taskId > 0 && content != null && !content.isEmpty()) {
-                        try {
-                            AgentTaskConfig config = objectMapper.readValue(content, AgentTaskConfig.class);
-                            result.put(taskId, config);
-                        } catch (Exception e) {
-                            log.warn("反序列化 Agent 配置失败: taskId={}, agentId={}", taskId, agent.getId(), e);
-                        }
+            AgentResponse<AgentConfigListData> agentResponse = proxyClientService.parseAgentResponse(
+                    proxyResponse.getData(),
+                    new TypeReference<AgentResponse<AgentConfigListData>>() {});
+
+            if (agentResponse.getData() == null || agentResponse.getData().getTasks() == null) {
+                return result;
+            }
+
+            for (AgentConfigTaskItem taskItem : agentResponse.getData().getTasks()) {
+                Long taskId = taskItem.getTaskId();
+                String content = taskItem.getContent();
+                if (taskId != null && taskId > 0 && content != null && !content.isEmpty()) {
+                    try {
+                        AgentTaskConfig config = objectMapper.readValue(content, AgentTaskConfig.class);
+                        result.put(taskId, config);
+                    } catch (Exception e) {
+                        log.warn("反序列化 Agent 配置失败: taskId={}, agentId={}", taskId, agent.getId(), e);
                     }
                 }
             }

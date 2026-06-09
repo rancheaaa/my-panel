@@ -1,6 +1,10 @@
 package com.cq.panel.admin.server.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.PingResult;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.TcpProbeResultData;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,10 +40,11 @@ public class ProxyClientService {
     /**
      * 检测Admin到Proxy的连通性（Ping）
      *
-     * @return Proxy响应体JSON字符串，如果连接失败抛异常
+     * @return Proxy Ping响应
      */
-    public String ping() {
-        return getForString(proxyUrl + "/forward/ping");
+    public ProxyApiResponse<PingResult> ping() {
+        String body = getForString(proxyUrl + "/forward/ping");
+        return parseResponse(body, new TypeReference<ProxyApiResponse<PingResult>>() {});
     }
 
     /**
@@ -47,11 +52,11 @@ public class ProxyClientService {
      *
      * @param agentId     Agent节点ID
      * @param requestBody Agent原始请求体JSON (command, timeout)
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String executeCommand(String agentId, String requestBody) {
+    public ProxyApiResponse<String> executeCommand(String agentId, String requestBody) {
         String url = buildUrl("/forward/agent/execute", Map.of("agentId", agentId));
-        return postForString(url, requestBody);
+        return postForTypedResponse(url, requestBody);
     }
 
     /**
@@ -60,14 +65,14 @@ public class ProxyClientService {
      * @param agentId   源Agent节点ID
      * @param targetIp  目标IP
      * @param targetPort 目标端口
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String probeViaAgent(String agentId, String targetIp, int targetPort) {
+    public ProxyApiResponse<String> probeViaAgent(String agentId, String targetIp, int targetPort) {
         String url = buildUrl("/forward/agent/probe", Map.of(
                 "agentId", agentId,
                 "host", targetIp,
                 "port", String.valueOf(targetPort)));
-        return getForString(url);
+        return parseResponse(getForString(url), stringResponseType());
     }
 
     /**
@@ -75,13 +80,13 @@ public class ProxyClientService {
      *
      * @param host 目标IP
      * @param port 目标端口
-     * @return 探测结果JSON字符串
+     * @return Proxy响应，data为TcpProbeResultData
      */
-    public String tcpProbe(String host, int port) {
+    public ProxyApiResponse<TcpProbeResultData> tcpProbe(String host, int port) {
         String url = buildUrl("/forward/agent/tcp-probe", Map.of(
                 "host", host,
                 "port", String.valueOf(port)));
-        return getForString(url);
+        return parseResponse(getForString(url), tcpProbeResponseType());
     }
 
     /**
@@ -89,13 +94,13 @@ public class ProxyClientService {
      *
      * @param agentId Agent节点ID
      * @param path    目录路径
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String dirCheck(String agentId, String path) {
+    public ProxyApiResponse<String> dirCheck(String agentId, String path) {
         String url = buildUrl("/forward/agent/file/dir-check", Map.of(
                 "agentId", agentId,
                 "path", path));
-        return getForString(url);
+        return parseResponse(getForString(url), stringResponseType());
     }
 
     /**
@@ -103,24 +108,24 @@ public class ProxyClientService {
      *
      * @param agentId Agent节点ID
      * @param path    目录路径
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String fileExists(String agentId, String path) {
+    public ProxyApiResponse<String> fileExists(String agentId, String path) {
         String url = buildUrl("/forward/agent/file/exists", Map.of(
                 "agentId", agentId,
                 "path", path));
-        return getForString(url);
+        return parseResponse(getForString(url), stringResponseType());
     }
 
     /**
      * 转发配置校验请求到Agent（通过Proxy）
      *
      * @param agentId Agent节点ID
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String configVerify(String agentId) {
+    public ProxyApiResponse<String> configVerify(String agentId) {
         String url = buildUrl("/forward/agent/config/verify", Map.of("agentId", agentId));
-        return getForString(url);
+        return parseResponse(getForString(url), stringResponseType());
     }
 
     /**
@@ -128,11 +133,11 @@ public class ProxyClientService {
      *
      * @param agentId     Agent节点ID
      * @param requestBody Agent原始请求体JSON (totalSize, totalChunks, chunkSize)
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String configPushInit(String agentId, String requestBody) {
+    public ProxyApiResponse<String> configPushInit(String agentId, String requestBody) {
         String url = buildUrl("/forward/agent/config/push/init", Map.of("agentId", agentId));
-        return postForString(url, requestBody);
+        return postForTypedResponse(url, requestBody);
     }
 
     /**
@@ -151,32 +156,57 @@ public class ProxyClientService {
      *
      * @param agentId     Agent节点ID
      * @param requestBody Agent原始请求体JSON (sessionId)
-     * @return Agent响应体JSON字符串
+     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
-    public String configPushComplete(String agentId, String requestBody) {
+    public ProxyApiResponse<String> configPushComplete(String agentId, String requestBody) {
         String url = buildUrl("/forward/agent/config/push/complete", Map.of("agentId", agentId));
-        return postForString(url, requestBody);
+        return postForTypedResponse(url, requestBody);
+    }
+
+    // ==================== 通用解析方法 ====================
+
+    /**
+     * 解析Proxy API响应为类型化对象
+     *
+     * @param responseBody   原始响应体JSON字符串
+     * @param responseType   data字段的TypeReference
+     * @param <T>            data字段的泛型类型
+     * @return 类型化的ProxyApiResponse，解析失败返回code非200的对象
+     */
+    public <T> ProxyApiResponse<T> parseResponse(String responseBody, TypeReference<ProxyApiResponse<T>> responseType) {
+        try {
+            ProxyApiResponse<T> response = objectMapper.readValue(responseBody, responseType);
+            if (!response.isSuccess()) {
+                log.warn("Proxy返回错误: code={}, msg={}", response.getCode(), response.getMsg());
+            }
+            return response;
+        } catch (Exception e) {
+            log.warn("解析Proxy响应失败: {}", e.getMessage());
+            ProxyApiResponse<T> errorResponse = new ProxyApiResponse<>();
+            errorResponse.setCode(-1);
+            errorResponse.setMsg("Parse error: " + e.getMessage());
+            return errorResponse;
+        }
     }
 
     /**
-     * 解析Proxy响应，提取data字段
+     * 解析Agent原始响应JSON字符串为类型化对象
+     * 用于从Proxy转发的响应中提取Agent的实际数据
      *
-     * @param responseBody Proxy响应体
-     * @return data字段的JsonNode，如果响应异常则返回null
+     * @param agentResponseJson Agent原始响应JSON字符串
+     * @param dataType          data字段的TypeReference
+     * @param <T>               data字段的泛型类型
+     * @return Agent响应对象，解析失败返回success=false的对象
      */
-    public JsonNode extractData(String responseBody) {
+    public <T> AgentResponse<T> parseAgentResponse(String agentResponseJson, TypeReference<AgentResponse<T>> dataType) {
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            int code = root.path("code").asInt(-1);
-            if (code != 200) {
-                String msg = root.path("msg").asText("未知错误");
-                log.warn("Proxy返回错误: code={}, msg={}", code, msg);
-                return null;
-            }
-            return root.path("data");
+            return objectMapper.readValue(agentResponseJson, dataType);
         } catch (Exception e) {
-            log.warn("解析Proxy响应失败: {}", e.getMessage());
-            return null;
+            log.warn("解析Agent响应失败: {}", e.getMessage());
+            AgentResponse<T> errorResponse = new AgentResponse<>();
+            errorResponse.setSuccess(false);
+            errorResponse.setMsg("Parse error: " + e.getMessage());
+            return errorResponse;
         }
     }
 
@@ -209,5 +239,28 @@ public class ProxyClientService {
             log.error("Proxy POST请求失败: url={}, error={}", url, e.getMessage());
             throw new RuntimeException("Proxy POST request failed: " + e.getMessage(), e);
         }
+    }
+
+    private ProxyApiResponse<String> postForTypedResponse(String url, String body) {
+        String responseBody = postForString(url, body);
+        return parseResponse(responseBody, stringResponseType());
+    }
+
+    // 预定义的TypeReference实例，避免重复创建
+    private static TypeReference<ProxyApiResponse<String>> STRING_RESPONSE_TYPE;
+    private static TypeReference<ProxyApiResponse<TcpProbeResultData>> TCP_PROBE_RESPONSE_TYPE;
+
+    private static synchronized TypeReference<ProxyApiResponse<String>> stringResponseType() {
+        if (STRING_RESPONSE_TYPE == null) {
+            STRING_RESPONSE_TYPE = new TypeReference<>() {};
+        }
+        return STRING_RESPONSE_TYPE;
+    }
+
+    private static synchronized TypeReference<ProxyApiResponse<TcpProbeResultData>> tcpProbeResponseType() {
+        if (TCP_PROBE_RESPONSE_TYPE == null) {
+            TCP_PROBE_RESPONSE_TYPE = new TypeReference<>() {};
+        }
+        return TCP_PROBE_RESPONSE_TYPE;
     }
 }

@@ -1,8 +1,9 @@
 package com.cq.panel.admin.server.service.batch;
 
 import com.cq.panel.admin.server.service.ProxyClientService;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,9 +14,7 @@ import java.util.Map;
 
 /**
  * Agent目录检查工具类
- * 通过HTTP调用Agent的 /api/file/exists?path=xxx 接口检查目录是否存在
- *
- * @author cq
+ * 通过Proxy转发到Agent的 /api/file/exists?path=xxx 接口检查目录是否存在
  */
 @Component
 public class AgentDirectoryChecker {
@@ -23,12 +22,9 @@ public class AgentDirectoryChecker {
     private static final Logger log = LoggerFactory.getLogger(AgentDirectoryChecker.class);
 
     private final ProxyClientService proxyClientService;
-    private final ObjectMapper objectMapper;
 
-    public AgentDirectoryChecker(ProxyClientService proxyClientService,
-                                  ObjectMapper objectMapper) {
+    public AgentDirectoryChecker(ProxyClientService proxyClientService) {
         this.proxyClientService = proxyClientService;
-        this.objectMapper = objectMapper;
     }
 
     /**
@@ -47,25 +43,23 @@ public class AgentDirectoryChecker {
         log.debug("检查目录: agentId={}, path={}", agentId, dirPath);
 
         try {
-            String proxyResponse = proxyClientService.fileExists(agentId, dirPath);
-            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+            ProxyApiResponse<String> proxyResponse = proxyClientService.fileExists(agentId, dirPath);
 
-            if (dataNode == null) {
+            if (!proxyResponse.isSuccess() || proxyResponse.getData() == null) {
                 log.warn("Proxy转发失败: agentId={}, path={}", agentId, dirPath);
                 return null;
             }
 
-            // dataNode是Agent原始响应的JSON字符串
-            String agentResponseStr = dataNode.asText();
-            JsonNode agentRoot = objectMapper.readTree(agentResponseStr);
-            JsonNode dataField = agentRoot.get("data");
+            AgentResponse<Boolean> agentResponse = proxyClientService.parseAgentResponse(
+                    proxyResponse.getData(),
+                    new TypeReference<AgentResponse<Boolean>>() {});
 
-            if (dataField == null) {
+            if (agentResponse.getData() == null) {
                 log.warn("Agent响应无data字段: agentId={}", agentId);
                 return null;
             }
 
-            boolean exists = dataField.asBoolean();
+            boolean exists = Boolean.TRUE.equals(agentResponse.getData());
             log.debug("目录检查结果: agentId={}, path={}, exists={}", agentId, dirPath, exists);
             return exists;
 

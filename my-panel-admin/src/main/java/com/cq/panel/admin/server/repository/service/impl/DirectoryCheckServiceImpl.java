@@ -7,7 +7,10 @@ import com.cq.panel.admin.server.repository.mapper.BatchTransferTaskMapper;
 import com.cq.panel.admin.server.repository.service.IDirectoryCheckService;
 import com.cq.panel.admin.server.service.ProxyClientService;
 import com.cq.panel.admin.server.web.domain.vo.batch.DirectoryCheckVO;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentDirCheckData;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,10 +105,9 @@ public class DirectoryCheckServiceImpl implements IDirectoryCheckService {
         }
 
         try {
-            String proxyResponse = proxyClientService.dirCheck(agentId, dirPath);
-            JsonNode dataNode = proxyClientService.extractData(proxyResponse);
+            ProxyApiResponse<String> proxyResponse = proxyClientService.dirCheck(agentId, dirPath);
 
-            if (dataNode == null) {
+            if (!proxyResponse.isSuccess() || proxyResponse.getData() == null) {
                 vo.setExists(false);
                 vo.setCanRead(false);
                 vo.setCanWrite(false);
@@ -115,31 +117,42 @@ public class DirectoryCheckServiceImpl implements IDirectoryCheckService {
                 return vo;
             }
 
-            // dataNode是Agent原始响应的JSON字符串
-            String agentResponseStr = dataNode.asText();
-            JsonNode agentRoot = objectMapper.readTree(agentResponseStr);
-            JsonNode data = agentRoot.path("data");
+            AgentResponse<AgentDirCheckData> agentResponse = proxyClientService.parseAgentResponse(
+                    proxyResponse.getData(),
+                    new TypeReference<AgentResponse<AgentDirCheckData>>() {});
 
-            vo.setExists(getBoolean(data, "exists"));
-            vo.setIsDirectory(getBoolean(data, "isDirectory"));
-            vo.setCanRead(getBoolean(data, "canRead"));
-            vo.setCanWrite(getBoolean(data, "canWrite"));
-            vo.setCanExecute(getBoolean(data, "canExecute"));
-
-            if (data.has("posixPermissions")) {
-                vo.setPosixPermissions(data.get("posixPermissions").asText());
+            if (!Boolean.TRUE.equals(agentResponse.getSuccess()) || agentResponse.getData() == null) {
+                vo.setExists(false);
+                vo.setCanRead(false);
+                vo.setCanWrite(false);
+                vo.setCanExecute(false);
+                vo.setDiskSufficient(false);
+                vo.setErrorMessage("Agent返回错误: " + agentResponse.getMsg());
+                return vo;
             }
 
-            vo.setDiskTotal(getLong(data, "diskTotal"));
-            vo.setDiskUsable(getLong(data, "diskUsable"));
-            vo.setDiskFree(getLong(data, "diskFree"));
-            vo.setDiskTotalMB(getLong(data, "diskTotalMB"));
-            vo.setDiskUsableMB(getLong(data, "diskUsableMB"));
-            vo.setDiskFreeMB(getLong(data, "diskFreeMB"));
-            vo.setDiskSufficient(getBoolean(data, "diskSufficient"));
+            AgentDirCheckData data = agentResponse.getData();
 
-            if (data.has("errorMessage")) {
-                vo.setErrorMessage(data.get("errorMessage").asText());
+            vo.setExists(data.getExists());
+            vo.setIsDirectory(data.getIsDirectory());
+            vo.setCanRead(data.getCanRead());
+            vo.setCanWrite(data.getCanWrite());
+            vo.setCanExecute(data.getCanExecute());
+
+            if (data.getPosixPermissions() != null) {
+                vo.setPosixPermissions(data.getPosixPermissions());
+            }
+
+            vo.setDiskTotal(data.getDiskTotal());
+            vo.setDiskUsable(data.getDiskUsable());
+            vo.setDiskFree(data.getDiskFree());
+            vo.setDiskTotalMB(data.getDiskTotalMB());
+            vo.setDiskUsableMB(data.getDiskUsableMB());
+            vo.setDiskFreeMB(data.getDiskFreeMB());
+            vo.setDiskSufficient(data.getDiskSufficient());
+
+            if (data.getErrorMessage() != null) {
+                vo.setErrorMessage(data.getErrorMessage());
             }
         } catch (Exception e) {
             log.warn("目录检测失败: agentId={}, path={}, error={}", agentId, dirPath, e.getMessage());
@@ -154,22 +167,14 @@ public class DirectoryCheckServiceImpl implements IDirectoryCheckService {
         return vo;
     }
 
-    private Boolean getBoolean(JsonNode node, String field) {
-        return node.has(field) && !node.get(field).isNull() ? node.get(field).asBoolean() : null;
-    }
-
-    private Long getLong(JsonNode node, String field) {
-        return node.has(field) && !node.get(field).isNull() ? node.get(field).asLong() : null;
-    }
-
     private List<String> parseJsonArray(String json) {
         List<String> result = new ArrayList<>();
         if (json == null || json.isBlank()) return result;
         try {
-            JsonNode array = objectMapper.readTree(json);
-            if (array.isArray()) {
-                for (JsonNode item : array) {
-                    result.add(item.asText());
+            String[] items = objectMapper.readValue(json, String[].class);
+            if (items != null) {
+                for (String item : items) {
+                    if (item != null && !item.isBlank()) result.add(item.trim());
                 }
             }
         } catch (Exception e) {

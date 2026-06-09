@@ -5,31 +5,28 @@ import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.service.IAgentConnectivityService;
 import com.cq.panel.admin.server.repository.service.impl.AgentConnectivityServiceImpl;
 import com.cq.panel.admin.server.service.ProxyClientService;
+import com.cq.panel.admin.server.web.domain.dto.proxy.*;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO.PortProbeResult;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO.Status;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class AgentConnectivityServiceTest {
 
     private AgentRegistryMapper agentRegistryMapper;
-    private ObjectMapper objectMapper;
     private ProxyClientService proxyClientService;
     private IAgentConnectivityService connectivityService;
 
     @BeforeEach
     void setUp() {
         agentRegistryMapper = mock(AgentRegistryMapper.class);
-        objectMapper = new ObjectMapper();
         proxyClientService = mock(ProxyClientService.class);
-        connectivityService = new AgentConnectivityServiceImpl(agentRegistryMapper, objectMapper, proxyClientService);
+        connectivityService = new AgentConnectivityServiceImpl(agentRegistryMapper, proxyClientService);
     }
 
     private AgentRegistry buildAgent(String id, String nodeName, String ip, int port, Integer nodeStatus, Integer nodeEnabled) {
@@ -53,13 +50,36 @@ class AgentConnectivityServiceTest {
         when(agentRegistryMapper.selectByNodeName("source")).thenReturn(buildAgent(sourceId, "source", sourceIp, sourcePort, 1, 0));
         when(agentRegistryMapper.selectByNodeName("target")).thenReturn(buildAgent(targetId, "target", targetIp, targetPort, 1, 0));
 
+        // Mock ping → UP
+        when(proxyClientService.ping()).thenReturn(ProxyApiResponse.<PingResult>builder()
+                .code(200).msg("success").data(PingResult.builder().status("UP").timestamp(System.currentTimeMillis()).build()).build());
+
+        // Mock tcpProbe → reachable
+        TcpProbeResultData reachableData = TcpProbeResultData.builder().reachable(true).host(sourceIp).port(sourcePort).build();
+        when(proxyClientService.tcpProbe(eq(sourceIp), anyInt()))
+                .thenReturn(ProxyApiResponse.<TcpProbeResultData>builder().code(200).msg("success").data(reachableData).build());
+        when(proxyClientService.tcpProbe(eq(targetIp), anyInt()))
+                .thenReturn(ProxyApiResponse.<TcpProbeResultData>builder().code(200).msg("success").data(
+                        TcpProbeResultData.builder().reachable(true).host(targetIp).port(targetPort).build()).build());
+
+        // Mock probeViaAgent → reachable
+        String agentProbeJson = "{\"success\":true,\"msg\":\"ok\",\"data\":{\"reachable\":true,\"details\":[\"✅ OK\"]}}";
+        when(proxyClientService.probeViaAgent(anyString(), anyString(), anyInt()))
+                .thenReturn(ProxyApiResponse.<String>builder().code(200).msg("success").data(agentProbeJson).build());
+        when(proxyClientService.parseAgentResponse(anyString(), any()))
+                .thenAnswer(inv -> {
+                    String json = inv.getArgument(0);
+                    return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json,
+                            new com.fasterxml.jackson.core.type.TypeReference<AgentResponse<AgentProbeData>>() {});
+                });
+
         AgentConnectivityServiceImpl spy = Mockito.spy(asImpl());
         doReturn(PortProbeResult.of("admin", "proxy", "", 0, true, null))
                 .when(spy).probeProxy();
         doReturn(PortProbeResult.of("proxy", "源Agent", sourceIp, sourcePort, true, null))
-                .when(spy).probePort("proxy", "源Agent", sourceIp, sourcePort);
+                .when(spy).probePort(eq("proxy"), eq("源Agent"), eq(sourceIp), eq(sourcePort));
         doReturn(PortProbeResult.of("proxy", "目标Agent", targetIp, targetPort, true, null))
-                .when(spy).probePort("proxy", "目标Agent", targetIp, targetPort);
+                .when(spy).probePort(eq("proxy"), eq("目标Agent"), eq(targetIp), eq(targetPort));
         doReturn(PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, true, null))
                 .when(spy).probeViaAgent(sourceId, targetIp, targetPort);
         return spy;
@@ -205,10 +225,10 @@ class AgentConnectivityServiceTest {
 
     @Test
     @DisplayName("5.1 probePort - Proxy返回可达")
-    void testProbePortReachable() throws Exception {
-        String proxyResponse = "{\"code\":200,\"msg\":\"success\",\"data\":{\"reachable\":true,\"host\":\"10.0.0.1\",\"port\":7777}}";
-        when(proxyClientService.tcpProbe("10.0.0.1", 7777)).thenReturn(proxyResponse);
-        when(proxyClientService.extractData(proxyResponse)).thenReturn(objectMapper.readTree(proxyResponse).path("data"));
+    void testProbePortReachable() {
+        TcpProbeResultData data = TcpProbeResultData.builder().reachable(true).host("10.0.0.1").port(7777).build();
+        when(proxyClientService.tcpProbe("10.0.0.1", 7777))
+                .thenReturn(ProxyApiResponse.<TcpProbeResultData>builder().code(200).msg("success").data(data).build());
 
         PortProbeResult result = asImpl().probePort("proxy", "源Agent", "10.0.0.1", 7777);
         assertTrue(result.isReachable());
@@ -217,10 +237,11 @@ class AgentConnectivityServiceTest {
 
     @Test
     @DisplayName("5.2 probePort - Proxy返回不可达")
-    void testProbePortUnreachable() throws Exception {
-        String proxyResponse = "{\"code\":200,\"msg\":\"success\",\"data\":{\"reachable\":false,\"host\":\"10.0.0.1\",\"port\":7777,\"failureReason\":\"连接被拒绝\"}}";
-        when(proxyClientService.tcpProbe("10.0.0.1", 7777)).thenReturn(proxyResponse);
-        when(proxyClientService.extractData(proxyResponse)).thenReturn(objectMapper.readTree(proxyResponse).path("data"));
+    void testProbePortUnreachable() {
+        TcpProbeResultData data = TcpProbeResultData.builder().reachable(false).host("10.0.0.1").port(7777)
+                .failureReason("连接被拒绝").build();
+        when(proxyClientService.tcpProbe("10.0.0.1", 7777))
+                .thenReturn(ProxyApiResponse.<TcpProbeResultData>builder().code(200).msg("success").data(data).build());
 
         PortProbeResult result = asImpl().probePort("proxy", "源Agent", "10.0.0.1", 7777);
         assertFalse(result.isReachable());
@@ -229,7 +250,7 @@ class AgentConnectivityServiceTest {
 
     @Test
     @DisplayName("5.3 probePort - Proxy请求异常")
-    void testProbePortException() throws Exception {
+    void testProbePortException() {
         when(proxyClientService.tcpProbe("10.0.0.1", 7777)).thenThrow(new RuntimeException("连接超时"));
 
         PortProbeResult result = asImpl().probePort("proxy", "源Agent", "10.0.0.1", 7777);
@@ -241,10 +262,10 @@ class AgentConnectivityServiceTest {
 
     @Test
     @DisplayName("5.4 probeProxy - Ping成功")
-    void testProbeProxySuccess() throws Exception {
-        String pingResponse = "{\"code\":200,\"msg\":\"success\",\"data\":{\"status\":\"UP\",\"timestamp\":1234567890}}";
-        when(proxyClientService.ping()).thenReturn(pingResponse);
-        when(proxyClientService.extractData(pingResponse)).thenReturn(objectMapper.readTree(pingResponse).path("data"));
+    void testProbeProxySuccess() {
+        PingResult data = PingResult.builder().status("UP").timestamp(1234567890L).build();
+        when(proxyClientService.ping())
+                .thenReturn(ProxyApiResponse.<PingResult>builder().code(200).msg("success").data(data).build());
 
         PortProbeResult result = asImpl().probeProxy();
         assertTrue(result.isReachable());
@@ -255,10 +276,10 @@ class AgentConnectivityServiceTest {
 
     @Test
     @DisplayName("5.5 probeProxy - Ping返回非UP状态")
-    void testProbeProxyNotUp() throws Exception {
-        String pingResponse = "{\"code\":200,\"msg\":\"success\",\"data\":{\"status\":\"DOWN\"}}";
-        when(proxyClientService.ping()).thenReturn(pingResponse);
-        when(proxyClientService.extractData(pingResponse)).thenReturn(objectMapper.readTree(pingResponse).path("data"));
+    void testProbeProxyNotUp() {
+        PingResult data = PingResult.builder().status("DOWN").build();
+        when(proxyClientService.ping())
+                .thenReturn(ProxyApiResponse.<PingResult>builder().code(200).msg("success").data(data).build());
 
         PortProbeResult result = asImpl().probeProxy();
         assertFalse(result.isReachable());
@@ -297,7 +318,6 @@ class AgentConnectivityServiceTest {
     @DisplayName("6.2 Proxy→Source不可达返回ADMIN_TO_SOURCE_UNREACHABLE")
     void testProxyToSourceUnreachable() {
         AgentConnectivityServiceImpl spy = buildReachableSpy("s1", "10.0.0.1", 7777, "t1", "10.0.0.2", 7777);
-        // 覆盖默认的可达结果，让Proxy→Source失败
         doReturn(PortProbeResult.of("proxy", "源Agent", "10.0.0.1", 7777, false, "连接被拒绝"))
                 .when(spy).probePort("proxy", "源Agent", "10.0.0.1", 7777);
 
@@ -334,7 +354,7 @@ class AgentConnectivityServiceTest {
     }
 
     @Test
-    @DisplayName("6.5 四层网络全部可达返回REACHABLE")
+    @DisplayName("6.5 五层网络全部可达返回REACHABLE")
     void testAllReachable() {
         AgentConnectivityServiceImpl spy = buildReachableSpy("s1", "10.0.0.1", 7777, "t1", "10.0.0.2", 7777);
 
@@ -355,7 +375,8 @@ class AgentConnectivityServiceTest {
         AgentConnectivityServiceImpl spy = buildReachableSpy("s1", "10.0.0.1", 7777, "t1", "10.0.0.2", 7777);
 
         AgentConnectivityVO vo = spy.checkConnectivity("source", "target");
-        // 6项前置检查(存在/在线/启用 x 2) + 4项网络层(Proxy/源Agent/目标Agent/源→目标)
+        // 6项前置检查 + 4项网络层(Admin->Proxy/Proxy->源Agent/Proxy->目标Agent/源Agent->目标Agent)
+        // 反向探测(目标->源)在reverseCheckDetails中
         assertEquals(10, vo.getCheckDetails().size());
         assertTrue(vo.getCheckDetails().stream().allMatch(d -> d.startsWith("✅")));
     }
@@ -411,7 +432,6 @@ class AgentConnectivityServiceTest {
         assertTrue(vo.isTargetOnline());
         assertTrue(vo.isSourceEnabled());
         assertTrue(vo.isTargetEnabled());
-        // 新增：Admin到Proxy的检测结果
         assertNotNull(vo.getAdminToProxy());
         assertTrue(vo.getAdminToProxy().isReachable());
         assertEquals("admin", vo.getAdminToProxy().getFrom());

@@ -707,6 +707,61 @@
     ]
   },
   {
+    "name": "com.cq.panel.common.dto.batch.AgentTaskConfig",
+    "allDeclaredFields": true,
+    "unsafeAllocated": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.cq.panel.common.dto.batch.TargetAgentInfo",
+    "allDeclaredFields": true,
+    "unsafeAllocated": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.cq.panel.common.dto.batch.ScanConfig",
+    "allDeclaredFields": true,
+    "unsafeAllocated": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.cq.panel.common.dto.batch.TransferConfig",
+    "allDeclaredFields": true,
+    "unsafeAllocated": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "com.cq.panel.common.dto.batch.RetryConfig",
+    "allDeclaredFields": true,
+    "unsafeAllocated": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
     "name": "com.sun.crypto.provider.AESCipher$General",
     "methods": [
       {

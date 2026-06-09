@@ -15,7 +15,15 @@ app:
   # 运行模式: cluster (redis) / standalone (memory)
   mode: cluster
   # Proxy服务地址 (Admin通过Proxy转发请求到Agent)
-  proxy-url: ${PROXY_URL:http://localhost:9876}
+  # 支持逗号分隔配置多个地址实现负载均衡，如: http://10.0.0.1:9876,http://10.0.0.2:9876
+  proxy-urls: ${PROXY_URLS:${PROXY_URL:http://localhost:9876}}
+  # Proxy负载均衡配置
+  proxy:
+    health-check-enabled: true
+    health-check-interval: 30000
+    health-check-failure-threshold: 3
+    health-check-success-threshold: 2
+    retry-count: 2
   # 上传路径
   importPath: ${app.profile}/import
   # 下载路径

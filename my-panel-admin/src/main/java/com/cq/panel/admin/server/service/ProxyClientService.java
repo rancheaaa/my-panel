@@ -1,5 +1,6 @@
 package com.cq.panel.admin.server.service;
 
+import com.cq.panel.admin.server.service.proxy.ProxyLoadBalancer;
 import com.cq.panel.admin.server.web.domain.dto.proxy.AgentResponse;
 import com.cq.panel.admin.server.web.domain.dto.proxy.PingResult;
 import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
@@ -8,17 +9,16 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
-
 import java.util.Map;
 
 /**
  * Proxy客户端服务
  * Admin通过此服务调用Proxy的转发端点，实现Admin->Proxy->Agent的调用链路
+ * 支持多Proxy地址负载均衡和故障转移
  */
 @Service
 public class ProxyClientService {
@@ -27,152 +27,111 @@ public class ProxyClientService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final String proxyUrl;
+    private final ProxyLoadBalancer loadBalancer;
 
     public ProxyClientService(RestTemplate restTemplate,
                                ObjectMapper objectMapper,
-                               @Value("${app.proxy-url:http://localhost:9876}") String proxyUrl) {
+                               ProxyLoadBalancer loadBalancer) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
-        this.proxyUrl = proxyUrl;
+        this.loadBalancer = loadBalancer;
     }
 
     /**
      * 检测Admin到Proxy的连通性（Ping）
-     *
-     * @return Proxy Ping响应
      */
     public ProxyApiResponse<PingResult> ping() {
-        String body = getForString(proxyUrl + "/forward/ping");
-        return parseResponse(body, new TypeReference<ProxyApiResponse<PingResult>>() {});
+        return loadBalancer.executeWithFailover(server -> {
+            String body = getForString(server.getUrl() + "/forward/ping");
+            return parseResponse(body, new TypeReference<>() {
+            });
+        });
     }
 
     /**
      * 转发命令执行请求到Agent（通过Proxy）
-     *
-     * @param agentId     Agent节点ID
-     * @param requestBody Agent原始请求体JSON (command, timeout)
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> executeCommand(String agentId, String requestBody) {
-        String url = buildUrl("/forward/agent/execute", Map.of("agentId", agentId));
-        return postForTypedResponse(url, requestBody);
+        return executeWithFailover("/forward/agent/execute", Map.of("agentId", agentId), requestBody);
     }
 
     /**
      * 转发连通性探测请求到Agent（通过Proxy）
-     *
-     * @param agentId   源Agent节点ID
-     * @param targetIp  目标IP
-     * @param targetPort 目标端口
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> probeViaAgent(String agentId, String targetIp, int targetPort) {
-        String url = buildUrl("/forward/agent/probe", Map.of(
-                "agentId", agentId,
-                "host", targetIp,
-                "port", String.valueOf(targetPort)));
-        return parseResponse(getForString(url), stringResponseType());
+        String path = "/forward/agent/probe";
+        Map<String, String> params = Map.of("agentId", agentId, "host", targetIp, "port", String.valueOf(targetPort));
+        return loadBalancer.executeWithFailover(server -> {
+            String url = buildUrl(server.getUrl(), path, params);
+            return parseResponse(getForString(url), stringResponseType());
+        });
     }
 
     /**
      * 从Proxy发起TCP端口探测
-     *
-     * @param host 目标IP
-     * @param port 目标端口
-     * @return Proxy响应，data为TcpProbeResultData
      */
     public ProxyApiResponse<TcpProbeResultData> tcpProbe(String host, int port) {
-        String url = buildUrl("/forward/agent/tcp-probe", Map.of(
-                "host", host,
-                "port", String.valueOf(port)));
-        return parseResponse(getForString(url), tcpProbeResponseType());
+        return loadBalancer.executeWithFailover(server -> {
+            String url = buildUrl(server.getUrl(), "/forward/agent/tcp-probe",
+                    Map.of("host", host, "port", String.valueOf(port)));
+            return parseResponse(getForString(url), tcpProbeResponseType());
+        });
     }
 
     /**
      * 转发目录详情检查请求到Agent（通过Proxy）
-     *
-     * @param agentId Agent节点ID
-     * @param path    目录路径
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> dirCheck(String agentId, String path) {
-        String url = buildUrl("/forward/agent/file/dir-check", Map.of(
-                "agentId", agentId,
-                "path", path));
-        return parseResponse(getForString(url), stringResponseType());
+        return executeGetWithFailover("/forward/agent/file/dir-check",
+                Map.of("agentId", agentId, "path", path));
     }
 
     /**
      * 转发目录存在性检查请求到Agent（通过Proxy）
-     *
-     * @param agentId Agent节点ID
-     * @param path    目录路径
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> fileExists(String agentId, String path) {
-        String url = buildUrl("/forward/agent/file/exists", Map.of(
-                "agentId", agentId,
-                "path", path));
-        return parseResponse(getForString(url), stringResponseType());
+        return executeGetWithFailover("/forward/agent/file/exists",
+                Map.of("agentId", agentId, "path", path));
     }
 
     /**
      * 转发配置校验请求到Agent（通过Proxy）
-     *
-     * @param agentId Agent节点ID
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> configVerify(String agentId) {
-        String url = buildUrl("/forward/agent/config/verify", Map.of("agentId", agentId));
-        return parseResponse(getForString(url), stringResponseType());
+        return executeGetWithFailover("/forward/agent/config/verify",
+                Map.of("agentId", agentId));
     }
 
     /**
      * 转发配置推送初始化请求到Agent（通过Proxy）
-     *
-     * @param agentId     Agent节点ID
-     * @param requestBody Agent原始请求体JSON (totalSize, totalChunks, chunkSize)
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> configPushInit(String agentId, String requestBody) {
-        String url = buildUrl("/forward/agent/config/push/init", Map.of("agentId", agentId));
-        return postForTypedResponse(url, requestBody);
+        return executeWithFailover("/forward/agent/config/push/init",
+                Map.of("agentId", agentId), requestBody);
     }
 
     /**
      * 转发配置推送分块请求到Agent（通过Proxy）
-     *
-     * @param agentId     Agent节点ID
-     * @param requestBody Agent原始请求体JSON (sessionId, chunkIndex, data)
      */
     public void configPushChunk(String agentId, String requestBody) {
-        String url = buildUrl("/forward/agent/config/push/chunk", Map.of("agentId", agentId));
-        postForString(url, requestBody);
+        loadBalancer.executeWithFailover(server -> {
+            String url = buildUrl(server.getUrl(), "/forward/agent/config/push/chunk",
+                    Map.of("agentId", agentId));
+            postForString(url, requestBody);
+            return null;
+        });
     }
 
     /**
      * 转发配置推送完成请求到Agent（通过Proxy）
-     *
-     * @param agentId     Agent节点ID
-     * @param requestBody Agent原始请求体JSON (sessionId)
-     * @return Proxy响应，data字段为Agent原始响应JSON字符串
      */
     public ProxyApiResponse<String> configPushComplete(String agentId, String requestBody) {
-        String url = buildUrl("/forward/agent/config/push/complete", Map.of("agentId", agentId));
-        return postForTypedResponse(url, requestBody);
+        return executeWithFailover("/forward/agent/config/push/complete",
+                Map.of("agentId", agentId), requestBody);
     }
 
     // ==================== 通用解析方法 ====================
 
-    /**
-     * 解析Proxy API响应为类型化对象
-     *
-     * @param responseBody   原始响应体JSON字符串
-     * @param responseType   data字段的TypeReference
-     * @param <T>            data字段的泛型类型
-     * @return 类型化的ProxyApiResponse，解析失败返回code非200的对象
-     */
     public <T> ProxyApiResponse<T> parseResponse(String responseBody, TypeReference<ProxyApiResponse<T>> responseType) {
         try {
             ProxyApiResponse<T> response = objectMapper.readValue(responseBody, responseType);
@@ -189,15 +148,6 @@ public class ProxyClientService {
         }
     }
 
-    /**
-     * 解析Agent原始响应JSON字符串为类型化对象
-     * 用于从Proxy转发的响应中提取Agent的实际数据
-     *
-     * @param agentResponseJson Agent原始响应JSON字符串
-     * @param dataType          data字段的TypeReference
-     * @param <T>               data字段的泛型类型
-     * @return Agent响应对象，解析失败返回success=false的对象
-     */
     public <T> AgentResponse<T> parseAgentResponse(String agentResponseJson, TypeReference<AgentResponse<T>> dataType) {
         try {
             return objectMapper.readValue(agentResponseJson, dataType);
@@ -212,8 +162,23 @@ public class ProxyClientService {
 
     // ==================== 内部方法 ====================
 
-    private String buildUrl(String path, Map<String, String> params) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(proxyUrl).path(path);
+    private ProxyApiResponse<String> executeGetWithFailover(String path, Map<String, String> params) {
+        return loadBalancer.executeWithFailover(server -> {
+            String url = buildUrl(server.getUrl(), path, params);
+            return parseResponse(getForString(url), stringResponseType());
+        });
+    }
+
+    private ProxyApiResponse<String> executeWithFailover(String path, Map<String, String> params, String requestBody) {
+        return loadBalancer.executeWithFailover(server -> {
+            String url = buildUrl(server.getUrl(), path, params);
+            String responseBody = postForString(url, requestBody);
+            return parseResponse(responseBody, stringResponseType());
+        });
+    }
+
+    private String buildUrl(String baseUrl, String path, Map<String, String> params) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl).path(path);
         params.forEach(builder::queryParam);
         return builder.build().toUriString();
     }
@@ -241,12 +206,7 @@ public class ProxyClientService {
         }
     }
 
-    private ProxyApiResponse<String> postForTypedResponse(String url, String body) {
-        String responseBody = postForString(url, body);
-        return parseResponse(responseBody, stringResponseType());
-    }
-
-    // 预定义的TypeReference实例，避免重复创建
+    // 预定义的TypeReference实例
     private static TypeReference<ProxyApiResponse<String>> STRING_RESPONSE_TYPE;
     private static TypeReference<ProxyApiResponse<TcpProbeResultData>> TCP_PROBE_RESPONSE_TYPE;
 

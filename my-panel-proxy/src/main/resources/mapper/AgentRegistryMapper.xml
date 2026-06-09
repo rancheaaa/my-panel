@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.proxy.repository.mapper.AgentRegistryMapper">
+
+    <select id="selectByIpPort" resultType="com.cq.proxy.repository.entity.AgentRegistry">
+        SELECT * FROM agent_registry
+        WHERE agent_ip = #{agentIp} AND agent_port = #{agentPort}
+        LIMIT 1
+    </select>
+
+    <select id="selectByAgentId" resultType="com.cq.proxy.repository.entity.AgentRegistry">
+        SELECT * FROM agent_registry
+        WHERE id = #{agentId}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.cq.proxy.repository.entity.AgentRegistry">
+        INSERT INTO agent_registry (
+            id, node_name, os_type, app_id, agent_ip, agent_port,
+            node_enabled, node_status, remark, last_refresh_time,
+            create_time, update_time
+        ) VALUES (
+            #{id}, #{nodeName}, #{osType}, #{appId}, #{agentIp}, #{agentPort},
+            #{nodeEnabled}, #{nodeStatus}, #{remark}, #{lastRefreshTime},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateById" parameterType="com.cq.proxy.repository.entity.AgentRegistry">
+        UPDATE agent_registry
+        SET node_name = #{nodeName},
+            os_type = #{osType},
+            app_id = #{appId},
+            node_enabled = #{nodeEnabled},
+            node_status = #{nodeStatus},
+            remark = #{remark},
+            last_refresh_time = #{lastRefreshTime},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

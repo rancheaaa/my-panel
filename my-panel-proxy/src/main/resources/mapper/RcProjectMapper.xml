@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.proxy.repository.mapper.RcProjectMapper">
+
+    <select id="selectByName" resultType="com.cq.proxy.repository.entity.RcProject">
+        SELECT * FROM rc_project
+        WHERE project_name = #{projectName}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.cq.proxy.repository.entity.RcProject" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO rc_project (project_name, create_time, update_time)
+        VALUES (#{projectName}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="updateById" parameterType="com.cq.proxy.repository.entity.RcProject">
+        UPDATE rc_project
+        SET project_name = #{projectName},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

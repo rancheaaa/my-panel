@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.proxy.repository.mapper.BatchSyncEventMapper">
+
+    <select id="selectPendingEvents" resultType="com.cq.proxy.repository.entity.BatchSyncEvent">
+        SELECT * FROM batch_sync_event
+        WHERE status = 'PENDING'
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= NOW())
+          AND (expire_at IS NULL OR expire_at &gt;= NOW())
+        ORDER BY created_at ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="updateStatusToProcessing">
+        UPDATE batch_sync_event
+        SET status = 'PROCESSING',
+            started_at = NOW(),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusToCompleted">
+        UPDATE batch_sync_event
+        SET status = 'COMPLETED',
+            processed_at = NOW(),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusToFailed">
+        UPDATE batch_sync_event
+        SET status = 'FAILED',
+            error_message = #{errorMessage},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusToPending">
+        UPDATE batch_sync_event
+        SET status = 'PENDING',
+            started_at = NULL,
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateRetry">
+        UPDATE batch_sync_event
+        SET retry_count = retry_count + 1,
+            next_retry_at = #{nextRetryAt},
+            error_message = #{errorMessage},
+            status = 'PENDING',
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectExpiredEvents" resultType="com.cq.proxy.repository.entity.BatchSyncEvent">
+        SELECT * FROM batch_sync_event
+        WHERE status = 'PENDING'
+          AND expire_at IS NOT NULL
+          AND expire_at &lt; #{now}
+    </select>
+
+    <select id="selectStuckProcessingEvents" resultType="com.cq.proxy.repository.entity.BatchSyncEvent">
+        SELECT * FROM batch_sync_event
+        WHERE status = 'PROCESSING'
+          AND started_at IS NOT NULL
+          AND started_at &lt; #{threshold}
+    </select>
+
+</mapper>

@@ -1,4 +1,4 @@
-package com.cq.panel.admin.server.web.controller.batch;
+package com.cq.panel.admin.server.web.controller.agent;
 
 import com.cq.panel.admin.server.repository.service.IAgentConnectivityService;
 import com.cq.panel.admin.server.web.controller.base.BaseController;

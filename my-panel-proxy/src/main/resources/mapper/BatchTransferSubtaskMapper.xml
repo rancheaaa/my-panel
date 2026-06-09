@@ -2,6 +2,32 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cq.proxy.repository.mapper.BatchTransferSubtaskMapper">
 
+    <insert id="insert" parameterType="com.cq.proxy.repository.entity.BatchTransferSubtask" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO batch_transfer_subtask (
+            id, task_id, scan_batch_id, file_batch_id,
+            source_agent_id, source_agent_name,
+            target_agent_id, target_agent_name,
+            source_path, target_path, file_name, file_size_bytes, file_last_modified,
+            status, transfer_id,
+            transferred_chunks, total_chunks, transferred_bytes, speed_bytes_per_sec,
+            started_at, completed_at, duration_ms,
+            error_code, error_message, error_stack_trace,
+            retry_count, target_count, last_retry_at, next_retry_after,
+            create_by, create_time, update_by, update_time, remark
+        ) VALUES (
+            #{id}, #{taskId}, #{scanBatchId}, #{fileBatchId},
+            #{sourceAgentId}, #{sourceAgentName},
+            #{targetAgentId}, #{targetAgentName},
+            #{sourcePath}, #{targetPath}, #{fileName}, #{fileSizeBytes}, #{fileLastModified},
+            #{status}, #{transferId},
+            #{transferredChunks}, #{totalChunks}, #{transferredBytes}, #{speedBytesPerSec},
+            #{startedAt}, #{completedAt}, #{durationMs},
+            #{errorCode}, #{errorMessage}, #{errorStackTrace},
+            #{retryCount}, #{targetCount}, #{lastRetryAt}, #{nextRetryAfter},
+            #{createBy}, #{createTime}, #{updateBy}, #{updateTime}, #{remark}
+        )
+    </insert>
+
     <update id="updateByEntity" parameterType="com.cq.proxy.repository.entity.BatchTransferSubtask">
         UPDATE batch_transfer_subtask
         <set>
@@ -28,6 +54,46 @@
             <if test="nextRetryAfter != null">next_retry_after = #{nextRetryAfter},</if>
             update_time = NOW()
         </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateProgress">
+        UPDATE batch_transfer_subtask
+        SET transferred_chunks = #{transferredChunks},
+            total_chunks = COALESCE(#{totalChunks}, total_chunks),
+            transferred_bytes = #{transferredBytes},
+            speed_bytes_per_sec = #{speedBytesPerSec},
+            status = 'SENDING',
+            started_at = COALESCE(started_at, NOW()),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusCompleted">
+        UPDATE batch_transfer_subtask
+        SET status = 'COMPLETED',
+            completed_at = NOW(),
+            duration_ms = #{durationMs},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusFailed">
+        UPDATE batch_transfer_subtask
+        SET status = 'FAILED',
+            error_code = #{errorCode},
+            error_message = #{errorMessage},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatusRetrying">
+        UPDATE batch_transfer_subtask
+        SET status = 'RETRYING',
+            retry_count = #{retryCount},
+            last_retry_at = NOW(),
+            next_retry_after = #{nextRetryAfter},
+            update_time = NOW()
         WHERE id = #{id}
     </update>
 

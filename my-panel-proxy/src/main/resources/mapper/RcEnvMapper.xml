@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cq.proxy.repository.mapper.RcEnvMapper">
+
+    <select id="selectByName" resultType="com.cq.proxy.repository.entity.RcEnv">
+        SELECT * FROM rc_env
+        WHERE env_name = #{envName}
+        LIMIT 1
+    </select>
+
+    <insert id="insert" parameterType="com.cq.proxy.repository.entity.RcEnv" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO rc_env (env_name, create_time, update_time)
+        VALUES (#{envName}, #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="updateById" parameterType="com.cq.proxy.repository.entity.RcEnv">
+        UPDATE rc_env
+        SET env_name = #{envName},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

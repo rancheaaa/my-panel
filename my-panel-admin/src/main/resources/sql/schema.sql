@@ -738,7 +738,7 @@ CREATE TABLE IF NOT EXISTS `batch_transfer_task` (
 
 -- 批量传输子任务实例表(文件×目标Agent的笛卡尔积)
 CREATE TABLE IF NOT EXISTS `batch_transfer_subtask` (
-    `id` bigint NOT NULL COMMENT '主键ID',
+    `id` bigint NOT NULL COMMENT '主键ID(Agent上送)',
     `task_id` bigint NOT NULL COMMENT '关联的批量任务ID',
     `scan_batch_id` bigint DEFAULT NULL COMMENT '扫描批次ID(一次调度触发扫描到的N个文件共享)',
     `file_batch_id` bigint DEFAULT NULL COMMENT '文件批次ID(同一文件传输到多个Agent共享)',

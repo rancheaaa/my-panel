@@ -258,7 +258,7 @@ class ProgressReceiverControllerTest {
                                     "sourceAgentId": "agent-001",
                                     "sourceAgentName": "agent@192.168.1.100:8080",
                                     "targetAgentId": "target-001",
-                                    "targetName": "target@192.168.1.200:8080",
+                                    "targetAgentName": "target@192.168.1.200:8080",
                                     "sourcePath": "/data/upload/a7.txt",
                                     "targetPath": "/backup/a7.txt",
                                     "fileName": "a7.txt",
@@ -280,7 +280,27 @@ class ProgressReceiverControllerTest {
         }
 
         @Test
-        @DisplayName("12. POST /api/batch/subtask/status - Agent完成状态上报Date格式解析成功")
+        @DisplayName("12. POST /api/batch/subtask/create - 缺少必填字段返回400")
+        void testCreateSubTask_missingRequiredField_returns400() throws Exception {
+                String incompleteJson = """
+                                {
+                                    "subtaskId": 12345,
+                                    "status": "QUEUED"
+                                }
+                                """;
+
+                mockMvc.perform(post("/api/batch/subtask/create")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(incompleteJson))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value(400));
+
+                verify(progressService, never()).createSubTask(any());
+                System.out.println("✅ 缺少必填字段正确返回400");
+        }
+
+        @Test
+        @DisplayName("13. POST /api/batch/subtask/status - Agent完成状态上报Date格式解析成功")
         void testReceiveStatus_agentCompletedWithDateFormat_success() throws Exception {
                 doNothing().when(progressService).updateSubTaskStatus(any());
 
@@ -312,7 +332,7 @@ class ProgressReceiverControllerTest {
         }
 
         @Test
-        @DisplayName("13. POST /api/batch/subtask/create - 日期字符串格式解析成功")
+        @DisplayName("14. POST /api/batch/subtask/create - 日期字符串格式解析成功")
         void testDateFormat_parsedSuccessfully() throws Exception {
                 when(progressService.createSubTask(any())).thenReturn(12345L);
 
@@ -321,6 +341,10 @@ class ProgressReceiverControllerTest {
                                     "subtaskId": 12345,
                                     "taskId": 1,
                                     "status": "QUEUED",
+                                    "sourceAgentId": "agent-001",
+                                    "targetAgentId": "target-001",
+                                    "sourcePath": "/data/test.txt",
+                                    "targetPath": "/backup/test.txt",
                                     "fileName": "test.txt",
                                     "fileSizeBytes": 512,
                                     "fileLastModified": "2026-05-20 11:12:35",

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cq.proxy.repository.mapper.BatchTransferSubtaskMapper">
 
-    <insert id="insert" parameterType="com.cq.proxy.repository.entity.BatchTransferSubtask" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.cq.proxy.repository.entity.BatchTransferSubtask">
         INSERT INTO batch_transfer_subtask (
             id, task_id, scan_batch_id, file_batch_id,
             source_agent_id, source_agent_name,

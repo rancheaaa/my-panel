@@ -84,48 +84,11 @@ mvn test -Dtest=ClassName#methodName       # Single test method
 - **Proxy**: `com.cq.proxy.ProxyApplication` (port 9876)
 - **Agent**: `com.cq.agent.AgentApplication` (standalone Netty server, configurable port)
 
-## Module Architecture
-
-```
-my-panel/
-├── my-panel-admin/       # Main Spring Boot admin server (port 8888)
-├── my-panel-proxy/       # Registry & config center proxy service (port 9876)
-├── agent/                # Standalone agent for remote command execution & file ops (Netty-based)
-├── my-panel-auth-lite/   # Lightweight auth library (JWT + annotation-based authorization)
-├── my-panel-common/      # Shared utilities & custom load balancer implementations
-├── cli-tools/            # CLI tools for Redis and MySQL operations
-├── distribution/         # Assembly packaging (JDK, Nginx, startup scripts)
-└── my-panel-ui/          # React 19 frontend (Vite + Ant Design 6)
-```
-
-### Dependency Flow
-```
-my-panel-admin → my-panel-auth-lite, my-panel-common
-my-panel-proxy → my-panel-common
-agent → my-panel-common
-distribution → my-panel-admin, my-panel-proxy, agent, cli-tools
-```
+## 
 
 ## Backend Architecture (my-panel-admin)
 
 Entry point: `com.cq.panel.admin.server.App`
-
-### Package Structure
-```
-com.cq.panel.admin.server/
-├── annotation/       # Custom annotations: @Anonymous, @Excel, @Log, @Sensitive
-├── common/           # Constants, enums, utilities
-├── config/           # Spring configuration classes
-├── context/          # Thread-local auth/permission holders
-├── datasource/       # Dynamic datasource support
-├── manager/          # Shutdown hooks
-├── quartz/           # Scheduled job execution
-├── repository/
-│   ├── domain/       # Entity classes (MyBatis POJOs)
-│   └── mapper/       # MyBatis mapper interfaces
-├── service/          # Business logic
-└── web/controller/   # REST controllers
-```
 
 ### Key Patterns
 - **Controllers** extend `BaseController` for common response handling
@@ -137,66 +100,7 @@ com.cq.panel.admin.server/
 - **Password**: Frontend MD5+salt → Backend BCrypt double encryption
 - **Virtual threads**: Enabled via `spring.threads.virtual.enabled=true`
 
-### Controller Domains
-- `system/` - Users, roles, menus, depts, dicts, configs, posts, notices
-- `monitor/` - Dashboard, cache, online users, login/operation logs, jobs, alert rules
-- `rc/` - Registry center (projects, environments, nodes, configs, access tokens)
-- `architecture/` - Architecture diagrams with versioning, tags, favorites
-- `agent/` - Agent registry and command history
-- `batch/` - Batch file transfer operations and monitoring
-- `common/` - Captcha, file upload/download
 
-## Proxy Service (my-panel-proxy)
-
-Entry point: `com.cq.proxy.ProxyApplication`
-
-Acts as a lightweight registry and config center. Key services:
-- `RegistryService` - Service instance registration/discovery
-- `ConfigService` - Distributed configuration management
-- `BatchTaskScheduler` / `RoutingScheduler` - Batch file transfer orchestration with multiple routing strategies (round-robin, random, region-based, broadcast)
-
-Has JaCoCo coverage enforcement (80% instruction coverage on `com.cq.proxy.service.*`).
-
-## Agent Module
-
-Entry point: `com.cq.agent.AgentApplication` (pure Java, no Spring)
-
-A standalone Netty-based HTTP server providing:
-- **Command execution**: `POST /api/execute` (supports Windows & Linux)
-- **File operations**: FTP-like API (LIST, RETR, STOR, DELE, MKD, etc.)
-- **Chunked transfers**: Large file upload/download with RocksDB-backed persistent queues
-- **Agent registration**: Auto-registers with proxy service via `AgentRegistryService`
-
-Key classes:
-- `HttpServer` / `CommonNettyHandler` - Netty HTTP server pipeline
-- `handler/file/*` - Individual FTP command handlers
-- `handler/upload/*` / `handler/download/*` - Chunked transfer handlers
-- `client/upload/` - Client-side upload with persistent queue and retry logic
-
-## Frontend Architecture (my-panel-ui)
-
-- **Framework**: React 19 + Vite 7 + Ant Design 6
-- **Routing**: Dynamic route generation from backend menu API (`src/router/utils.jsx`)
-- **API layer**: `src/api/` organized by domain, using Axios with token interceptor
-- **Mock data**: `src/mock/` provides development mock endpoints
-- **Dev proxy**: Vite proxies `/api` → `http://localhost:8888`
-
-### Frontend Structure
-```
-src/
-├── api/          # API service modules
-├── components/   # Reusable components (BrandIcon, IconSelect, TagsView, ResizableTable)
-├── layout/       # MainLayout with sidebar navigation
-├── mock/         # Mock data for development
-├── pages/        # Page components organized by domain
-│   ├── arch/     # Architecture diagram editor
-│   ├── monitor/  # Monitoring dashboards
-│   ├── op/       # Operations (agent manage, command history)
-│   ├── rc/       # Registry center UI
-│   └── system/   # System management
-├── router/       # Route generation from backend menu config
-└── utils/        # Utilities (request.js with Axios, crypto.js for MD5)
-```
 
 ## Deployment
 

@@ -201,6 +201,12 @@
         background: transparent !important;
       }
 
+      /* 防止固定列 sticky 堆叠上下文与弹层竞争 */
+      .ant-table-cell-fix-left,
+      .ant-table-cell-fix-right {
+        isolation: isolate;
+      }
+
       .ant-checkbox-wrapper {
         .ant-checkbox-inner {
           border-radius: 4px;

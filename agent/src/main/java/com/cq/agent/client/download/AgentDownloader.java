@@ -109,6 +109,7 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                 downloadChunks(task);
                 task.setDownloadChunksEndTime(Util.currentTime());
                 updateTaskStatus(task, DownloadTaskStatus.DOWNLOAD_CHUNKS_COMPLETED);
+                applyRateLimit((int) task.getTotalSize(), traceId);
             } catch (IOException e) {
                 logger.error("[traceId={}] Chunk download failed", traceId, e);
                 throw e;
@@ -592,9 +593,6 @@ public class AgentDownloader extends BaseAgentClient<DownloadTask, DownloadListe
                                         "Chunk size mismatch for chunk %d: expected=%d, actual=%d",
                                         chunkIndex, expectedChunkSize, chunkSize));
                             }
-
-                            applyRateLimit((int) chunkSize, traceId);
-
                             task.incrementDownloadChunksCount();
                             int currentDownloaded = task.getDownloadedChunksCount();
                             task.updateTimestamp();

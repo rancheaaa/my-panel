@@ -1,7 +1,6 @@
 package com.cq.panel.admin.server.common.utils.ip;
 
 import com.cq.panel.admin.server.common.utils.JsonUtils;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.cq.panel.admin.server.common.utils.spring.SpringUtils;
 import com.cq.panel.admin.server.config.AppConfig;
 import com.cq.panel.admin.server.common.constant.Constants;
@@ -42,9 +41,9 @@ public class AddressUtils
                     log.error("获取地理位置异常 {}", ip);
                     return UNKNOWN;
                 }
-                JsonNode obj = JsonUtils.getObjectMapper().readValue(rspStr, JsonNode.class);
-                String region = obj.get("pro").asText();
-                String city = obj.get("city").asText();
+                IpLocationResult obj = JsonUtils.getObjectMapper().readValue(rspStr, IpLocationResult.class);
+                String region = obj.getPro();
+                String city = obj.getCity();
                 return String.format("%s %s", region, city);
             }
             catch (Exception e)

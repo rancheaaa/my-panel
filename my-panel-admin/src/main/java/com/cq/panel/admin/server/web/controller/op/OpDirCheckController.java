@@ -8,7 +8,6 @@ import com.cq.panel.authlite.annotation.RequirePermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "目录检测", description = "检测指定Agent节点上指定目录的存在性、读写执行权限、磁盘空间等")
@@ -16,8 +15,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/op/dir-check")
 public class OpDirCheckController extends BaseController {
 
-    @Autowired
-    private IDirectoryCheckService directoryCheckService;
+    private final IDirectoryCheckService directoryCheckService;
+
+    public OpDirCheckController(IDirectoryCheckService directoryCheckService) {
+        this.directoryCheckService = directoryCheckService;
+    }
 
     @Operation(summary = "单节点目录检测", description = "检测指定Agent节点上指定目录的存在性、读写执行权限、磁盘空间等")
     @RequirePermission("op:dirCheck:query")

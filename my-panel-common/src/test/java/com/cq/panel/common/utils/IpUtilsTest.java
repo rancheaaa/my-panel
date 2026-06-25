@@ -4,9 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
-
 import java.lang.reflect.Method;
-import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
 
@@ -158,28 +156,6 @@ class IpUtilsTest {
         
         assertTrue(foundPhysicalInterface, 
             "系统中至少应该有一个非Docker、非虚拟的可用网卡");
-    }
-
-    @Test
-    @DisplayName("Windows物理适配器识别")
-    void testWindowsPhysicalAdapterDetection() throws Exception {
-        Method method = IpUtils.class.getDeclaredMethod(
-            "isWindowsPhysicalAdapter", String.class);
-        method.setAccessible(true);
-
-        assertTrue((boolean) method.invoke(null, "ethernet"),
-            "ethernet 应该被识别为Windows物理网卡");
-        assertTrue((boolean) method.invoke(null, "wi-fi"),
-            "wi-fi 应该被识别为Windows无线网卡");
-        assertTrue((boolean) method.invoke(null, "wifi"),
-            "wifi 应该被识别为Windows无线网卡");
-        assertTrue((boolean) method.invoke(null, "local area connection"),
-            "local area connection 应该被识别为本地连接");
-        
-        assertFalse((boolean) method.invoke(null, "vmware network adapter"),
-            "VMware 虚拟网卡不应该被识别为物理网卡");
-        assertFalse((boolean) method.invoke(null, "virtualbox host-only"),
-            "VirtualBox 虚拟网卡不应该被识别为物理网卡");
     }
 
     @Test

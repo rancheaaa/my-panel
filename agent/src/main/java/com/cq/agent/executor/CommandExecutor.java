@@ -2,7 +2,6 @@ package com.cq.agent.executor;
 
 import com.cq.agent.config.AgentConfig;
 import com.cq.panel.common.dto.agent.AgentExecuteCommandResponse;
-import com.google.inject.Inject;
 import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +33,6 @@ public class CommandExecutor {
 
     private final ExecutorService virtualThreadPool;
 
-    @Inject
     public CommandExecutor(AgentConfig config) {
         this.defaultTimeoutSeconds = config.getDefaultTimeoutSeconds();
         this.maxTimeoutSeconds = config.getMaxTimeoutSeconds();

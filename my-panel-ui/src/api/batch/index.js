@@ -329,5 +329,39 @@ export const batchApi = {
       method: 'get',
       params: { sourceNodeName, targetNodeName }
     });
+  },
+
+  /**
+   * 导出Agent配置文件(zip)
+   */
+  exportAgentConfig(sourceAgentId) {
+    return request({
+      url: '/batch/config-export/download',
+      method: 'post',
+      data: { sourceAgentId },
+      responseType: 'blob'
+    });
+  },
+
+  /**
+   * 校验Agent配置
+   */
+  verifyAgentConfig(sourceAgentId) {
+    return request({
+      url: '/batch/config-verify/verify',
+      method: 'post',
+      data: { sourceAgentId }
+    });
+  },
+
+  /**
+   * 强制推送配置到Agent
+   */
+  pushAgentConfig(sourceAgentId) {
+    return request({
+      url: '/batch/config-verify/push',
+      method: 'post',
+      data: { sourceAgentId }
+    });
   }
 };

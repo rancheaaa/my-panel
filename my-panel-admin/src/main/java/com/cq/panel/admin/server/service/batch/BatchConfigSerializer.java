@@ -6,51 +6,48 @@ import com.cq.panel.common.dto.batch.RetryConfig;
 import com.cq.panel.common.dto.batch.ScanConfig;
 import com.cq.panel.common.dto.batch.TargetAgentInfo;
 import com.cq.panel.common.dto.batch.TransferConfig;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.springframework.stereotype.Component;
 
 /**
  * JSON序列化工具
+ * 使用Gson与Agent端保持完全一致的序列化行为，确保MD5一致性
  * 将Admin的BatchTransferTask实体转换为Agent端公共Bean AgentTaskConfig
- * 确保字段数量和格式与spec.md设计一致
  */
 @Component
 public class BatchConfigSerializer {
 
-  private final ObjectMapper objectMapper;
-
-  public BatchConfigSerializer() {
-    this.objectMapper = createObjectMapper();
-  }
-
-  public BatchConfigSerializer(ObjectMapper objectMapper) {
-    this.objectMapper = objectMapper;
-  }
+  /** 与Agent端ConfigFileManager中完全一致的Gson实例 */
+  private static final Gson GSON = new GsonBuilder()
+      .setPrettyPrinting()
+      .create();
 
   public <T> String serialize(T object) throws SerializationException {
     try {
-      return objectMapper.writeValueAsString(object);
-    } catch (JsonProcessingException e) {
+      return GSON.toJson(object);
+    } catch (Exception e) {
       throw new SerializationException("序列化失败: " + e.getMessage(), e);
     }
   }
 
   /**
    * 将Admin实体转换为公共AgentTaskConfig Bean并序列化为JSON
-   * 确保Admin写入的字段数量和格式与Agent使用的一致，符合spec.md设计
+   * 使用Gson序列化，与Agent端ConfigFileManager.saveTaskConfig()行为完全一致
    */
   public String serializeForAgent(BatchTransferTask task) throws SerializationException {
     try {
@@ -73,14 +70,15 @@ public class BatchConfigSerializer {
       if (task.getStartedAt() != null) {
         config.setStartedAt(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'").format(task.getStartedAt()));
       }
-      return objectMapper.writeValueAsString(config);
-    } catch (JsonProcessingException e) {
+      // 使用Gson序列化，与Agent端完全一致
+      return GSON.toJson(config);
+    } catch (Exception e) {
       throw new SerializationException("Agent格式序列化失败: " + e.getMessage(), e);
     }
   }
 
   private List<TargetAgentInfo> buildTargetAgents(BatchTransferTask task) {
-    List<String> targetDirs = parseToArray(task.getTargetDirs(), ";");
+    List<String> targetDirs = parseToArray(task.getTargetDirs());
     List<String> agentIds = parseJsonArray(task.getTargetAgentIds());
     List<String> agentNames = parseJsonArray(task.getTargetAgentNames());
     int size = Math.max(targetDirs.size(), Math.max(agentIds.size(), agentNames.size()));
@@ -138,12 +136,12 @@ public class BatchConfigSerializer {
     return retryConfig;
   }
 
-  private List<String> parseToArray(String value, String delimiter) {
+  private List<String> parseToArray(String value) {
     if (value == null || value.trim().isEmpty()) {
       return Collections.emptyList();
     }
-    return Arrays.asList(value.split(delimiter)).stream()
-        .map(s -> s.trim()).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+    return Arrays.stream(value.split(";"))
+        .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
   }
 
   @SuppressWarnings("unchecked")
@@ -154,31 +152,43 @@ public class BatchConfigSerializer {
     String str = value.trim();
     if (str.startsWith("[") && str.endsWith("]")) {
       try {
-        return objectMapper.readValue(str, List.class);
-      } catch (Exception e) {
-        return Arrays.asList(str.replace("[", "").replace("]", "").split(",")).stream()
+        return GSON.fromJson(str, List.class);
+      } catch (JsonSyntaxException e) {
+        return Arrays.stream(str.replace("[", "").replace("]", "").split(","))
             .map(s -> s.trim().replaceAll("^\"|\"$", "")).filter(s -> !s.isEmpty()).collect(Collectors.toList());
       }
     }
     return Collections.singletonList(str);
   }
 
+  /**
+   * 将配置文件Map打包为ZIP字节数组
+   */
+  public byte[] generateConfigZip(Map<String, String> configs) {
+    try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+         ZipOutputStream zos = new ZipOutputStream(baos)) {
+      for (Map.Entry<String, String> entry : configs.entrySet()) {
+        ZipEntry zipEntry = new ZipEntry(entry.getKey());
+        zos.putNextEntry(zipEntry);
+        zos.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+        zos.closeEntry();
+      }
+      zos.flush();
+      return baos.toByteArray();
+    } catch (Exception e) {
+      throw new SerializationException("生成配置ZIP失败: " + e.getMessage(), e);
+    }
+  }
+
   public <T> T deserialize(String json, Class<T> clazz) throws DeserializationException {
     try {
-      return objectMapper.readValue(json, clazz);
-    } catch (IOException e) {
+      return GSON.fromJson(json, clazz);
+    } catch (Exception e) {
       throw new DeserializationException("反序列化失败: " + e.getMessage(), e);
     }
   }
 
-  private static ObjectMapper createObjectMapper() {
-    ObjectMapper mapper = new ObjectMapper();
-    mapper.registerModule(new JavaTimeModule());
-    mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    return mapper;
-  }
-
+  @SuppressWarnings("all")
   public static class SerializationException extends RuntimeException {
     public SerializationException(String message) {
       super(message);
@@ -189,6 +199,7 @@ public class BatchConfigSerializer {
     }
   }
 
+  @SuppressWarnings("all")
   public static class DeserializationException extends RuntimeException {
     public DeserializationException(String message) {
       super(message);

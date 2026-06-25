@@ -372,13 +372,13 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         try (FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             for (int i = 0; i < totalToUpload; i++) {
                 final int chunkIndex = missingChunks.get(i);
+                byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
                 CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                     try {
-                        byte[] chunkData = readChunk(channel, chunkIndex, task.getChunkSize(), task.getTotalSize());
-                        applyRateLimit(chunkData.length, traceId);
                         if (listener != null) {
                             handleListenerBeforeSend(transferId, task);
                         }
+                        applyRateLimit(chunkData.length, traceId);
                         ApiResponse<ChunkUploadResponse> uploadResponse = uploadChunk(task, chunkIndex, chunkData);
                         if (!uploadResponse.isSuccess()) {
                             throw new IOException("Chunk upload failed: " + uploadResponse.getMsg());
@@ -401,29 +401,13 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
                 }, chunkExecutor);
                 uploadFutures.add(future);
             }
-
-            long waves = (long) Math.ceil((double) totalToUpload / this.concurrentThreads);
-            long estimatedRateLimitMsPerChunk = estimateRateLimitTimeMsPerChunk(task.getChunkSize());
-            long perChunkTimeMs = Math.max(this.requestTimeoutSeconds * 1000L, estimatedRateLimitMsPerChunk);
-            long timeoutMs = Math.max(60_000L, (waves + 2) * perChunkTimeMs);
-
-            boolean completedInTime;
             try {
-                completedInTime = completionLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
+                completionLatch.await();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 cancelAllFutures(uploadFutures);
                 throw new IOException("Chunk upload interrupted", e);
             }
-
-            if (!completedInTime) {
-                cancelAllFutures(uploadFutures);
-                int succeeded = totalToUpload - failedCount.get();
-                throw new IOException(String.format(
-                        "Chunk uploads timed out after %d seconds: %d/%d chunks completed (%d failed), %d still pending",
-                        timeoutMs / 1000, succeeded, totalToUpload, failedCount.get(), completionLatch.getCount()));
-            }
-
             int failed = failedCount.get();
             if (failed > 0) {
                 int succeeded = totalToUpload - failed;
@@ -435,13 +419,6 @@ public class AgentUploader extends BaseAgentClient<UploadTask, UploadListener> i
         } catch (Exception e) {
             throw new IOException("Failed to upload chunks", e);
         }
-    }
-
-    private long estimateRateLimitTimeMsPerChunk(int chunkSize) {
-        if (rateLimiter == null || maxRateKBPerSecond <= 0 || chunkSize <= 0) {
-            return 0;
-        }
-        return (long) ((double) chunkSize / (maxRateKBPerSecond * 1024L)) * 1000;
     }
 
     private void cancelAllFutures(List<CompletableFuture<Void>> futures) {

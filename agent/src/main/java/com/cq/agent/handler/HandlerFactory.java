@@ -5,6 +5,8 @@ import com.cq.agent.batch.config.ConfigFileManager;
 import com.cq.agent.client.upload.BatchTaskSchedulerUploader;
 import com.cq.agent.handler.batch.BatchConfigReceiveHandler;
 import com.cq.agent.handler.batch.BatchTaskControlHandler;
+import com.cq.agent.handler.batch.ConfigPushHandler;
+import com.cq.agent.handler.batch.ConfigVerifyHandler;
 import com.cq.agent.handler.download.ChunkDownloadHandler;
 import com.cq.agent.handler.download.ChunkDownloadInfoHandler;
 import com.cq.agent.handler.upload.*;
@@ -65,6 +67,14 @@ public class HandlerFactory {
         
         // Batch task control (pause/resume/delete)
         handlerMap.put("/api/batch/task/control", new BatchTaskControlHandler(batchTaskUploader));
+
+        // Config verify and push
+        ConfigVerifyHandler configVerifyHandler = new ConfigVerifyHandler(configFileManager);
+        ConfigPushHandler configPushHandler = new ConfigPushHandler(configFileManager);
+        handlerMap.put("/api/config/verify", configVerifyHandler);
+        handlerMap.put("/api/config/push/init", configPushHandler);
+        handlerMap.put("/api/config/push/chunk", configPushHandler);
+        handlerMap.put("/api/config/push/complete", configPushHandler);
 
         // Connectivity probe
         handlerMap.put("/api/probe", new ProbeHandler(fileService, chunkedTransferService));

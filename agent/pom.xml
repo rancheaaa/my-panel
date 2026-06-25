@@ -38,12 +38,6 @@
             <artifactId>netty-handler</artifactId>
         </dependency>
 
-        <!-- Guava -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-
         <!-- JSON processing -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -54,20 +48,6 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-exec</artifactId>
-        </dependency>
-
-        <!-- Guice DI -->
-        <dependency>
-            <groupId>com.google.inject</groupId>
-            <artifactId>guice</artifactId>
-            <version>7.0.0</version>
-        </dependency>
-
-
-        <!-- Quartz Scheduler -->
-        <dependency>
-            <groupId>org.quartz-scheduler</groupId>
-            <artifactId>quartz</artifactId>
         </dependency>
 
         <!-- Logging -->
@@ -121,6 +101,30 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-agent-properties</id>
+                        <phase>compile</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/src/main/resources</directory>
+                                    <includes>
+                                        <include>agent.properties</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.6.0</version>
                 <executions>
@@ -129,7 +133,7 @@
                         <goals><goal>shade</goal></goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <minimizeJar>true</minimizeJar>
+                            <minimizeJar>false</minimizeJar>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -150,6 +154,31 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <plugin>
+                <groupId>org.graalvm.buildtools</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+                <version>0.10.3</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <mainClass>com.cq.agent.AgentApplication</mainClass>
+                    <imageName>my-agent</imageName>
+                    <buildArgs>
+                        <arg>--no-fallback</arg>
+                        <arg>-H:+ReportExceptionStackTraces</arg>
+                        <arg>-H:+UnlockExperimentalVMOptions</arg>
+                        <arg>--initialize-at-build-time=org.slf4j,org.apache.commons.exec</arg>
+                        <arg>--initialize-at-run-time=ch.qos.logback,io.netty,org.quartz</arg>
+                        <arg>-H:IncludeResources=logback.xml|agent.properties|quartz.properties|META-INF/services/.*</arg>
+                        <arg>-H:+AddAllCharsets</arg>
+                        <arg>--enable-url-protocols=http,https</arg>
+                    </buildArgs>
+                    <metadataRepository>
+                        <enabled>true</enabled>
+                    </metadataRepository>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

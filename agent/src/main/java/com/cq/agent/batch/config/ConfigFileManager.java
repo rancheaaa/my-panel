@@ -178,6 +178,22 @@ public class ConfigFileManager {
         return metaCache;
     }
 
+    /**
+     * 获取配置文件目录
+     */
+    public File getConfigDir() {
+        return new File(configDir);
+    }
+
+    /**
+     * 从磁盘重新加载所有配置文件到内存缓存
+     */
+    public void reloadFromDisk() {
+        metaCache.clear();
+        loadExistingMeta();
+        log.info("重新加载配置完成: count={}", metaCache.size());
+    }
+
     // ==================== 内部方法 ====================
 
     private void loadExistingMeta() {

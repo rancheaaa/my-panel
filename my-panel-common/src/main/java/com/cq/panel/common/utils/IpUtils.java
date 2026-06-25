@@ -2,7 +2,6 @@ package com.cq.panel.common.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -112,7 +111,7 @@ public class IpUtils {
                 return Integer.compare(scoreB, scoreA);
             });
             
-            NetworkInterfaceInfo selected = candidates.get(0);
+            NetworkInterfaceInfo selected = candidates.getFirst();
             log.info("Selected network interface: {} ({}) - IP: {}", 
                 selected.networkInterface.getName(),
                 selected.networkInterface.getDisplayName(),
@@ -124,7 +123,8 @@ public class IpUtils {
         }
         return null;
     }
-    
+
+    @SuppressWarnings("all")
     static class NetworkInterfaceInfo {
         final NetworkInterface networkInterface;
         final InetAddress address;
@@ -139,28 +139,33 @@ public class IpUtils {
     static int calculateInterfaceScore(NetworkInterface networkInterface) {
         int score = 0;
         String name = networkInterface.getName().toLowerCase();
-        
+        String displayName = networkInterface.getDisplayName().toLowerCase();
+
         try {
+            // 无线网卡
+            if (isWirelessName(name) || isWirelessName(displayName)) {
+                score += 1;
+                return score;
+            }
+
             if (networkInterface.getHardwareAddress() != null && networkInterface.getHardwareAddress().length > 0) {
                 score += 100;
             }
-            
+
             if (networkInterface.getMTU() == 1500) {
                 score += 50;
             }
-            
+
             if (name.matches("eth\\d+") || name.matches("ens\\d+") || name.matches("enp\\d+s\\d+")) {
                 score += 200;
             } else if (name.matches("em\\d+")) {
                 score += 180;
             } else if (name.startsWith("bond")) {
                 score += 150;
-            } else if (isWindowsPhysicalAdapter(name)) {
+            } else if (isWindowsPhysicalAdapter(name, displayName)) {
                 score += 190;
-            } else if (name.startsWith("wlan") || name.startsWith("wlx")) {
-                score -= 100;
             }
-            
+
             try {
                 java.lang.reflect.Method speedMethod = NetworkInterface.class.getMethod("getSpeed");
                 Long speed = (Long) speedMethod.invoke(networkInterface);
@@ -170,25 +175,42 @@ public class IpUtils {
             } catch (Exception e) {
                 //
             }
-            
+
         } catch (Exception e) {
             log.debug("计算网卡评分失败: {}", name, e);
         }
-        
+
         return score;
     }
 
-    private static boolean isWindowsPhysicalAdapter(String name) {
+    private static boolean isWindowsPhysicalAdapter(String name, String displayName) {
         String[] windowsPhysicalPatterns = {
-            "ethernet", "wi-fi", "wifi", "local", "连接"
+            "ethernet", "local", "连接"
         };
-        
+        String lowerName = name.toLowerCase();
+        String lowerDisplayName = displayName.toLowerCase();
+
         for (String pattern : windowsPhysicalPatterns) {
-            if (name.contains(pattern.toLowerCase())) {
+            if (lowerName.contains(pattern) || lowerDisplayName.contains(pattern)) {
+                // 额外确认不是无线网卡伪装成有线
+                if (!isWirelessName(lowerName) && !isWirelessName(lowerDisplayName)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean isWirelessName(String text) {
+        String[] wirelessPatterns = {
+            "wi-fi", "wifi", "wireless", "wlan", "802.11", "无线", "Wireless"
+        };
+        for (String pattern : wirelessPatterns) {
+            if (text.contains(pattern)) {
                 return true;
             }
         }
-        
         return false;
     }
 
@@ -232,12 +254,8 @@ public class IpUtils {
                 return true;
             }
         }
-        
-        if (isDockerInternalNetwork(name, displayName)) {
-            return true;
-        }
-        
-        return false;
+
+        return isDockerInternalNetwork(name, displayName);
     }
 
     private static boolean isDockerInternalNetwork(String name, String displayName) {
@@ -252,12 +270,8 @@ public class IpUtils {
         if (displayName.contains("Docker NAT") || displayName.contains("docker0")) {
             return true;
         }
-        
-        if (name.startsWith("virbr")) {
-            return true;
-        }
-        
-        return false;
+
+        return name.startsWith("virbr");
     }
     
     private static boolean isVirtualInterface(String displayName, String name) {

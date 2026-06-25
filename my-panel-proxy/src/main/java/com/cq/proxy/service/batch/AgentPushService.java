@@ -1,8 +1,11 @@
 package com.cq.proxy.service.batch;
 
+import com.cq.proxy.dto.AgentCommonResponse;
+import com.cq.proxy.dto.AgentConfigPersistedData;
+import com.cq.proxy.dto.AgentDeleteConfirmData;
 import com.cq.proxy.repository.entity.AgentRegistry;
 import com.cq.proxy.repository.mapper.AgentRegistryMapper;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.slf4j.Logger;
@@ -174,12 +177,13 @@ public class AgentPushService {
             return false;
         }
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            if (!root.path("success").asBoolean(false)) {
+            AgentCommonResponse<AgentConfigPersistedData> response =
+                    objectMapper.readValue(responseBody,
+                            new TypeReference<AgentCommonResponse<AgentConfigPersistedData>>() {});
+            if (!Boolean.TRUE.equals(response.getSuccess())) {
                 return false;
             }
-            JsonNode data = root.path("data");
-            return data.path("configPersisted").asBoolean(false);
+            return response.getData() != null && Boolean.TRUE.equals(response.getData().getConfigPersisted());
         } catch (Exception e) {
             log.warn("⚠️ 解析Agent响应失败: {}, error={}", responseBody, e.getMessage());
             return false;
@@ -198,12 +202,17 @@ public class AgentPushService {
             return false;
         }
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            if (!root.path("success").asBoolean(false)) {
+            AgentCommonResponse<AgentDeleteConfirmData> response =
+                    objectMapper.readValue(responseBody,
+                            new TypeReference<AgentCommonResponse<AgentDeleteConfirmData>>() {});
+            if (!Boolean.TRUE.equals(response.getSuccess())) {
                 return false;
             }
-            JsonNode data = root.path("data");
-            return data.path("success").asBoolean(false) || data.path("deleted").asBoolean(false);
+            if (response.getData() == null) {
+                return false;
+            }
+            return Boolean.TRUE.equals(response.getData().getSuccess())
+                    || Boolean.TRUE.equals(response.getData().getDeleted());
         } catch (Exception e) {
             log.warn("⚠️ 解析Agent删除响应失败: {}, error={}", responseBody, e.getMessage());
             return false;

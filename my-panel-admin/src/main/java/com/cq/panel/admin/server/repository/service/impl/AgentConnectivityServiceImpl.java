@@ -3,26 +3,23 @@ package com.cq.panel.admin.server.repository.service.impl;
 import com.cq.panel.admin.server.repository.domain.AgentRegistry;
 import com.cq.panel.admin.server.repository.mapper.AgentRegistryMapper;
 import com.cq.panel.admin.server.repository.service.IAgentConnectivityService;
+import com.cq.panel.admin.server.service.ProxyClientService;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO.PortProbeResult;
 import com.cq.panel.admin.server.web.domain.vo.batch.AgentConnectivityVO.Status;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentProbeData;
+import com.cq.panel.admin.server.web.domain.dto.proxy.AgentResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.PingResult;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
+import com.cq.panel.admin.server.web.domain.dto.proxy.TcpProbeResultData;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.cq.panel.common.utils.IpUtils;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.URI;
 import java.net.UnknownHostException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,18 +28,15 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentConnectivityServiceImpl.class);
 
-    private static final int CONNECT_TIMEOUT_MS = 5000;
-    private static final int HTTP_TIMEOUT_S = 10;
-
     private final AgentRegistryMapper agentRegistryMapper;
-    private final ObjectMapper objectMapper;
+    private final ProxyClientService proxyClientService;
 
     @Value("${server.port:8888}")
     private int adminPort;
 
-    public AgentConnectivityServiceImpl(AgentRegistryMapper agentRegistryMapper, ObjectMapper objectMapper) {
+    public AgentConnectivityServiceImpl(AgentRegistryMapper agentRegistryMapper, ProxyClientService proxyClientService) {
         this.agentRegistryMapper = agentRegistryMapper;
-        this.objectMapper = objectMapper;
+        this.proxyClientService = proxyClientService;
     }
 
     private String getAdminAddress() {
@@ -63,101 +57,143 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
 
         if (!validateInput(vo, sourceNodeName, targetNodeName, details)) {
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：输入校验未通过"));
+            vo.setReverseCheckDetails(List.of("⏳ 跳过：输入校验未通过"));
             return vo;
         }
 
         AgentRegistry source = agentRegistryMapper.selectByNodeName(sourceNodeName);
-        if (!checkSourceExists(vo, source, sourceNodeName, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点不存在"));
-            return vo;
-        }
-
         AgentRegistry target = agentRegistryMapper.selectByNodeName(targetNodeName);
-        if (!checkTargetExists(vo, target, targetNodeName, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点不存在"));
-            return vo;
-        }
 
-        if (!checkSourceOnline(vo, source, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点离线"));
-            return vo;
-        }
+        boolean sourceExists = source != null;
+        boolean targetExists = target != null;
+        vo.setSourceExists(sourceExists);
+        vo.setTargetExists(targetExists);
 
-        if (!checkSourceEnabled(vo, source, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源节点已禁用"));
-            return vo;
-        }
+        boolean sourceOnline = sourceExists && source.getNodeStatus() != null && source.getNodeStatus() == 1;
+        boolean targetOnline = targetExists && target.getNodeStatus() != null && target.getNodeStatus() == 1;
+        vo.setSourceOnline(sourceOnline);
+        vo.setTargetOnline(targetOnline);
 
-        if (!checkTargetOnline(vo, target, details)) {
-            vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点离线"));
-            return vo;
-        }
+        boolean sourceEnabled = sourceExists && source.getNodeEnabled() != null && source.getNodeEnabled() == 0;
+        boolean targetEnabled = targetExists && target.getNodeEnabled() != null && target.getNodeEnabled() == 0;
+        vo.setSourceEnabled(sourceEnabled);
+        vo.setTargetEnabled(targetEnabled);
 
-        if (!checkTargetEnabled(vo, target, details)) {
+        if (sourceExists) { vo.setSourceIp(source.getAgentIp()); vo.setSourcePort(source.getAgentPort()); }
+        if (targetExists) { vo.setTargetIp(target.getAgentIp()); vo.setTargetPort(target.getAgentPort()); }
+
+        Status firstFailure = null;
+        String firstFailureReason = null;
+
+        if (!sourceExists) {
+            details.add("❌ 源节点 [" + sourceNodeName + "] 在注册表中不存在");
+            if (firstFailure == null) { firstFailure = Status.SOURCE_NOT_FOUND; firstFailureReason = "源节点不存在: " + sourceNodeName; }
+        } else { details.add("✅ 源节点 [" + sourceNodeName + "] 存在，IP: " + source.getAgentIp() + ":" + source.getAgentPort()); }
+
+        if (!targetExists) {
+            details.add("❌ 目标节点 [" + targetNodeName + "] 在注册表中不存在");
+            if (firstFailure == null) { firstFailure = Status.TARGET_NOT_FOUND; firstFailureReason = "目标节点不存在: " + targetNodeName; }
+        } else { details.add("✅ 目标节点 [" + targetNodeName + "] 存在，IP: " + target.getAgentIp() + ":" + target.getAgentPort()); }
+
+        if (sourceExists && !sourceOnline) {
+            details.add("❌ 源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()));
+            if (firstFailure == null) {
+                firstFailure = Status.SOURCE_OFFLINE;
+                firstFailureReason = "源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus());
+            }
+        } else if (sourceExists) { details.add("✅ 源节点在线"); }
+
+        if (sourceExists && !sourceEnabled) {
+            details.add("❌ 源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()));
+            if (firstFailure == null) {
+                firstFailure = Status.SOURCE_DISABLED;
+                firstFailureReason = "源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled());
+            }
+        } else if (sourceExists) { details.add("✅ 源节点已启用"); }
+
+        if (targetExists && !targetOnline) {
+            details.add("❌ 目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()));
+            if (firstFailure == null) {
+                firstFailure = Status.TARGET_OFFLINE;
+                firstFailureReason = "目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus());
+            }
+        } else if (targetExists) { details.add("✅ 目标节点在线"); }
+
+        if (targetExists && !targetEnabled) {
+            details.add("❌ 目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()));
+            if (firstFailure == null) {
+                firstFailure = Status.TARGET_DISABLED;
+                firstFailureReason = "目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled());
+            }
+        } else if (targetExists) { details.add("✅ 目标节点已启用"); }
+
+        if (firstFailure != null) {
+            vo.setConnectivityStatus(firstFailure.name());
+            vo.setFailureReason(firstFailureReason);
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：目标节点已禁用"));
+            vo.setReverseCheckDetails(List.of("⏳ 跳过：前置检查未通过"));
             return vo;
         }
 
         String adminAddr = getAdminAddress();
 
-        // Layer 1: Admin → Source
-        PortProbeResult adminToSource = probePort("admin", "源Agent", source.getAgentIp(), source.getAgentPort());
-        vo.setAdminToSource(adminToSource);
-        if (!adminToSource.isReachable()) {
-            details.add("❌ Admin[" + adminAddr + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + adminToSource.getFailureReason());
+        PortProbeResult adminToProxy = probeProxy();
+        vo.setAdminToProxy(adminToProxy);
+        if (!adminToProxy.isReachable()) {
+            details.add("❌ Admin[" + adminAddr + "] -> Proxy 不可达 - " + adminToProxy.getFailureReason());
+            vo.setConnectivityStatus(Status.ADMIN_TO_PROXY_UNREACHABLE.name());
+            vo.setFailureReason("Admin无法连接Proxy服务: " + adminToProxy.getFailureReason());
+            vo.setCheckDetails(details);
+            vo.setReverseCheckDetails(List.of("⏳ 跳过：Admin无法连接Proxy"));
+            return vo;
+        }
+        details.add("✅ Admin[" + adminAddr + "] -> Proxy 可达");
+
+        PortProbeResult proxyToSource = probePort("proxy", "源Agent", source.getAgentIp(), source.getAgentPort());
+        vo.setAdminToSource(proxyToSource);
+        if (!proxyToSource.isReachable()) {
+            details.add("❌ Proxy -> 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + proxyToSource.getFailureReason());
             vo.setConnectivityStatus(Status.ADMIN_TO_SOURCE_UNREACHABLE.name());
-            vo.setFailureReason("Admin无法连接源Agent: " + adminToSource.getFailureReason());
+            vo.setFailureReason("Proxy无法连接源Agent: " + proxyToSource.getFailureReason());
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接源Agent"));
+            vo.setReverseCheckDetails(List.of("⏳ 跳过：Proxy无法连接源Agent"));
             return vo;
         }
-        details.add("✅ Admin[" + adminAddr + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
+        details.add("✅ Proxy -> 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
 
-        // Layer 2: Admin → Target
-        PortProbeResult adminToTarget = probePort("admin", "目标Agent", target.getAgentIp(), target.getAgentPort());
-        vo.setAdminToTarget(adminToTarget);
-        if (!adminToTarget.isReachable()) {
-            details.add("❌ Admin[" + adminAddr + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + adminToTarget.getFailureReason());
+        PortProbeResult proxyToTarget = probePort("proxy", "目标Agent", target.getAgentIp(), target.getAgentPort());
+        vo.setAdminToTarget(proxyToTarget);
+        if (!proxyToTarget.isReachable()) {
+            details.add("❌ Proxy -> 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + proxyToTarget.getFailureReason());
             vo.setConnectivityStatus(Status.ADMIN_TO_TARGET_UNREACHABLE.name());
-            vo.setFailureReason("Admin无法连接目标Agent: " + adminToTarget.getFailureReason());
+            vo.setFailureReason("Proxy无法连接目标Agent: " + proxyToTarget.getFailureReason());
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：Admin无法连接目标Agent"));
+            vo.setReverseCheckDetails(List.of("⏳ 跳过：Proxy无法连接目标Agent"));
             return vo;
         }
-        details.add("✅ Admin[" + adminAddr + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
+        details.add("✅ Proxy -> 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
 
-        // Layer 3: Source → Target (via agent probe API)
-        PortProbeResult sourceToTarget = probeViaAgent(source.getAgentIp(), source.getAgentPort(),
-                target.getAgentIp(), target.getAgentPort());
+        PortProbeResult sourceToTarget = probeViaAgent(source.getId(), target.getAgentIp(), target.getAgentPort());
         vo.setSourceToTarget(sourceToTarget);
         if (!sourceToTarget.isReachable()) {
-            details.add("❌ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + sourceToTarget.getFailureReason());
+            details.add("❌ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] -> 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 不可达 - " + sourceToTarget.getFailureReason());
             vo.setConnectivityStatus(Status.SOURCE_TO_TARGET_UNREACHABLE.name());
             vo.setFailureReason("源Agent无法连接目标Agent: " + sourceToTarget.getFailureReason());
             vo.setCheckDetails(details);
-            vo.setReverseCheckDetails(List.of("⏭️ 跳过：源Agent无法连接目标Agent"));
+            vo.setReverseCheckDetails(List.of("⏳ 跳过：源Agent无法连接目标Agent"));
             return vo;
         }
-        details.add("✅ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] → 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
+        details.add("✅ 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] -> 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] 可达");
 
-        // Layer 4: Target → Source (via target agent probe API)
         List<String> reverseDetails = new ArrayList<>();
-        PortProbeResult targetToSource = probeViaAgent(target.getAgentIp(), target.getAgentPort(),
-                source.getAgentIp(), source.getAgentPort());
+        PortProbeResult targetToSource = probeViaAgent(target.getId(), source.getAgentIp(), source.getAgentPort());
         vo.setTargetToSource(targetToSource);
         if (!targetToSource.isReachable()) {
-            reverseDetails.add("❌ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + targetToSource.getFailureReason());
+            reverseDetails.add("❌ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] -> 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 不可达 - " + targetToSource.getFailureReason());
             vo.setReverseStatus(Status.UNREACHABLE.name());
             vo.setReverseFailureReason("目标Agent无法连接源Agent: " + targetToSource.getFailureReason());
         } else {
-            reverseDetails.add("✅ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] → 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
+            reverseDetails.add("✅ 目标Agent [" + target.getAgentIp() + ":" + target.getAgentPort() + "] -> 源Agent [" + source.getAgentIp() + ":" + source.getAgentPort() + "] 可达");
             vo.setReverseStatus(Status.REACHABLE.name());
         }
 
@@ -183,132 +219,69 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
         return true;
     }
 
-    private boolean checkSourceExists(AgentConnectivityVO vo, AgentRegistry source, String sourceNodeName, List<String> details) {
-        if (source == null) {
-            vo.setSourceExists(false);
-            vo.setConnectivityStatus(Status.SOURCE_NOT_FOUND.name());
-            vo.setFailureReason("源节点不存在: " + sourceNodeName);
-            details.add("❌ 源节点 [" + sourceNodeName + "] 在注册表中不存在");
-            return false;
-        }
-        vo.setSourceExists(true);
-        vo.setSourceIp(source.getAgentIp());
-        vo.setSourcePort(source.getAgentPort());
-        details.add("✅ 源节点 [" + sourceNodeName + "] 存在，IP: " + source.getAgentIp() + ":" + source.getAgentPort());
-        return true;
-    }
-
-    private boolean checkTargetExists(AgentConnectivityVO vo, AgentRegistry target, String targetNodeName, List<String> details) {
-        if (target == null) {
-            vo.setTargetExists(false);
-            vo.setConnectivityStatus(Status.TARGET_NOT_FOUND.name());
-            vo.setFailureReason("目标节点不存在: " + targetNodeName);
-            details.add("❌ 目标节点 [" + targetNodeName + "] 在注册表中不存在");
-            return false;
-        }
-        vo.setTargetExists(true);
-        vo.setTargetIp(target.getAgentIp());
-        vo.setTargetPort(target.getAgentPort());
-        details.add("✅ 目标节点 [" + targetNodeName + "] 存在，IP: " + target.getAgentIp() + ":" + target.getAgentPort());
-        return true;
-    }
-
-    private boolean checkSourceOnline(AgentConnectivityVO vo, AgentRegistry source, List<String> details) {
-        boolean online = source.getNodeStatus() != null && source.getNodeStatus() == 1;
-        vo.setSourceOnline(online);
-        if (!online) {
-            vo.setConnectivityStatus(Status.SOURCE_OFFLINE.name());
-            vo.setFailureReason("源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()));
-            details.add("❌ 源节点离线，当前状态: " + nodeStatusDesc(source.getNodeStatus()));
-            return false;
-        }
-        details.add("✅ 源节点在线");
-        return true;
-    }
-
-    private boolean checkSourceEnabled(AgentConnectivityVO vo, AgentRegistry source, List<String> details) {
-        boolean enabled = source.getNodeEnabled() != null && source.getNodeEnabled() == 0;
-        vo.setSourceEnabled(enabled);
-        if (!enabled) {
-            vo.setConnectivityStatus(Status.SOURCE_DISABLED.name());
-            vo.setFailureReason("源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()));
-            details.add("❌ 源节点已禁用，当前状态: " + nodeEnabledDesc(source.getNodeEnabled()));
-            return false;
-        }
-        details.add("✅ 源节点已启用");
-        return true;
-    }
-
-    private boolean checkTargetOnline(AgentConnectivityVO vo, AgentRegistry target, List<String> details) {
-        boolean online = target.getNodeStatus() != null && target.getNodeStatus() == 1;
-        vo.setTargetOnline(online);
-        if (!online) {
-            vo.setConnectivityStatus(Status.TARGET_OFFLINE.name());
-            vo.setFailureReason("目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()));
-            details.add("❌ 目标节点离线，当前状态: " + nodeStatusDesc(target.getNodeStatus()));
-            return false;
-        }
-        details.add("✅ 目标节点在线");
-        return true;
-    }
-
-    private boolean checkTargetEnabled(AgentConnectivityVO vo, AgentRegistry target, List<String> details) {
-        boolean enabled = target.getNodeEnabled() != null && target.getNodeEnabled() == 0;
-        vo.setTargetEnabled(enabled);
-        if (!enabled) {
-            vo.setConnectivityStatus(Status.TARGET_DISABLED.name());
-            vo.setFailureReason("目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()));
-            details.add("❌ 目标节点已禁用，当前状态: " + nodeEnabledDesc(target.getNodeEnabled()));
-            return false;
-        }
-        details.add("✅ 目标节点已启用");
-        return true;
-    }
-
     public PortProbeResult probePort(String from, String to, String ip, int port) {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS);
-            return PortProbeResult.of(from, to, ip, port, true, null);
-        } catch (IOException e) {
-            String reason = classifyConnectionFailure(e);
+        try {
+            ProxyApiResponse<TcpProbeResultData> response = proxyClientService.tcpProbe(ip, port);
+            if (response.isSuccess() && Boolean.TRUE.equals(response.getData().getReachable())) {
+                return PortProbeResult.of(from, to, ip, port, true, null);
+            } else {
+                TcpProbeResultData data = response.getData();
+                String reason = data != null ? data.getFailureReason() : "Proxy探测失败";
+                log.warn("端口探测失败 {}:{} - {}", ip, port, reason);
+                return PortProbeResult.of(from, to, ip, port, false, reason);
+            }
+        } catch (Exception e) {
+            String reason = "Proxy探测请求失败: " + e.getMessage();
             log.warn("端口探测失败 {}:{} - {}", ip, port, reason);
             return PortProbeResult.of(from, to, ip, port, false, reason);
         }
     }
 
-    public PortProbeResult probeViaAgent(String sourceIp, int sourcePort, String targetIp, int targetPort) {
+    public PortProbeResult probeProxy() {
         try {
-            String url = String.format("http://%s:%d/api/probe?host=%s&port=%d",
-                    sourceIp, sourcePort, targetIp, targetPort);
-
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(HTTP_TIMEOUT_S))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(HTTP_TIMEOUT_S))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() == 200) {
-                JsonNode root = objectMapper.readTree(response.body());
-                boolean success = root.path("success").asBoolean(false);
-                if (success) {
-                    JsonNode data = root.path("data");
-                    boolean reachable = data.path("reachable").asBoolean(false);
-                    String reason = reachable ? null : extractFailureFromDetails(data);
-                    return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, reachable, reason);
-                } else {
-                    String msg = root.path("msg").asText("未知错误");
-                    return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Agent返回错误: " + msg);
+            ProxyApiResponse<PingResult> response = proxyClientService.ping();
+            if (response.isSuccess()) {
+                PingResult data = response.getData();
+                if (data != null && "UP".equals(data.getStatus())) {
+                    return PortProbeResult.of("admin", "proxy", "", 0, true, null);
                 }
+                String reason = "Proxy状态异常";
+                log.warn("Proxy Ping响应异常: status={}", data != null ? data.getStatus() : "null");
+                return PortProbeResult.of("admin", "proxy", "", 0, false, reason);
             } else {
-                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false,
-                        "Agent返回HTTP " + response.statusCode());
+                String reason = "Proxy返回错误: " + response.getMsg();
+                return PortProbeResult.of("admin", "proxy", "", 0, false, reason);
             }
+        } catch (Exception e) {
+            String reason = e.getMessage() != null ? e.getMessage() : "连接失败";
+            log.warn("Admin到Proxy连通性检测失败: {}", reason);
+            return PortProbeResult.of("admin", "proxy", "", 0, false, reason);
+        }
+    }
+
+    public PortProbeResult probeViaAgent(String sourceAgentId, String targetIp, int targetPort) {
+        try {
+            ProxyApiResponse<String> proxyResponse = proxyClientService.probeViaAgent(sourceAgentId, targetIp, targetPort);
+            if (!proxyResponse.isSuccess() || proxyResponse.getData() == null) {
+                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Proxy转发失败");
+            }
+
+            AgentResponse<AgentProbeData> agentResponse = proxyClientService.parseAgentResponse(
+                    proxyResponse.getData(), new TypeReference<AgentResponse<AgentProbeData>>() {});
+
+            if (!Boolean.TRUE.equals(agentResponse.getSuccess())) {
+                String msg = agentResponse.getMsg() != null ? agentResponse.getMsg() : "未知错误";
+                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Agent返回错误: " + msg);
+            }
+
+            AgentProbeData data = agentResponse.getData();
+            if (data == null) {
+                return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, false, "Agent响应无data字段");
+            }
+
+            boolean reachable = Boolean.TRUE.equals(data.getReachable());
+            String reason = reachable ? null : extractFailureFromDetails(data);
+            return PortProbeResult.of("源Agent", "目标Agent", targetIp, targetPort, reachable, reason);
         } catch (Exception e) {
             String reason = "调用源Agent探测接口失败: " + e.getMessage();
             log.warn("调用源Agent探测接口失败: {}", e.getMessage());
@@ -316,30 +289,17 @@ public class AgentConnectivityServiceImpl implements IAgentConnectivityService {
         }
     }
 
-    private String extractFailureFromDetails(JsonNode data) {
-        JsonNode detailsNode = data.path("details");
-        if (detailsNode.isArray()) {
-            for (JsonNode item : detailsNode) {
-                String text = item.asText();
-                if (text.startsWith("❌")) {
-                    return text.substring(text.indexOf("- ") + 2);
+    private String extractFailureFromDetails(AgentProbeData data) {
+        List<String> detailList = data.getDetails();
+        if (detailList != null) {
+            for (String item : detailList) {
+                if (item.startsWith("❌")) {
+                    int idx = item.indexOf("- ");
+                    return idx >= 0 ? item.substring(idx + 2) : "端口不可达";
                 }
             }
         }
         return "端口不可达";
-    }
-
-    public String classifyConnectionFailure(IOException e) {
-        String msg = e.getMessage();
-        if (msg == null) return "未知原因";
-        String lowerMsg = msg.toLowerCase();
-        if (lowerMsg.contains("connection refused")) return "连接被拒绝（目标进程未启动或端口未监听）";
-        if (lowerMsg.contains("network is unreachable") || lowerMsg.contains("no route to host")) return "网络不可达（可能因网络策略限制）";
-        if (lowerMsg.contains("connection timed out") || lowerMsg.contains("timed out")) return "连接超时（可能因防火墙拦截或网络不通）";
-        if (lowerMsg.contains("connection reset")) return "连接被重置（对端拒绝连接）";
-        if (lowerMsg.contains("unreachable")) return "目标主机不可达";
-        if (lowerMsg.contains("permission denied")) return "权限被拒绝（可能因安全策略限制）";
-        return "未知原因: " + msg;
     }
 
     private String nodeStatusDesc(Integer nodeStatus) {

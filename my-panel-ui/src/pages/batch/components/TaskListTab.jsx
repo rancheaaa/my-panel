@@ -136,25 +136,29 @@ const TaskListTab = ({
 
   const columns = [
     {
-      title: '任务',
-      key: 'task',
+      title: '任务ID',
+      key: 'taskId',
+      width: 100,
+      fixed: 'left',
+      render: (_, record) => {
+        const t = record.task || record;
+        return (
+          <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={`任务ID: ${t.id}`}>
+            <span style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: 12, color: '#8c8c8c' }}>{t.id}</span>
+          </Tooltip>
+        );
+      }
+    },
+    {
+      title: '任务名称',
+      key: 'taskName',
       width: 150,
       fixed: 'left',
       render: (_, record) => {
         const t = record.task || record;
         return (
-          <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={
-            <div style={{ padding: '4px 0' }}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>任务名称:{t.taskName || '-'}</div>
-              <div style={{ fontSize: 12, color: '#888' }}>任务ID:{t.id}</div>
-            </div>
-          }>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: '#1f1f1f', marginBottom: 2 }}>
-                {t.taskName || '-'}
-              </div>
-              <div style={{ fontSize: 11.5, color: '#8c8c8c' }}>{t.id}</div>
-            </div>
+          <Tooltip color="#fff" overlayInnerStyle={{ color: '#333' }} title={t.taskName || '-'}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#1f1f1f' }}>{t.taskName || '-'}</span>
           </Tooltip>
         );
       }
@@ -171,7 +175,7 @@ const TaskListTab = ({
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <CloudServerOutlined style={{ color: '#1890ff', fontSize: 12, flexShrink: 0 }} />
-            <Tooltip title={agentName} placement="topLeft">
+            <Tooltip title={t.sourceAgentId || agentName} placement="topLeft">
               <span style={{
                 fontWeight: 500, fontSize: 12.5, color: '#1f1f1f',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
@@ -196,8 +200,10 @@ const TaskListTab = ({
         const t = record.task || record;
         let targetNames = [];
         let targetDirs = [];
+        let targetAgentIds = [];
         try { targetNames = JSON.parse(t.targetAgentNames || '[]'); } catch (e) { targetNames = (t.targetAgentNames || '').split(';').filter(Boolean); }
         try { targetDirs = JSON.parse(t.targetDirs || '[]'); } catch (e) { targetDirs = (t.targetDirs || '').split(';').filter(Boolean); }
+        try { targetAgentIds = JSON.parse(t.targetAgentIds || '[]'); } catch (e) { targetAgentIds = (t.targetAgentIds || '').split(';').filter(Boolean); }
 
         if (targetNames.length === 0) {
           return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>;
@@ -206,10 +212,11 @@ const TaskListTab = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {targetNames.map((name, idx) => {
               const dir = targetDirs[idx] || '-';
+              const agentId = targetAgentIds[idx] || name || '-';
               return (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <ClusterOutlined style={{ color: '#722ed1', fontSize: 11, flexShrink: 0 }} />
-                  <Tooltip title={name || '-'} placement="topLeft">
+                  <Tooltip title={agentId} placement="topLeft">
                     <span style={{
                       fontWeight: 500, fontSize: 11.5, color: '#722ed1',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0
@@ -244,15 +251,15 @@ const TaskListTab = ({
     {
       title: '传输策略',
       key: 'strategy',
-      width: 160,
+      width: 260,
       render: (_, record) => {
         const t = record.task || record;
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Tag color={transferModeMap[t.transferMode]?.color || 'default'} style={{ margin: 0, fontSize: 11.5, width: 'fit-content' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+            <Tag color={transferModeMap[t.transferMode]?.color || 'default'} style={{ margin: 0, fontSize: 11.5 }}>
               {transferModeMap[t.transferMode]?.text || t.transferMode}
             </Tag>
-            <Tag color={routingMap[t.routingStrategy]?.color || 'default'} style={{ margin: 0, fontSize: 11, width: 'fit-content' }}>
+            <Tag color={routingMap[t.routingStrategy]?.color || 'default'} style={{ margin: 0, fontSize: 11 }}>
               {routingMap[t.routingStrategy]?.text || t.routingStrategy}
             </Tag>
             {t.routingStrategy === 'REGION_BASED' && t.routingConfig && (
@@ -261,12 +268,12 @@ const TaskListTab = ({
                   <pre style={{ margin: 0, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{t.routingConfig}</pre>
                 </div>
               }>
-                <Tag color="purple" style={{ margin: 0, fontSize: 10, width: 'fit-content', cursor: 'pointer' }}>
+                <Tag color="purple" style={{ margin: 0, fontSize: 10, cursor: 'pointer' }}>
                   区域配置 ✓
                 </Tag>
               </Tooltip>
             )}
-            <Tag color={t.preserveDirStructure === 1 ? 'blue' : 'default'} style={{ margin: 0, fontSize: 10.5, width: 'fit-content' }}>
+            <Tag color={t.preserveDirStructure === 1 ? 'blue' : 'default'} style={{ margin: 0, fontSize: 10.5 }}>
               {t.preserveDirStructure === 1 ? '保持目录' : '扁平化'}
             </Tag>
           </div>
@@ -736,7 +743,7 @@ const TaskListTab = ({
               onChange: (keys) => setSelectedRowKeys(keys)
             }}
             expandable={undefined}
-            scroll={{ x: 2050 }}
+            scroll={{ x: 2250 }}
             pagination={false}
             size={tableSize}
           />

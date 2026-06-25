@@ -25,10 +25,35 @@ public class ProgressReceiverController {
     @PostMapping("/create")
     public ApiResponse<SubTaskCreateResponse> createSubTask(@RequestBody SubTaskDTO dto) {
         try {
+            if (dto.getSubtaskId() == null) {
+                return ApiResponse.badRequest("缺少必填字段: subtaskId");
+            }
+            if (dto.getTaskId() == null) {
+                return ApiResponse.badRequest("缺少必填字段: taskId");
+            }
+            if (dto.getSourceAgentId() == null || dto.getSourceAgentId().isBlank()) {
+                return ApiResponse.badRequest("缺少必填字段: sourceAgentId");
+            }
+            if (dto.getTargetAgentId() == null || dto.getTargetAgentId().isBlank()) {
+                return ApiResponse.badRequest("缺少必填字段: targetAgentId");
+            }
+            if (dto.getSourcePath() == null || dto.getSourcePath().isBlank()) {
+                return ApiResponse.badRequest("缺少必填字段: sourcePath");
+            }
+            if (dto.getTargetPath() == null || dto.getTargetPath().isBlank()) {
+                return ApiResponse.badRequest("缺少必填字段: targetPath");
+            }
+            if (dto.getFileName() == null || dto.getFileName().isBlank()) {
+                return ApiResponse.badRequest("缺少必填字段: fileName");
+            }
+            if (dto.getFileSizeBytes() == null) {
+                return ApiResponse.badRequest("缺少必填字段: fileSizeBytes");
+            }
+
             BatchTransferSubtask subtask = convertToSubtask(dto);
             Long subtaskId = progressService.createSubTask(subtask);
 
-            log.info("✅ 子任务创建: taskId={}, file={}", dto.getTaskId(), dto.getFileName());
+            log.info("✅ 子任务创建: id={}, taskId={}, file={}", subtask.getId(), dto.getTaskId(), dto.getFileName());
             return ApiResponse.success(new SubTaskCreateResponse(subtaskId));
 
         } catch (Exception e) {
@@ -214,9 +239,8 @@ public class ProgressReceiverController {
     private BatchTransferSubtask convertToSubtask(SubTaskDTO dto) {
         BatchTransferSubtask subtask = new BatchTransferSubtask();
 
-        if (dto.getId() != null) {
-            subtask.setId(dto.getId());
-        } else if (dto.getSubtaskId() != null) {
+        // id由Agent上送，创建时从subtaskId取值；更新时也通过subtaskId定位
+        if (dto.getSubtaskId() != null) {
             subtask.setId(dto.getSubtaskId());
         }
 

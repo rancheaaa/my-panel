@@ -4,7 +4,6 @@ import com.cq.agent.dto.ApiResponse;
 import com.cq.agent.dto.ApiCode;
 import com.cq.agent.config.AgentConfig;
 import com.cq.agent.model.FileInfo;
-import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.*;
@@ -33,7 +32,6 @@ public class FileService {
     private final boolean allowOutsideBase;
     private final long maxFileSize;
 
-    @Inject
     public FileService(AgentConfig config) {
         String baseDir = config.getFileBaseDirectory();
         this.baseDirectory = Path.of(baseDir).toAbsolutePath().normalize();
@@ -42,7 +40,7 @@ public class FileService {
 
         // Ensure base directory exists
         try {
-            if(!Files.exists(baseDirectory)) {
+            if (!Files.exists(baseDirectory)) {
                 Files.createDirectories(baseDirectory);
                 logger.info("File service initialized with base directory: {}", baseDirectory);
             }
@@ -82,8 +80,7 @@ public class FileService {
                 "LIST", "NLST", "RETR", "STOR", "STOU", "APPE", "DELE",
                 "MKD", "RMD", "CWD", "CDUP", "PWD", "SIZE", "MDTM",
                 "RNFR", "RNTO", "STAT", "CHMOD", "MFMT",
-                "MD5", "SHA1", "SHA256"
-        );
+                "MD5", "SHA1", "SHA256");
     }
 
     /**
@@ -152,7 +149,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to list directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.LIST_DIRECTORY_FAILED.getCode(), "Failed to list directory: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.LIST_DIRECTORY_FAILED.getCode(),
+                    "Failed to list directory: " + e.getMessage());
         }
     }
 
@@ -166,7 +164,8 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             if (Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(), "Cannot retrieve directory: " + path);
+                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(),
+                        "Cannot retrieve directory: " + path);
             }
             if (!Files.isReadable(targetPath)) {
                 return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "File is not readable: " + path);
@@ -174,7 +173,8 @@ public class FileService {
 
             long size = Files.size(targetPath);
             if (size > maxFileSize) {
-                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "File too large. Max size: " + maxFileSize + " bytes");
+                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                        "File too large. Max size: " + maxFileSize + " bytes");
             }
 
             byte[] content = Files.readAllBytes(targetPath);
@@ -183,7 +183,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to retrieve file: {}", path, e);
-            return ApiResponse.failure(ApiCode.RETRIEVE_FILE_FAILED.getCode(), "Failed to retrieve file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.RETRIEVE_FILE_FAILED.getCode(),
+                    "Failed to retrieve file: " + e.getMessage());
         }
     }
 
@@ -212,7 +213,8 @@ public class FileService {
             Path targetPath = resolvePath(path);
 
             if (content.length > maxFileSize) {
-                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Content too large. Max size: " + maxFileSize + " bytes");
+                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                        "Content too large. Max size: " + maxFileSize + " bytes");
             }
 
             // Create parent directories if needed
@@ -246,7 +248,8 @@ public class FileService {
             }
 
             if (content.length > maxFileSize) {
-                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Content too large. Max size: " + maxFileSize + " bytes");
+                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                        "Content too large. Max size: " + maxFileSize + " bytes");
             }
 
             String fileName = (prefix != null ? prefix : "file") + "_" +
@@ -281,7 +284,8 @@ public class FileService {
             if (Files.exists(targetPath)) {
                 long currentSize = Files.size(targetPath);
                 if (currentSize + content.length > maxFileSize) {
-                    return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Resulting file would be too large. Max size: " + maxFileSize + " bytes");
+                    return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                            "Resulting file would be too large. Max size: " + maxFileSize + " bytes");
                 }
             }
 
@@ -292,7 +296,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to append to file: {}", path, e);
-            return ApiResponse.failure(ApiCode.APPEND_FILE_FAILED.getCode(), "Failed to append to file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.APPEND_FILE_FAILED.getCode(),
+                    "Failed to append to file: " + e.getMessage());
         }
     }
 
@@ -307,7 +312,8 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             if (Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Cannot delete directory with DELE, use RMD: " + path);
+                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                        "Cannot delete directory with DELE, use RMD: " + path);
             }
 
             Files.delete(targetPath);
@@ -317,7 +323,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to delete file: {}", path, e);
-            return ApiResponse.failure(ApiCode.DELETE_FILE_FAILED.getCode(), "Failed to delete file: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.DELETE_FILE_FAILED.getCode(),
+                    "Failed to delete file: " + e.getMessage());
         }
     }
 
@@ -335,10 +342,11 @@ public class FileService {
             logger.info("Directory created: {}", targetPath);
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(),"Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to create directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.CREATE_DIRECTORY_FAILED.getCode(), "Failed to create directory: " + path);
+            return ApiResponse.failure(ApiCode.CREATE_DIRECTORY_FAILED.getCode(),
+                    "Failed to create directory: " + path);
         }
     }
 
@@ -361,7 +369,8 @@ public class FileService {
                 // Check if directory is empty
                 try (DirectoryStream<Path> stream = Files.newDirectoryStream(targetPath)) {
                     if (stream.iterator().hasNext()) {
-                        return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Directory is not empty: " + path);
+                        return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                                "Directory is not empty: " + path);
                     }
                 }
                 Files.delete(targetPath);
@@ -373,7 +382,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to remove directory: {}", path, e);
-            return ApiResponse.failure(ApiCode.REMOVE_DIRECTORY_FAILED.getCode(), "Failed to remove directory: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.REMOVE_DIRECTORY_FAILED.getCode(),
+                    "Failed to remove directory: " + e.getMessage());
         }
     }
 
@@ -404,10 +414,11 @@ public class FileService {
             }
             return ApiResponse.success(FileInfo.fromPath(targetPath));
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(),"Access denied: " + path);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get directory info: {}", path, e);
-            return ApiResponse.failure(ApiCode.GET_DIRECTORY_INFO_FAILED.getCode(), "Failed to get directory info: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_DIRECTORY_INFO_FAILED.getCode(),
+                    "Failed to get directory info: " + e.getMessage());
         }
     }
 
@@ -425,7 +436,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get file size: {}", path, e);
-            return ApiResponse.failure(ApiCode.GET_FILE_SIZE_FAILED.getCode(), "Failed to get file size: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_FILE_SIZE_FAILED.getCode(),
+                    "Failed to get file size: " + e.getMessage());
         }
     }
 
@@ -443,7 +455,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get modification time: {}", path, e);
-            return ApiResponse.failure(ApiCode.GET_MODIFICATION_TIME_FAILED.getCode(), "Failed to get modification time: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_MODIFICATION_TIME_FAILED.getCode(),
+                    "Failed to get modification time: " + e.getMessage());
         }
     }
 
@@ -463,7 +476,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to set modification time: {}", path, e);
-            return ApiResponse.failure(ApiCode.SET_MODIFICATION_TIME_FAILED.getCode(), "Failed to set modification time: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.SET_MODIFICATION_TIME_FAILED.getCode(),
+                    "Failed to set modification time: " + e.getMessage());
         }
     }
 
@@ -511,10 +525,11 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.NOT_FOUND.getCode(), "Source does not exist: " + fromPath);
             }
             if (Files.isDirectory(sourcePath)) {
-                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(), "Cannot copy directory: " + fromPath);
+                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(),
+                        "Cannot copy directory: " + fromPath);
             }
             if (Files.exists(targetPath)) {
-                return ApiResponse.failure(ApiCode.PATH_ALREADY_EXISTS.getCode(),"Target already exists: " + toPath);
+                return ApiResponse.failure(ApiCode.PATH_ALREADY_EXISTS.getCode(), "Target already exists: " + toPath);
             }
 
             // Create parent directories if needed
@@ -588,7 +603,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to change permissions: {}", path, e);
-            return ApiResponse.failure(ApiCode.CHANGE_PERMISSIONS_FAILED.getCode(), "Failed to change permissions: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.CHANGE_PERMISSIONS_FAILED.getCode(),
+                    "Failed to change permissions: " + e.getMessage());
         }
     }
 
@@ -602,7 +618,8 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "File does not exist: " + path);
             }
             if (Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(), "Cannot calculate checksum for directory: " + path);
+                return ApiResponse.failure(ApiCode.INVALID_REQUEST.getCode(),
+                        "Cannot calculate checksum for directory: " + path);
             }
 
             MessageDigest digest = MessageDigest.getInstance(algorithm);
@@ -625,12 +642,13 @@ public class FileService {
             }
             return ApiResponse.success(hexString.toString());
         } catch (NoSuchAlgorithmException e) {
-            return ApiResponse.failure(ApiCode.UNSUPPORTED_ALGORITHM.getCode(),"Unsupported algorithm: " + algorithm);
+            return ApiResponse.failure(ApiCode.UNSUPPORTED_ALGORITHM.getCode(), "Unsupported algorithm: " + algorithm);
         } catch (SecurityException e) {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to calculate checksum: {}", path, e);
-            return ApiResponse.failure(ApiCode.CALCULATE_CHECKSUM_FAILED.getCode(), "Failed to calculate checksum: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.CALCULATE_CHECKSUM_FAILED.getCode(),
+                    "Failed to calculate checksum: " + e.getMessage());
         }
     }
 
@@ -644,7 +662,8 @@ public class FileService {
                 return ApiResponse.failure(ApiCode.PATH_NOT_FOUND.getCode(), "Path does not exist: " + basePath);
             }
             if (!Files.isDirectory(targetPath)) {
-                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(), "Path is not a directory: " + basePath);
+                return ApiResponse.failure(ApiCode.PATH_IS_NOT_DIRECTORY.getCode(),
+                        "Path is not a directory: " + basePath);
             }
 
             PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
@@ -663,10 +682,11 @@ public class FileService {
 
             return ApiResponse.success(results);
         } catch (SecurityException e) {
-            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(),"Access denied: " + basePath);
+            return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + basePath);
         } catch (IOException e) {
             logger.error("Failed to search: {}", basePath, e);
-            return ApiResponse.failure(ApiCode.SEARCH_FAILED.getCode(), "Failed to search in " + basePath + ": " + e.getMessage());
+            return ApiResponse.failure(ApiCode.SEARCH_FAILED.getCode(),
+                    "Failed to search in " + basePath + ": " + e.getMessage());
         }
     }
 
@@ -687,7 +707,8 @@ public class FileService {
             return ApiResponse.failure(ApiCode.ACCESS_DENIED.getCode(), "Access denied: " + path);
         } catch (IOException e) {
             logger.error("Failed to get disk space: {}", path, e);
-            return ApiResponse.failure(ApiCode.GET_DISK_SPACE_FAILED.getCode(), "Failed to get disk space: " + e.getMessage());
+            return ApiResponse.failure(ApiCode.GET_DISK_SPACE_FAILED.getCode(),
+                    "Failed to get disk space: " + e.getMessage());
         }
     }
 

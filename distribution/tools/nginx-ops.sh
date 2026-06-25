@@ -51,6 +51,16 @@ start() {
     if pgrep -f "nginx: master process" >/dev/null; then
          warn "Nginx is already running."
     else
+         # Set nginx user to current shell user to avoid permission denied
+         CONF_FILE="$NGINX_HOME/conf/nginx.conf"
+         CURRENT_USER=$(whoami)
+         if grep -q "^user " "$CONF_FILE" 2>/dev/null; then
+             sed -i "s/^user .*/user $CURRENT_USER;/" "$CONF_FILE"
+         else
+             sed -i "1i user $CURRENT_USER;" "$CONF_FILE"
+         fi
+         info "Set nginx user to: $CURRENT_USER"
+
          info "Checking Nginx config..."
          "$NGINX_CMD" -t -p "$NGINX_HOME"
          if [ $? -ne 0 ]; then

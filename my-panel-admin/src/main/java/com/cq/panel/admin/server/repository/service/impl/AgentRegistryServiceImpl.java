@@ -15,8 +15,8 @@ import com.cq.panel.admin.server.repository.domain.AgentCommandHistory;
 import com.cq.panel.admin.server.repository.service.IAgentRegistryService;
 import com.cq.panel.admin.server.repository.service.IAgentCommandHistoryService;
 
-import org.springframework.http.*;
-import org.springframework.web.client.RestTemplate;
+import com.cq.panel.admin.server.service.ProxyClientService;
+import com.cq.panel.admin.server.web.domain.dto.proxy.ProxyApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -29,10 +29,12 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
 
     private final AgentRegistryMapper agentRegistryMapper;
     private final IAgentCommandHistoryService agentCommandHistoryService;
+    private final ProxyClientService proxyClientService;
 
-    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper, IAgentCommandHistoryService agentCommandHistoryService) {
+    public AgentRegistryServiceImpl(AgentRegistryMapper agentRegistryMapper, IAgentCommandHistoryService agentCommandHistoryService, ProxyClientService proxyClientService) {
         this.agentRegistryMapper = agentRegistryMapper;
         this.agentCommandHistoryService = agentCommandHistoryService;
+        this.proxyClientService = proxyClientService;
     }
 
     /**
@@ -238,13 +240,11 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         {
             throw new RuntimeException("Agent节点不存在");
         }
-        
+
         if (agent.getNodeStatus() != 1)
         {
             throw new RuntimeException("Agent节点不在线，无法执行命令");
         }
-
-        String agentUrl = "http://" + agent.getAgentIp() + ":" + agent.getAgentPort() + "/api/execute";
 
         final AgentExecuteCommandRequest requestBody = new AgentExecuteCommandRequest();
         requestBody.setCommand(command);
@@ -262,67 +262,57 @@ public class AgentRegistryServiceImpl implements IAgentRegistryService {
         history.setUserName(SecurityUtils.getUsername());
         try
         {
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            
-            HttpEntity<AgentExecuteCommandRequest> requestEntity = new HttpEntity<>(requestBody, headers);
-            
+            String requestJson = new ObjectMapper().writeValueAsString(requestBody);
+
             Date startTime = MyDateUtils.getNowDate();
             history.setStartTime(startTime);
-            
-            ResponseEntity<String> response = restTemplate.postForEntity(agentUrl, requestEntity, String.class);
-            
+
+            ProxyApiResponse<String> proxyResponse = proxyClientService.executeCommand(agentId, requestJson);
+
             Date endTime = MyDateUtils.getNowDate();
             long duration = endTime.getTime() - startTime.getTime();
             history.setEndTime(endTime);
             history.setExecuteTime(duration);
-            
-            if (response.getStatusCode() == HttpStatus.OK)
-            {
-                ObjectMapper objectMapper = new ObjectMapper();
-                AgentExecuteCommandResponse result = objectMapper.readValue(response.getBody(), AgentExecuteCommandResponse.class);
-                
-                boolean success = result.isSuccess();
-                int exitCode = result.getExitCode();
-                String output = result.getOutput();
-                String error = result.getError();
 
-                if (success)
-                {
-                    history.setCommandStatus(0);
-                }
-                else if (exitCode == -999)
-                {
-                    // timeout
-                    history.setCommandStatus(2);
-                }
-                else if (exitCode < 0)
-                {
-                    // 未知
-                    history.setCommandStatus(3);
-                }
-                else
-                {
-                    // 失败
-                    history.setCommandStatus(1);
-                }
-                
-                history.setExitCode(exitCode);
-                history.setOutput(output);
-                history.setError(error);
-                
+            if (!proxyResponse.isSuccess() || proxyResponse.getData() == null)
+            {
+                history.setCommandStatus(1);
+                history.setError("Proxy转发失败");
                 agentCommandHistoryService.insert(history);
-                
-                return result;
+                throw new RuntimeException("Proxy转发命令执行请求失败");
+            }
+
+            AgentExecuteCommandResponse result = new ObjectMapper().readValue(proxyResponse.getData(), AgentExecuteCommandResponse.class);
+
+            boolean success = result.isSuccess();
+            int exitCode = result.getExitCode();
+            String output = result.getOutput();
+            String error = result.getError();
+
+            if (success)
+            {
+                history.setCommandStatus(0);
+            }
+            else if (exitCode == -999)
+            {
+                history.setCommandStatus(2);
+            }
+            else if (exitCode < 0)
+            {
+                history.setCommandStatus(3);
             }
             else
             {
                 history.setCommandStatus(1);
-                history.setError("HTTP " + response.getStatusCode().value());
-                agentCommandHistoryService.insert(history);
-                throw new RuntimeException("Agent服务返回错误状态码: " + response.getStatusCode());
             }
+
+            history.setExitCode(exitCode);
+            history.setOutput(output);
+            history.setError(error);
+
+            agentCommandHistoryService.insert(history);
+
+            return result;
         }
         catch (RuntimeException e)
         {

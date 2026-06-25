@@ -10,7 +10,7 @@ import {
   TableOutlined,
   ApartmentOutlined
 } from '@ant-design/icons';
-import ReactFlow, { Background, Controls, Handle, Position, useReactFlow } from 'reactflow';
+import ReactFlow, { Background, Controls, Handle, Position, useReactFlow, getBezierPath, ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { batchApi } from '../../../api/batch';
 import { listAgentRegistry } from '../../../api/agent';
@@ -68,16 +68,27 @@ function AgentNode({ data }) {
   );
 }
 
-function AnimatedEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd }) {
-  const [edgePath] = useMemo(() => {
-    const dx = targetX - sourceX;
-    const dy = targetY - sourceY;
-    const cx = (sourceX + targetX) / 2;
-    const path = `M ${sourceX} ${sourceY} C ${cx} ${sourceY}, ${cx} ${targetY}, ${targetX} ${targetY}`;
-    const labelX = cx;
-    const labelY = (sourceY + targetY) / 2;
-    return [path, labelX, labelY];
-  }, [sourceX, sourceY, targetX, targetY]);
+function AnimatedEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data
+}) {
+  const [edgePath, labelX, labelY] = useMemo(() => {
+    return getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      curvature: 0.35
+    });
+  }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition]);
 
   const reachable = data?.reachable;
   const checking = data?.checking;
@@ -101,21 +112,56 @@ function AnimatedEdge({ id, sourceX, sourceY, targetX, targetY, data, markerEnd 
   return (
     <>
       <defs>
-        <marker id={markerId} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
-          <polygon points="0 0, 10 3.5, 0 7" fill={strokeColor} />
+        <marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5"
+          markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 0 1 L 9 5 L 0 9 z" fill={strokeColor} />
         </marker>
       </defs>
       <path d={edgePath} fill="none" stroke={strokeColor} strokeWidth={strokeWidth}
         className={`conn-edge-path ${animClass}`} strokeLinecap="round"
         strokeDasharray={strokeDasharray}
         markerEnd={`url(#${markerId})`} />
-      <g className="conn-edge-label-group">
+      {reachable === true && (
+        <path d={edgePath} fill="none" stroke="#52c41a" strokeWidth={6}
+          className="conn-edge-glow" opacity={0.2} strokeLinecap="round" />
+      )}
+      <g className="conn-edge-label-group" transform={`translate(${labelX}, ${labelY})`}>
         <rect x={-40} y={-12} width={80} height={24} rx={12} fill="white" stroke="#e8e8e8" strokeWidth={1} opacity={0.95} />
         <text textAnchor="middle" dominantBaseline="central" fontSize={11} fill="#595959" fontWeight={500}>
           {checking ? '探测中...' : label}
         </text>
       </g>
     </>
+  );
+}
+
+function ConnectivityFlowView({ nodes, edges }) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (nodes.length > 0) {
+      setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 100);
+    }
+  }, [nodes, fitView]);
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      fitView
+      fitViewOptions={{ padding: 0.15 }}
+      proOptions={{ hideAttribution: true }}
+      minZoom={0.3}
+      maxZoom={1.5}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable={false}
+    >
+      <Background color="#e8e8e8" gap={16} size={1} />
+      <Controls showInteractive={false} />
+    </ReactFlow>
   );
 }
 
@@ -137,7 +183,7 @@ export default function AgentConnectivityPage() {
     try {
       const res = await listAgentRegistry({ pageNum: 1, pageSize: 1000 });
       if (res.data?.rows) {
-        setAgentList(res.data.rows.filter(a => a.nodeStatus === 1));
+        setAgentList(res.data.rows);
       }
     } catch (e) {
       console.error('加载Agent列表失败', e);
@@ -450,23 +496,9 @@ export default function AgentConnectivityPage() {
         {hasResults && viewMode === 'flow' && (
           <div className="agent-conn-flow-wrapper">
             <div className="conn-flow-container" style={{ height: 280 }}>
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                fitView
-                fitViewOptions={{ padding: 0.15 }}
-                proOptions={{ hideAttribution: true }}
-                minZoom={0.3}
-                maxZoom={1.5}
-                nodesDraggable={false}
-                nodesConnectable={false}
-                elementsSelectable={false}
-              >
-                <Background color="#e8e8e8" gap={16} size={1} />
-                <Controls showInteractive={false} />
-              </ReactFlow>
+              <ReactFlowProvider>
+                <ConnectivityFlowView nodes={nodes} edges={edges} />
+              </ReactFlowProvider>
             </div>
             <div className="conn-legend">
               <div className="conn-legend-item"><span className="conn-legend-line conn-legend-ok" /> 可达</div>

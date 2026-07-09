@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+**/target
+**/build
+**/*.log
+docs/
+*.md
+my-panel-ui/node_modules
+my-panel-ui/dist

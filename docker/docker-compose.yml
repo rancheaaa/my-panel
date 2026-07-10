@@ -9,16 +9,16 @@ services:
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
       TZ: Asia/Shanghai
     ports:
-      - "33306:3306"
+      - "5306:5306"
     volumes:
       # 数据持久化
-      - ./data/mysql-8.0.26/data:/var/lib/mysql
+      - ./data/mysql-8.4.10/data:/var/lib/mysql
       # 自定义配置文件
       - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
       # MySQL 首次启动初始化脚本(用户创建/远程授权)
       - ./mysql/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-P", "5306", "-uroot", "-p123456"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -28,13 +28,15 @@ services:
   redis:
     image: library/redis:8.6.4
     container_name: my-panel-redis
-    command: redis-server --appendonly yes
+    command: redis-server /usr/local/etc/redis/redis.conf
     ports:
-      - "6390:6379"
+      - "7379:7379"
     volumes:
-      - ./data/redis-7/data:/data
+      - ./data/redis-8.6.4/data:/data
+      # 自定义配置文件
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-p", "7379", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -53,26 +55,28 @@ services:
         condition: service_healthy
     environment:
       APP_JAR: admin/my-panel-admin.jar
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogback.configurationFile=/my-panel/admin/config/logback-spring.xml"
       CONFIG_ARGS: "--spring.config.additional-location=file:/my-panel/admin/config/"
       ROOT_DIR: /my-panel/admin
       APP_MODE: cluster
+      # 是否初始化sql脚本，never，mysql容器启动时会自动初始化
+      SPRING_SQL_INIT_MODE: never
       # 数据库连接(覆盖 common.properties 中的默认值)
-      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:3306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
-      COMMON_DATASOURCE_USERNAME: root
+      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:5306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+      COMMON_DATASOURCE_USERNAME: cq
       COMMON_DATASOURCE_PASSWORD: 123456
       # Redis 连接
       COMMON_REDIS_HOST: redis
-      COMMON_REDIS_PORT: 6379
+      COMMON_REDIS_PORT: 7379
       COMMON_REDIS_DATABASE: 0
       COMMON_REDIS_PASSWORD: ""
       # Proxy 服务地址(Admin通过Proxy转发请求到Agent)
-      PROXY_URL: http://proxy:9876
+      PROXY_URLS: http://proxy1:9876,http://proxy2:9877
     ports:
       - "8888:8888"
     volumes:
       - ./config/admin:/my-panel/admin/config:ro
-      - ./data/admin/logs:/my-panel/admin/logs
+      - ./data/admin/logs:/my-panel/admin/logs/admin
       - ./data/admin/uploadPath:/my-panel/admin/uploadPath
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
@@ -84,28 +88,65 @@ services:
       - my-panel-net
     restart: unless-stopped
 
-  proxy:
+  proxy1:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: my-panel-proxy
+    container_name: my-panel-proxy1
     depends_on:
       mysql:
         condition: service_healthy
     environment:
       APP_JAR: proxy/my-panel-proxy.jar
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
       CONFIG_ARGS: "--spring.config.additional-location=file:/my-panel/proxy/config/"
       ROOT_DIR: /my-panel/proxy
+      PROXY_REGISTRY_ADDRESS: ${HOST_IP}
+      PROXY_REGISTRY_PORT: 9876
+
       # 数据库连接(覆盖 common.properties 中的默认值)
-      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:3306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
-      COMMON_DATASOURCE_USERNAME: root
+      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:5306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+      COMMON_DATASOURCE_USERNAME: cq
       COMMON_DATASOURCE_PASSWORD: 123456
     ports:
       - "9876:9876"
     volumes:
       - ./config/proxy:/my-panel/proxy/config:ro
-      - ./data/proxy/logs:/my-panel/proxy/logs
+      - ./data/proxy/logs:/my-panel/proxy/logs/proxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9876/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - my-panel-net
+    restart: unless-stopped
+
+  proxy2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: my-panel-proxy2
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      APP_JAR: proxy/my-panel-proxy.jar
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
+      CONFIG_ARGS: " --spring.config.additional-location=file:/my-panel/proxy/config/"
+      ROOT_DIR: /my-panel/proxy
+      PROXY_REGISTRY_ADDRESS: ${HOST_IP}
+      PROXY_REGISTRY_PORT: 9877
+      # 数据库连接(覆盖 common.properties 中的默认值)
+      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:5306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+      COMMON_DATASOURCE_USERNAME: cq
+      COMMON_DATASOURCE_PASSWORD: 123456
+    ports:
+      - "9877:9876"
+    volumes:
+      - ./config/proxy:/my-panel/proxy/config:ro
+      - ./data/proxy2/logs:/my-panel/proxy/logs/proxy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9876/api/health"]
       interval: 30s

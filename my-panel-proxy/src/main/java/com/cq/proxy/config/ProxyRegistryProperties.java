@@ -11,4 +11,6 @@ public class ProxyRegistryProperties {
     private String zone;
     private int portRangeMin;
     private int portRangeMax;
+    private String address;
+    private Integer port;
 }

@@ -4,6 +4,7 @@ import com.cq.panel.common.constant.EnvNameConstant;
 import com.cq.panel.common.utils.IpUtils;
 import com.cq.proxy.dto.ServiceRegisterRequest;
 import com.cq.proxy.service.RegistryService;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.server.context.WebServerInitializedEvent;
@@ -29,17 +30,23 @@ public class ProxyServiceRegistration {
     private volatile ServiceRegisterRequest serviceRegisterRequest;
 
     public ProxyServiceRegistration(RegistryService registryService, ProxyRegistryProperties registryProperties) {
-    this.registryService = registryService;
-    this.registryProperties = registryProperties;
-  }
+        this.registryService = registryService;
+        this.registryProperties = registryProperties;
+    }
 
-  @EventListener
-  public void onPortReady(WebServerInitializedEvent event) {
-    try {
-      this.localHost = IpUtils.getLocalHost();
-      // 直接从事件中获取实际运行的端口
-      this.localPort = event.getWebServer().getPort();
+    @EventListener
+    public void onPortReady(WebServerInitializedEvent event) {
+        try {
 
+            if (registryProperties.getPort() != null &&
+                    !StringUtils.isEmpty(registryProperties.getAddress())) {
+                this.localHost = registryProperties.getAddress();
+                this.localPort = registryProperties.getPort();
+            } else {
+                this.localHost = IpUtils.getLocalHost();
+                // 直接从事件中获取实际运行的端口
+                this.localPort = event.getWebServer().getPort();
+            }
             ServiceRegisterRequest request = new ServiceRegisterRequest(
                     serviceName,
                     environmentName,

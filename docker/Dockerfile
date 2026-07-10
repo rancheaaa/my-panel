@@ -5,6 +5,7 @@ LABEL maintainer="my-panel"
 LABEL description="My-Panel Admin/Proxy"
 
 WORKDIR /my-panel
+ENV TZ=Asia/Shanghai
 
 # 复制两个 jar
 COPY my-panel-admin.jar /my-panel/admin/my-panel-admin.jar

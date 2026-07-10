@@ -83,7 +83,7 @@ My-Panel 是一个现代化的管理面板,基于 React 19 + Spring Boot 4 构�
    ├── mysql/
    │   ├── my.cnf               # MySQL 配置
    │   └── init/
-   │       └── init-mysql.sql   # MySQL 初始化脚本（root 远程授权）
+   │       └── 00-init-mysql.sql   # MySQL 初始化脚本（root 远程授权）
    ├── nginx/
    │   └── default.conf         # nginx 站点配置（前端 + API 反向代理）
    └── README.txt               # 本文档

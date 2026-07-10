@@ -19,6 +19,19 @@
             <includes>
                 <include>**/*</include>
             </includes>
+            <excludes>
+                <exclude>my-panel.sh</exclude>
+            </excludes>
+        </fileSet>
+
+        <!-- my-panel.sh 管理脚本(可执行权限) -->
+        <fileSet>
+            <directory>${project.basedir}/docker</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>my-panel.sh</include>
+            </includes>
+            <fileMode>0755</fileMode>
         </fileSet>
 
         <!-- admin 配置文件 -->
@@ -35,6 +48,31 @@
             </includes>
         </fileSet>
 
+        <!-- admin 配置文件 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-admin/src/main/resources</directory>
+            <outputDirectory>config/admin</outputDirectory>
+            <includes>
+                <include>application.yml</include>
+                <include>application-standalone.yml</include>
+                <include>application-cluster.yml</include>
+                <include>logback-spring.xml</include>
+                <include>common.properties</include>
+                <include>banner.txt</include>
+            </includes>
+        </fileSet>
+
+        <!-- admin 配置文件 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-admin/src/main/resources/sql</directory>
+            <outputDirectory>mysql/init</outputDirectory>
+            <includes>
+                <include>01-schema.sql</include>
+                <include>02-quartz.sql</include>
+                <include>03-data.sql</include>
+            </includes>
+        </fileSet>
+
         <!-- proxy 配置文件 -->
         <fileSet>
             <directory>${project.basedir}/my-panel-proxy/src/main/resources</directory>
@@ -42,6 +80,15 @@
             <includes>
                 <include>application.properties</include>
                 <include>logback-spring.xml</include>
+            </includes>
+        </fileSet>
+
+        <!-- proxy 配置文件 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-admin/src/main/resources</directory>
+            <outputDirectory>config/proxy</outputDirectory>
+            <includes>
+                <include>common.properties</include>
             </includes>
         </fileSet>
 

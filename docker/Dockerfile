@@ -1,5 +1,5 @@
 # === 阶段 1: 运行 ===
-FROM docker.1ms.run/amd64/eclipse-temurin:21-jdk-jammy
+FROM library/eclipse-temurin:21-jdk-jammy
 
 LABEL maintainer="my-panel"
 LABEL description="My-Panel Admin/Proxy"

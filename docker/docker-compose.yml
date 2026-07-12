@@ -161,9 +161,6 @@ services:
   nginx:
     image: library/nginx:1.27-alpine
     container_name: my-panel-nginx
-    depends_on:
-      admin:
-        condition: service_healthy
     ports:
       - "9999:80"
     volumes:

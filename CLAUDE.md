@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 13、**【重要】新增功能页面必须同步初始化菜单数据到data.sql中**：
 
 ```
-- 任何新增的前端功能页面，都必须在 `data.sql` 的 `sys_menu` 表中添加对应的菜单初始化数据
+- 任何新增的前端功能页面，都必须在 `03-data.sql` 的 `sys_menu` 表中添加对应的菜单初始化数据
     - 菜单结构必须包含三个层级：
   - **一级目录(M)**: 功能模块目录 (如：menu_id=2300, parent_id=0)
   - **二级菜单(C)**: 具体页面入口 (如：menu_id=2301, component='xxx/index')
@@ -94,7 +94,7 @@ Entry point: `com.cq.panel.admin.server.App`
 - **Controllers** extend `BaseController` for common response handling
 - **Entities** extend `BaseEntity` (provides createBy, createTime, updateBy, updateTime)
 - **MyBatis XML mappers** in `src/main/resources/mapper/` organized by domain (system/, rc/, architecture/, agent/, batch/, monitor/)
-- **SQL initialization**: `src/main/resources/sql/schema.sql` + `data.sql` (runs on startup via `spring.sql.init.mode`)
+- **SQL initialization**: `src/main/resources/sql/01-schema.sql` + `03-data.sql` (runs on startup via `spring.sql.init.mode`)
 - **Mode switching**: `app.mode` property controls standalone/cluster profile activation
 - **Auth**: `my-panel-auth-lite` provides `@RequirePermission` / `@RequireRole` annotations with AOP enforcement
 - **Password**: Frontend MD5+salt → Backend BCrypt double encryption

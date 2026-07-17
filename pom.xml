@@ -425,6 +425,21 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- 打包 Docker 部署文件 + jar 为 tar -->
+            <!-- 使用方式: 先在 my-panel-ui/ 执行 npm run build 生成 dist,再执行 -->
+            <!--           cd my-panel-ui;npm run build;cd ..;mvn install -DskipTests -pl my-panel-admin,my-panel-proxy;mvn assembly:single -N -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>${maven.assembly.plugin.version}</version>
+                <configuration>
+                    <descriptors>
+                        <descriptor>src/assembly/docker.xml</descriptor>
+                    </descriptors>
+                    <attach>false</attach>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 

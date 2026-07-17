@@ -21,7 +21,7 @@
 ### Task 0.1: 创建 batch_transfer_task 表结构
 
 **Files:**
-- Modify: `my-panel-admin/src/main/resources/sql/schema.sql`
+- Modify: `my-panel-admin/src/main/resources/sql/01-schema.sql`
 - Test: `my-panel-admin/src/test/java/com/cq/panel/admin/server/repository/domain/BatchTransferTaskTest.java`
 
 **描述:** 创建批量传输任务主表，包含所有必需字段和索引
@@ -103,7 +103,7 @@ void testNotNullConstraints() {
 ### Task 0.2: 创建 batch_transfer_subtask 表结构
 
 **Files:**
-- Modify: `my-panel-admin/src/main/resources/sql/schema.sql`
+- Modify: `my-panel-admin/src/main/resources/sql/01-schema.sql`
 - Test: `my-panel-admin/src/test/java/com/cq/panel/admin/server/repository/domain/BatchTransferSubtaskTest.java`
 
 **描述:** 创建批量子任务表，记录每个文件的传输实例
@@ -127,7 +127,7 @@ void testCompositeIndex_performance() { }
 ### Task 0.3: 创建 batch_sync_event 表结构
 
 **Files:**
-- Modify: `my-panel-admin/src/main/resources/sql/schema.sql`
+- Modify: `my-panel-admin/src/main/resources/sql/01-schema.sql`
 - Test: `my-panel-admin/src/test/java/com/cq/panel/admin/server/repository/domain/BatchSyncEventTest.java`
 
 **描述:** 创建事件队列表，用于Admin-Proxy异步通信

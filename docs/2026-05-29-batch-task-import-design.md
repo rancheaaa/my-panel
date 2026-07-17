@@ -312,7 +312,7 @@ sequenceDiagram
 
 ## 7. 菜单数据
 
-在 `data.sql` 的 `sys_menu` 表中新增：
+在 `03-data.sql` 的 `sys_menu` 表中新增：
 
 | menu_id | parent_id | menu_name | menu_type | perms | component | order_num |
 |---------|-----------|-----------|-----------|-------|-----------|-----------|

@@ -1,0 +1,192 @@
+services:
+  mysql:
+    image: library/mysql:8.4.10
+    container_name: my-panel-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: my-panel
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+      TZ: Asia/Shanghai
+    ports:
+      - "5306:5306"
+    volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+      # 数据持久化
+      - ./data/mysql-8.4.10/data:/var/lib/mysql
+      # 自定义配置文件
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      # MySQL 首次启动初始化脚本(用户创建/远程授权)
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-P", "5306", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - my-panel-net
+
+  redis:
+    image: library/redis:8.6.4
+    container_name: my-panel-redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7379:7379"
+    volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+      - ./data/redis-8.6.4/data:/data
+      # 自定义配置文件
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - my-panel-net
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile-admin
+    container_name: my-panel-admin
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogging.file.path=/my-panel/admin/logs -Dlogback.configurationFile=/my-panel/admin/config/logback-spring.xml"
+      CONFIG_ARGS: "--spring.config.additional-location=file:/my-panel/admin/config/"
+      ROOT_DIR: /my-panel/admin
+      APP_MODE: cluster
+      # 是否初始化sql脚本，never，mysql容器启动时会自动初始化
+      SPRING_SQL_INIT_MODE: never
+      # 数据库连接(覆盖 common.properties 中的默认值)
+      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:5306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+      COMMON_DATASOURCE_USERNAME: cq
+      COMMON_DATASOURCE_PASSWORD: 123456
+      # Redis 连接
+      COMMON_REDIS_HOST: redis
+      COMMON_REDIS_PORT: 7379
+      COMMON_REDIS_DATABASE: 0
+      COMMON_REDIS_PASSWORD: ""
+      # Proxy 服务地址(Admin通过Proxy转发请求到Agent)
+      PROXY_URLS: http://proxy1:9876,http://proxy2:9877
+    ports:
+      - "8888:8888"
+    volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/admin:/my-panel/admin/config:ro
+      - ./data/admin/logs:/my-panel/admin/logs/admin
+      - ./data/admin/uploadPath:/my-panel/admin/uploadPath
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - my-panel-net
+    restart: unless-stopped
+
+  proxy1:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    container_name: my-panel-proxy1
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogging.file.path=/my-panel/proxy/logs -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
+      CONFIG_ARGS: "--spring.config.additional-location=file:/my-panel/proxy/config/"
+      ROOT_DIR: /my-panel/proxy
+      PROXY_REGISTRY_ADDRESS: ${HOST_IP}
+      PROXY_REGISTRY_PORT: 9876
+
+      # 数据库连接(覆盖 common.properties 中的默认值)
+      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:5306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+      COMMON_DATASOURCE_USERNAME: cq
+      COMMON_DATASOURCE_PASSWORD: 123456
+    ports:
+      - "9876:9876"
+    volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/proxy:/my-panel/proxy/config:ro
+      - ./data/proxy/logs:/my-panel/proxy/logs/proxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9876/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - my-panel-net
+    restart: unless-stopped
+
+  proxy2:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    container_name: my-panel-proxy2
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogging.file.path=/my-panel/proxy/logs -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
+      CONFIG_ARGS: " --spring.config.additional-location=file:/my-panel/proxy/config/"
+      ROOT_DIR: /my-panel/proxy
+      PROXY_REGISTRY_ADDRESS: ${HOST_IP}
+      PROXY_REGISTRY_PORT: 9877
+      # 数据库连接(覆盖 common.properties 中的默认值)
+      COMMON_DATASOURCE_URL: jdbc:mysql://mysql:5306/my-panel?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&autoReconnect=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+      COMMON_DATASOURCE_USERNAME: cq
+      COMMON_DATASOURCE_PASSWORD: 123456
+    ports:
+      - "9877:9876"
+    volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/proxy:/my-panel/proxy/config:ro
+      - ./data/proxy2/logs:/my-panel/proxy/logs/proxy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9876/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - my-panel-net
+    restart: unless-stopped
+
+  # my-panel-ui 前端控制台:nginx 提供静态资源 + /api、/admin 反向代理到 admin
+  nginx:
+    image: library/nginx:1.27-alpine
+    container_name: my-panel-nginx
+    ports:
+      - "9999:80"
+    volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+      # 前端构建产物(my-panel-ui/dist)
+      - ./my-panel-ui/dist:/usr/share/nginx/html:ro
+      # nginx 站点配置
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - my-panel-net
+    restart: unless-stopped
+
+networks:
+  my-panel-net:
+    driver: bridge

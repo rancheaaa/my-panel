@@ -147,7 +147,7 @@ public class AgentConfig {
         // Agent ID
         this.agentId = getStringProperty("agent.id", null);
         if (this.agentId == null || this.agentId.isBlank()) {
-            this.agentId = UUID.randomUUID().toString();
+            this.agentId = UUID.randomUUID().toString().replace("-", "");
             logger.info("agent.id is not configured, generated a random UUID: {}", this.agentId);
         }
 

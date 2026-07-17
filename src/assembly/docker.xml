@@ -1,0 +1,113 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
+
+    <!-- 打包 Docker 部署文件 + jar 包为 tar -->
+    <id>docker</id>
+    <formats>
+        <format>tar</format>
+    </formats>
+
+    <!-- tar 内不包含基础目录前缀 -->
+    <includeBaseDirectory>false</includeBaseDirectory>
+
+    <fileSets>
+        <!-- Docker 配置文件目录(docker/ 下的所有文件,解压后直接在根目录) -->
+        <fileSet>
+            <directory>${project.basedir}/docker</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+            <excludes>
+                <exclude>my-panel.sh</exclude>
+            </excludes>
+            <lineEnding>unix</lineEnding>
+        </fileSet>
+
+        <!-- my-panel.sh 管理脚本(可执行权限) -->
+        <fileSet>
+            <directory>${project.basedir}/docker</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>my-panel.sh</include>
+            </includes>
+            <fileMode>0755</fileMode>
+            <lineEnding>unix</lineEnding>
+        </fileSet>
+
+        <!-- admin 配置文件 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-admin/src/main/resources</directory>
+            <outputDirectory>config/admin</outputDirectory>
+            <includes>
+                <include>application.yml</include>
+                <include>application-standalone.yml</include>
+                <include>application-cluster.yml</include>
+                <include>logback-spring.xml</include>
+                <include>common.properties</include>
+                <include>banner.txt</include>
+            </includes>
+            <lineEnding>unix</lineEnding>
+        </fileSet>
+
+        <!-- SQL 初始化脚本 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-admin/src/main/resources/sql</directory>
+            <outputDirectory>mysql/init</outputDirectory>
+            <includes>
+                <include>01-schema.sql</include>
+                <include>02-quartz.sql</include>
+                <include>03-data.sql</include>
+            </includes>
+            <lineEnding>unix</lineEnding>
+        </fileSet>
+
+        <!-- proxy 配置文件 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-proxy/src/main/resources</directory>
+            <outputDirectory>config/proxy</outputDirectory>
+            <includes>
+                <include>application.properties</include>
+                <include>logback-spring.xml</include>
+            </includes>
+            <lineEnding>unix</lineEnding>
+        </fileSet>
+
+        <!-- proxy 也需要 common.properties(spring.config.import 引用) -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-admin/src/main/resources</directory>
+            <outputDirectory>config/proxy</outputDirectory>
+            <includes>
+                <include>common.properties</include>
+            </includes>
+            <lineEnding>unix</lineEnding>
+        </fileSet>
+
+        <!-- my-panel-ui 前端构建产物(nginx 静态资源)
+             注意: 不设置 lineEnding,因为 dist 中包含图片/字体等二进制文件,转换会损坏 -->
+        <fileSet>
+            <directory>${project.basedir}/my-panel-ui/dist</directory>
+            <outputDirectory>my-panel-ui/dist</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+    </fileSets>
+
+    <files>
+        <!-- my-panel-admin.jar -->
+        <file>
+            <source>${project.basedir}/my-panel-admin/target/my-panel-admin-${project.version}.jar</source>
+            <outputDirectory>/</outputDirectory>
+            <destName>my-panel-admin.jar</destName>
+        </file>
+
+        <!-- my-panel-proxy.jar -->
+        <file>
+            <source>${project.basedir}/my-panel-proxy/target/my-panel-proxy-${project.version}.jar</source>
+            <outputDirectory>/</outputDirectory>
+            <destName>my-panel-proxy.jar</destName>
+        </file>
+    </files>
+</assembly>

@@ -95,8 +95,8 @@ spring:
       - optional:${ROOT_DIR:/tmp/my-panel/admin}/config/common.properties
   sql:
     init:
-      schema-locations: classpath:sql/schema.sql,classpath:sql/quartz.sql
-      data-locations: classpath:sql/data.sql
+      schema-locations: classpath:sql/01-schema.sql,classpath:sql/02-quartz.sql
+      data-locations: classpath:sql/03-data.sql
       # always never
       mode: ${SPRING_SQL_INIT_MODE:always}
       encoding: UTF-8

@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -117,7 +118,7 @@ public class BatchFileGenerator {
         if (!Files.exists(dir)) {
             return;
         }
-        try (var stream = Files.walk(dir).sorted((a, b) -> b.compareTo(a))) {
+        try (var stream = Files.walk(dir).sorted(Comparator.reverseOrder())) {
             for (Path p : (Iterable<Path>) stream::iterator) {
                 Files.deleteIfExists(p);
             }

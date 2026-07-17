@@ -30,8 +30,8 @@
 
 | 文件 | 修改内容 |
 |------|---------|
-| `resources/sql/schema.sql` | 新增batch_transfer_task_import建表语句 |
-| `resources/sql/data.sql` | 新增菜单数据 |
+| `resources/sql/01-schema.sql` | 新增batch_transfer_task_import建表语句 |
+| `resources/sql/03-data.sql` | 新增菜单数据 |
 | `repository/domain/BatchTransferTask.java` | 给JSON字段添加@Excel注解(type=IMPORT) |
 
 ### 前端新建文件
@@ -54,7 +54,7 @@
 ## Task 1: 临时表建表 + Entity + Mapper
 
 **Files:**
-- Modify: `my-panel-admin/src/main/resources/sql/schema.sql`
+- Modify: `my-panel-admin/src/main/resources/sql/01-schema.sql`
 - Create: `my-panel-admin/src/main/java/com/cq/panel/admin/server/repository/domain/BatchTransferTaskImport.java`
 - Create: `my-panel-admin/src/main/java/com/cq/panel/admin/server/repository/mapper/BatchTransferTaskImportMapper.java`
 - Create: `my-panel-admin/src/main/resources/mapper/batch/BatchTransferTaskImportMapper.xml`
@@ -142,7 +142,7 @@ Expected: BUILD SUCCESS
 - [ ] **Step 6: Commit**
 
 ```bash
-git add my-panel-admin/src/main/resources/sql/schema.sql my-panel-admin/src/main/java/com/cq/panel/admin/server/repository/domain/BatchTransferTaskImport.java my-panel-admin/src/main/java/com/cq/panel/admin/server/repository/mapper/BatchTransferTaskImportMapper.java my-panel-admin/src/main/resources/mapper/batch/BatchTransferTaskImportMapper.xml
+git add my-panel-admin/src/main/resources/sql/01-schema.sql my-panel-admin/src/main/java/com/cq/panel/admin/server/repository/domain/BatchTransferTaskImport.java my-panel-admin/src/main/java/com/cq/panel/admin/server/repository/mapper/BatchTransferTaskImportMapper.java my-panel-admin/src/main/resources/mapper/batch/BatchTransferTaskImportMapper.xml
 git commit -m "feat(batch): add batch_transfer_task_import table, entity and mapper"
 ```
 
@@ -340,10 +340,10 @@ git commit -m "test(batch): add BatchTaskImportServiceTest with comprehensive sc
 
 ---
 
-## Task 6: 菜单数据 + data.sql
+## Task 6: 菜单数据 + 03-data.sql
 
 **Files:**
-- Modify: `my-panel-admin/src/main/resources/sql/data.sql`
+- Modify: `my-panel-admin/src/main/resources/sql/03-data.sql`
 
 - [ ] **Step 1: 在data.sql中添加菜单数据**
 
@@ -360,8 +360,8 @@ Run: `mvn clean compile -pl my-panel-admin -q`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add my-panel-admin/src/main/resources/sql/data.sql
-git commit -m "feat(batch): add task import menu data to data.sql"
+git add my-panel-admin/src/main/resources/sql/03-data.sql
+git commit -m "feat(batch): add task import menu data to 03-data.sql"
 ```
 
 ---

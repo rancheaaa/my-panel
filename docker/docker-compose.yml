@@ -11,6 +11,8 @@ services:
     ports:
       - "5306:5306"
     volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
       # 数据持久化
       - ./data/mysql-8.4.10/data:/var/lib/mysql
       # 自定义配置文件
@@ -32,6 +34,8 @@ services:
     ports:
       - "7379:7379"
     volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
       - ./data/redis-8.6.4/data:/data
       # 自定义配置文件
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -46,7 +50,7 @@ services:
   admin:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-admin
     container_name: my-panel-admin
     depends_on:
       mysql:
@@ -54,8 +58,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      APP_JAR: admin/my-panel-admin.jar
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogback.configurationFile=/my-panel/admin/config/logback-spring.xml"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogging.file.path=/my-panel/admin/logs -Dlogback.configurationFile=/my-panel/admin/config/logback-spring.xml"
       CONFIG_ARGS: "--spring.config.additional-location=file:/my-panel/admin/config/"
       ROOT_DIR: /my-panel/admin
       APP_MODE: cluster
@@ -75,6 +78,8 @@ services:
     ports:
       - "8888:8888"
     volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
       - ./config/admin:/my-panel/admin/config:ro
       - ./data/admin/logs:/my-panel/admin/logs/admin
       - ./data/admin/uploadPath:/my-panel/admin/uploadPath
@@ -91,14 +96,13 @@ services:
   proxy1:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-proxy
     container_name: my-panel-proxy1
     depends_on:
       mysql:
         condition: service_healthy
     environment:
-      APP_JAR: proxy/my-panel-proxy.jar
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogging.file.path=/my-panel/proxy/logs -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
       CONFIG_ARGS: "--spring.config.additional-location=file:/my-panel/proxy/config/"
       ROOT_DIR: /my-panel/proxy
       PROXY_REGISTRY_ADDRESS: ${HOST_IP}
@@ -111,6 +115,8 @@ services:
     ports:
       - "9876:9876"
     volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
       - ./config/proxy:/my-panel/proxy/config:ro
       - ./data/proxy/logs:/my-panel/proxy/logs/proxy
     healthcheck:
@@ -126,14 +132,13 @@ services:
   proxy2:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile-proxy
     container_name: my-panel-proxy2
     depends_on:
       mysql:
         condition: service_healthy
     environment:
-      APP_JAR: proxy/my-panel-proxy.jar
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Dlogging.file.path=/my-panel/proxy/logs -Dlogback.configurationFile=/my-panel/proxy/config/logback-spring.xml"
       CONFIG_ARGS: " --spring.config.additional-location=file:/my-panel/proxy/config/"
       ROOT_DIR: /my-panel/proxy
       PROXY_REGISTRY_ADDRESS: ${HOST_IP}
@@ -145,6 +150,8 @@ services:
     ports:
       - "9877:9876"
     volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
       - ./config/proxy:/my-panel/proxy/config:ro
       - ./data/proxy2/logs:/my-panel/proxy/logs/proxy
     healthcheck:
@@ -164,6 +171,8 @@ services:
     ports:
       - "9999:80"
     volumes:
+      - # 同步宿主机时区
+      - /etc/localtime:/etc/localtime:ro
       # 前端构建产物(my-panel-ui/dist)
       - ./my-panel-ui/dist:/usr/share/nginx/html:ro
       # nginx 站点配置

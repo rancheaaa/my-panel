@@ -1,0 +1,25 @@
+# === Proxy 服务镜像 ===
+FROM library/eclipse-temurin:21-jdk-jammy
+
+LABEL maintainer="my-panel"
+LABEL description="My-Panel Proxy 代理服务"
+
+WORKDIR /my-panel/proxy
+ENV TZ=Asia/Shanghai
+
+# 复制 proxy jar
+COPY my-panel-proxy.jar /my-panel/proxy/my-panel-proxy.jar
+
+# 暴露端口:9876(proxy)
+EXPOSE 9876
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8"
+# CONFIG_ARGS 由 docker-compose 注入,指定外部配置文件路径
+#   --spring.config.additional-location=file:/my-panel/proxy/config/
+ENV CONFIG_ARGS=""
+
+# proxy 健康检查
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:9876/api/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /my-panel/proxy/my-panel-proxy.jar $CONFIG_ARGS"]

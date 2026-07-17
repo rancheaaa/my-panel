@@ -1,0 +1,25 @@
+# === Admin 服务镜像 ===
+FROM library/eclipse-temurin:21-jdk-jammy
+
+LABEL maintainer="my-panel"
+LABEL description="My-Panel Admin 管理后台"
+
+WORKDIR /my-panel/admin
+ENV TZ=Asia/Shanghai
+
+# 复制 admin jar
+COPY my-panel-admin.jar /my-panel/admin/my-panel-admin.jar
+
+# 暴露端口:8888(admin web)
+EXPOSE 8888
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8"
+# CONFIG_ARGS 由 docker-compose 注入,指定外部配置文件路径
+#   --spring.config.additional-location=file:/my-panel/admin/config/
+ENV CONFIG_ARGS=""
+
+# admin 健康检查(Actuator /actuator/health 端点)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8888/actuator/health || exit 1
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /my-panel/admin/my-panel-admin.jar $CONFIG_ARGS"]
